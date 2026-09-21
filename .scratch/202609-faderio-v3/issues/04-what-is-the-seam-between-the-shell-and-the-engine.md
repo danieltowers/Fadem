@@ -39,3 +39,17 @@ interface is the thing being designed.
 ## Answer
 
 _(pending)_
+
+## Noted from ticket 03
+
+[Ticket 03](03-what-position-does-set-from-here-capture.md) settled that **playhead** and
+**decode position** are distinct types, so a mix-up does not compile — but scoped that
+deliberately to the position quantities and left the general question here.
+
+v2's *other* headline defect was frames-versus-samples confusion (`FramesToSamplesProvider`),
+which is the same disease: two frame counts in different units sharing a type. Whether the
+seam should carry typed units generally — frames, samples, device bytes, engine frames — is
+this ticket's call.
+
+Ticket 03 also grew the seam: `IAudioOutput` gains a member reporting frames actually emitted
+by the device, because as written it carries no position or latency fact at all.

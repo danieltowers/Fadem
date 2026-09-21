@@ -52,6 +52,15 @@ heard. Every session should keep asking whether the current work could fail that
   71 ms; **FLAC silently discards the authored fade-in point entirely** because the engine
   seeks before its first read. Variable-bitrate MP3 remains unmeasured.
 
+- [What position does "set from here" capture?](issues/03-what-position-does-set-from-here-capture.md):
+  Two position quantities, distinct types, only one public. The **playhead** (where the
+  listener is *now*) is all the shell ever sees: displayed, scrubbed, captured. The **decode
+  position** stays engine-internal for scheduling. The playhead is derived at the output
+  boundary from a *measured* device clock, not the latency constants. Position belongs to a
+  **voice**, never the player, so during a crossfade the outgoing voice stays attended until
+  it falls silent. Capture stores the honest value; no reaction-time compensation.
+  Recorded as [ADR 0001](../../docs/adr/0001-playhead-from-the-device-clock.md).
+
 ## Not yet specified
 
 - **Restaging the rest of Phase 1.** Once the slice is trustworthy, how the remaining
@@ -66,6 +75,10 @@ heard. Every session should keep asking whether the current work could fail that
   touches the store format.
 - **What happens to v2's transition store data**, if the user has authored anything worth
   keeping.
+- **Where the audible-time discipline stops.** Ticket 03 put the playhead, the seek bar, the
+  time readout and the visualiser on audible time. Whether *every* user-visible signal owes
+  the same honesty — end-of-track notifications, queue advance, ReplayGain switchover — is
+  unexamined, and only some of those surfaces exist yet.
 - **Audio paths still unmeasured.** Between them, tickets 01 and 02 could not cover AIFF,
   8-bit WAV, sources with more than two channels, the WASAPI exclusive resampling path, real
   music as opposed to test signals, files longer than eight seconds, or seek accuracy at rates

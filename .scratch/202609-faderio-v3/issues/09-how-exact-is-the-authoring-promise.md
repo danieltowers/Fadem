@@ -56,3 +56,19 @@ positional accuracy. They may want answering together.
 ## Answer
 
 _(pending)_
+
+## Noted from ticket 03
+
+[Ticket 03](03-what-position-does-set-from-here-capture.md) moved the playhead onto a measured
+device clock (`IWavePosition.GetPosition()`) rather than the 100/50/150 ms constants. That
+leaves one **known, unmeasured residue** for this ticket to price:
+
+`GetPosition()` reports bytes on the *output* stream. Under WASAPI-exclusive that stream is
+post-resampler at device rate, so the resampler's internal buffering adds a skew that the
+device counter does not account for. `AudioClient.AudioClockClient` (the true hardware clock)
+is strictly more precise and remains available if this residue turns out to matter.
+
+Also relevant: ticket 03 settled that capture does **not** compensate for human reaction time
+(150-250 ms), on the grounds that a stored point must equal the measured one. That puts the
+dominant source of authoring error firmly in the human, not the engine — which this ticket
+should account for when deciding how exact the promise actually needs to be.
