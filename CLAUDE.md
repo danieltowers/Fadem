@@ -14,6 +14,20 @@ Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 
 Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+## Where logic belongs
+
+Three mechanical tests, checkable by reading a diff. A change that fails one belongs in the
+engine, not the shell. Decided in wayfinder ticket 04.
+
+1. **One user intent is one engine call.** If the shell sequences two engine members to do one
+   thing the user asked for, the intent is missing from the engine.
+2. **The shell formats engine values; it never computes from them.** If a number needs
+   arithmetic, the engine returns the result.
+3. **The shell holds no engine state between calls.** It reads, renders, forgets.
+
+Frames never cross the shell seam: externally `Playhead`, `Point`, `Length` and `TimeSpan`;
+`Frames` appears only on `IAudioOutput`.
+
 ## Verification
 
 - Run `dotnet test` before every commit and **state the result in the commit message**

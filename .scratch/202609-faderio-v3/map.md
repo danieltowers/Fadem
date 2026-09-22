@@ -85,6 +85,13 @@ asking whether the current work could fail that way again.
   every commit, reported in the message, by discipline not hook.
   Recorded as [ADR 0002](../../docs/adr/0002-six-seams.md).
 
+- [What is the seam between the shell and the engine?](issues/04-what-is-the-seam-between-the-shell-and-the-engine.md):
+  A command surface and an immutable `View`, nothing else. No live collection crosses the
+  seam; every command is total; state is published after the lock through an `IEngineSink`
+  the shell supplies. Rows keyed by engine-issued `RowId`. Frames never cross the shell seam.
+  `Author()` reschedules a pending boundary. Reached by Design It Twice — four designs
+  converged on the substance and differed only in packaging. Placement rule in `CLAUDE.md`.
+
 ## Not yet specified
 
 - **Restaging the rest of Phase 1.** Once the slice is trustworthy, how the remaining
@@ -93,7 +100,9 @@ asking whether the current work could fail that way again.
   whether those are reusable as written is unknown until the slice lands.
 - **The fate of the preview feature.** v2 built it with its own mixer and its own output
   device. Whether that is the right design, or whether preview should just be the offline
-  render played back, is unclear until the render harness exists.
+  render played back, is unclear until the render harness exists. Ticket 04 added a
+  constraint: a second engine over its own output cannot open WASAPI-exclusive twice, so
+  "preview as a second engine" is unavailable in that mode.
 - **Stable track identity.** The store keys transitions by full file path. v2's spec deferred
   real identity to Phase 2 but claimed the schema could absorb the change. Untested, and it
   touches the store format.
@@ -102,9 +111,6 @@ asking whether the current work could fail that way again.
   20 s fade. Schema version 1, keyed by ordered full path pair, reads cleanly. The open part is
   now narrower: v3 reuses the same store and would share that path, so whether the two builds
   can coexist on one machine without schema drift is unexamined.
-- **How the slice is actually built, and in what order.** Ticket 05 fixed *what* is in it and
-  ticket 06 fixed how it is verified; the build decomposition now waits only on the seam
-  (ticket 04). Deliberately not pre-sliced.
 - **Where the audible-time discipline stops.** Ticket 03 put the playhead, the seek bar, the
   time readout and the visualiser on audible time. Whether *every* user-visible signal owes
   the same honesty — end-of-track notifications, queue advance, ReplayGain switchover — is

@@ -47,3 +47,13 @@ The questions to settle:
 ## Answer
 
 _(pending)_
+
+## Noted from ticket 04
+
+A strong signal, recorded not decided: **four independent interface designers, given no
+steer on length, all chose the decoded length**, issued by the engine via an internal `Track`
+constructor, learned by opening the file at add time. All four also named the cost: adding a
+folder is slower than v2's tag read.
+
+The seam commits only to *engine-issued* length — `Track` cannot be constructed by the shell —
+which holds whichever way this ticket goes. But the unanimous default is worth weighing.

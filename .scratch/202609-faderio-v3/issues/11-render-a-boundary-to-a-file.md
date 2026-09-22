@@ -61,3 +61,10 @@ Two additions to "done":
 
 The S3 end-to-end tests themselves run against the fake, in memory, for speed; this harness is
 for the human and for that one round-trip test.
+
+## Noted from ticket 04
+
+The shape is decided: `Renderer.RenderBoundary(Adjacency a, ITransitionStore store, string wavPath)`,
+a static entry point with no engine event plumbing, driving a `WavFileAudioOutput` adapter
+that drains synchronously. The harness passes an in-memory or temp-path `ITransitionStore` so
+it never touches the user's file. `IEngineSink` gets a `RecordingSink` or console adapter here.

@@ -109,3 +109,18 @@ Test-suite work that lands with the migration:
   across 16/24-bit × 44.1/48/96 kHz × mono/stereo; FLAC cells from checked-in fixtures with the
   generating ffmpeg script beside them. The purity and seek-round-trip methods are documented
   in tickets 01 and 02 — their code did not survive and is rebuilt here.
+
+## Noted from ticket 04
+
+Three things the seam decision hands to the migration:
+
+- **`Track` gets an internal constructor.** Only the engine issues a `Track`, so the shell can
+  never fabricate a length. Which length the engine issues is ticket 10's call.
+- **An internal `Frames` type** distinct from sample counts, as engine discipline. v2's
+  frames-vs-samples bug lived inside the engine at the output adapter; this is where the type
+  goes. Publicly, `Frames` appears only on `IAudioOutput`.
+- **`ITransitionStore` stays as-is** and is handed to the engine. `Author()` lives on the
+  engine and writes through it; the shell holds the store only to construct the engine.
+
+This ticket is now unblocked and is the gate on [12](12-rework-the-engine-seam.md), [14](14-fill-the-real-input-matrix.md)
+and, through 12 and 11, [13](13-build-the-shell.md). It is the next thing to build.
