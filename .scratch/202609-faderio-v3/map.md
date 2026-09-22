@@ -83,6 +83,7 @@ asking whether the current work could fail that way again.
   checked in; FLAC seek pinned at 40 ms pending ticket 09. Smoke checklist at `docs/smoke.md`,
   split into a Looks half the agent runs and a Sounds half the user runs. `dotnet test` before
   every commit, reported in the message, by discipline not hook.
+  Recorded as [ADR 0002](../../docs/adr/0002-six-seams.md).
 
 ## Not yet specified
 
