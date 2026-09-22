@@ -60,3 +60,16 @@ The real-input matrix is shaped so that **a format is one row**: format × rate 
 channels, three assertions per cell (completeness, purity, seek round-trip). Whatever this
 ticket promises, adding it to the suite is adding rows and, for compressed formats, checking in
 a fixture. The matrix is the promise's enforcement, so the two should be written together.
+
+## Noted from ticket 07
+
+Two decoder facts measured while building the matrix skeleton, both for this ticket's promise:
+
+- **NVorbis 0.10.5 cannot seek into an Ogg file paged by ffmpeg's defaults.** Sequential
+  decode is fine; any seek throws `GranulePos mismatch`, with both `libvorbis` and ffmpeg's
+  native encoder. Files with short pages (oggenc-style, or `-page_duration 10000`) seek within
+  40 ms. Ticket 02's "effectively exact" OGG was on a compatible file. So OGG support as it
+  stands is "some files" — a promise this ticket has to make honestly or fix (newer NVorbis,
+  or a different decoder).
+- **Media Foundation FLAC decodes faithfully** — a suspected −3 dB attenuation turned out to be
+  the fixture. Recorded so it is not re-suspected.

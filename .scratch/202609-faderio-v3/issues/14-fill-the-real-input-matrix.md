@@ -37,3 +37,14 @@ permanent tests, per the map's research rule.
 ## Answer
 
 _(pending)_
+
+## Noted from ticket 07
+
+The skeleton exists: `RealInputMatrixTests` with all twelve WAV cells green on three assertions,
+plus FLAC and OGG at 44.1 kHz stereo 16-bit. What this ticket adds is the compressed grid.
+Tools already there: `TestAudio.WriteWavAt` (any rate/depth/channels, extensible header for
+24-bit), `TestAudio.Purity` (Goertzel at an exact bin — window must hold whole cycles),
+`Landing()` (self-calibrating seek measure; do not assume fixture gain, the ffmpeg upmix writes
+−3 dB), and `Fixtures/generate.sh` (one ffmpeg line per fixture; Ogg needs `-page_duration
+10000` or NVorbis will not seek). Pink-noise cross-correlation from ticket 02 is still unbuilt;
+the ramp method has served so far.

@@ -4,7 +4,7 @@ using Faderio.Core.Transitions;
 namespace Faderio.Core.Tests;
 
 /// <summary>
-/// The on-disk shape of transitions.json (ADR 0003 in v2, carried over). Two quirks ticket 05's
+/// The on-disk shape of transitions.json (ADR 0006, imported from v2). Two quirks ticket 05's
 /// survey found: the computed IsEmpty leaked into the file, and Curve serialised as a bare
 /// integer. The user's real v2 file has both, so loading that shape must keep working.
 /// </summary>

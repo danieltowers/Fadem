@@ -40,3 +40,9 @@ control does.
 ## Answer
 
 _(pending)_
+
+## Noted from ticket 07
+
+The second test project (`net8.0-windows`, referencing `Faderio.App`) was deferred to here: it
+cannot exist before the shell does. `InternalsVisibleTo("Faderio.Core.Tests")` is already on
+Core; add the App project's own when it appears.

@@ -1,7 +1,7 @@
 # Migrate Faderio.Core into v3
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: 01, 05
 
 ## Question
@@ -66,7 +66,85 @@ decides whether the store, ReplayGain and preview code come along now or later.
 
 ## Answer
 
-_(pending)_
+**Done. v3 has a compiling, tested core: 141 tests pass, up from a true baseline of 92, with
+every known defect repaired red-first and the real-input matrix started.**
+
+### What was done
+
+**Imported verbatim, then repaired — two commits.** The import (`8bc92c4`) copies
+`src/Faderio.Core` and `tests/Faderio.Core.Tests` from v2 commit `91cb980` unchanged, minus
+`bin/`, `obj/`, the 31 checked-in `.trx` artefacts, and `UnitTest1.cs`. `Directory.Build.props`
+as-is; `faderio.sln` new; `.gitignore` gains v2's entries (which v2 had and ignored).
+`src/Faderio.App` deliberately not imported. The repairs are a separate commit so each is a
+reviewable diff against a green baseline.
+
+**The true test count is 92**, not 86 (stale log), 87 (attribute count) or 93 (estimate). The
+87 `[Fact]`/`[Theory]` attributes expand to 92 cases.
+
+**Stack unchanged.** `net8.0` builds under the 9.0.318 SDK with the 8.0.31 runtime present.
+No TFM change.
+
+### Repairs, each red before green
+
+| Defect | Fix | Regression test |
+|---|---|---|
+| **A** — `NormalizedTrackSource.Position` inverted, files above 44.1 kHz end early | two operators swapped | completeness and seek-halfway at 48/96 kHz; `Engine_PlaysWholeTrack_ThenFallsSilent` |
+| **B** — no `Extensible` case, 24-bit WAVs silent | resolve the sub-format GUID from `WaveFormatExtraData` byte 6 | every 24-bit cell (all three assertions) |
+| **C** — Vorbis seek-before-read throws | **not reproducible as stated**; ctor touches the length anyway | `Ogg_SeekBeforeFirstRead_DoesNotThrow_AndLands` |
+| **FLAC** — Media Foundation drops a seek before its first read | warm-up read on first seek | `Flac_SeekBeforeFirstRead_LandsWithin100ms_PendingTicket09` |
+| `IsEmpty` leaks into JSON | `[JsonIgnore]` | file text does not contain it |
+| `Curve` serialises as an integer | `JsonStringEnumConverter` | by name; v2's exact integer shape still loads |
+
+Plus `Track` gets an `internal` constructor (ticket 04) and `InternalsVisibleTo` for the tests.
+
+### Three things measured that were not known
+
+1. **Defect C is really an encoder-compatibility issue.** Seek order makes no difference to
+   NVorbis 0.10.5. What it rejects — with `GranulePos mismatch`, on *any* seek, sequential
+   decode fine — is **ffmpeg's default 1 s Ogg page duration**. With 10 ms pages it seeks
+   within 40 ms. Ticket 02's "effectively exact" OGG result was on a compatible file. Real-world
+   files paged by ffmpeg's defaults will not seek in this player. → ticket 08.
+2. **FLAC seek lands +67 ms late** after the warm-up, on this fixture, independent of warm-up
+   size (1 frame or 4096). Ticket 02 saw 31 ms on its own 8 s file. Pinned at 100 ms. → ticket 09.
+3. **A false finding, caught.** An early version of the landing measure assumed the fixture's
+   peak and reported FLAC 392 ms *early* and OGG ~430 ms early — two unrelated decoders, one
+   offset, which was the tell. ffmpeg's `-ac 2` upmix writes these fixtures at −3 dB; a raw
+   byte read of the WAV confirmed it. The landing measure now self-calibrates against a
+   sequential decode of the same file — ticket 02's ground-truth method — and assumes no gain.
+   Recorded in the fixture script so nobody "fixes" the decoders for it.
+
+### The matrix skeleton (seam S2)
+
+`RealInputMatrixTests`: WAV cells generated at test time via `TestAudio.WriteWavAt` across
+16/24-bit × 44.1/48/96 kHz × mono/stereo (24-bit with an extensible header, as tools write it),
+three assertions per cell — **completeness** (frames read equals expected, and `Position` equals
+`TotalFrames` after exhaustion), **purity** (`TestAudio.Purity`, Goertzel at an exact bin,
+≥ 0.999), **seek** (halfway-then-count on every cell; exact ramp landing at 44.1 kHz). Compressed
+cells from three checked-in fixtures (58 KB: `tone-1k.flac`, `ramp.flac`, `ramp.ogg`) with
+`Fixtures/generate.sh` beside them. `Landing()` reports what the decoder did in its failure
+message. Ticket 14 fills the grid.
+
+### Not done here, and why
+
+- **Internal `Frames` type** — belongs with the seam rework ([ticket 12](12-rework-the-engine-seam.md)),
+  where `FramesEmitted` is introduced; doing it during migration would be the redesign the
+  ticket forbids.
+- **Second test project for the shell** — cannot exist before the shell does. Lands with
+  [ticket 13](13-build-the-shell.md).
+- **v2's ADRs** — imported as 0004–0006 with a provenance line, since the store they describe
+  is the one we reuse. `CONTEXT.md` was already carried over in ticket 03.
+
+### Facts this rests on
+
+- `WaveFileReader` returns `WaveFormatExtraData`, not `WaveFormatExtensible`, for an extensible
+  header; the sub-format GUID is at offset 6 of `ExtraData`.
+- NVorbis 0.10.5 + ffmpeg default paging: `GranulePos mismatch: Page 3` on seek, both
+  `libvorbis` and native `vorbis` encoders; `-page_duration 10000` seeks cleanly.
+- Media Foundation FLAC: seek before first read dropped; after warm-up, +67 ms on a 2 s file.
+- swresample mono→stereo upmix: 0.707 gain. Raw s16 at frame 66150 of the ramp: 15638 (0.477),
+  not 22118 (0.675).
+
+Commits: `8bc92c4` (import), then the repairs. Tests: 141 passed, 0 failed.
 
 ## Noted from ticket 05
 

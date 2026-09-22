@@ -100,3 +100,18 @@ Two numbers this ticket now owns:
   ≤ 40 ms (31 measured plus margin), named `Flac_SeekLandsWithin40ms_PendingTicket09`. When
   this ticket sets the real promise, that test is the one place that changes. It is
   deliberately green-and-documented rather than red-and-ignored.
+
+## Noted from ticket 07
+
+The pinned numbers, now measured on v3's own fixtures rather than inherited:
+
+- **FLAC: +67 ms late** after the warm-up read, on a 2 s ffmpeg-encoded file, independent of
+  warm-up size. Pinned at **100 ms** (`Flac_SeekBeforeFirstRead_LandsWithin100ms_PendingTicket09`).
+  Ticket 02's 31 ms was a different file; the residual is file-dependent, which is itself a
+  fact for this ticket.
+- **OGG: within 40 ms** on a short-paged file, seek order irrelevant.
+- **WAV: exact** at 44.1 kHz (ramp landing within 1 ms); ±100 frames on the resampled cells.
+
+`RealInputMatrixTests.Landing()` is the measuring instrument: ground truth from a sequential
+decode of the same file, so it assumes no encoder gain. Its failure message prints what the
+decoder did. Tighten the pins here when this ticket decides.

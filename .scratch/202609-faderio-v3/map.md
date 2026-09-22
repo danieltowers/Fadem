@@ -93,6 +93,14 @@ asking whether the current work could fail that way again.
   converged on the substance and differed only in packaging. Placement rule in `CLAUDE.md`.
   Recorded as [ADR 0003](../../docs/adr/0003-command-surface-and-view.md).
 
+- [Migrate Faderio.Core into v3](issues/07-migrate-faderio-core-into-v3.md):
+  Done. Core and tests imported verbatim (true baseline **92**), then the four known defects
+  repaired red-first with regression cells, the store's serialisation quirks fixed, and the
+  real-input matrix started: **141 tests pass**. Measured along the way: NVorbis rejects
+  ffmpeg's default Ogg paging on any seek; FLAC seek lands +67 ms late after the warm-up,
+  pinned at 100 ms; and a −3 dB fixture level that nearly became a false decoder finding.
+  v2's three ADRs imported as 0004–0006.
+
 ## Not yet specified
 
 - **Restaging the rest of Phase 1.** Once the slice is trustworthy, how the remaining
