@@ -69,3 +69,19 @@ cell list in "What done means" above is amended as follows:
 
 Each theory name in the doc's "Proven by" column must exist verbatim when this ticket closes,
 and the doc's Status column flips from "pending ticket 14" to "proven" in the same commit.
+
+## Noted from ticket 09
+
+The tolerance is set: **1 ms landing at every promised cell.** Consequences for this ticket:
+
+- The seek-landing theory asserts 1 ms on every WAV, FLAC and MP3 cell. No pinned
+  characterisation values remain once ticket 15 lands; if a cell cannot reach 1 ms, its row
+  leaves `docs/supported-audio.md` rather than the tolerance widening. The VBR MP3 pin from
+  ticket 08's note is the one permitted exception, and only until ticket 09's owner decides.
+- **FLAC cells decode through `BunLabs.NAudio.Flac`** after ticket 15. If this ticket runs first,
+  the FLAC seek cells will fail at 1 ms on Media Foundation; leave them red with a
+  `PendingTicket15` name rather than loosening them, and land the rest of the grid.
+- The ±100-frame allowance on resampled WAV cells is a resampler landing question, not a
+  decoder one; ticket 08 decided the engine compensates known resampler latency rather than
+  the tolerance absorbing it. Measure it, and if it is a constant, that constant is a finding
+  for ticket 12.

@@ -68,3 +68,17 @@ ticket's "done", all engine-side; see `docs/supported-audio.md` and ADRs 0007 an
   doc's Rejected table.
 
 Play-time failures (corrupt frame, device gone) are one `Notice` and a skip, never per block.
+
+## Noted from ticket 09
+
+Two amendments from [ticket 09](09-how-exact-is-the-authoring-promise.md):
+
+- **The S3 acceptance test tightens from 5 ms to 1 ms.** The promise is 1 ms everywhere, and on
+  the fake output with WAV there is no resampler and no decoder inexactness for 5 ms to absorb.
+  A failure at 1 ms is a finding, not a tolerance problem.
+- **The decoder switch is now ticket 15's**, not this one's. Ticket 08's note above said the
+  `MediaFoundationReader` catch-all becomes an explicit `.flac` case; ticket 09 went further and
+  removed Media Foundation from the chain, with FLAC on `BunLabs.NAudio.Flac`. Ticket 15 makes
+  that change to `AudioSources.cs`. This ticket still owns the **probe and the structured
+  rejection**; until 15 lands, the probe may treat `.flac` as promised and leave the decoder
+  alone. Whichever lands second reconciles the factory switch.

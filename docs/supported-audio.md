@@ -18,13 +18,19 @@ Nothing plays on a best-effort basis.
 A file is promised when its format, sample rate, bit depth and channel count all appear in one
 row. Every promised cell is proven three ways through the production decoder chain:
 **completeness** (every frame the file holds is rendered), **purity** (a test tone comes out as
-that tone) and **seek landing** (a seek lands where it was asked to, within the tolerance
-[ticket 09](../.scratch/202609-faderio-v3/issues/09-how-exact-is-the-authoring-promise.md) sets).
+that tone) and **seek landing** (a seek lands where it was asked to, within the tolerance below).
+
+**Tolerance: 1 ms, at every promised cell, globally.** An authored point plays within 1 ms of
+where it was placed, on every format, rate, depth and channel count in the table. There is no
+per-format or per-transition tolerance. Set in
+[ticket 09](../.scratch/202609-faderio-v3/issues/09-how-exact-is-the-authoring-promise.md),
+recorded in [ADR 0009](adr/0009-authoring-exactness-is-bought-in-the-decoder.md). A cell that
+cannot reach it leaves this table; the tolerance never widens to meet a cell.
 
 | Format | Sample rates | Bit depths | Channels | Proven by | Status |
 |---|---|---|---|---|---|
 | WAV (PCM) | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | `Wav_ReadsToCompletion`, `Wav_ToneIsPure`, `Wav_SeekHalfway_ReadsHalfTheFrames` over `WavCells()` | proven (12 cells) |
-| FLAC | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | `Flac_*` theories over `FlacCells()`, same three assertions | 44.1 kHz / 16-bit / stereo proven; the other 11 cells land in [ticket 14](../.scratch/202609-faderio-v3/issues/14-fill-the-real-input-matrix.md) |
+| FLAC | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | `Flac_*` theories over `FlacCells()`, same three assertions | 44.1 kHz / 16-bit / stereo: completeness and purity proven, seek landing **pinned at 100 ms until [ticket 15](../.scratch/202609-faderio-v3/issues/15-make-flac-seek-exact.md) swaps the decoder**; the other 11 cells land in [ticket 14](../.scratch/202609-faderio-v3/issues/14-fill-the-real-input-matrix.md) |
 | MP3, constant bitrate with a Xing/Info header | 44.1, 48 kHz | n/a (decodes to PCM) | mono, stereo | `Mp3_*` theories over `Mp3Cells()`, variant `CbrInfo` | pending ticket 14 |
 | MP3, constant bitrate with no Xing/Info/VBRI header | 44.1, 48 kHz | n/a | mono, stereo | same theories, variant `CbrBare` | pending ticket 14 |
 | MP3, variable bitrate | 44.1, 48 kHz | n/a | mono, stereo | same theories, variant `Vbr` | pending ticket 14; if seek landing misses the tolerance the cell is pinned and ticket 09 owns the fix |
@@ -40,6 +46,11 @@ before then, and those files are rejected.
 is resampled once, on the way in. Authoring exactness is the same at every promised rate:
 the seek-landing assertion runs per rate with one tolerance, and the engine compensates the
 resampler's known latency if it has to.
+
+**Decoders.** WAV through NAudio's `WaveFileReader`, MP3 through `Mp3FileReader`, FLAC through
+`BunLabs.NAudio.Flac` (from ticket 15; Media Foundation until then). Windows Media Foundation is
+not in the production chain: its FLAC decoder is undocumented and lands seeks on the next block
+boundary. Every decoder that remains is open source, so a red cell can be read to its cause.
 
 **Length.** Length is a property of a file, not a format, so it is not a column. The matrix
 fixtures are two seconds long; long-file playback is not proven by the suite. The library's
@@ -58,7 +69,7 @@ particular:
 | 8-bit, 32-bit integer and 32-bit float PCM | Studio intermediates, not library formats. Unproven. | A row each, if anyone has one. |
 | Sample rates other than 44.1, 48 and 96 kHz | Unproven. The resampler would very likely cope, but "very likely" is not a row. | A row per rate; WAV rows are free to generate. |
 | AIFF | A reader exists but nobody has a file. Unproven. | One row and an ffmpeg fixture. |
-| M4A / AAC, WMA | Ticket 02 measured seek error up to 15 ms and 71 ms and both misreport their own length. | After ticket 09 decides whether inexact seek is ever acceptable. |
+| M4A / AAC, WMA | Ticket 02 measured seek error up to 15 ms and 71 ms and both misreport their own length. The promise is 1 ms. | Only a decoder that seeks them exactly; Media Foundation, the one that exists, does not. Nobody has asked. |
 | Ogg Vorbis | NVorbis 0.10.5 cannot seek into any file paged by ffmpeg's defaults (ticket 07). The reader is deleted rather than kept broken. | A research ticket on a decoder that seeks any Ogg, if the format is ever wanted. |
 | Opus, DSD, anything else | No reader, no row. | A row. |
 

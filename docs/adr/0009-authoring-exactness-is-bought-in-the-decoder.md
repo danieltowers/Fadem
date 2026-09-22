@@ -1,0 +1,56 @@
+# Authoring exactness is 1 ms, bought in the decoder, not the mixer
+
+Status: accepted
+
+The spec promised sample-accurate transitions and v2 could not keep it: FLAC, the user's whole
+library, ignored the authored fade-in point entirely, and after a workaround still landed 67 ms
+late. The promise is now **1 ms at every promised cell**, one global number in
+[`docs/supported-audio.md`](../supported-audio.md), and it is met by making every promised
+decoder seek to the sample rather than by buffering around an inexact one or documenting a
+tolerance. FLAC moves from Windows Media Foundation to a managed decoder
+(`BunLabs.NAudio.Flac`, a re-port of CSCore's) that pre-scans frame headers on open and trims to
+the exact sample on seek. Media Foundation leaves the production chain entirely.
+
+Decided in [ticket 09](../../.scratch/202609-faderio-v3/issues/09-how-exact-is-the-authoring-promise.md),
+built in [ticket 15](../../.scratch/202609-faderio-v3/issues/15-make-flac-seek-exact.md).
+
+## Why 1 ms and why global
+
+The human error at capture is 150 to 250 ms and is deliberately uncompensated ([ADR 0001](0001-playhead-from-the-device-clock.md)),
+so the engine's job is to never add to it. 1 ms is below anything audible, below one MP3 frame
+and below one FLAC block. A per-transition tolerance was considered and rejected: at 1 ms there
+is nothing to relax, and it would be UI and store complexity describing an engine shortcoming
+the engine should not have.
+
+## Considered options
+
+**Keep Media Foundation and document 100 ms for FLAC.** Rejected: audibly late on a hit, on the
+one format the user authors in. Microsoft documents `SetCurrentPosition` as inexact and tells
+the caller to advance to the target itself; NAudio's reader receives each sample's timestamp and
+ignores it; the FLAC decoder inside Media Foundation is undocumented.
+
+**Our own Media Foundation reader that seeks early and trims by timestamp.** Kept as the
+fallback. Rejected as the first choice because the timestamps' accuracy after a FLAC seek is
+unverified and one independent project reports them discontinuous.
+
+**A decode-ahead buffer in the engine.** Exact for any decoder, about 21 MB for two voices,
+decode starting seconds before the boundary. Rejected: fixes the symptom in the mixer and keeps
+an inexact decoder in the chain.
+
+**ffmpeg via FFMediaToolkit.** Exact and maintained. Rejected for shipping native FFmpeg 7
+binaries to decode a format a 2021 managed package handles.
+
+## Consequences
+
+The managed decoder's correctness is ours to prove; the real-input matrix's completeness and
+purity cells across the FLAC grid are that proof, and MS-PL lets the source be vendored and
+fixed if a cell fails.
+
+Opening a FLAC now reads every frame header once. The add-time probe reads only the stream
+header and is unaffected; the engine's open of the incoming voice carries the cost, budgeted at
+500 ms on a 26-minute file. Over budget, the pre-scan moves to the background at add time.
+
+M4A and WMA, measured at 15 ms and 71 ms, have no way back to the promised table short of a
+decoder that seeks them exactly.
+
+Every decoder left in the chain is open source and readable when a matrix cell goes red.

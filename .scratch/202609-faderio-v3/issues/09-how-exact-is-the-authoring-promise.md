@@ -1,7 +1,7 @@
 # How exact is the authoring promise?
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: —
 
 ## Question
@@ -55,7 +55,64 @@ positional accuracy. They may want answering together.
 
 ## Answer
 
-_(pending)_
+Resolved 2026-09-22 over two grilling rounds plus one fact-finding pass on Media Foundation and
+the FLAC decoders available on NuGet. Recorded as
+[ADR 0009](../../../docs/adr/0009-authoring-exactness-is-bought-in-the-decoder.md); the
+tolerance is now a stated number in [`docs/supported-audio.md`](../../../docs/supported-audio.md).
+
+**The promise is 1 ms, at every promised cell, globally.** One number, one meaning, the
+tolerance line of the supported-audio doc. Below anything audible and below one MP3 frame
+(26 ms) or one FLAC block (93 ms). The human error at capture (150–250 ms, deliberately
+uncompensated per ticket 03) is the whole error budget; the engine adds nothing to it. Not
+per-transition: at 1 ms there is nothing to relax, and a per-transition tolerance would be UI
+and store complexity describing an engine shortcoming the engine should not have.
+
+**The author sees nothing.** Exactness is a property of *Promised* (glossary updated), not a
+per-file condition the UI reports. A format that cannot hit 1 ms leaves the table and its files
+are rejected at add time; that is the only signal.
+
+**From-end points are measured against the decoded length**, and the completeness cell (frames
+rendered equal frames the decoder reports) is the proof. Displayed length, decoded or tagged,
+is ticket 10's.
+
+**Ticket 12's S3 acceptance test tightens from 5 ms to 1 ms.** Same number everywhere.
+
+**FLAC: swap the decoder.** The fact-finder established why FLAC lands late: Media Foundation
+resumes at the *next block boundary* (the +67 ms on our fixture is exactly target-to-next-4608-
+frame-block), NAudio's `MediaFoundationReader` receives every sample's timestamp and ignores
+it, Microsoft documents `SetCurrentPosition` as inexact and tells the caller to advance to the
+target itself, and the FLAC decoder inside Media Foundation is undocumented. The fix is
+`BunLabs.NAudio.Flac` 2.0.1 (MS-PL, netstandard2.0, NAudio 2.x): a managed re-port of CSCore's
+decoder that pre-scans every frame header on open and, on seek, lands on the frame before the
+target and decodes-and-discards to the exact sample. Exact by construction, 8/16/24-bit, a
+`WaveStream` that drops into the existing wrapper. **Fallback** if it fails a matrix cell: our
+own Media Foundation reader that seeks to target minus one block and trims by sample timestamp
+(150–250 lines on NAudio's public interop; timestamp accuracy after a FLAC seek is unverified).
+Rejected: a decode-ahead buffer in the engine (fixes the symptom in the mixer, 21 MB for two
+voices) and ffmpeg via FFMediaToolkit (ships native FFmpeg 7 binaries).
+
+**Media Foundation leaves the production chain entirely.** With FLAC on its own decoder and
+M4A/WMA rejected, the catch-all branch in `AudioSources.cs`, the warm-up-read workaround and
+the reader's dropped-first-seek behaviour all go. Every decoder left (`WaveFileReader`,
+`Mp3FileReader`, the FLAC decoder) is open source and readable when a cell goes red.
+
+**MP3 needs no treatment.** `Mp3FileReaderBase.Position` seeks to the containing frame and
+skips the intra-frame offset after decoding; ticket 02's "exact" was structural, not luck.
+
+**The pre-scan cost is accepted with a budget.** Opening a 26-minute FLAC now reads every
+frame header once (a couple of hundred megabytes, sequentially). The probe at add time reads
+only the STREAMINFO header and is unaffected. Budget: open in under 500 ms on the library's
+longest file, measured once in the task ticket and recorded there; exceeding it means moving
+the pre-scan to the background at add time. This is a smoke check, not a suite test, because a
+26-minute FLAC cannot be checked in.
+
+**Hand-offs.** New task ticket [Make FLAC seek exact](15-make-flac-seek-exact.md): the decoder
+swap, the Media Foundation removal, the pinned 100 ms test replaced by a 1 ms landing
+assertion, first decode of the 24-bit and 96 kHz FLAC fixtures, and the long-file open-time
+measurement. Ticket 14 spreads the 1 ms landing across the FLAC grid once 15 lands. Ticket 12
+tightens S3 to 1 ms. M4A and WMA stay rejected; with a 1 ms promise their measured 15 ms and
+71 ms have no way back short of a decoder that seeks them exactly, which nobody has asked for.
+
 
 ## Noted from ticket 03
 
@@ -135,3 +192,31 @@ of the promise and left this ticket three things:
 Also settled there and relevant here: the engine runs at the device rate (ADR 0008), so the
 resampler is in the path only when file and device rates differ. The residue ticket 03 flagged
 (post-resampler position skew under WASAPI-exclusive) is therefore file-dependent, not constant.
+
+## Working notes — round 1 (2026-09-22, superseded by the Answer above)
+
+Grilling round 1 is done; these are **decided**, not proposals. Do not re-ask them.
+
+1. **The promise is 1 ms at every promised cell**, one global number, the tolerance column of
+   `docs/supported-audio.md`. Below anything audible, below one MP3 frame (26 ms) and one FLAC
+   block (93 ms). The human error at capture (150–250 ms, uncompensated by ticket 03's decision)
+   is the whole error budget; the engine adds nothing to it.
+2. **Global, not per-transition.** Nothing to relax at 1 ms; per-transition tolerance would be
+   UI and store complexity describing an engine shortcoming the engine should not have.
+3. **The author sees nothing.** Exactness is a property of *Promised*, not a per-file condition
+   the UI reports. A format that cannot hit 1 ms leaves the table and is rejected. Glossary's
+   **Promised** entry now says the guarantee includes authoring exactness.
+4. **From-end points are measured against the decoded length**; the completeness cell (frames
+   rendered == frames the decoder reports) is the proof. Displayed length is ticket 10's.
+5. **Ticket 12's S3 acceptance test tightens from 5 ms to 1 ms.** Same number everywhere.
+6. **The FLAC repair gets its own task ticket**, "Make FLAC seek exact", blocked by this ticket
+   only, running in parallel with 12 and 14. It owns the decoder change and flips the pinned
+   100 ms characterisation test into a 1 ms cell; ticket 14 proves it across the FLAC grid.
+
+**Round 2 still to ask**, once the fact-finder on Media Foundation seek semantics and
+alternative FLAC decoders reports: which mitigation for FLAC (trim by decoder timestamp after
+seeking early, decode-ahead buffer, or a different decoder), and whether MP3's frame-boundary
+seek needs the same treatment.
+
+Then: write the answer, tolerance column into the doc, create the FLAC task ticket, note
+tickets 12 and 14, resolve.

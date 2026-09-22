@@ -113,6 +113,17 @@ asking whether the current work could fail that way again.
   Recorded as [ADR 0007](../../docs/adr/0007-audio-is-promised-or-rejected.md) and
   [ADR 0008](../../docs/adr/0008-engine-runs-at-the-device-rate.md).
 
+- [How exact is the authoring promise?](issues/09-how-exact-is-the-authoring-promise.md):
+  **1 ms, at every promised cell, globally**; not per-transition; the author sees nothing
+  because exactness is a property of Promised. From-end points measure against the decoded
+  length, proven by the completeness cell. Ticket 12's S3 test tightens to 1 ms. FLAC misses
+  because **Media Foundation lands on the next block boundary and NAudio never trims**; the fix
+  is the managed `BunLabs.NAudio.Flac` decoder (exact by construction), Media Foundation leaves
+  the chain entirely, and a new task ticket, [Make FLAC seek exact](issues/15-make-flac-seek-exact.md),
+  builds it. MP3 already trims within the frame. Pre-scan cost on open accepted with a 500 ms
+  budget on the longest library file.
+  Recorded as [ADR 0009](../../docs/adr/0009-authoring-exactness-is-bought-in-the-decoder.md).
+
 ## Not yet specified
 
 - **Restaging the rest of Phase 1.** Once the slice is trustworthy, how the remaining
@@ -138,7 +149,7 @@ asking whether the current work could fail that way again.
   unexamined, and only some of those surfaces exist yet.
 - **Formats rejected today, each with a named way back.** Ticket 08 drew the promise at what
   the library holds and rejected the rest rather than play it unproven: AIFF (one row and a
-  fixture), M4A/WMA (after ticket 09 decides whether inexact seek is ever acceptable), Ogg
+  fixture), M4A/WMA (only with a decoder that seeks them to 1 ms; Media Foundation does not), Ogg
   Vorbis (a research ticket on a decoder that seeks any Ogg; NVorbis 0.10.5 cannot), more than
   two channels (downmix), 8/32-bit PCM and rates beyond 96 kHz (a row each). Which of these
   restaging brings back, and when, is fog until someone has such a file.

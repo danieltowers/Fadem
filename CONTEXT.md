@@ -95,8 +95,9 @@ remains the outgoing voice until that voice falls silent.
 
 **Promised**:
 A kind of audio file (format, sample rate, bit depth, channel count together) that the player
-guarantees to play and author correctly. The guarantee is written down and every line of it is
-proven; a kind of file that is not promised is rejected.
+guarantees to play and author correctly. Authoring correctly means an authored point plays
+where it was placed, to the one tolerance the promise states. The guarantee is written down
+and every line of it is proven; a kind of file that is not promised is rejected.
 _Avoid_: Supported, compatible, works
 
 **Rejected**:
