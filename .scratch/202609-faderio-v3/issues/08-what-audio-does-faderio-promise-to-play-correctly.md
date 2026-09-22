@@ -1,7 +1,7 @@
 # What audio does faderio promise to play correctly?
 
 Type: grilling
-Status: open
+Status: claimed
 Blocked by: —
 
 ## Question
@@ -73,3 +73,40 @@ Two decoder facts measured while building the matrix skeleton, both for this tic
   or a different decoder).
 - **Media Foundation FLAC decodes faithfully** — a suspected −3 dB attenuation turned out to be
   the fixture. Recorded so it is not re-suspected.
+
+## In progress — claimed, round 1 settled, round 2 pending (2026-09-22)
+
+Grilling round 1 is done; these are **decided**, not proposals. Do not re-ask them.
+
+1. **Engine rate = the output device's rate, set at launch.** Never worse than fixed 44.1 kHz
+   and strictly better wherever file and device agree (a 48 kHz file on a 48 kHz device is
+   resampled twice today). Becomes a launch-time value the output adapter supplies, implemented
+   in ticket 12 where the rate constants (`TransitionMixer.SampleRate`,
+   `NormalizedTrackSource.EngineSampleRate`, `EngineTime.SampleRate`) are being replaced anyway.
+   Free for the slice: on 44.1 kHz files it behaves identically. Store is rate-agnostic
+   (`TimeSpan` points, converted at load). Fake output declares 44.1 kHz; tests don't move.
+   WaveOut fallback defaults to 44.1 kHz.
+2. **More than two channels → reject at load** with the reason. Today such a file plays as
+   garbage silently: `NormalizedTrackSource.Wrap` handles only mono and stereo, and the mixer
+   assumes two samples per frame. Downmix is a feature for the restaging fog.
+3. **Probe at add time.** Open, read the header, check against the rules, reject then — a
+   queued track is a track that will play. Play-time failures (corrupt frame, device gone) are
+   one notice and a skip, never per-block.
+4. **The promise lives in `docs/supported-audio.md`**: one table, every row naming the matrix
+   test that proves it. Rejection reasons quote it. A row without a doc line is unpromised; a
+   doc line without a row is a lie.
+5. **Equal exactness at every promised rate**: the same 1 ms landing tolerance, a landing row
+   per rate (ticket 14), and the engine compensates the resampler's known latency if needed.
+
+**Round 2 still to ask**, and it depends on a survey of the user's library at
+`the user's music folder\` (counts by extension; rate/depth/channel distribution via
+ffprobe; MP3 VBR-vs-CBR by Xing/Info header; anything exotic) — **re-dispatch that survey
+first**, its result was lost with the previous session's context:
+
+- Which **formats** are promised (tiers?), given what the library actually holds.
+- Which **rates** and **bit depths** get rows (16/24/32/float; 44.1/48/88.2/96/176.4/192?).
+- **MP3 VBR** — unmeasured since ticket 02 and the common real-world case.
+- **Ogg / NVorbis paging** (ticket 07 finding) — promise "some files", fix, or research ticket.
+- **AIFF, 8-bit, >20 min files** — promise, support-unpromised, or reject.
+
+Then: write `docs/supported-audio.md`, resolve, cross-reference tickets 09, 12 and 14.
