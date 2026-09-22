@@ -43,3 +43,13 @@ person.
 ## Answer
 
 _(pending)_
+
+## Noted from ticket 05
+
+Ticket 05 scoped the **slice** to 44.1 kHz WAV and FLAC — WAV as an exact control, FLAC because
+it is the user's actual library. That is a slice-local decision made for provability and belief,
+and it deliberately does **not** pre-empt this ticket's answer about the product promise.
+
+The relevant new fact: the user's real `transitions.json` contains one authored transition, and
+it is a **FLAC** boundary. Whatever promise this ticket lands on, FLAC is not hypothetical
+coverage — it is the format the user actually authors in.

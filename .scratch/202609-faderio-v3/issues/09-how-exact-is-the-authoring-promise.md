@@ -72,3 +72,17 @@ Also relevant: ticket 03 settled that capture does **not** compensate for human 
 (150-250 ms), on the grounds that a stored point must equal the measured one. That puts the
 dominant source of authoring error firmly in the human, not the engine — which this ticket
 should account for when deciding how exact the promise actually needs to be.
+
+## Noted from ticket 05
+
+Ticket 05 put **FLAC inside the slice**, so this ticket's residue is now load-bearing rather
+than theoretical. Two corrections to how ticket 02's result was being read:
+
+- The warm-up read does not make FLAC exact. It drops the error from 2267 ms to **31 ms** — so
+  fixed-FLAC is *approximate*, and by that measure worse than M4A's 15 ms worst case.
+- The user's library is FLAC. Whatever exactness this ticket promises, 31 ms is the floor on the
+  format they will actually use, unless the seek path changes.
+
+Ticket 05 set a **slice-local** tolerance of 5 ms on WAV for its measured assertion, explicitly
+as a latency-class tripwire (regressions there are 50-150 ms) and explicitly **not** as a product
+claim. Setting the real number is this ticket's job.

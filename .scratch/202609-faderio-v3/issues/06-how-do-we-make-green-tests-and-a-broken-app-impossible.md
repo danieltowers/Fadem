@@ -55,3 +55,32 @@ track and a correct one look identical to an assertion that only checks the fade
 ## Answer
 
 _(pending)_
+
+## Noted from ticket 05
+
+The shell survey sharpens this ticket's premise considerably, and corrects it.
+
+**The shell was never fat.** It is 1033 lines across 9 files, cleanly decomposed: `MainForm`
+split into four partials by concern, panels isolated, composition root separate, NAudio behind
+a factory. Core is 2642 lines. The map's original "untested ~800-line shell" framing invites the
+wrong lesson.
+
+**The shell is untestable, not merely untested.** There is exactly one test project, it
+references `Faderio.Core` only, and **no test project references `Faderio.App` at all**. All 87
+`[Fact]`/`[Theory]` tests run against Core through the `IAudioOutput` seam with
+`FakeAudioOutput`. Nothing was ever run against those 1033 lines, and nothing could be.
+
+So "ninety tests passed and the user could not use the app" is not a paradox and not a coverage
+gap — it is the arithmetic working exactly as built. The tests covered Core, Core was mostly
+fine, and every defect the user hit lived in the untested region. Any answer to this ticket has
+to make that region reachable, or it has not addressed the failure at all.
+
+Two more facts worth having:
+
+- `UnitTest1.cs` is an empty xUnit scaffold whose single test method has **no body** — it passes
+  by doing nothing, and it survived to the end of the project.
+- 30 `.trx` run artefacts (~10,000 lines) are checked into `tests/.../TestResults/`.
+
+Ticket 05 also put the render harness ([ticket 11](11-render-a-boundary-to-a-file.md)) *before*
+the slice precisely so verification is not the last thing to arrive. That is one concrete
+mechanism this ticket can build on: an audible artifact producible without launching the UI.

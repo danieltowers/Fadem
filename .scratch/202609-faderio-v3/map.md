@@ -35,9 +35,11 @@ material and must not be modified. Its spec at
 **Skills every session should consult:** `tdd`, `diagnosing-bugs`, `code-review`,
 `domain-modeling`.
 
-**Why v2 failed, in one line.** Not a missing plan and not a broken engine: an untested
-~800-line shell, plus an authoring button that captured a position later than what the user
-heard. Every session should keep asking whether the current work could fail that way again.
+**Why v2 failed, in one line.** Not a missing plan, not a broken engine, and *not* a fat
+shell: a shell no test could reach, plus an authoring button that captured a position later
+than what the user heard. The shell was 1033 lines, thin and well-decomposed, and shipped every
+defect the user hit because no test project referenced it at all. Every session should keep
+asking whether the current work could fail that way again.
 
 ## Decisions so far
 
@@ -61,6 +63,14 @@ heard. Every session should keep asking whether the current work could fail that
   it falls silent. Capture stores the honest value; no reaction-time compensation.
   Recorded as [ADR 0001](../../docs/adr/0001-playhead-from-the-device-clock.md).
 
+- [What exactly is in the narrow slice?](issues/05-what-exactly-is-in-the-narrow-slice.md):
+  Two tracks, one boundary authored by ear, the fade lands where you put it — provable in the
+  app *and* in a rendered file, on three output modes. All four transition parameters,
+  from-start only, equal-power fixed. 44.1 kHz WAV (exact control) plus FLAC (the real
+  library). v2's JSON store reused. All of ticket 03's playhead rework included. Visualiser,
+  preview, settings dialog, M3U, repeat/shuffle and ReplayGain explicitly out. The render
+  harness lands *before* the slice.
+
 ## Not yet specified
 
 - **Restaging the rest of Phase 1.** Once the slice is trustworthy, how the remaining
@@ -73,8 +83,14 @@ heard. Every session should keep asking whether the current work could fail that
 - **Stable track identity.** The store keys transitions by full file path. v2's spec deferred
   real identity to Phase 2 but claimed the schema could absorb the change. Untested, and it
   touches the store format.
-- **What happens to v2's transition store data**, if the user has authored anything worth
-  keeping.
+- **What happens to v2's transition store data.** There *is* data: one authored transition in
+  `%APPDATA%aderio	ransitions.json`, a FLAC boundary with a 37.132 s fade-out point and a
+  20 s fade. Schema version 1, keyed by ordered full path pair, reads cleanly. The open part is
+  now narrower: v3 reuses the same store and would share that path, so whether the two builds
+  can coexist on one machine without schema drift is unexamined.
+- **How the slice is actually built, and in what order.** Ticket 05 fixed *what* is in it;
+  the build decomposition waits on the seam (ticket 04) and the verification strategy
+  (ticket 06), both of which shape it. Deliberately not pre-sliced.
 - **Where the audible-time discipline stops.** Ticket 03 put the playhead, the seek bar, the
   time readout and the visualiser on audible time. Whether *every* user-visible signal owes
   the same honesty — end-of-track notifications, queue advance, ReplayGain switchover — is

@@ -67,3 +67,29 @@ decides whether the store, ReplayGain and preview code come along now or later.
 ## Answer
 
 _(pending)_
+
+## Noted from ticket 05
+
+Ticket 05 settled what the slice needs, which fixes this ticket's scope. The repairs to land
+during migration, all small and all already diagnosed:
+
+- **Defect A** — `SourceNormalizer.Position` getter/setter conversion is inverted, truncating
+  every file above 44.1 kHz by (rate/44100)². Two characters.
+- **Defect B** — `ConvertToFloat` has no `WaveFormatEncoding.Extensible` case, so ordinary
+  24-bit WAVs render as silence. One switch case. **"WAV works" is false until this lands**, and
+  the slice depends on WAV being the exact control.
+- **Defect C, latent** — `VorbisTrackSource.Position` throws if set before any read; production
+  survives only by accident of ordering.
+- **FLAC warm-up read** — one read before the first seek, dropping error from 2267 ms to 31 ms.
+  Near-free and removes the only catastrophic case, whatever
+  [ticket 09](09-how-exact-is-the-authoring-promise.md) decides.
+- **`TransitionSpec` serialisation** — the computed `IsEmpty` property leaks into the JSON for
+  want of a `[JsonIgnore]`, and `Curve` would serialise as a bare integer with no
+  `JsonStringEnumConverter`.
+
+The store itself migrates as-is: `JsonTransitionStore` is 155 lines, takes a path in its
+constructor, depends only on `TransitionSpec` and an atomic-write helper, and carries 12 tests.
+Ticket 05 chose to reuse it rather than start in memory.
+
+Not in this ticket: the render harness, which ticket 05 split out as
+[ticket 11](11-render-a-boundary-to-a-file.md) and which this ticket blocks.

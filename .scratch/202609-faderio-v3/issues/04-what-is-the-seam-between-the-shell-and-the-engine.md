@@ -53,3 +53,20 @@ this ticket's call.
 
 Ticket 03 also grew the seam: `IAudioOutput` gains a member reporting frames actually emitted
 by the device, because as written it carries no position or latency fact at all.
+
+## Noted from ticket 05
+
+Two facts that reframe this ticket's premise.
+
+**The shell is thin already.** 1033 lines across 9 files, decomposed by concern, with the
+composition root and the NAudio binding already separated. v2's spec asked for a thin shell and
+*got one* — and every defect the user hit still lived in it. So thinness is not the property
+this ticket is really after. The property is **reachability by a test**: there is no test project
+referencing `Faderio.App`, so none of those 1033 lines was ever executed by the suite.
+
+**The seam is about to carry more.** Ticket 03 adds a frames-emitted member to `IAudioOutput`;
+[ticket 11](11-render-a-boundary-to-a-file.md) adds a file-writing implementation alongside
+`NAudioAudioOutput` and `FakeAudioOutput`; ticket 05 makes output mode selectable at launch
+rather than through a dialog. Three implementations and a launch-time selection is a real seam
+with real pressure on it, which is a better test of this ticket's answer than one production
+binding was.
