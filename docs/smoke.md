@@ -31,6 +31,12 @@ Report the result item by item in the session's hand-off.
       showed at that moment.
 - [ ] After Save, the status strip shows a confirmation and nothing else changed.
 - [ ] Resizing the window narrower does not hide the transport or the editor's buttons.
+- [ ] Adding a rejected file (an `.m4a`, an `.ogg`, or a file with more than two channels)
+      leaves the list unchanged and shows one notice naming the property that failed and
+      pointing at `docs/supported-audio.md`. Nothing is queued, nothing plays.
+- [ ] Adding the library's longest FLAC (about 26 minutes) shows its full length in the time
+      readout, and seeking into its last minute lands there. Length is not proven by the test
+      suite; this is where it is checked.
 
 ## Sounds — the user runs this
 

@@ -101,6 +101,18 @@ asking whether the current work could fail that way again.
   pinned at 100 ms; and a −3 dB fixture level that nearly became a false decoder finding.
   v2's three ADRs imported as 0004–0006.
 
+- [What audio does faderio promise to play correctly?](issues/08-what-audio-does-faderio-promise-to-play-correctly.md):
+  **Two tiers, nothing in between.** A file is *promised* when its format × rate × depth ×
+  channels is a row in `docs/supported-audio.md`, every row naming the matrix test that proves
+  it; everything else is *rejected* at add time with a structured reason. Promised now: WAV and
+  FLAC at 44.1/48/96 kHz, 16/24-bit, mono/stereo; MP3 in three variants (CBR with Info tag, CBR
+  bare, VBR) at 44.1/48 kHz. Rejected with a named way back: >2 channels, 8/32-bit, other
+  rates, AIFF, M4A/WMA, and **Ogg Vorbis, whose reader is deleted** over the NVorbis paging bug.
+  **Engine rate = output device rate, fixed at launch.** Length is not a column. The library
+  survey (903 files, all 16-bit stereo, all 44.1 kHz bar four 48 kHz MP3s) is in the ticket.
+  Recorded as [ADR 0007](../../docs/adr/0007-audio-is-promised-or-rejected.md) and
+  [ADR 0008](../../docs/adr/0008-engine-runs-at-the-device-rate.md).
+
 ## Not yet specified
 
 - **Restaging the rest of Phase 1.** Once the slice is trustworthy, how the remaining
@@ -124,12 +136,16 @@ asking whether the current work could fail that way again.
   time readout and the visualiser on audible time. Whether *every* user-visible signal owes
   the same honesty — end-of-track notifications, queue advance, ReplayGain switchover — is
   unexamined, and only some of those surfaces exist yet.
-- **Audio paths still unmeasured.** Between them, tickets 01 and 02 could not cover AIFF,
-  8-bit WAV, sources with more than two channels, the WASAPI exclusive resampling path, real
-  music as opposed to test signals, files longer than eight seconds, or seek accuracy at rates
-  other than 44.1 kHz. Whether any of these matter depends on how tickets 08 and 09 scope the
-  promise. Variable-bitrate MP3 is the sharpest of these and is already a question inside
-  ticket 09.
+- **Formats rejected today, each with a named way back.** Ticket 08 drew the promise at what
+  the library holds and rejected the rest rather than play it unproven: AIFF (one row and a
+  fixture), M4A/WMA (after ticket 09 decides whether inexact seek is ever acceptable), Ogg
+  Vorbis (a research ticket on a decoder that seeks any Ogg; NVorbis 0.10.5 cannot), more than
+  two channels (downmix), 8/32-bit PCM and rates beyond 96 kHz (a row each). Which of these
+  restaging brings back, and when, is fog until someone has such a file.
+- **Audio paths still unmeasured after ticket 08.** The WASAPI-exclusive resampling path,
+  real music as opposed to test signals, and files longer than two seconds are not proven by
+  the matrix. Length is deliberately not a promise column; the smoke checklist covers it by ear.
+  Whether any of these needs a permanent test is open.
 
 ## Out of scope
 

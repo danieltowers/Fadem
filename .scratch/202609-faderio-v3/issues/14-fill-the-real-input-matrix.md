@@ -48,3 +48,24 @@ Tools already there: `TestAudio.WriteWavAt` (any rate/depth/channels, extensible
 −3 dB), and `Fixtures/generate.sh` (one ffmpeg line per fixture; Ogg needs `-page_duration
 10000` or NVorbis will not seek). Pink-noise cross-correlation from ticket 02 is still unbuilt;
 the ramp method has served so far.
+
+## Noted from ticket 08
+
+[Ticket 08](08-what-audio-does-faderio-promise-to-play-correctly.md) set the promised table in
+`docs/supported-audio.md`; this ticket's job is to turn every "pending" row there green. The
+cell list in "What done means" above is amended as follows:
+
+- **FLAC**: as written, 16/24-bit × 44.1/48/96 kHz × mono/stereo, twelve fixtures, one
+  `FlacCells()` member data feeding `Flac_ReadsToCompletion`, `Flac_ToneIsPure` and the seek
+  landing theory. 24-bit FLAC is promised despite zero library files.
+- **MP3, new**: three variants × 44.1/48 kHz × mono/stereo = twelve fixtures, one `Mp3Cells()`
+  member data with a variant parameter. Variants: `CbrInfo` (ffmpeg default, writes an Info
+  tag), `CbrBare` (`-write_xing 0`), `Vbr` (`-q:a 2`). If the VBR seek landing misses the
+  tolerance, pin it `_PendingTicket09` like FLAC's; do not widen the tolerance.
+- **Ogg**: removed. Ticket 12 deletes the reader, its tests and `ramp.ogg`. If this ticket
+  runs first, leave them; do not add Ogg cells.
+- **No AIFF, 8-bit, 32-bit or >96 kHz cells.** Those formats are rejected, and a cell without a
+  doc row proves nothing the product claims.
+
+Each theory name in the doc's "Proven by" column must exist verbatim when this ticket closes,
+and the doc's Status column flips from "pending ticket 14" to "proven" in the same commit.

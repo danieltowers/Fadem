@@ -90,3 +90,21 @@ _Avoid_: Set from here, mark, grab
 **Attended voice**:
 The voice whose playhead the shell displays and the seek bar scrubs. During a crossfade it
 remains the outgoing voice until that voice falls silent.
+
+### Supported audio
+
+**Promised**:
+A kind of audio file (format, sample rate, bit depth, channel count together) that the player
+guarantees to play and author correctly. The guarantee is written down and every line of it is
+proven; a kind of file that is not promised is rejected.
+_Avoid_: Supported, compatible, works
+
+**Rejected**:
+A file the player refuses at the moment it is added, naming the property that disqualifies it.
+Rejection never happens during playback: a queued track is a track that will play.
+_Avoid_: Unsupported, failed, skipped
+
+**Probe**:
+Reading a file's header when it is added to decide whether it is promised or rejected. The
+probe decides before the file is queued and never after.
+_Avoid_: Validate, scan, check

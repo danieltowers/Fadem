@@ -115,3 +115,23 @@ The pinned numbers, now measured on v3's own fixtures rather than inherited:
 `RealInputMatrixTests.Landing()` is the measuring instrument: ground truth from a sequential
 decode of the same file, so it assumes no encoder gain. Its failure message prints what the
 decoder did. Tighten the pins here when this ticket decides.
+
+## Noted from ticket 08
+
+[Ticket 08](08-what-audio-does-faderio-promise-to-play-correctly.md) resolved the format side
+of the promise and left this ticket three things:
+
+- **The tolerance column.** `docs/supported-audio.md` promises a seek-landing assertion on every
+  cell "within the tolerance ticket 09 sets". Round 1 of ticket 08 assumed the same 1 ms
+  landing class at every promised rate; this ticket confirms or replaces that number, and it is
+  then one column in the doc's table, not a per-format footnote.
+- **M4A and WMA are rejected**, not promised inexactly. Their way back is this ticket's
+  decision on whether an inexact seek is ever acceptable. If the answer is a documented
+  tolerance, they return as rows with that tolerance; if not, they stay rejected.
+- **MP3 VBR gets a matrix cell in ticket 14** rather than a research ticket. If it lands
+  outside the tolerance, that cell is pinned like FLAC's and the mitigation is this ticket's
+  to choose. The probe cannot tell CBR from VBR by header, so the promise covers both.
+
+Also settled there and relevant here: the engine runs at the device rate (ADR 0008), so the
+resampler is in the path only when file and device rates differ. The residue ticket 03 flagged
+(post-resampler position skew under WASAPI-exclusive) is therefore file-dependent, not constant.

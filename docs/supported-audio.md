@@ -1,0 +1,76 @@
+# Supported audio
+
+What faderio promises to play and author correctly, and what it refuses. Decided in
+[wayfinder ticket 08](../.scratch/202609-faderio-v3/issues/08-what-audio-does-faderio-promise-to-play-correctly.md);
+policy recorded in [ADR 0007](adr/0007-audio-is-promised-or-rejected.md) and
+[ADR 0008](adr/0008-engine-runs-at-the-device-rate.md).
+
+**This table is the contract.** Every row names the real-input matrix test that proves it
+(`tests/Faderio.Core.Tests/RealInputMatrixTests.cs`). A row without a passing test is
+unpromised and must not be in this table. A test cell without a row here is a proof of nothing
+the product claims; add the row or delete the cell. Rejection messages quote this file.
+
+Two tiers, nothing in between: a file is **promised** or it is **rejected** when it is added.
+Nothing plays on a best-effort basis.
+
+## Promised
+
+A file is promised when its format, sample rate, bit depth and channel count all appear in one
+row. Every promised cell is proven three ways through the production decoder chain:
+**completeness** (every frame the file holds is rendered), **purity** (a test tone comes out as
+that tone) and **seek landing** (a seek lands where it was asked to, within the tolerance
+[ticket 09](../.scratch/202609-faderio-v3/issues/09-how-exact-is-the-authoring-promise.md) sets).
+
+| Format | Sample rates | Bit depths | Channels | Proven by | Status |
+|---|---|---|---|---|---|
+| WAV (PCM) | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | `Wav_ReadsToCompletion`, `Wav_ToneIsPure`, `Wav_SeekHalfway_ReadsHalfTheFrames` over `WavCells()` | proven (12 cells) |
+| FLAC | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | `Flac_*` theories over `FlacCells()`, same three assertions | 44.1 kHz / 16-bit / stereo proven; the other 11 cells land in [ticket 14](../.scratch/202609-faderio-v3/issues/14-fill-the-real-input-matrix.md) |
+| MP3, constant bitrate with a Xing/Info header | 44.1, 48 kHz | n/a (decodes to PCM) | mono, stereo | `Mp3_*` theories over `Mp3Cells()`, variant `CbrInfo` | pending ticket 14 |
+| MP3, constant bitrate with no Xing/Info/VBRI header | 44.1, 48 kHz | n/a | mono, stereo | same theories, variant `CbrBare` | pending ticket 14 |
+| MP3, variable bitrate | 44.1, 48 kHz | n/a | mono, stereo | same theories, variant `Vbr` | pending ticket 14; if seek landing misses the tolerance the cell is pinned and ticket 09 owns the fix |
+
+"Pending" rows exist because this table is written ahead of ticket 14, which fills the
+matrix. They are not a second tier: ticket 14 lands before the shell
+([ticket 13](../.scratch/202609-faderio-v3/issues/13-build-the-shell.md)) can add a file, so
+no user ever meets a pending row. A row ticket 14 cannot turn green is removed from this table
+before then, and those files are rejected.
+
+**Sample rate policy.** The engine runs at the output device's rate, fixed at launch
+([ADR 0008](adr/0008-engine-runs-at-the-device-rate.md)). A file at any other promised rate
+is resampled once, on the way in. Authoring exactness is the same at every promised rate:
+the seek-landing assertion runs per rate with one tolerance, and the engine compensates the
+resampler's known latency if it has to.
+
+**Length.** Length is a property of a file, not a format, so it is not a column. The matrix
+fixtures are two seconds long; long-file playback is not proven by the suite. The library's
+longest file is about 26 minutes, and frame counts are 64-bit, so there is no arithmetic
+limit. The **Looks** half of [`docs/smoke.md`](smoke.md) checks that a 26-minute FLAC shows
+its length and seeks into its last minute.
+
+## Rejected
+
+Everything not in the table above is refused when the file is added, with the reason. In
+particular:
+
+| What | Why it is rejected | Where it could come back |
+|---|---|---|
+| More than two channels | The mixer is stereo; today such a file would play as garbage. | Downmix is a restaging feature. |
+| 8-bit, 32-bit integer and 32-bit float PCM | Studio intermediates, not library formats. Unproven. | A row each, if anyone has one. |
+| Sample rates other than 44.1, 48 and 96 kHz | Unproven. The resampler would very likely cope, but "very likely" is not a row. | A row per rate; WAV rows are free to generate. |
+| AIFF | A reader exists but nobody has a file. Unproven. | One row and an ffmpeg fixture. |
+| M4A / AAC, WMA | Ticket 02 measured seek error up to 15 ms and 71 ms and both misreport their own length. | After ticket 09 decides whether inexact seek is ever acceptable. |
+| Ogg Vorbis | NVorbis 0.10.5 cannot seek into any file paged by ffmpeg's defaults (ticket 07). The reader is deleted rather than kept broken. | A research ticket on a decoder that seeks any Ogg, if the format is ever wanted. |
+| Opus, DSD, anything else | No reader, no row. | A row. |
+
+**How rejection works.** The engine probes the file when it is added: it opens it, reads the
+header and checks format, sample rate, bit depth and channel count against this table. A file
+that fails is never queued; a queued track is a track that will play. The engine reports a
+structured reason (the four probed properties and which one disqualified the file) and the
+shell formats it and points here. Failures during playback (a corrupt frame, the device gone)
+are one notice and a skip, never a notice per block.
+
+## Changing this table
+
+Adding a promised cell is: a fixture (checked in, generated by `Fixtures/generate.sh`), a cell
+in the matching `*Cells()` member data, a green run, then the row. Removing one is the reverse.
+The pull request that changes the table changes the matrix in the same commit.

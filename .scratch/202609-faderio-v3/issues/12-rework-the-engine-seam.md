@@ -46,3 +46,25 @@ shape is decided here and 11 fills it.
 ## Answer
 
 _(pending)_
+
+## Noted from ticket 08
+
+[Ticket 08](08-what-audio-does-faderio-promise-to-play-correctly.md) adds four items to this
+ticket's "done", all engine-side; see `docs/supported-audio.md` and ADRs 0007 and 0008:
+
+- **Engine rate comes from the output adapter at launch.** `TransitionMixer.SampleRate`,
+  `NormalizedTrackSource.EngineSampleRate` and `EngineTime.SampleRate` are replaced by one
+  launch-time value. `FakeAudioOutput` declares 44.1 kHz so existing tests do not move; the
+  WaveOut fallback defaults to 44.1 kHz. Store points stay `TimeSpan`, converted at load.
+- **Probe at add time.** The add command opens the file, reads the header and checks format,
+  rate, depth and channels against the promised table. A file that fails is never queued. The
+  result is a **structured** rejection (the four probed properties plus which one failed) that
+  travels as a `Notice`; the shell formats it and links the doc. Rejected today: >2 channels,
+  8/32-bit PCM, rates other than 44.1/48/96 kHz, AIFF, M4A/WMA, Ogg, anything without a row.
+- **The `MediaFoundationReader` catch-all in `AudioSources.cs` becomes an explicit `.flac` case**
+  plus rejection. The `.aif/.aiff` case is removed with it.
+- **Delete Ogg support**: `VorbisTrackSource`, the three `Ogg_*` matrix tests, `ramp.ogg` and
+  its `generate.sh` line, and the NVorbis package reference. The paging finding lives in the
+  doc's Rejected table.
+
+Play-time failures (corrupt frame, device gone) are one `Notice` and a skip, never per block.

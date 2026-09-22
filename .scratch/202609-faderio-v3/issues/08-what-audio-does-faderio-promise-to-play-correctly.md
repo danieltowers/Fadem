@@ -1,7 +1,7 @@
 # What audio does faderio promise to play correctly?
 
 Type: grilling
-Status: claimed
+Status: resolved
 Blocked by: —
 
 ## Question
@@ -42,7 +42,59 @@ person.
 
 ## Answer
 
-_(pending)_
+Resolved 2026-09-22 over two grilling rounds. The contract is
+[`docs/supported-audio.md`](../../../docs/supported-audio.md); the policy is
+[ADR 0007](../../../docs/adr/0007-audio-is-promised-or-rejected.md) and the rate decision is
+[ADR 0008](../../../docs/adr/0008-engine-runs-at-the-device-rate.md). `CONTEXT.md` gained
+**Promised**, **Rejected** and **Probe**.
+
+**Two tiers, nothing in between.** A file is *promised* when its format × rate × depth × channels
+is a row in the doc, and every row names the matrix test that proves it. Everything else is
+*rejected* at add time with a structured reason (the four probed properties and which one
+failed) that the shell formats and links to the doc. No best-effort tier: that is v2's failure
+with a label on it, and the library holds nothing that would land in it. The
+`MediaFoundationReader` catch-all becomes an explicit `.flac` case plus rejection.
+
+**Promised now.**
+
+| Format | Rates | Depths | Channels | Proof |
+|---|---|---|---|---|
+| WAV | 44.1 / 48 / 96 kHz | 16 / 24 | mono, stereo | proven, 12 cells |
+| FLAC | 44.1 / 48 / 96 kHz | 16 / 24 | mono, stereo | 1 cell proven, 11 pending ticket 14 |
+| MP3 × {CBR+Info, CBR bare, VBR} | 44.1 / 48 kHz | n/a | mono, stereo | pending ticket 14 |
+
+24-bit FLAC earns its row with zero library files because it is the actual hi-res download
+format. MP3 gets three variants because the probe cannot tell CBR from VBR from the header, so
+the promise must cover both or the gate cannot enforce it. If VBR seek misses the tolerance the
+cell is pinned and ticket 09 owns the fix.
+
+**Rejected now, each with a named way back:** more than two channels (downmix is a restaging
+feature); 8-bit, 32-bit int and 32-bit float PCM; rates other than 44.1/48/96; AIFF (reader
+exists, nobody has a file); M4A and WMA (inexact seek and wrong length per ticket 02, revisit
+after ticket 09); **Ogg Vorbis** (NVorbis paging bug from ticket 07: `VorbisTrackSource`, its
+tests, the `ramp.ogg` fixture and the NVorbis package are deleted rather than kept broken; a
+research ticket if the format is ever wanted).
+
+**Engine rate = output device rate, fixed at launch** (round 1, ADR 0008). Same 1 ms landing
+class at every promised rate, one landing row per rate, resampler latency compensated by the
+engine if it shows.
+
+**Length is not a column.** Frame counts are 64-bit, so no arithmetic limit; the suite's
+fixtures are 2 s so long files are unproven by the suite, and the doc says so. The Looks half
+of `docs/smoke.md` gains an item: a 26-minute FLAC shows its length and seeks into its last
+minute.
+
+**Probe at add time**, header only; a queued track is a track that will play. Play-time
+failures are one notice and a skip, never per block.
+
+**The library survey** (903 files, all probed) is in the working notes below and need not be
+re-run.
+
+**Hand-offs.** Ticket 12 builds the probe, the structured rejection, the device-rate engine and
+the Ogg deletion. Ticket 14 fills the FLAC grid and adds the twelve MP3 cells. Ticket 09 sets
+the tolerance column and decides M4A/WMA's way back. The restaging fog on the map records
+AIFF, M4A/WMA, Ogg, downmix and the 32-bit depths.
+
 
 ## Noted from ticket 05
 
@@ -74,7 +126,7 @@ Two decoder facts measured while building the matrix skeleton, both for this tic
 - **Media Foundation FLAC decodes faithfully** — a suspected −3 dB attenuation turned out to be
   the fixture. Recorded so it is not re-suspected.
 
-## In progress — claimed, round 1 settled, round 2 pending (2026-09-22)
+## Working notes — round 1 (2026-09-22, superseded by the Answer above)
 
 Grilling round 1 is done; these are **decided**, not proposals. Do not re-ask them.
 
