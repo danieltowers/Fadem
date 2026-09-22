@@ -93,3 +93,19 @@ Ticket 05 chose to reuse it rather than start in memory.
 
 Not in this ticket: the render harness, which ticket 05 split out as
 [ticket 11](11-render-a-boundary-to-a-file.md) and which this ticket blocks.
+
+## Noted from ticket 06
+
+Test-suite work that lands with the migration:
+
+- **A second test project** on `net8.0-windows` that references `Faderio.App`, with an
+  `InternalsVisibleTo` on the App project, so the Form can be instantiated headless.
+- **Delete `UnitTest1.cs`** — an empty xUnit scaffold whose one test has no body and passes by
+  doing nothing. **Do not check in `TestResults/`** — v2 has 30 `.trx` artefacts committed.
+- **Completeness assertions on the existing synthetic fixtures**: rendered frame count equals
+  decoded length. v2 asserted this nowhere. Cheap, and it is the assertion that would have
+  caught defect A.
+- **The real-input matrix skeleton** (ticket 06, seam S2): WAV cells generated at test time
+  across 16/24-bit × 44.1/48/96 kHz × mono/stereo; FLAC cells from checked-in fixtures with the
+  generating ffmpeg script beside them. The purity and seek-round-trip methods are documented
+  in tickets 01 and 02 — their code did not survive and is rebuilt here.

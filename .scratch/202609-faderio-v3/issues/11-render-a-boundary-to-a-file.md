@@ -48,3 +48,16 @@ This ticket is a **task**, not a decision. If a real design question surfaces wh
 ## Answer
 
 _(pending)_
+
+## Noted from ticket 06
+
+Two additions to "done":
+
+- **A round-trip test**: render one boundary through this output *and* through
+  `FakeAudioOutput`, and assert the file's samples match the in-memory blocks. The artifact the
+  human hears must be the artifact the suite measured.
+- **The in-app driver** is one "Render this boundary" button in the transition editor, writing
+  to a chosen path. One button, no options. It is not preview.
+
+The S3 end-to-end tests themselves run against the fake, in memory, for speed; this harness is
+for the human and for that one round-trip test.

@@ -53,3 +53,10 @@ and it deliberately does **not** pre-empt this ticket's answer about the product
 The relevant new fact: the user's real `transitions.json` contains one authored transition, and
 it is a **FLAC** boundary. Whatever promise this ticket lands on, FLAC is not hypothetical
 coverage — it is the format the user actually authors in.
+
+## Noted from ticket 06
+
+The real-input matrix is shaped so that **a format is one row**: format × rate × depth ×
+channels, three assertions per cell (completeness, purity, seek round-trip). Whatever this
+ticket promises, adding it to the suite is adding rows and, for compressed formats, checking in
+a fixture. The matrix is the promise's enforcement, so the two should be written together.

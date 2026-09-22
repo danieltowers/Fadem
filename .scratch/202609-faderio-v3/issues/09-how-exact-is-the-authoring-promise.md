@@ -86,3 +86,17 @@ than theoretical. Two corrections to how ticket 02's result was being read:
 Ticket 05 set a **slice-local** tolerance of 5 ms on WAV for its measured assertion, explicitly
 as a latency-class tripwire (regressions there are 50-150 ms) and explicitly **not** as a product
 claim. Setting the real number is this ticket's job.
+
+## Noted from ticket 06
+
+Two numbers this ticket now owns:
+
+- **1 ms.** v2's shell formatted the captured position with `"0.###"` before saving it, so every
+  capture was quantised to a millisecond regardless of what the engine knew. Ticket 06 made
+  capture an engine operation returning a typed point in frames, so this quantisation no
+  longer exists on the path — but it is the kind of loss this ticket should check for
+  elsewhere (the store serialises `TimeSpan`, which is 100 ns ticks; fine, but confirm).
+- **40 ms.** The FLAC seek cell of the real-input matrix is a *pinned characterisation test* at
+  ≤ 40 ms (31 measured plus margin), named `Flac_SeekLandsWithin40ms_PendingTicket09`. When
+  this ticket sets the real promise, that test is the one place that changes. It is
+  deliberately green-and-documented rather than red-and-ignored.

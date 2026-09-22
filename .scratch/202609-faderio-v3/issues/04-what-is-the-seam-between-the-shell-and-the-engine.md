@@ -70,3 +70,21 @@ referencing `Faderio.App`, so none of those 1033 lines was ever executed by the 
 rather than through a dialog. Three implementations and a launch-time selection is a real seam
 with real pressure on it, which is a better test of this ticket's answer than one production
 binding was.
+
+## Noted from ticket 06
+
+Two things ticket 06 hands to this ticket, both "verification by construction":
+
+- **The seek bar's `Maximum` is the track length in milliseconds.** v2 never set `Minimum`,
+  `Maximum` or `TickFrequency`, so WinForms' defaults gave 11 positions — 24-second seek
+  granularity on a four-minute track, hidden by `TickStyle.None`. With `Maximum` in ms there is
+  no scaling in either direction and the defect cannot be written. Which length it uses is
+  [ticket 10](10-which-length-is-a-track.md)'s call.
+- **Capture is an engine operation** — `engine.Capture()` returns a typed point — so the shell
+  holds no position logic at all. That, plus ticket 03, empties the shell of everything but
+  parse/format, row → adjacency, error summaries and store recovery. Whatever presenter this
+  ticket designs holds exactly that list and nothing else.
+
+Ticket 06 also fixed the shell's test reachability: a second test project on `net8.0-windows`
+with `InternalsVisibleTo`, instantiating the real `MainForm` headless on an STA thread. The
+seam this ticket designs should assume that test exists and can poke any control.

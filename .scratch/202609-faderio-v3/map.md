@@ -35,6 +35,10 @@ material and must not be modified. Its spec at
 **Skills every session should consult:** `tdd`, `diagnosing-bugs`, `code-review`,
 `domain-modeling`.
 
+**Research leaves a permanent test.** Settled in ticket 06 after tickets 01 and 02 produced the
+map's most decision-shaping findings and left no code behind. A harness that renders through
+the production chain and measures something *is* an integration test; commit it as one.
+
 **Why v2 failed, in one line.** Not a missing plan, not a broken engine, and *not* a fat
 shell: a shell no test could reach, plus an authoring button that captured a position later
 than what the user heard. The shell was 1033 lines, thin and well-decomposed, and shipped every
@@ -71,6 +75,15 @@ asking whether the current work could fail that way again.
   preview, settings dialog, M3U, repeat/shuffle and ReplayGain explicitly out. The render
   harness lands *before* the slice.
 
+- [How do we make "green tests, broken app" impossible?](issues/06-how-do-we-make-green-tests-and-a-broken-app-impossible.md):
+  Six seams instead of one: the fake output (kept), **real files** through the production
+  decoder, the engine end to end, a presenter, the Form headless, and the human. A real-input
+  matrix asserts **completeness, purity and seek round-trip** on every cell — v2 asserted
+  length nowhere. Capture becomes an engine operation returning a typed point. FLAC fixtures
+  checked in; FLAC seek pinned at 40 ms pending ticket 09. Smoke checklist at `docs/smoke.md`,
+  split into a Looks half the agent runs and a Sounds half the user runs. `dotnet test` before
+  every commit, reported in the message, by discipline not hook.
+
 ## Not yet specified
 
 - **Restaging the rest of Phase 1.** Once the slice is trustworthy, how the remaining
@@ -88,9 +101,9 @@ asking whether the current work could fail that way again.
   20 s fade. Schema version 1, keyed by ordered full path pair, reads cleanly. The open part is
   now narrower: v3 reuses the same store and would share that path, so whether the two builds
   can coexist on one machine without schema drift is unexamined.
-- **How the slice is actually built, and in what order.** Ticket 05 fixed *what* is in it;
-  the build decomposition waits on the seam (ticket 04) and the verification strategy
-  (ticket 06), both of which shape it. Deliberately not pre-sliced.
+- **How the slice is actually built, and in what order.** Ticket 05 fixed *what* is in it and
+  ticket 06 fixed how it is verified; the build decomposition now waits only on the seam
+  (ticket 04). Deliberately not pre-sliced.
 - **Where the audible-time discipline stops.** Ticket 03 put the playhead, the seek bar, the
   time readout and the visualiser on audible time. Whether *every* user-visible signal owes
   the same honesty — end-of-track notifications, queue advance, ReplayGain switchover — is
