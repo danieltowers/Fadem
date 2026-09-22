@@ -24,4 +24,8 @@
     <ProjectReference Include="..\..\src\Faderio.Core\Faderio.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

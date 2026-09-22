@@ -49,6 +49,60 @@ public static class TestAudio
         var w = 2.0 * Math.PI * freq / SampleRate;
         return WriteWav(name, seconds, f => amplitude * Math.Sin(w * f));
     }
+
+    /// <summary>A WAV in an arbitrary rate, depth and channel count — the real-input matrix's
+    /// WAV cells (ticket 06, seam S2). 24-bit is written with an extensible header, as ffmpeg
+    /// and most tools do; that header is what exposed defect B (ticket 01).</summary>
+    public static string WriteWavAt(
+        string name, double seconds, Func<long, double> generator,
+        int sampleRate, int bitsPerSample, int channels)
+    {
+        Directory.CreateDirectory(Dir);
+        var path = Path.Combine(Dir, $"{Path.GetFileNameWithoutExtension(name)}-{Interlocked.Increment(ref _fileCounter)}.wav");
+        var frames = (long)Math.Round(seconds * sampleRate);
+        WaveFormat format = bitsPerSample == 16
+            ? new WaveFormat(sampleRate, 16, channels)
+            : new WaveFormatExtensible(sampleRate, bitsPerSample, channels);
+        using var writer = new WaveFileWriter(path, format);
+        const int chunk = 4410;
+        var buffer = new float[chunk * channels];
+        for (var start = 0L; start < frames; start += chunk)
+        {
+            var n = (int)Math.Min(chunk, frames - start);
+            for (var f = 0; f < n; f++)
+            {
+                var value = (float)generator(start + f);
+                for (var c = 0; c < channels; c++)
+                {
+                    buffer[f * channels + c] = value;
+                }
+            }
+            writer.WriteSamples(buffer, 0, n * channels);
+        }
+        return path;
+    }
+
+    /// <summary>Fraction of a window's energy sitting at <paramref name="freq"/>: 1.0 is a pure
+    /// tone, and the buzzing bug or silence collapse it. Goertzel at an exact bin, so the window
+    /// must hold a whole number of cycles. Ticket 01's purity measure, made permanent; ticket 14
+    /// may swap in a full FFT.</summary>
+    public static double Purity(IReadOnlyList<float> mono, int start, int frames, double freq, int sampleRate)
+    {
+        var w = 2.0 * Math.PI * freq / sampleRate;
+        var coeff = 2.0 * Math.Cos(w);
+        double s1 = 0, s2 = 0, total = 0;
+        for (var i = start; i < start + frames; i++)
+        {
+            double x = mono[i];
+            total += x * x;
+            var s = x + coeff * s1 - s2;
+            s2 = s1;
+            s1 = s;
+        }
+        var binPower = s1 * s1 + s2 * s2 - coeff * s1 * s2; // |X[k]|²
+        // Parseval, for a real signal concentrated in one bin: 2·|X[k]|² = N·Σx².
+        return total <= 0 ? 0.0 : 2.0 * binPower / (frames * total);
+    }
 }
 
 /// <summary>Rendered output captured by the fake output, indexed by absolute frame.</summary>

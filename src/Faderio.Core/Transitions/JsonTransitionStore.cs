@@ -19,6 +19,8 @@ public sealed class JsonTransitionStore : ITransitionStore
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        // Curve by name, not ordinal. Integer values still deserialise, so v2's files load.
+        Converters = { new JsonStringEnumConverter() },
     };
 
     private readonly string _path;

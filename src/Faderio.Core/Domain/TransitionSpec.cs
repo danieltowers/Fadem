@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Faderio.Core.Domain;
 
 /// <summary>The shape of the gain change across a fade.</summary>
@@ -33,6 +35,7 @@ public sealed record TransitionSpec
     /// <summary>Equal-power by default; linear selectable. Individually optional.</summary>
     public FadeCurveKind? Curve { get; init; }
 
+    [JsonIgnore]
     public bool IsEmpty =>
         FadeOutPoint is null && FadeInPoint is null &&
         FadeOutDuration is null && FadeInDuration is null && Curve is null;

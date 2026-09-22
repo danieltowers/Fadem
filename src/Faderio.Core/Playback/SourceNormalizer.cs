@@ -64,11 +64,15 @@ public sealed class NormalizedTrackSource : ITrackSource
 
     public long TotalFrames => (long)Math.Round(_inner.TotalFrames * _framesPerInnerFrame);
 
-    /// <summary>Position in normalized frames; mapped back to the file's own frames on seek.</summary>
+    /// <summary>Position in normalized frames; mapped back to the file's own frames on seek.
+    /// One inner frame is <c>_framesPerInnerFrame</c> normalized frames, so the getter multiplies
+    /// and the setter divides — the same direction as <see cref="TotalFrames"/>. v2 had these
+    /// inverted, so Position outran TotalFrames by (rate/44100)² and every file above 44.1 kHz
+    /// ended early (ticket 01, defect A).</summary>
     public long Position
     {
-        get => (long)Math.Round(_inner.Position / _framesPerInnerFrame);
-        set => _inner.Position = (long)Math.Round(value * _framesPerInnerFrame);
+        get => (long)Math.Round(_inner.Position * _framesPerInnerFrame);
+        set => _inner.Position = (long)Math.Round(value / _framesPerInnerFrame);
     }
 
     /// <summary>Frames in, frames out (the engine's convention): asks the NAudio pipeline for
