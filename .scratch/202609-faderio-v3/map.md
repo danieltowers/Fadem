@@ -91,6 +91,7 @@ asking whether the current work could fail that way again.
   the shell supplies. Rows keyed by engine-issued `RowId`. Frames never cross the shell seam.
   `Author()` reschedules a pending boundary. Reached by Design It Twice — four designs
   converged on the substance and differed only in packaging. Placement rule in `CLAUDE.md`.
+  Recorded as [ADR 0003](../../docs/adr/0003-command-surface-and-view.md).
 
 ## Not yet specified
 
