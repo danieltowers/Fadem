@@ -1,7 +1,7 @@
 # Migrate Faderio.Core into v3
 
 Type: task
-Status: open
+Status: claimed
 Blocked by: 01, 05
 
 ## Question

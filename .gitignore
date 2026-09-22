@@ -1,1 +1,8 @@
 /tmp/
+bin/
+obj/
+TestResults/
+*.trx
+*.user
+.vs/
+.idea/
