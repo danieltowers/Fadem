@@ -98,10 +98,22 @@ Grilling round 1 is done; these are **decided**, not proposals. Do not re-ask th
 5. **Equal exactness at every promised rate**: the same 1 ms landing tolerance, a landing row
    per rate (ticket 14), and the engine compensates the resampler's known latency if needed.
 
-**Round 2 still to ask**, and it depends on a survey of the user's library at
-`the user's music folder\` (counts by extension; rate/depth/channel distribution via
-ffprobe; MP3 VBR-vs-CBR by Xing/Info header; anything exotic) — **re-dispatch that survey
-first**, its result was lost with the previous session's context:
+**The library survey is done** — all 903 files probed, not a sample. Do not re-run it.
+
+| | count | rate | depth | channels |
+|---|---|---|---|---|
+| MP3 | 654 | 650 × 44.1 kHz, **4 × 48 kHz** | – | all stereo |
+| FLAC | 245 | all 44.1 kHz | all 16-bit | all stereo |
+| WAV | 4 | 44.1 kHz | 16-bit | stereo |
+
+- **Every MP3 is CBR 320 kbps.** 447 carry an "Info" tag, 207 have no Xing/Info/VBRI header
+  at all; ffprobe reports a flat 320000 on all 654. **Zero VBR-likely.** So the VBR gap from
+  ticket 02 does not touch this library — but it is still the common real-world case.
+- **Nothing exotic**: no mono, no multichannel, no hi-res, no 24-bit, no DSD, no
+  OGG/M4A/WMA/AIFF/Opus. 14 files over 20 min (longest ~26 min); none over an hour.
+- 15.4 GB, ~69 h of audio.
+
+**Round 2 still to ask**, now with the survey in hand:
 
 - Which **formats** are promised (tiers?), given what the library actually holds.
 - Which **rates** and **bit depths** get rows (16/24/32/float; 44.1/48/88.2/96/176.4/192?).
