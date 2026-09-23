@@ -67,6 +67,10 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   setting is dropped. A new **Transition now** button plays the next adjacency's transition
   from the playhead. ⏮ wraps under repeat-all, and ⏭ leaves repeat-one. The end-of-queue fade
   is cut, and *Stopped* follows the playhead.
+- [Does the visualiser come back?](issues/03-does-the-visualiser-come-back.md):
+  only as a clip light. The fade strip and the peak meter are cut. The light latches on
+  audible time when the mix goes over full scale, and names the cause: the in-flight adjacency
+  or the attended track, with a count. One engine command clears it, and it has no setting.
 
 ## Not yet specified
 

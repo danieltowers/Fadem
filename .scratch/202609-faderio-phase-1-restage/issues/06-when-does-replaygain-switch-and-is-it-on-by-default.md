@@ -21,3 +21,11 @@ Decide:
   end-of-track notice, queue advance, the ReplayGain switch, the now-playing row? Settle the
   rule once here, for all of them, so tickets 02 and 03 can cite it.
 - **Album gain** is out of scope (Phase 2); confirm track gain alone is enough.
+
+## Comments
+
+- From [Does the visualiser come back?](03-does-the-visualiser-come-back.md): clipping is
+  indicated by an engine-driven clip light and not prevented. Peak-aware gain
+  (`REPLAYGAIN_TRACK_PEAK`) is still this ticket's option to take or leave; the light covers
+  boost clipping either way. The visualiser no longer exists, so drop it from the audible-time
+  list above and put the clip light in its place.

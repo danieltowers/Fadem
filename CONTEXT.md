@@ -123,3 +123,11 @@ _Avoid_: Unsupported, failed, skipped
 Reading a file's header when it is added to decide whether it is promised or rejected. The
 probe decides before the file is queued and never after.
 _Avoid_: Validate, scan, check
+
+### Output
+
+**Clip**:
+Output the listener hears beyond full scale, attributed to what caused it: the adjacency whose
+transition was in flight, or else the attended track. Clips are latched until the user clears
+them.
+_Avoid_: Overload, distortion, peak
