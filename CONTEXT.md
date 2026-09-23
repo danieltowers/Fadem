@@ -91,7 +91,6 @@ _Avoid_: Set from here, mark, grab
 The voice whose playhead the shell displays and the seek bar scrubs. During a crossfade it
 remains the outgoing voice until that voice falls silent.
 
-
 **Length**:
 How long a track is, as the engine issues it: the span the playhead lives within, the value a
 from-end point resolves against, and what the seek bar spans. There is exactly one length per
