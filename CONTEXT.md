@@ -26,7 +26,8 @@ _Avoid_: Up next, playback list
 
 **Adjacency**:
 An ordered pair of tracks — the **outgoing** and the **incoming** — at a boundary in a
-sequence. Directional: A→B and B→A are distinct adjacencies.
+sequence. Directional: A→B and B→A are distinct adjacencies. A track can be adjacent to
+itself (A→A) when it repeats.
 _Avoid_: Track pair, boundary, junction
 
 **Skip**:

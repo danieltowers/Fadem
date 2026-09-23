@@ -93,6 +93,11 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   trimming is exact from the LAME tag for Info/Xing files and impossible from headers for bare
   CBR. In the library, 546 of 654 MP3s carry a valid tag and 103 are bare, none with
   `iTunSMPB`. The ACM decoder's offset is unmeasured. The choice itself graduates to a new ticket.
+- [What completes the editor?](issues/09-what-completes-the-editor.md): from-end on the fade-out
+  point only, converted on toggle. Curve is selectable per transition. Revert and Remove
+  transition are separate, and a blank save unauthors. Entry points are this → next (wrapping
+  like ⏭), previous → this, and this → this under repeat-one. Unsaved edits prompt, and
+  `Author` validates.
 
 ## Not yet specified
 
