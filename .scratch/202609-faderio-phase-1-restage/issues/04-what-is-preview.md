@@ -65,7 +65,9 @@ you hear is what the queue would play. When it ends, there is nothing to restore
 - **Queue buttons end the preview, then act** on the held queue: Play, Pause, ⏭, ⏮, seek and
   Transition now. They are never disabled for a preview.
 - **Rows removed during a preview do not stop it.** A preview plays tracks, not rows. When it
-  ends, the queue shows what the removal left (*Stopped* if its row went).
+  ends, the queue shows what the removal left. *Corrected by
+  [What does queue management add?](12-what-does-queue-management-add.md): a held queue whose
+  playing row is removed lands paused on the next row, not Stopped.*
 
 ### The editor during a preview
 

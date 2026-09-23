@@ -21,8 +21,13 @@ _Avoid_: Album, set
 
 **Queue**:
 The runtime playback sequence — what the player will play next. Playlists are loaded into the
-queue; the queue itself is never saved.
+queue; the queue itself is never saved, though its order can be saved as a new playlist.
 _Avoid_: Up next, playback list
+
+**Row**:
+One place in the queue, holding one track. The same track can fill several rows. A row keeps
+its identity when it moves; removing it removes that place, not the track.
+_Avoid_: Entry, item, slot
 
 **Adjacency**:
 An ordered pair of tracks — the **outgoing** and the **incoming** — at a boundary in a

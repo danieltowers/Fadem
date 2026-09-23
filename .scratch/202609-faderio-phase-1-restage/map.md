@@ -103,6 +103,11 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   crossfade of 1–30 s) and ReplayGain. A blank authored duration no longer borrows N. The
   settings live in `settings.json`, owned by the engine, and change through one
   `ChangeSettings` call. `--output=` goes.
+- [What does queue management add?](issues/12-what-does-queue-management-add.md): one
+  background `Add` for files, folders (recursive, natural order) and M3U, appending as files
+  resolve, with progress and cancel. `Move` reorders by drag, and `Remove` handles several rows.
+  `SaveAsPlaylist` writes UTF-8 `.m3u8` with absolute paths. Adding never starts playback, and
+  duplicates are allowed.
 
 ## Not yet specified
 
