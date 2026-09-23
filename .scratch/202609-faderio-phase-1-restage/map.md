@@ -55,15 +55,21 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
 
 <!-- one line per closed ticket: gist + link -->
 
+- [Audit the engine against v2's intent](issues/01-audit-the-engine-against-v2s-intent.md):
+  the engine already covers skip, repeat, shuffle, seek, ReplayGain, settings storage and
+  add-time rejection, with tests at the fake seam. Most of those have no shell yet. Missing:
+  folder add, reorder, M3U as a queue command, settings that change at runtime, preview and
+  the visualiser. To fix: the end-of-queue fade borrows an arbitrary A→x transition, decode
+  failures after a file opens are not skipped, device loss leaves the engine half-stopped,
+  and `Remove`/`Clear` are untested.
+
 ## Not yet specified
 
-- **The M3U format's detail.** v2 wrote M3U with tag duration, which no longer exists; the
-  writer now formats the engine's `Length`. Whether extended M3U, relative paths or playlist
-  reload semantics need a decision is unclear until queue management is staged.
 - **Unmeasured audio paths.** The WASAPI-exclusive resampling path, real music as opposed to
   test signals, and files longer than two seconds are not proven by the real-input matrix.
   Queue advance and long files will exercise them for the first time; whether any needs a
-  permanent test is open.
+  permanent test is open. The audit adds that no automated test reaches `NAudioAudioOutput` at
+  all: its device clock, WaveOut fallback and stop handling rest on the smoke checklist.
 - **Queue persistence across restarts.** v2 never persisted the queue itself. Whether a daily
   driver needs it may surface from the settings or robust-file tickets.
 
