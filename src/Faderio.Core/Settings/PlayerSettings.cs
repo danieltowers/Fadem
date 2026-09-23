@@ -7,6 +7,9 @@ public enum AudioOutputMode
 
     /// <summary>WASAPI exclusive (opted in): bit-perfect output, takes the device.</summary>
     WasapiExclusive,
+
+    /// <summary>WaveOut: the compatibility fallback, and the third mode the slice must prove on.</summary>
+    WaveOut,
 }
 
 /// <summary>What an adjacency with no authored transition does.</summary>

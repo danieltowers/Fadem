@@ -1,0 +1,267 @@
+using Faderio.Core.Domain;
+using Faderio.Core.Playback;
+using Faderio.Core.Transitions;
+
+namespace Faderio.App;
+
+/// <summary>
+/// The WinForms shell for the slice (ticket 05): add files, a plain list, a context menu for
+/// "Edit transition (this → next)", transport, a seek bar in milliseconds, and the transition
+/// editor. It renders <see cref="PlayerView"/>s and issues commands; it holds no engine state
+/// between calls (the placement rule in CLAUDE.md). The seek bar's Maximum is the track length
+/// in milliseconds, so no scaling exists to get wrong (ticket 06).
+/// </summary>
+internal sealed class MainForm : Form
+{
+    private readonly PlaybackEngine _engine;
+
+    internal readonly ListView _queueList;
+    internal readonly TrackBar _seek;
+    internal readonly Label _time;
+    internal readonly Button _addFiles;
+    internal readonly Button _prev;
+    internal readonly Button _playPause;
+    internal readonly Button _stop;
+    internal readonly Button _next;
+    internal readonly ToolStripStatusLabel _status;
+    internal readonly TransitionEditorPanel _editor;
+    internal readonly ToolStripMenuItem _editTransition;
+    private readonly System.Windows.Forms.Timer _timer;
+
+    private long _shownQueue = -1;
+    private bool _seekDragging;
+
+    public MainForm(PlaybackEngine engine, ITransitionStore store, PostingSink sink)
+    {
+        _engine = engine;
+
+        Text = "faderio";
+        MinimumSize = new Size(760, 480);
+        Size = new Size(1040, 600);
+        StartPosition = FormStartPosition.CenterScreen;
+
+        _status = new ToolStripStatusLabel("Ready.") { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
+        var statusStrip = new StatusStrip { Items = { _status } };
+
+        _addFiles = new Button { Text = "Add files…", Width = 90, Height = 28, Margin = new Padding(4, 8, 8, 4) };
+        var symbols = new Font("Segoe UI Symbol", 9f);
+        _prev = new Button { Text = "⏮", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
+        _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
+        _stop = new Button { Text = "⏹", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
+        _next = new Button { Text = "⏭", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
+        _seek = new TrackBar
+        {
+            Dock = DockStyle.Fill,
+            Minimum = 0,
+            Maximum = 0,
+            TickStyle = TickStyle.None,
+            Margin = new Padding(8, 6, 8, 0),
+        };
+        _time = new Label
+        {
+            Text = "0:00 / -0:00",
+            Width = 130,
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoSize = false,
+            Dock = DockStyle.Fill,
+        };
+        // A table, not anchors: the seek bar takes whatever width is left between the buttons
+        // and the readout, at any window size.
+        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 7, RowCount = 1 };
+        foreach (var _ in Enumerable.Range(0, 5))
+        {
+            transport.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        }
+        transport.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        transport.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+        transport.Controls.Add(_addFiles, 0, 0);
+        transport.Controls.Add(_prev, 1, 0);
+        transport.Controls.Add(_playPause, 2, 0);
+        transport.Controls.Add(_stop, 3, 0);
+        transport.Controls.Add(_next, 4, 0);
+        transport.Controls.Add(_seek, 5, 0);
+        transport.Controls.Add(_time, 6, 0);
+
+        _queueList = new ListView
+        {
+            Dock = DockStyle.Fill,
+            View = View.Details,
+            FullRowSelect = true,
+            MultiSelect = false,
+            HideSelection = false,
+        };
+        _queueList.Columns.Add("#", 36);
+        _queueList.Columns.Add("Title", 320);
+        _queueList.Columns.Add("Artist", 200);
+        _queueList.Columns.Add("Length", 70, HorizontalAlignment.Right);
+
+        _editTransition = new ToolStripMenuItem("Edit transition (this → next)");
+        var menu = new ContextMenuStrip { Items = { _editTransition } };
+        menu.Opening += (_, _) => _editTransition.Enabled = SelectedAdjacency() is not null;
+        _editTransition.Click += (_, _) => EditSelectedTransition();
+        _queueList.ContextMenuStrip = menu;
+        _queueList.DoubleClick += (_, _) => PlaySelected();
+
+        _editor = new TransitionEditorPanel(engine, store, ShowNotice, ChooseRenderPath);
+
+        // Docking order: right-docked editor and bottom strip first, the fill-docked list last.
+        Controls.Add(_queueList);
+        Controls.Add(_editor);
+        Controls.Add(statusStrip);
+        Controls.Add(transport);
+
+        _addFiles.Click += (_, _) => AddFiles();
+        _playPause.Click += (_, _) => _engine.TogglePlayPause();
+        _prev.Click += (_, _) => _engine.Previous();
+        _stop.Click += (_, _) => _engine.Stop();
+        _next.Click += (_, _) => _engine.Next();
+        _seek.MouseDown += (_, _) => _seekDragging = true;
+        _seek.MouseUp += (_, _) =>
+        {
+            _seekDragging = false;
+            _engine.Seek(Playhead.FromMilliseconds(_seek.Value)); // straight through, no scaling
+        };
+
+        sink.Changed += Render;
+        sink.Noticed += ShowNotice;
+
+        _timer = new System.Windows.Forms.Timer { Interval = 100 };
+        _timer.Tick += (_, _) => Render(_engine.View);
+        _timer.Start();
+
+        FormClosing += (_, _) =>
+        {
+            _timer.Stop();
+            _engine.Dispose();
+        };
+
+        Render(_engine.View);
+    }
+
+    // ── Rendering: read, render, forget ─────────────────────────────────────────────────
+
+    internal void Render() => Render(_engine.View);
+
+    internal void Render(PlayerView view)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+        _playPause.Text = Presenter.PlayPauseGlyph(view.Transport);
+
+        if (view.QueueVersion != _shownQueue)
+        {
+            RebuildRows(view);
+            _shownQueue = view.QueueVersion;
+        }
+        for (var i = 0; i < _queueList.Items.Count && i < view.Queue.Count; i++)
+        {
+            var current = view.Queue[i].IsCurrent && view.Transport != Transport.Stopped;
+            _queueList.Items[i].BackColor = current ? SystemColors.Info : SystemColors.Window;
+        }
+
+        var attended = view.Attended;
+        _seek.Maximum = attended?.Length.Milliseconds ?? 0;
+        if (!_seekDragging)
+        {
+            _seek.Value = Math.Clamp(attended?.Playhead.Milliseconds ?? 0, _seek.Minimum, _seek.Maximum);
+        }
+        _time.Text = attended is null
+            ? "0:00 / -0:00"
+            : $"{Presenter.Fmt(attended.Playhead)} / -{Presenter.FmtRemaining(attended.Remaining)}";
+
+        _editor.Refresh(view);
+    }
+
+    private void RebuildRows(PlayerView view)
+    {
+        _queueList.BeginUpdate();
+        _queueList.Items.Clear();
+        var n = 1;
+        foreach (var row in view.Queue)
+        {
+            var item = new ListViewItem((n++).ToString()) { Tag = row.Id };
+            item.SubItems.Add(string.IsNullOrEmpty(row.Track.Title) ? Path.GetFileName(row.Track.FilePath) : row.Track.Title);
+            item.SubItems.Add(row.Track.Artist);
+            item.SubItems.Add(Presenter.Fmt(row.Track.Length));
+            _queueList.Items.Add(item);
+        }
+        _queueList.EndUpdate();
+    }
+
+    private void ShowNotice(string message)
+    {
+        if (!IsDisposed)
+        {
+            _status.Text = message;
+        }
+    }
+
+    // ── Commands: one intent, one engine call ───────────────────────────────────────────
+
+    private void AddFiles()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Title = "Add audio files",
+            Filter = "Promised audio (WAV, FLAC, MP3)|*.wav;*.flac;*.mp3|All files|*.*",
+            Multiselect = true,
+        };
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            AddPaths(dialog.FileNames);
+        }
+    }
+
+    internal void AddPaths(IEnumerable<string> paths)
+    {
+        var report = _engine.AddTracks(paths);
+        ShowNotice(Presenter.Summarise(report));
+    }
+
+    internal static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
+
+    private void PlaySelected()
+    {
+        if (_queueList.SelectedItems.Count == 1)
+        {
+            _engine.PlayRow(RowOf(_queueList.SelectedItems[0]));
+        }
+    }
+
+    internal void PlayRowAt(int index) => _engine.PlayRow(RowOf(_queueList.Items[index]));
+
+    internal Adjacency? SelectedAdjacency() =>
+        _queueList.SelectedIndices.Count == 1 ? Presenter.AdjacencyAt(_engine.View, _queueList.SelectedIndices[0]) : null;
+
+    internal Adjacency? AdjacencyAt(int rowIndex) => Presenter.AdjacencyAt(_engine.View, rowIndex);
+
+    private void EditSelectedTransition()
+    {
+        if (SelectedAdjacency() is { } adjacency)
+        {
+            _editor.Edit(adjacency);
+        }
+    }
+
+    internal void EditTransitionAt(int rowIndex)
+    {
+        if (AdjacencyAt(rowIndex) is { } adjacency)
+        {
+            _editor.Edit(adjacency);
+        }
+    }
+
+    private string? ChooseRenderPath(string suggestedName)
+    {
+        using var dialog = new SaveFileDialog
+        {
+            Title = "Render this boundary",
+            Filter = "WAV|*.wav",
+            DefaultExt = "wav",
+            FileName = suggestedName,
+        };
+        return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
+    }
+}

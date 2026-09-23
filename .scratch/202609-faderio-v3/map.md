@@ -144,6 +144,20 @@ asking whether the current work could fail that way again.
   test passes at 1 ms** with 100 ms of fake device latency. **162 tests pass.** Found on the way:
   v2's ReplayGain reader threw on every ID3v2-tagged file, unreached by any v2 test.
 
+- [Render a boundary to a file](issues/11-render-a-boundary-to-a-file.md):
+  Built. `WavFileAudioOutput` binds the seam to a float WAV; `Renderer.RenderBoundary` renders
+  pre-roll, transition and tail through a fresh engine. Tested: the fade lands within 1 ms in
+  the file, and the file is frame-for-frame what the fake renders in memory.
+
+- [Build the shell](issues/13-build-the-shell.md):
+  Built. `NAudioAudioOutput` (three modes, device rate, `FramesEmitted` from the device clock,
+  a render-thread stop signalled as end-of-stream), `PostingSink`, a `Presenter` with exactly
+  ticket 06's list, `MainForm` and the editor, launch arguments instead of a settings dialog.
+  Headless-form tests over the fake output poke the real controls. **Core 165, App 26 tests
+  pass.** The Looks half of the smoke checklist passed on screenshots of the real app, with
+  two layout defects found and fixed only by the screenshot. **The Sounds half is the user's**
+  and is the map's destination: it has not been run.
+
 ## Not yet specified
 
 - **Restaging the rest of Phase 1.** Once the slice is trustworthy, how the remaining

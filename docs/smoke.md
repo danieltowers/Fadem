@@ -12,8 +12,15 @@ Extend it when the shell grows; never let an item go stale.
 
 ## Looks — the agent runs this
 
-Launch the app (see the `run` skill), take a screenshot, and check each item against it.
-Report the result item by item in the session's hand-off.
+Launch the app, take a screenshot, and check each item against it. Report the result item by
+item in the session's hand-off. Plain arguments are files to queue; `--play` starts them and
+`--edit-first` opens the editor on the first boundary; `--output=` picks the mode:
+
+```
+dotnet run --project src/Faderio.App -- "a.wav" "b.wav" --play --edit-first --output=wasapi-shared
+```
+
+Capture the window with `PrintWindow` rather than a screen grab, so it need not be in front.
 
 - [ ] The window opens without an error dialog.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.

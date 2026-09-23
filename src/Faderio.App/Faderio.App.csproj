@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>faderio</AssemblyName>
+    <RootNamespace>Faderio.App</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Faderio.Core\Faderio.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The shell is reachable by a test from its first commit (ADR 0002, S5). -->
+    <InternalsVisibleTo Include="Faderio.App.Tests" />
+  </ItemGroup>
+
+</Project>

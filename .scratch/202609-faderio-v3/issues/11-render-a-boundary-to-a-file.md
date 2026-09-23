@@ -1,7 +1,7 @@
 # Render a boundary to a file
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 07
 
 ## Question
@@ -47,7 +47,28 @@ This ticket is a **task**, not a decision. If a real design question surfaces wh
 
 ## Answer
 
-_(pending)_
+Done, 2026-09-23, in the same session as [ticket 13](13-build-the-shell.md), which needed it for
+its Render button.
+
+- **`WavFileAudioOutput`** (Core): the output seam bound to a 32-bit float WAV through
+  `WaveFileWriter`. Deterministic, faster than real time, no latency: `FramesEmitted` equals
+  what was rendered, and `Stop()` resets it like every other output. `Advance(Frames)` pulls
+  the engine in device-sized blocks.
+- **`Renderer.RenderBoundary(Adjacency, ITransitionStore, wavPath, preRoll?, tail?)`**: a fresh
+  engine on that output with a `RecordingSink`, both tracks through the production probe (a
+  rejected file throws, naming it), `PlayRow` on the outgoing row, a seek to the fade-out point
+  minus the pre-roll (5 s by default), then blocks until the attended voice has been the
+  incoming one for the tail (5 s) or playback ends. Returns a `RenderReport` with the path, the
+  rendered length and where in the file the fade-out point sits.
+- **Three tests** (`RendererTests`): the fade in the file starts within 1 ms of where it was
+  authored, measured with the same extrapolating onset detector as the S3 test; the file is
+  frame-for-frame the audio the fake output renders in memory for the same boundary, so the
+  artifact the human hears is the artifact the suite measured; and a rejected file is refused
+  loudly.
+
+The shell's "Render this boundary" button calls this with a path from a save dialog and reports
+the rendered length and the fade-out point's position in the file on the status strip.
+
 
 ## Noted from ticket 06
 
