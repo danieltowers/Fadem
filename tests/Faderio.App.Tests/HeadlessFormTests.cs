@@ -145,6 +145,52 @@ public sealed class HeadlessFormTests
     });
 
     [Fact]
+    public void OpenPlaylist_PassesThePickedPlaylistToAdd_AndAppendsItsTracks() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 1, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 1, 0.2);
+        h.Form.AddPaths(new[] { a });
+        var playlist = Path.Combine(h.TempDir, "mix † ⭐️.m3u8");
+        File.WriteAllLines(playlist, new[] { "#EXTM3U", b, a });
+        h.Form.ChoosePlaylists = () => new[] { playlist };
+
+        Click(h.Form._openPlaylist);
+
+        Assert.Equal(new[] { a, b, a }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
+        Assert.Equal(3, h.Form._queueList.Items.Count);
+    });
+
+    [Fact]
+    public void SaveAsPlaylist_WritesTheQueueToThePickedPath_AndSaysSo() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 1, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 1, 0.2);
+        h.Form.AddPaths(new[] { b, a });
+        var playlist = Path.Combine(h.TempDir, "saved.m3u8");
+        h.Form.ChoosePlaylistSavePath = () => playlist;
+
+        Click(h.Form._saveAsPlaylist);
+
+        Assert.Equal(new[] { b, a }, File.ReadAllLines(playlist).Where(l => !l.StartsWith('#')));
+        Assert.Equal("Saved 2 tracks to saved.m3u8.", h.Form._status.Text);
+    });
+
+    [Fact]
+    public void SaveAsPlaylist_Cancelled_WritesNothing() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Form.AddPaths(new[] { TestAudio.WriteDcWav("alpha.wav", 1, 0.4) });
+        h.Form.ChoosePlaylistSavePath = () => null;
+
+        Click(h.Form._saveAsPlaylist);
+
+        Assert.Empty(Directory.GetFiles(h.TempDir, "*.m3u8"));
+        Assert.Equal("Ready.", h.Form._status.Text);
+    });
+
+    [Fact]
     public void DroppingFilesAndFolders_OnTheList_AddsThemInTheOrderDropped() => RunSta(() =>
     {
         using var h = new Harness();

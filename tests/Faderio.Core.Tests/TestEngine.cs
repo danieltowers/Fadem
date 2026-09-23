@@ -88,6 +88,15 @@ public sealed class TestEngine : IDisposable
         };
     }
 
+    /// <summary>A track of a stated length for a path that need not exist: for tests that never
+    /// play it, only queue, order or save it.</summary>
+    public Track TrackOfLength(string filePath, double seconds) => new()
+    {
+        FilePath = filePath,
+        Title = Path.GetFileNameWithoutExtension(filePath),
+        Length = Length.FromFrames((long)Math.Round(seconds * 44100), 44100),
+    };
+
     public RowId RowOf(string filePath) =>
         View.Queue.First(r => r.Track.FilePath == filePath).Id;
 

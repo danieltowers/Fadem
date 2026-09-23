@@ -55,6 +55,9 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
       "1" to "10" in natural order. The cover scans are ignored without a notice.
 - [ ] Dropping a mix of files and folders from Explorer onto the list adds them in the order
       dropped, each folder expanded in place.
+- [ ] **Save as playlist…** then **Open playlist…** on the file just saved doubles the queue
+      in the same order, and the status strip names the file saved. Save it in a folder whose
+      name has `†` or `⭐️`.
 - [ ] Adding a rejected file (an `.m4a`, an `.ogg`, or a file with more than two channels)
       leaves the list unchanged and shows one notice naming the property that failed and
       pointing at `docs/supported-audio.md`. Nothing is queued, nothing plays.

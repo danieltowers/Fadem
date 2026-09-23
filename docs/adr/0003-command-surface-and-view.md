@@ -85,3 +85,11 @@ The worker lists a folder off the lock when the add reaches it and puts its file
 folder stood, so a drop of files and folders keeps its order. Until then the folder counts as
 one path in `View.Adding`. **Add files…**, **Add folder…** and a drop from Explorer each pass
 their paths straight to `Add`; the shell never lists a directory.
+
+`Add` also opens `.m3u` and `.m3u8` playlists
+([issue 03](../../.scratch/202609-faderio-phase-1-build/issues/03-open-and-save-playlists.md)),
+read off the lock like a folder with their entries put where they stood. Opening a playlist is
+adding it, so it appends; there is no "replace the queue". `SaveAsPlaylist(path)` writes the
+visible order, taking the rows under the lock and writing the file off it, and reports how it
+went as a notice. **Open playlist…** and **Save as playlist…** are two file dialogs; the shell
+never reads a playlist or reads `View.Queue` to write one.

@@ -7,21 +7,30 @@ public sealed partial class PlaybackEngine
     // ── Adding: probes off the lock, rows appended under it one at a time ───────────────
 
     /// <summary>One call to <see cref="Add"/>: its paths still to resolve, in order, and what
-    /// became of the ones resolved so far. A folder is replaced in place by its files once listed.
-    /// Touched only under the engine lock.</summary>
+    /// became of the ones resolved so far. A folder or playlist is replaced in place by its files
+    /// once listed. Touched only under the engine lock.</summary>
     private sealed class AddJob
     {
-        public AddJob(IReadOnlyList<string> paths) => Remaining = new LinkedList<string>(paths);
+        public AddJob(IReadOnlyList<string> paths) =>
+            Remaining = new LinkedList<PendingPath>(paths.Select(p => new PendingPath(p, Named: true)));
 
-        public LinkedList<string> Remaining { get; }
+        public LinkedList<PendingPath> Remaining { get; }
         public List<QueueRow> Added { get; } = new();
         public List<Rejection> Rejected { get; } = new();
         public bool Reported { get; set; }
         public TaskCompletionSource<AddReport> Done { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
+    /// <summary>A path still to resolve. <see cref="Named"/> when the caller passed it to
+    /// <see cref="Add"/>, rather than a folder or playlist yielding it: only a named playlist is
+    /// opened, so a playlist naming a playlist, or itself, is probed and rejected, never followed.</summary>
+    private readonly record struct PendingPath(string Path, bool Named);
+
     /// <summary>A path taken by the worker, and the run it was taken in.</summary>
-    private sealed record AddStep(AddJob Job, string Path, long RunId);
+    private sealed record AddStep(AddJob Job, PendingPath Pending, long RunId)
+    {
+        public string Path => Pending.Path;
+    }
 
     /// <summary>A report to hand to its caller once the lock is released.</summary>
     private sealed record AddCompletion(AddJob Job, AddReport Report);
@@ -52,8 +61,10 @@ public sealed partial class PlaybackEngine
 
     /// <summary>
     /// Queues files at the end of the queue, in the given order, and returns at once. A folder
-    /// stands for every promised file under it (<see cref="FolderContents"/>), listed when the add
-    /// reaches it and counted as one path until then; the shell never lists a directory. Each file
+    /// stands for every promised file under it (<see cref="FolderContents"/>), and an
+    /// <c>.m3u</c> or <c>.m3u8</c> for its entries (<see cref="M3UPlaylist.Read"/>), a missing one
+    /// rejected like any file; each is listed when the add reaches it and counted as one path until
+    /// then. The shell never lists a directory or reads a playlist. Each file
     /// is probed and its tags read off the engine lock and off the caller's thread; the lock is
     /// taken only to append its row. <see cref="PlayerView.Adding"/> counts the files resolved.
     /// A second add waits behind the first and shares its progress. When the run ends, one notice
@@ -127,7 +138,12 @@ public sealed partial class PlaybackEngine
                 }
                 if (Directory.Exists(step.Path))
                 {
-                    Complete(Run(ListedOrRejected(step)));
+                    Complete(Run(ListedOrRejected(step, ListFolder)));
+                    continue;
+                }
+                if (step.Pending.Named && M3UPlaylist.IsPlaylist(step.Path) && File.Exists(step.Path))
+                {
+                    Complete(Run(ListedOrRejected(step, M3UPlaylist.Read)));
                     continue;
                 }
                 (Track? Track, Rejection? Rejection) resolved;
@@ -166,9 +182,9 @@ public sealed partial class PlaybackEngine
             {
                 if (job.Remaining.Count > 0)
                 {
-                    var path = job.Remaining.First!.Value;
+                    var pending = job.Remaining.First!.Value;
                     job.Remaining.RemoveFirst();
-                    return new AddStep(job, path, _addRunId);
+                    return new AddStep(job, pending, _addRunId);
                 }
             }
         }
@@ -199,14 +215,14 @@ public sealed partial class PlaybackEngine
         return FinishStep(job, done);
     }
 
-    /// <summary>Lists <paramref name="step"/>'s folder off the lock and returns the locked step
-    /// that puts its files where the folder stood. A folder that cannot be listed is a rejection
+    /// <summary>Lists <paramref name="step"/>'s folder or playlist off the lock and returns the
+    /// locked step that puts its files where it stood. One that cannot be listed is a rejection
     /// like a file that cannot be read.</summary>
-    private Func<List<AddCompletion>> ListedOrRejected(AddStep step)
+    private Func<List<AddCompletion>> ListedOrRejected(AddStep step, Func<string, IReadOnlyList<string>> list)
     {
         try
         {
-            var files = ListFolder(step.Path);
+            var files = list(step.Path);
             return () => ApplyListed(step, files);
         }
         catch (Exception e)
@@ -220,14 +236,14 @@ public sealed partial class PlaybackEngine
     {
         if (_disposed || step.RunId != _addRunId)
         {
-            return new List<AddCompletion>(); // the run was cancelled while this folder was listed
+            return new List<AddCompletion>(); // the run was cancelled while this was listed
         }
         ObserveClock();
         for (var i = files.Count - 1; i >= 0; i--)
         {
-            step.Job.Remaining.AddFirst(files[i]);
+            step.Job.Remaining.AddFirst(new PendingPath(files[i], Named: false));
         }
-        _addTotal += files.Count - 1; // the folder counted as one path until now
+        _addTotal += files.Count - 1; // the folder or playlist counted as one path until now
         return FinishStep(step.Job, new List<AddCompletion>());
     }
 

@@ -6,8 +6,9 @@ namespace Faderio.App;
 
 /// <summary>
 /// The WinForms shell for the slice (ticket 05): add files or a folder, or drop either on the
-/// list (build issue 02), a plain list, a context menu for "Edit transition (this → next)",
-/// transport, a seek bar in milliseconds, and the transition editor. It renders <see cref="PlayerView"/>s and issues commands; it holds no engine state
+/// list (build issue 02), open a playlist or save the queue as one (build issue 03), a plain
+/// list, a context menu for "Edit transition (this → next)", transport, a seek bar in
+/// milliseconds, and the transition editor. It renders <see cref="PlayerView"/>s and issues commands; it holds no engine state
 /// between calls (the placement rule in CLAUDE.md). The seek bar's Maximum is the track length
 /// in milliseconds, so no scaling exists to get wrong (ticket 06).
 /// </summary>
@@ -20,6 +21,8 @@ internal sealed class MainForm : Form
     internal readonly Label _time;
     internal readonly Button _addFiles;
     internal readonly Button _addFolder;
+    internal readonly Button _openPlaylist;
+    internal readonly Button _saveAsPlaylist;
     internal readonly Button _prev;
     internal readonly Button _playPause;
     internal readonly Button _stop;
@@ -39,6 +42,8 @@ internal sealed class MainForm : Form
         _engine = engine;
         ChooseFiles = ShowFilesDialog;
         ChooseFolders = ShowFolderDialog;
+        ChoosePlaylists = ShowPlaylistDialog;
+        ChoosePlaylistSavePath = ShowSavePlaylistDialog;
 
         Text = "faderio";
         MinimumSize = new Size(760, 480);
@@ -50,8 +55,13 @@ internal sealed class MainForm : Form
         _cancelAdd = new ToolStripButton("Cancel") { Available = false, DisplayStyle = ToolStripItemDisplayStyle.Text };
         var statusStrip = new StatusStrip { Items = { _status, _addProgress, _cancelAdd } };
 
-        _addFiles = new Button { Text = "Add files…", Width = 90, Height = 28, Margin = new Padding(4, 8, 4, 4) };
-        _addFolder = new Button { Text = "Add folder…", Width = 90, Height = 28, Margin = new Padding(0, 8, 8, 4) };
+        _addFiles = new Button { Text = "Add files…", Width = 90, Height = 28, Margin = new Padding(4, 8, 4, 0) };
+        _addFolder = new Button { Text = "Add folder…", Width = 90, Height = 28, Margin = new Padding(0, 8, 4, 0) };
+        _openPlaylist = new Button { Text = "Open playlist…", Width = 104, Height = 28, Margin = new Padding(0, 8, 4, 0) };
+        _saveAsPlaylist = new Button { Text = "Save as playlist…", Width = 116, Height = 28, Margin = new Padding(0, 8, 4, 0) };
+        // The queue's own commands get a row of their own, so the seek bar keeps its travel.
+        var queueBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36, WrapContents = false };
+        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _openPlaylist, _saveAsPlaylist });
         var symbols = new Font("Segoe UI Symbol", 9f);
         _prev = new Button { Text = "⏮", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
@@ -75,21 +85,19 @@ internal sealed class MainForm : Form
         };
         // A table, not anchors: the seek bar takes whatever width is left between the buttons
         // and the readout, at any window size.
-        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 8, RowCount = 1 };
-        foreach (var _ in Enumerable.Range(0, 6))
+        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 6, RowCount = 1 };
+        foreach (var _ in Enumerable.Range(0, 4))
         {
             transport.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         }
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
-        transport.Controls.Add(_addFiles, 0, 0);
-        transport.Controls.Add(_addFolder, 1, 0);
-        transport.Controls.Add(_prev, 2, 0);
-        transport.Controls.Add(_playPause, 3, 0);
-        transport.Controls.Add(_stop, 4, 0);
-        transport.Controls.Add(_next, 5, 0);
-        transport.Controls.Add(_seek, 6, 0);
-        transport.Controls.Add(_time, 7, 0);
+        transport.Controls.Add(_prev, 0, 0);
+        transport.Controls.Add(_playPause, 1, 0);
+        transport.Controls.Add(_stop, 2, 0);
+        transport.Controls.Add(_next, 3, 0);
+        transport.Controls.Add(_seek, 4, 0);
+        transport.Controls.Add(_time, 5, 0);
 
         _queueList = new ListView
         {
@@ -128,9 +136,12 @@ internal sealed class MainForm : Form
         Controls.Add(_editor);
         Controls.Add(statusStrip);
         Controls.Add(transport);
+        Controls.Add(queueBar);
 
         _addFiles.Click += (_, _) => AddChosen(ChooseFiles);
         _addFolder.Click += (_, _) => AddChosen(ChooseFolders);
+        _openPlaylist.Click += (_, _) => AddChosen(ChoosePlaylists);
+        _saveAsPlaylist.Click += (_, _) => SaveAsPlaylist();
         _cancelAdd.Click += (_, _) => _engine.CancelAdd();
         _playPause.Click += (_, _) => _engine.TogglePlayPause();
         _prev.Click += (_, _) => _engine.Previous();
@@ -244,6 +255,13 @@ internal sealed class MainForm : Form
     /// shell only passes them on.</summary>
     internal Func<IReadOnlyList<string>> ChooseFolders { get; set; }
 
+    /// <summary>The playlists picked in the Open playlist dialog, or none. Opening one is adding
+    /// it: the engine reads it and appends its tracks; there is no "replace the queue".</summary>
+    internal Func<IReadOnlyList<string>> ChoosePlaylists { get; set; }
+
+    /// <summary>The path picked in the Save as playlist dialog, or null.</summary>
+    internal Func<string?> ChoosePlaylistSavePath { get; set; }
+
     private void AddChosen(Func<IReadOnlyList<string>> choose)
     {
         var paths = choose();
@@ -272,6 +290,38 @@ internal sealed class MainForm : Form
             UseDescriptionForTitle = true,
         };
         return dialog.ShowDialog(this) == DialogResult.OK ? new[] { dialog.SelectedPath } : Array.Empty<string>();
+    }
+
+    private IReadOnlyList<string> ShowPlaylistDialog()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Title = "Open playlist",
+            Filter = "Playlists (M3U, M3U8)|*.m3u;*.m3u8|All files|*.*",
+            Multiselect = true,
+        };
+        return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileNames : Array.Empty<string>();
+    }
+
+    private string? ShowSavePlaylistDialog()
+    {
+        using var dialog = new SaveFileDialog
+        {
+            Title = "Save the queue as a playlist",
+            Filter = "UTF-8 playlist (M3U8)|*.m3u8",
+            DefaultExt = "m3u8",
+        };
+        return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
+    }
+
+    /// <summary>The engine writes the file and says how it went; the shell never reads the queue
+    /// to write it.</summary>
+    private void SaveAsPlaylist()
+    {
+        if (ChoosePlaylistSavePath() is { } path)
+        {
+            _engine.SaveAsPlaylist(path);
+        }
     }
 
     /// <summary>Returns at once; rows, progress and the closing notice arrive through the sink.

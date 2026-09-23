@@ -106,48 +106,4 @@ public sealed class PlaybackQueueTests
         // And it is a genuine permutation of the same tracks.
         Assert.Equal(new[] { "a", "b", "c", "d", "e" }.OrderBy(x => x), Paths(queue).OrderBy(x => x));
     }
-
-    [Fact]
-    public void M3U_SaveLoad_RoundTripsAQueueOfTracks()
-    {
-        var dir = Path.Combine(Path.GetTempPath(), "faderio-m3u", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var tracks = new List<Track>
-            {
-                new() { FilePath = Path.Combine(dir, "one.wav"), Title = "One", Artist = "Artist A", Length = Length.FromFrames(4427640, 44100) },
-                new() { FilePath = Path.Combine(dir, "two.wav"), Title = "Two", Length = Length.FromFrames(529200, 44100) },
-            };
-            var playlistPath = Path.Combine(dir, "queue.m3u");
-            M3UPlaylist.Save(playlistPath, tracks);
-
-            var loaded = M3UPlaylist.Load(playlistPath);
-            Assert.Equal(2, loaded.Count);
-            Assert.Equal(tracks[0].FilePath, loaded[0]);
-            Assert.Equal(tracks[1].FilePath, loaded[1]);
-            Assert.Contains("#EXTINF:100,Artist A - One", File.ReadAllText(playlistPath));
-        }
-        finally
-        {
-            Directory.Delete(dir, recursive: true);
-        }
-    }
-
-    [Fact]
-    public void M3U_HasTheExtm3uHeader()
-    {
-        var dir = Path.Combine(Path.GetTempPath(), "faderio-m3u", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var playlistPath = Path.Combine(dir, "q.m3u");
-            M3UPlaylist.Save(playlistPath, new List<Track> { new() { FilePath = "x.wav" } });
-            Assert.StartsWith("#EXTM3U", File.ReadAllText(playlistPath));
-        }
-        finally
-        {
-            Directory.Delete(dir, recursive: true);
-        }
-    }
 }

@@ -48,6 +48,32 @@ public sealed partial class PlaybackEngine
         return new QueueRow(entry.Id, track, _queue.Current == entry && _attendedVoice is null);
     }
 
+    /// <summary>Writes the queue in its visible order (under shuffle, the play order) as a UTF-8
+    /// playlist at <paramref name="path"/> (<see cref="M3UPlaylist.Write"/>). The queue itself is
+    /// never saved; this makes a new playlist from it. The rows are taken under the lock and the
+    /// file is written off it. Total: the outcome is a notice either way.</summary>
+    public void SaveAsPlaylist(string path)
+    {
+        ThrowIfDisposed();
+        var tracks = Run(() =>
+        {
+            ObserveClock();
+            return _queue.Entries.Select(e => e.Track).ToList();
+        });
+        string notice;
+        try
+        {
+            M3UPlaylist.Write(path, tracks);
+            var count = tracks.Count == 1 ? "1 track" : $"{tracks.Count} tracks";
+            notice = $"Saved {count} to {Path.GetFileName(path)}.";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            notice = $"Could not save the playlist: {e.Message}";
+        }
+        Run(() => RaiseNotice(notice));
+    }
+
     public void Remove(RowId row)
     {
         ThrowIfDisposed();
