@@ -48,3 +48,12 @@ A reader coming from v2 will find its planning docs arguing the opposite — *"o
 does not affect fade timing or alignment... it only shifts audibility."* That is true of the
 **trigger** side and false of the **authoring** side, and the authoring side is where the human
 is. Transitions are still scheduled against the mixer timeline; nothing here changes that.
+
+## Addendum: the rule, stated generally (2026-09-23)
+
+The `View` describes what the listener hears: the playhead, the attended voice, the now-playing
+row, *Stopped*, the clip light and a preview's phase all follow audible time. Commands take
+effect at the decode position as soon as possible and are heard one device buffer later; the
+engine never delays a command to line it up with the playhead. Settings in the `View` show
+their value as set, and notices carry no position. Settled in
+[When does ReplayGain switch, and is it on by default?](../../.scratch/202609-faderio-phase-1-restage/issues/06-when-does-replaygain-switch-and-is-it-on-by-default.md).

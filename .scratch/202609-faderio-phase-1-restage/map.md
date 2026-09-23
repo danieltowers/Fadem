@@ -80,6 +80,11 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   its boundary is scheduled, so a failure re-targets the boundary. A decode error ends the audio
   there. Device loss pauses without resuming; the launch fallback is exclusive → shared →
   WaveOut. Notices go to a strip with a session list, and nothing is swallowed.
+- [When does ReplayGain switch, and is it on by default?](issues/06-when-does-replaygain-switch-and-is-it-on-by-default.md):
+  track gain from tags only, on by default, with 0 dB for untagged tracks and a toggle that
+  applies at once to live voices. It is nearly inert: 2 of 342 sampled files are tagged. It
+  also settles the audible-time rule: the `View` shows what is heard, and commands act as soon
+  as possible.
 
 ## Not yet specified
 
@@ -106,6 +111,9 @@ Beyond this map's destination; returns only if the destination is redrawn.
   [What do skip, repeat and end-of-queue do?](issues/02-what-do-skip-repeat-and-end-of-queue-do.md):
   it needs a store key, an editor mode and a glossary term to serve the last track of a
   session. It returns as a fresh effort if daily use misses it.
+- **Loudness scanning** (computing gain for untagged files). Ruled out by
+  [When does ReplayGain switch, and is it on by default?](issues/06-when-does-replaygain-switch-and-is-it-on-by-default.md):
+  it is a library feature (Phase 2), and an external scanner can tag the files.
 - **v2/v3 store coexistence.** v2 is retired for listening, so the two never share the file.
 - Everything the predecessor ruled out: library manager, playlist manager, cross-platform,
   MusicBee interop, tag editing, sidecar transition files.

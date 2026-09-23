@@ -96,6 +96,12 @@ How far the decoder has read ahead of the playhead. Engine-internal, used to sch
 transitions; it never crosses the seam into the shell.
 _Avoid_: Position, read cursor, current position
 
+**Audible time**:
+The clock of what the listener is hearing, which the playhead reads. Everything the player shows
+about its sound follows audible time. What the user asks for takes effect as soon as it can and
+is heard shortly after; it is never held back to line up with what is showing.
+_Avoid_: Real time, wall clock, decode time
+
 **Capture**:
 The user action of turning a playhead into a point — "author by ear". Captures the playhead,
 never the decode position.
