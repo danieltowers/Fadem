@@ -165,3 +165,9 @@ and `Domain/Units.cs`. Deviations from ticket 04's sketch, all packaging:
 - `IsCurrent` flips at the audible handover, not at `QueueVersion`; render the current-row
   highlight from `View.Queue` on every tick, and rebuild rows only when `QueueVersion` moves.
 - `Capture()` returns null when stopped; the capture button is disabled then.
+
+## Comments
+
+**2026-09-23, the user:** the Sounds half of `docs/smoke.md` passed, run on the authored boundary
+from the store. The by-ear half this ticket declined to claim
+is now claimed by the one party who can.

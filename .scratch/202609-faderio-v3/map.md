@@ -10,6 +10,10 @@ shell. The map is done when that loop is trustworthy: the user can add two track
 fade points by listening, and hear the handoff happen where they put it. Restaging the rest
 of Phase 1 is routine work handed off once the way there is clear.
 
+**Reached, 2026-09-23.** Every ticket is resolved and the user ran the Sounds half of
+`docs/smoke.md` on the authored boundary from the store: it passed. What remains on this map is fog
+for the restaging effort, not steps on this route.
+
 ## Notes
 
 **Domain.** Vocabulary per `CONTEXT.md`. A transition belongs to an *adjacency*, the ordered
