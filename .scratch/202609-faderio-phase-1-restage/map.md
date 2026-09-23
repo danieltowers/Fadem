@@ -108,6 +108,10 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   resolve, with progress and cancel. `Move` reorders by drag, and `Remove` handles several rows.
   `SaveAsPlaylist` writes UTF-8 `.m3u8` with absolute paths. Adding never starts playback, and
   duplicates are allowed.
+- [Trim tagged MP3s, or keep whole frames?](issues/13-trim-tagged-mp3s-or-keep-whole-frames.md):
+  trim when a LAME tag passes its CRC, MusicLength and range checks (546 of 654 library MP3s),
+  from the first encoded sample; bare files and failing tags keep whole frames silently. A
+  permanent test must pin the ACM offset, or the build stops. Staged late.
 
 ## Not yet specified
 
