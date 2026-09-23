@@ -68,6 +68,12 @@ once. One kind of transition, not a synonym for it.
 **Hard cut**:
 Switching from outgoing to incoming instantly, with no fade on either side.
 
+**Default crossfade**:
+What an unauthored adjacency plays when the user opts in: one crossfade of the same length at
+every boundary nobody authored. It never applies to an authored transition, even one with blank
+durations.
+_Avoid_: Auto-crossfade, global transition, fallback transition
+
 **Transition now**:
 The user action of starting the current adjacency's transition immediately, instead of at its
 fade-out point. Only the fade-out point moves, to the playhead; everything else plays as

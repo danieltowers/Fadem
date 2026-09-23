@@ -98,6 +98,11 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   transition are separate, and a blank save unauthors. Entry points are this → next (wrapping
   like ⏭), previous → this, and this → this under repeat-one. Unsaved edits prompt, and
   `Author` validates.
+- [Which settings exist, and where do they live?](issues/10-which-settings-exist-and-where-do-they-live.md):
+  three settings: output mode (next launch), unauthored boundaries (hard cut, or a default
+  crossfade of 1–30 s) and ReplayGain. A blank authored duration no longer borrows N. The
+  settings live in `settings.json`, owned by the engine, and change through one
+  `ChangeSettings` call. `--output=` goes.
 
 ## Not yet specified
 
@@ -108,8 +113,6 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   all: its device clock, WaveOut fallback and stop handling rest on the smoke checklist.
   [What happens when a file or the device fails?](issues/05-what-happens-when-a-file-or-the-device-fails.md)
   adds device loss, reopening on Play, and the exclusive → shared → WaveOut launch chain.
-- **Queue persistence across restarts.** v2 never persisted the queue itself. Whether a daily
-  driver needs it may surface from the settings or robust-file tickets.
 
 ## Out of scope
 
@@ -127,6 +130,9 @@ Beyond this map's destination; returns only if the destination is redrawn.
 - **Loudness scanning** (computing gain for untagged files). Ruled out by
   [When does ReplayGain switch, and is it on by default?](issues/06-when-does-replaygain-switch-and-is-it-on-by-default.md):
   it is a library feature (Phase 2), and an external scanner can tag the files.
+- **Queue persistence across restarts.** Ruled out by
+  [Which settings exist, and where do they live?](issues/10-which-settings-exist-and-where-do-they-live.md):
+  saving the queue as M3U is the manual way; automatic restore returns as a fresh effort.
 - **v2/v3 store coexistence.** v2 is retired for listening, so the two never share the file.
 - Everything the predecessor ruled out: library manager, playlist manager, cross-platform,
   MusicBee interop, tag editing, sidecar transition files.
