@@ -34,7 +34,7 @@ public sealed class AudioProbeTests
     [Fact]
     public void Flac_IsAccepted_FromItsStreamInfo()
     {
-        var rejection = Probe(FixturePath("tone-1k.flac"), out var result);
+        var rejection = Probe(FixturePath("tone-44100-16-2.flac"), out var result);
 
         Assert.Null(rejection);
         Assert.Equal(new AudioShape(AudioFormat.Flac, 44100, 16, 2), result!.Shape);
@@ -44,12 +44,13 @@ public sealed class AudioProbeTests
     [Fact]
     public void Mp3_IsAccepted_FromItsFirstFrameAndInfoTag()
     {
-        var rejection = Probe(FixturePath("tone-1k.mp3"), out var result);
+        var rejection = Probe(FixturePath("tone-cbrinfo-44100-2.mp3"), out var result);
 
         Assert.Null(rejection);
         Assert.Equal(new AudioShape(AudioFormat.Mp3, 44100, null, 2), result!.Shape);
-        // 2 s at 44.1 kHz is 76.5 frames of 1152; the encoder pads to whole frames.
-        Assert.InRange(result.Frames, 88200, 88200 + 1152 * 2);
+        // 2 s at 44.1 kHz is 76.5 frames of 1152; LAME pads to 78 whole frames, and the matrix
+        // proves this equals Mp3FileReader.Length on every MP3 cell (Mp3_HeaderLengthEqualsDecoded).
+        Assert.Equal(78 * 1152, result.Frames);
     }
 
     [Fact]

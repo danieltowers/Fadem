@@ -167,6 +167,16 @@ asking whether the current work could fail that way again.
   pre-scans in about 250 ms, within the 500 ms budget: no background pre-scan needed.
   **Core 170, App 26 tests pass.**
 
+- [Fill the real-input matrix](issues/14-fill-the-real-input-matrix.md):
+  Done. **Every row of `docs/supported-audio.md` is proven: 36 cells, five theories each, every
+  cell seeking to 1 ms**, no pin, no skip, no change to `src/`. WAV, FLAC and MP3 (three
+  variants) × every promised rate, depth and channel count; 48 fixtures checked in with their
+  ffmpeg script. Ticket 02's pink-noise cross-correlation is now the permanent seek measure.
+  Found: completeness is exact even through the resampler (the ±100-frame allowance was never
+  needed, so ticket 09's resampler constant is zero); MP3 length is whole 1152-frame blocks and
+  the probe issues it exactly from all three variants, so no MP3 row scans frames; MP3 seeks
+  are sample-exact through NAudio. **Core 305, App 26 tests pass.**
+
 ## Not yet specified
 
 - **Restaging the rest of Phase 1.** Once the slice is trustworthy, how the remaining
@@ -177,7 +187,9 @@ asking whether the current work could fail that way again.
   the matrix forces onto a frame scan reads the whole file at add time, and **opening a FLAC**
   pre-scans it (about 250 ms on the longest library file, ticket 15). Whether folder adds need
   a background probe is unexamined. The M3U writer
-  returns formatting the engine's `Length`, since tag duration no longer exists.
+  returns formatting the engine's `Length`, since tag duration no longer exists. Ticket 14
+  measured that an MP3's `Length` is whole encoder frames, so it carries up to about 50 ms of
+  encoder silence at each end; whether to trim it from LAME's gapless info is unexamined.
 - **The fate of the preview feature.** v2 built it with its own mixer and its own output
   device. Whether that is the right design, or whether preview should just be the offline
   render played back, is unclear until the render harness exists. Ticket 04 added a

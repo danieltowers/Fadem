@@ -3,12 +3,36 @@ using Faderio.Core.Playback;
 
 namespace Faderio.Core.Tests;
 
+/// <summary>The three ways the add-time probe learns an MP3's length (ADR 0010), each a
+/// promised row of <c>docs/supported-audio.md</c>. The fixture name carries it.</summary>
+public enum Mp3Variant
+{
+    /// <summary>Constant bitrate with LAME's Info tag: the frame count is in the tag.</summary>
+    CbrInfo,
+    /// <summary>Constant bitrate, no Xing/Info tag: audio bytes over the frame size.</summary>
+    CbrBare,
+    /// <summary>Variable bitrate with a Xing tag: the frame count is in the tag.</summary>
+    Vbr,
+}
+
 /// <summary>
-/// Seam S2 (ticket 06): real files through the production decoder chain, three assertions per
-/// cell — completeness, purity, seek. v2 fed only 16-bit 44.1 kHz WAV and asserted length
-/// nowhere, which is how every file above 44.1 kHz was truncated and every 24-bit WAV rendered
-/// as silence while 92 tests passed (ticket 01). Each theory here is a regression test for one
-/// of those. This is the skeleton; ticket 14 fills the compressed cells.
+/// Seam S2 (ticket 06): real files through the production decoder chain, four assertions on
+/// every cell of the promised table in <c>docs/supported-audio.md</c> (ticket 08):
+/// <list type="number">
+/// <item><b>Completeness</b>: a drain renders every frame the decoder reports.</item>
+/// <item><b>Purity</b>: a 1 kHz tone comes out as that tone (ticket 01's Goertzel measure).</item>
+/// <item><b>Seek landing</b>: a seek lands within 1 ms of where it was asked to (ADR 0009),
+/// found by cross-correlating the first block read after the seek against a sequential decode
+/// of the same pink-noise file (ticket 02's method).</item>
+/// <item><b>Length</b>: the length the add-time probe issues from the header equals the decoded
+/// length, exactly, in frames (ADR 0010).</item>
+/// </list>
+/// v2 fed only 16-bit 44.1 kHz WAV and asserted length nowhere, which is how every file above
+/// 44.1 kHz was truncated and every 24-bit WAV rendered as silence while 92 tests passed
+/// (ticket 01). WAV cells are generated at test time; FLAC and MP3 cells are checked-in
+/// fixtures from <c>Fixtures/generate.sh</c>, so a missing fixture is a red cell, never a skip.
+/// A row in the doc names the theories here that prove it; a theory here proves nothing the
+/// product claims unless its row exists.
 /// </summary>
 public class RealInputMatrixTests
 {
@@ -17,14 +41,58 @@ public class RealInputMatrixTests
     private const long ExpectedFrames = (long)(Seconds * EngineRate); // after normalisation
     private const int Tone = 1000;
 
+    /// <summary>The authoring promise (ticket 09, ADR 0009): 1 ms at every promised cell.</summary>
+    private const double LandingToleranceSeconds = 0.001;
+
+    /// <summary>Frames a seek may land from its target: 1 ms at the engine rate, ADR 0009.</summary>
+    private const long LandingToleranceFrames = (long)(LandingToleranceSeconds * EngineRate);
+
+    /// <summary>Frames read after a seek and correlated back. Pink noise this long matches one
+    /// offset with similarity near 1 and every other below about 0.2.</summary>
+    private const int LandingWindow = 1024;
+
+    // ── The cells ────────────────────────────────────────────────────────────────────────
+
     public static IEnumerable<object[]> WavCells() =>
         from rate in new[] { 44100, 48000, 96000 }
         from bits in new[] { 16, 24 }
         from channels in new[] { 1, 2 }
         select new object[] { rate, bits, channels };
 
-    private static string FixturePath(string name) =>
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", name);
+    public static IEnumerable<object[]> FlacCells() => WavCells();
+
+    public static IEnumerable<object[]> Mp3Cells() =>
+        from variant in new[] { Mp3Variant.CbrInfo, Mp3Variant.CbrBare, Mp3Variant.Vbr }
+        from rate in new[] { 44100, 48000 }
+        from channels in new[] { 1, 2 }
+        select new object[] { variant, rate, channels };
+
+    private static string FixturePath(string name)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", name);
+        Assert.True(File.Exists(path), $"fixture {name} is missing; run Fixtures/generate.sh");
+        return path;
+    }
+
+    private static string FlacFixture(string signal, int rate, int bits, int channels) =>
+        FixturePath($"{signal}-{rate}-{bits}-{channels}.flac");
+
+    private static string Mp3Fixture(string signal, Mp3Variant variant, int rate, int channels) =>
+        FixturePath($"{signal}-{variant.ToString().ToLowerInvariant()}-{rate}-{channels}.mp3");
+
+    private static string ToneWav(int rate, int bits, int channels)
+    {
+        var w = 2.0 * Math.PI * Tone / rate;
+        return TestAudio.WriteWavAt("tone", Seconds, f => 0.4 * Math.Sin(w * f), rate, bits, channels);
+    }
+
+    private static string NoiseWav(int rate, int bits, int channels)
+    {
+        var noise = TestAudio.PinkNoise((long)(Seconds * rate));
+        return TestAudio.WriteWavAt("noise", Seconds, f => noise[f], rate, bits, channels);
+    }
+
+    // ── The chain and the measures ───────────────────────────────────────────────────────
 
     /// <summary>Opens through the production factory and normaliser — the exact path a voice
     /// takes into the mixer.</summary>
@@ -50,6 +118,99 @@ public class RealInputMatrixTests
         return (frames, left);
     }
 
+    private static void AssertComplete(string path)
+    {
+        using var source = OpenNormalised(path);
+        var (frames, _) = Drain(source);
+        // The fixture is 2 s; a lossy encoder pads it to whole frames (LAME: up to two of 1152).
+        Assert.InRange(source.TotalFrames, ExpectedFrames, ExpectedFrames + 2 * 1152);
+        // Exactly, resampled or not: the normaliser rounds the length once and the resampler
+        // delivers that many (measured in ticket 14; v2 needed a 100-frame allowance here).
+        Assert.True(frames == source.TotalFrames,
+            $"rendered {frames} of the {source.TotalFrames} frames the decoder reports");
+        Assert.Equal(source.TotalFrames, source.Position); // the getter agrees with the length it reports
+    }
+
+    private static void AssertPure(string path)
+    {
+        using var source = OpenNormalised(path);
+        var (_, left) = Drain(source);
+        // Skip the resampler's warm-up and any encoder delay; 4410 frames at 44.1 kHz is
+        // exactly 100 cycles of 1 kHz, which Goertzel needs.
+        var purity = TestAudio.Purity(left, start: 4410, frames: 4410, Tone, EngineRate);
+        Assert.True(purity >= 0.999, $"purity {purity:F5} < 0.999");
+    }
+
+    /// <summary>The fourth assertion (ADR 0010): the header's length, as the add-time probe reads
+    /// it, is the decoder's length, exactly, in the file's own frames.</summary>
+    private static void AssertHeaderLengthEqualsDecoded(string path)
+    {
+        var rejection = AudioProbe.Probe(path, out var probed);
+        Assert.True(rejection is null, $"probe rejected the cell: {rejection}");
+        using var decoded = TrackSources.Open(path);
+        Assert.Equal(decoded.TotalFrames, probed!.Frames);
+    }
+
+    /// <summary>Where a seek to <paramref name="target"/> landed, in engine frames, by ticket
+    /// 02's method: a fresh source is seeked before any read (the production order: a voice
+    /// seeks to its fade-in point, then plays), the first block it yields is located in a
+    /// sequential decode of the same file by cross-correlation, and that offset is the landing.
+    /// No assumption about the decoder's gain, delay or block size survives into the answer.</summary>
+    private static long Landing(string path, long target)
+    {
+        List<float> reference;
+        using (var sequential = OpenNormalised(path))
+        {
+            (_, reference) = Drain(sequential);
+        }
+
+        using var source = OpenNormalised(path);
+        source.Position = target;
+        var block = new float[LandingWindow * 2];
+        var got = 0;
+        int n;
+        while (got < LandingWindow && (n = source.Read(block, got * 2, LandingWindow - got)) > 0)
+        {
+            got += n;
+        }
+        Assert.True(got > 0, "nothing could be read after the seek");
+        var left = new float[got];
+        for (var f = 0; f < got; f++)
+        {
+            left[f] = block[f * 2];
+        }
+
+        // Near the target first (the suite runs unoptimised, and the whole search is 4× the
+        // cost of the cell); anywhere at all if that misses, so a red cell says where it went.
+        var (offset, similarity) = TestAudio.Locate(reference, left, (int)target - EngineRate / 4, (int)target + EngineRate / 4);
+        if (similarity < 0.9)
+        {
+            (offset, similarity) = TestAudio.Locate(reference, left);
+        }
+        LastLandingReport = $"target={target} landed={offset} similarity={similarity:F3} " +
+                            $"blockFrames={got} sequentialFrames={reference.Count}";
+        Assert.True(similarity > 0.9, $"the block read after the seek matches nowhere in a sequential decode; {LastLandingReport}");
+        return offset;
+    }
+
+    /// <summary>Set by <see cref="Landing"/>; put it in the assertion message so a red cell
+    /// says what the decoder actually did.</summary>
+    [ThreadStatic] private static string? LastLandingReport;
+
+    private static void AssertLanded(long landed, long target)
+    {
+        Assert.True(Math.Abs(landed - target) <= LandingToleranceFrames,
+            $"off by {(landed - target) * 1000.0 / EngineRate:F1} ms; {LastLandingReport}");
+    }
+
+    /// <summary>A fade-in point three quarters of the way in.</summary>
+    private static long SeekTarget => ExpectedFrames * 3 / 4;
+
+    /// <summary>A point inside the decoder's last block: FLAC frames are 4096 or 4608 samples
+    /// and MP3 frames 1152, and 2 s is not a multiple of either at any promised rate, so 100
+    /// frames from the end is inside the last block on every cell.</summary>
+    private static long LastBlockTarget => ExpectedFrames - 100;
+
     // ── WAV cells, generated at test time ────────────────────────────────────────────────
 
     [Theory, MemberData(nameof(WavCells))]
@@ -58,28 +219,20 @@ public class RealInputMatrixTests
         // Defect A: NormalizedTrackSource.Position inverted its conversion, so Position raced
         // ahead of TotalFrames by (rate/44100)² and the voice ended early. Defect B: no
         // Extensible case, so every 24-bit block threw and the track was silent.
-        var path = TestAudio.WriteWavAt("complete", Seconds, _ => 0.4, rate, bits, channels);
-        using var source = OpenNormalised(path);
-
-        var (frames, _) = Drain(source);
-
-        Assert.InRange(frames, ExpectedFrames - 100, ExpectedFrames + 100);
-        Assert.Equal(source.TotalFrames, source.Position); // the getter agrees with the length it reports
+        AssertComplete(TestAudio.WriteWavAt("complete", Seconds, _ => 0.4, rate, bits, channels));
     }
 
     [Theory, MemberData(nameof(WavCells))]
-    public void Wav_ToneIsPure(int rate, int bits, int channels)
-    {
-        var w = 2.0 * Math.PI * Tone / rate;
-        var path = TestAudio.WriteWavAt("tone", Seconds, f => 0.4 * Math.Sin(w * f), rate, bits, channels);
-        using var source = OpenNormalised(path);
+    public void Wav_ToneIsPure(int rate, int bits, int channels) =>
+        AssertPure(ToneWav(rate, bits, channels));
 
-        var (_, left) = Drain(source);
+    [Theory, MemberData(nameof(WavCells))]
+    public void Wav_HeaderLengthEqualsDecoded(int rate, int bits, int channels) =>
+        AssertHeaderLengthEqualsDecoded(ToneWav(rate, bits, channels));
 
-        // Skip the resampler's warm-up; 4410 frames at 44.1 kHz is exactly 100 cycles of 1 kHz.
-        var purity = TestAudio.Purity(left, start: 4410, frames: 4410, Tone, EngineRate);
-        Assert.True(purity >= 0.999, $"purity {purity:F5} < 0.999");
-    }
+    [Theory, MemberData(nameof(WavCells))]
+    public void Wav_SeekBeforeFirstRead_LandsWithin1ms(int rate, int bits, int channels) =>
+        AssertLanded(Landing(NoiseWav(rate, bits, channels), SeekTarget), SeekTarget);
 
     [Theory, MemberData(nameof(WavCells))]
     public void Wav_SeekHalfway_ReadsHalfTheFrames(int rate, int bits, int channels)
@@ -92,25 +245,7 @@ public class RealInputMatrixTests
         source.Position = source.TotalFrames / 2;
         var (frames, _) = Drain(source);
 
-        Assert.InRange(frames, ExpectedFrames / 2 - 100, ExpectedFrames / 2 + 100);
-    }
-
-    [Fact]
-    public void Wav_SeekLandsExactly_At44100()
-    {
-        // A ramp encodes position in amplitude: the first sample after a seek says where it
-        // landed. WAV at the engine rate is exact (ticket 02); 1 ms is the tripwire.
-        var total = (long)(Seconds * 44100);
-        var path = TestAudio.WriteWavAt("ramp", Seconds, f => 0.9 * f / total, 44100, 16, 2);
-        using var source = OpenNormalised(path);
-        var target = total * 3 / 4;
-
-        source.Position = target;
-        var buffer = new float[2];
-        Assert.Equal(1, source.Read(buffer, 0, 1));
-
-        var landed = buffer[0] / 0.9 * total;
-        Assert.InRange(landed, target - 44, target + 44);
+        Assert.InRange(frames, ExpectedFrames / 2 - 1, ExpectedFrames / 2 + 1); // the midpoint rounds once on the way in
     }
 
     [Theory]
@@ -137,105 +272,64 @@ public class RealInputMatrixTests
         Assert.InRange(lastAudible, ExpectedFrames - 4410, ExpectedFrames + 4410); // within one block
     }
 
-    /// <summary>Where a seek landed, in frames, by ticket 02's method: ground truth is a full
-    /// sequential decode of the same file, and the ramp fixture makes amplitude a linear
-    /// function of position, so the sample read after the seek maps back to a frame without
-    /// assuming the encoder's gain or the fixture's peak.</summary>
-    private static double Landing(string path, long target, bool readFirst)
-    {
-        double atTarget;
-        List<float> left;
-        long frames;
-        using (var reference = OpenNormalised(path))
-        {
-            (frames, left) = Drain(reference);
-            atTarget = left[(int)target];
-        }
+    // ── FLAC cells, checked-in fixtures ──────────────────────────────────────────────────
 
-        using var source = OpenNormalised(path);
-        var buffer = new float[4410 * 2];
-        if (readFirst)
-        {
-            source.Read(buffer, 0, 4410);
-        }
-        source.Position = target;
-        Assert.Equal(1, source.Read(buffer, 0, 1));
-        var landed = target * (buffer[0] / atTarget);
+    [Theory, MemberData(nameof(FlacCells))]
+    public void Flac_ReadsToCompletion(int rate, int bits, int channels) =>
+        AssertComplete(FlacFixture("tone", rate, bits, channels));
 
-        // Enough to diagnose a decoder whose timeline is shifted, without a debugger.
-        var probe = string.Join(", ", new[] { 0, 4410, 22050, 44100, 66150, 88000 }
-            .Where(i => i < left.Count).Select(i => $"[{i}]={left[i]:F4}"));
-        LastLandingReport = $"target={target} landed={landed:F0} seekValue={buffer[0]:F4} " +
-                            $"sequentialAtTarget={atTarget:F4} frames={frames} sequential: {probe}";
-        return landed;
-    }
+    [Theory, MemberData(nameof(FlacCells))]
+    public void Flac_ToneIsPure(int rate, int bits, int channels) =>
+        AssertPure(FlacFixture("tone", rate, bits, channels));
 
-    /// <summary>Set by <see cref="Landing"/>; put it in the assertion message so a red cell
-    /// says what the decoder actually did.</summary>
-    private static string LastLandingReport = "";
+    [Theory, MemberData(nameof(FlacCells))]
+    public void Flac_HeaderLengthEqualsDecoded(int rate, int bits, int channels) =>
+        AssertHeaderLengthEqualsDecoded(FlacFixture("tone", rate, bits, channels));
 
-    private static void AssertLanded(double landed, long target, double toleranceSeconds)
-    {
-        var tolerance = toleranceSeconds * EngineRate;
-        Assert.True(landed >= target - tolerance && landed <= target + tolerance,
-            $"off by {(landed - target) / EngineRate * 1000:F0} ms; {LastLandingReport}");
-    }
-
-    /// <summary>The authoring promise (ticket 09, ADR 0009): 1 ms at every promised cell.</summary>
-    private const double LandingToleranceSeconds = 0.001;
-
-    // ── Compressed cells, from checked-in fixtures (see Fixtures/generate.sh) ────────────
-
-    /// <summary>The checked-in FLAC tone fixtures: the slice's cell plus one depth and one rate
-    /// step, a first check that the managed decoder (ticket 15) handles the promised depths and
-    /// rates. Ticket 14 fills the twelve-cell grid.</summary>
-    public static IEnumerable<object[]> FlacToneFixtures() =>
-        new[] { "tone-1k.flac", "tone-1k-24bit.flac", "tone-1k-96k.flac" }
-            .Select(name => new object[] { name });
-
-    [Theory, MemberData(nameof(FlacToneFixtures))]
-    public void Flac_ReadsToCompletion(string fixture)
-    {
-        using var source = OpenNormalised(FixturePath(fixture));
-        var (frames, _) = Drain(source);
-        Assert.InRange(frames, ExpectedFrames - 100, ExpectedFrames + 100);
-        Assert.Equal(source.TotalFrames, source.Position);
-    }
-
-    [Theory, MemberData(nameof(FlacToneFixtures))]
-    public void Flac_ToneIsPure(string fixture)
-    {
-        using var source = OpenNormalised(FixturePath(fixture));
-        var (_, left) = Drain(source);
-        var purity = TestAudio.Purity(left, start: 4410, frames: 4410, Tone, EngineRate);
-        Assert.True(purity >= 0.999, $"purity {purity:F5} < 0.999");
-    }
-
-    [Fact]
-    public void Flac_SeekBeforeFirstRead_LandsWithin1ms()
+    [Theory, MemberData(nameof(FlacCells))]
+    public void Flac_SeekBeforeFirstRead_LandsWithin1ms(int rate, int bits, int channels)
     {
         // Ticket 02: the Media Foundation FLAC reader silently dropped a seek issued before any
         // read (an authored fade-in point discarded entirely, -2267 ms), and with a warm-up read
-        // still landed on the next decoder block boundary, +67 ms on this fixture (ticket 07).
-        // Ticket 09 set the promise at 1 ms and ticket 15 swapped the decoder for one that
-        // lands on the frame before the target and discards to the exact sample. Seek before
-        // any read is the production order: a voice seeks to its fade-in point, then plays.
-        var target = ExpectedFrames * 3 / 4;
-        var landed = Landing(FixturePath("ramp.flac"), target, readFirst: false);
-        AssertLanded(landed, target, LandingToleranceSeconds);
+        // still landed on the next decoder block boundary, +67 ms (ticket 07). Ticket 09 set
+        // the promise at 1 ms and ticket 15 swapped the decoder for one that lands on the frame
+        // before the target and discards to the exact sample.
+        AssertLanded(Landing(FlacFixture("noise", rate, bits, channels), SeekTarget), SeekTarget);
     }
 
-    [Fact]
-    public void Flac_SeekIntoLastBlock_LandsWithin1ms()
+    [Theory, MemberData(nameof(FlacCells))]
+    public void Flac_SeekIntoLastBlock_LandsWithin1ms(int rate, int bits, int channels)
     {
         // BunLabs.NAudio.Flac 2.0.1 seeks by finding the first frame that starts at or after
         // the target, so a target inside the last frame matched nothing and the seek was
         // silently a no-op: the voice would have played from wherever it was. FlacTrackReader
-        // seeks into the last frame by hand. The fixture's last block is 648 frames (88200 mod
-        // 4608); 100 frames from the end is inside it.
-        var target = ExpectedFrames - 100;
-        var landed = Landing(FixturePath("ramp.flac"), target, readFirst: false);
-        AssertLanded(landed, target, LandingToleranceSeconds);
+        // seeks into the last frame by hand (ticket 15).
+        AssertLanded(Landing(FlacFixture("noise", rate, bits, channels), LastBlockTarget), LastBlockTarget);
     }
 
+    // ── MP3 cells, checked-in fixtures ───────────────────────────────────────────────────
+
+    [Theory, MemberData(nameof(Mp3Cells))]
+    public void Mp3_ReadsToCompletion(Mp3Variant variant, int rate, int channels) =>
+        AssertComplete(Mp3Fixture("tone", variant, rate, channels));
+
+    [Theory, MemberData(nameof(Mp3Cells))]
+    public void Mp3_ToneIsPure(Mp3Variant variant, int rate, int channels) =>
+        AssertPure(Mp3Fixture("tone", variant, rate, channels));
+
+    [Theory, MemberData(nameof(Mp3Cells))]
+    public void Mp3_HeaderLengthEqualsDecoded(Mp3Variant variant, int rate, int channels)
+    {
+        // This is where the three variants earn their rows (ticket 10): the Xing/Info frame
+        // count for CbrInfo and Vbr, the audio bytes over the frame size for CbrBare.
+        AssertHeaderLengthEqualsDecoded(Mp3Fixture("tone", variant, rate, channels));
+    }
+
+    [Theory, MemberData(nameof(Mp3Cells))]
+    public void Mp3_SeekBeforeFirstRead_LandsWithin1ms(Mp3Variant variant, int rate, int channels) =>
+        AssertLanded(Landing(Mp3Fixture("noise", variant, rate, channels), SeekTarget), SeekTarget);
+
+    [Theory, MemberData(nameof(Mp3Cells))]
+    public void Mp3_SeekIntoLastBlock_LandsWithin1ms(Mp3Variant variant, int rate, int channels) =>
+        AssertLanded(Landing(Mp3Fixture("noise", variant, rate, channels), LastBlockTarget), LastBlockTarget);
 }

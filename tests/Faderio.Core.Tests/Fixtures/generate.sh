@@ -3,41 +3,60 @@
 #
 # Fixtures are checked in rather than generated at test time, by decision (ticket 06, ADR 0002):
 # a cell that skips because ffmpeg is absent is green while asserting nothing. This script is
-# the provenance. Every fixture is 2 s and stereo, and all but the two ticket-15 ones are
-# 44.1 kHz, so no resampling or channel mapping happens on the way in and the decoder is the
-# only thing under test.
+# the provenance. Every fixture is 2 s. The grid is the promised table in
+# docs/supported-audio.md (ticket 08), one tone and one noise fixture per cell (ticket 14):
 #
-#   tone-1k.flac   1 kHz sine            purity and completeness
-#   ramp.flac      0 -> 0.9 linear ramp  seek landing: the sample value IS the position
-#   tone-1k.mp3    1 kHz sine, MP3 CBR   the add-time probe: first frame header + Info tag
-#   tone-1k-24bit.flac   1 kHz sine, 44.1 kHz / 24-bit   first depth check on the managed decoder (ticket 15)
-#   tone-1k-96k.flac     1 kHz sine, 96 kHz / 16-bit     first rate check on the managed decoder (ticket 15)
+#   tone-<rate>-<bits>-<ch>.flac            0.5 x 1 kHz sine   purity, completeness, header length
+#   noise-<rate>-<bits>-<ch>.flac           pink noise         seek landing by cross-correlation
+#   tone-<variant>-<rate>-<ch>.mp3          as above, MP3
+#   noise-<variant>-<rate>-<ch>.mp3
+#
+# FLAC: 16/24-bit x 44.1/48/96 kHz x mono/stereo, twelve cells. "-sample_fmt s32" makes
+# ffmpeg's FLAC encoder write 24-bit.
+#
+# MP3: three variants x 44.1/48 kHz x mono/stereo, twelve cells. Each variant is a way the
+# add-time probe learns the length (ADR 0010):
+#   cbrinfo   320 kbps CBR with LAME's Info tag (ffmpeg's default), like 447 of the library's
+#             654 MP3s (ticket 08 survey): the probe reads the frame count from the tag.
+#   cbrbare   320 kbps CBR with no Xing/Info tag ("-write_xing 0"): the probe divides the audio
+#             bytes by the frame size.
+#   vbr       LAME V2 ("-q:a 2"), Xing tag: the frame count from the tag.
+#
+# A sine, not a full-scale one: lavfi's "sine" source is full scale, which a lossy encoder
+# overshoots into clipping. The pink noise is what the seek landing correlates against; a tone
+# is periodic and would match every cycle.
 #
 # Levels: lavfi sources are mono and "-ac 2" upmixes through swresample, which applies -3 dB
-# (0.707). So the ramp peaks at ~0.64 on disk, not 0.9, and the tone is quieter than written.
-# Harmless: the tests self-calibrate against a sequential decode of the same file. Do not
-# "fix" the decoders for it. (Verified from the raw s16 bytes, not through a decoder.)
-#
-# The two ticket-15 fixtures vary depth and rate one at a time, as a first check that the
-# managed FLAC decoder handles the promised depths and rates. Ticket 14 fills the rest of the
-# grid (16/24-bit x 44.1/48/96 kHz x mono/stereo).
+# (0.707). So the stereo fixtures are quieter on disk than the mono ones. Harmless: the tests
+# self-calibrate against a sequential decode of the same file. Do not "fix" the decoders for
+# it. (Verified from the raw s16 bytes, not through a decoder.)
 set -euo pipefail
 cd "$(dirname "$0")"
 
-ffmpeg -y -loglevel error -f lavfi -i "sine=frequency=1000:sample_rate=44100:duration=2" \
-  -ac 2 -sample_fmt s16 tone-1k.flac
+tone()  { echo "aevalsrc='0.5*sin(2*PI*1000*t)':s=$1:d=2"; }
+noise() { echo "anoisesrc=color=pink:sample_rate=$1:duration=2:seed=42:amplitude=0.5"; }
 
-ffmpeg -y -loglevel error -f lavfi -i "aevalsrc='0.9*t/2':s=44100:d=2" \
-  -ac 2 -sample_fmt s16 ramp.flac
+rm -f tone-*.flac noise-*.flac tone-*.mp3 noise-*.mp3
 
-# CBR 320 kbps with LAME's Info tag, like 447 of the library's 654 MP3s (ticket 08 survey).
-ffmpeg -y -loglevel error -f lavfi -i "sine=frequency=1000:sample_rate=44100:duration=2" \
-  -ac 2 -c:a libmp3lame -b:a 320k tone-1k.mp3
+for rate in 44100 48000 96000; do
+  for bits in 16 24; do
+    fmt=s16; [ "$bits" = 24 ] && fmt=s32
+    for ch in 1 2; do
+      ffmpeg -y -loglevel error -f lavfi -i "$(tone $rate)"  -ac $ch -sample_fmt $fmt "tone-$rate-$bits-$ch.flac"
+      ffmpeg -y -loglevel error -f lavfi -i "$(noise $rate)" -ac $ch -sample_fmt $fmt "noise-$rate-$bits-$ch.flac"
+    done
+  done
+done
 
-ffmpeg -y -loglevel error -f lavfi -i "sine=frequency=1000:sample_rate=44100:duration=2" \
-  -ac 2 -sample_fmt s32 tone-1k-24bit.flac
-
-ffmpeg -y -loglevel error -f lavfi -i "sine=frequency=1000:sample_rate=96000:duration=2" \
-  -ac 2 -sample_fmt s16 tone-1k-96k.flac
+for rate in 44100 48000; do
+  for ch in 1 2; do
+    ffmpeg -y -loglevel error -f lavfi -i "$(tone $rate)"  -ac $ch -c:a libmp3lame -b:a 320k "tone-cbrinfo-$rate-$ch.mp3"
+    ffmpeg -y -loglevel error -f lavfi -i "$(noise $rate)" -ac $ch -c:a libmp3lame -b:a 320k "noise-cbrinfo-$rate-$ch.mp3"
+    ffmpeg -y -loglevel error -f lavfi -i "$(tone $rate)"  -ac $ch -c:a libmp3lame -b:a 320k -write_xing 0 "tone-cbrbare-$rate-$ch.mp3"
+    ffmpeg -y -loglevel error -f lavfi -i "$(noise $rate)" -ac $ch -c:a libmp3lame -b:a 320k -write_xing 0 "noise-cbrbare-$rate-$ch.mp3"
+    ffmpeg -y -loglevel error -f lavfi -i "$(tone $rate)"  -ac $ch -c:a libmp3lame -q:a 2 "tone-vbr-$rate-$ch.mp3"
+    ffmpeg -y -loglevel error -f lavfi -i "$(noise $rate)" -ac $ch -c:a libmp3lame -q:a 2 "noise-vbr-$rate-$ch.mp3"
+  done
+done
 
 ls -l *.flac *.mp3

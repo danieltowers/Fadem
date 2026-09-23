@@ -82,10 +82,94 @@ public static class TestAudio
         return path;
     }
 
+    /// <summary>Pink noise, <paramref name="frames"/> long, peak-normalised to
+    /// <paramref name="peak"/>: the seek-landing signal (ticket 02). Every window of it is
+    /// unlike every other, so a block read after a seek matches one place in a sequential
+    /// decode; a tone would match every cycle. Paul Kellet's three-pole filter over seeded
+    /// white noise, so the same seed is the same file. Mirrors ffmpeg's <c>anoisesrc</c> for
+    /// the checked-in fixtures.</summary>
+    public static double[] PinkNoise(long frames, int seed = 42, double peak = 0.5)
+    {
+        var rng = new Random(seed);
+        var samples = new double[frames];
+        double b0 = 0, b1 = 0, b2 = 0, max = 0;
+        for (var i = 0; i < frames; i++)
+        {
+            var white = rng.NextDouble() * 2 - 1;
+            b0 = 0.99765 * b0 + white * 0.0990460;
+            b1 = 0.96300 * b1 + white * 0.2965164;
+            b2 = 0.57000 * b2 + white * 1.0526913;
+            samples[i] = b0 + b1 + b2 + white * 0.1848;
+            max = Math.Max(max, Math.Abs(samples[i]));
+        }
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i] *= peak / max;
+        }
+        return samples;
+    }
+
+    /// <summary>Where <paramref name="block"/> occurs in <paramref name="reference"/>: the offset
+    /// with the highest cosine similarity over every possible alignment, and that similarity
+    /// (1.0 is an exact match, noise-level is about 0.1). Ticket 02's cross-correlation, made
+    /// permanent: with a sequential decode as the reference and the first block read after a
+    /// seek as the needle, the offset is where the seek landed, whatever the decoder's gain or
+    /// timeline. Searches offsets <paramref name="from"/> to <paramref name="to"/>, or the
+    /// whole reference when they are omitted, so a wildly wrong landing is reported as where it
+    /// went, not as "no match".</summary>
+    public static (int Offset, double Similarity) Locate(
+        IReadOnlyList<float> reference, ReadOnlySpan<float> block, int from = 0, int to = int.MaxValue)
+    {
+        var n = block.Length;
+        var haystack = reference as float[] ?? reference.ToArray();
+        var needle = block.ToArray();
+        var needleEnergy = Dot(needle, needle);
+        // Prefix sums of squares, so the energy of any reference window is one subtraction.
+        var prefix = new double[haystack.Length + 1];
+        for (var i = 0; i < haystack.Length; i++)
+        {
+            prefix[i + 1] = prefix[i] + (double)haystack[i] * haystack[i];
+        }
+        var best = -1;
+        var bestScore = double.NegativeInfinity;
+        var last = Math.Min(to, haystack.Length - n);
+        for (var k = Math.Max(0, from); k <= last; k++)
+        {
+            var energy = prefix[k + n] - prefix[k];
+            if (energy <= 1e-12)
+            {
+                continue; // silence matches nothing
+            }
+            var score = Dot(haystack.AsSpan(k, n), needle) / Math.Sqrt(energy * needleEnergy);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = k;
+            }
+        }
+        return (best, bestScore);
+    }
+
+    private static double Dot(ReadOnlySpan<float> a, ReadOnlySpan<float> b)
+    {
+        var width = System.Numerics.Vector<float>.Count;
+        var acc = System.Numerics.Vector<float>.Zero;
+        var i = 0;
+        for (; i + width <= a.Length; i += width)
+        {
+            acc += new System.Numerics.Vector<float>(a.Slice(i, width)) * new System.Numerics.Vector<float>(b.Slice(i, width));
+        }
+        double sum = System.Numerics.Vector.Dot(acc, System.Numerics.Vector<float>.One);
+        for (; i < a.Length; i++)
+        {
+            sum += (double)a[i] * b[i];
+        }
+        return sum;
+    }
+
     /// <summary>Fraction of a window's energy sitting at <paramref name="freq"/>: 1.0 is a pure
     /// tone, and the buzzing bug or silence collapse it. Goertzel at an exact bin, so the window
-    /// must hold a whole number of cycles. Ticket 01's purity measure, made permanent; ticket 14
-    /// may swap in a full FFT.</summary>
+    /// must hold a whole number of cycles. Ticket 01's purity measure, made permanent.</summary>
     public static double Purity(IReadOnlyList<float> mono, int start, int frames, double freq, int sampleRate)
     {
         var w = 2.0 * Math.PI * freq / sampleRate;

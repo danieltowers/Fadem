@@ -1,7 +1,7 @@
 # Fill the real-input matrix
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 07
 
 ## Question
@@ -36,7 +36,66 @@ permanent tests, per the map's research rule.
 
 ## Answer
 
-_(pending)_
+**Done. Every row of `docs/supported-audio.md` is proven, 36 cells, five theories each, and
+every cell seeks to 1 ms.** Core 305 tests pass (from 170), App 26. No cell is pinned, no cell
+skips, and nothing in `src/` changed: the decoders and the probe ticket 12 and 15 left were
+already right for every cell, so this ticket is tests, fixtures and the doc.
+
+### What was built
+
+- **`RealInputMatrixTests` is the grid.** `WavCells()`, `FlacCells()` (16/24-bit × 44.1/48/96
+  kHz × mono/stereo, twelve each) and `Mp3Cells()` (`Mp3Variant` `CbrInfo`/`CbrBare`/`Vbr` ×
+  44.1/48 kHz × mono/stereo, twelve). Five theories per format, named
+  `<Format>_ReadsToCompletion`, `_ToneIsPure`, `_HeaderLengthEqualsDecoded`,
+  `_SeekBeforeFirstRead_LandsWithin1ms` and `_SeekIntoLastBlock_LandsWithin1ms`; the doc's
+  "Proven by" column names them and its Status column reads "proven" on every row.
+- **Ticket 02's method exists as code.** `TestAudio.PinkNoise` and `TestAudio.Locate`: the
+  first block read after a seek is cross-correlated (cosine similarity, SIMD dot product)
+  against a sequential decode of the same file, and the best offset is the landing. Nothing
+  about the decoder's gain, delay or block size is assumed, which is what let the same
+  `Landing()` serve WAV, FLAC and MP3 unchanged. It searches ±0.25 s of the target first and
+  the whole file on a miss, so a red cell reports where the seek actually went. The ramp
+  method is gone.
+- **Fixtures: 48 files, 5.9 MB, checked in**, one tone and one pink-noise file per compressed
+  cell, named `<signal>-<rate>-<bits>-<ch>.flac` and `<signal>-<variant>-<rate>-<ch>.mp3`, all
+  from `Fixtures/generate.sh`. The five ticket-07/15 fixtures (`tone-1k*.flac`, `ramp.flac`,
+  `tone-1k.mp3`) are replaced by their grid equivalents. A missing fixture fails the cell
+  with the script's name.
+- **Completeness is exact**, not ±100 frames: at every cell, resampled or not, the drain
+  renders exactly `TotalFrames`. Ticket 09's question about the resampler's landing constant
+  is answered: there is none. `WdlResamplingSampleProvider` delivers the rounded length to the
+  frame, and every 48 and 96 kHz landing is within 1 ms with no compensation. The
+  `Wav_SeekHalfway` allowance tightened from ±100 to ±1 (the midpoint rounds once on the way
+  in).
+
+### Measured
+
+| Cell group | Completeness | Purity | Header = decoded | Landing at ¾ | Landing in last block |
+|---|---|---|---|---|---|
+| WAV, 12 cells | exact | ≥ 0.999 | exact | ≤ 1 ms | ≤ 1 ms |
+| FLAC, 12 cells | exact | ≥ 0.999 | exact | ≤ 1 ms | ≤ 1 ms |
+| MP3, 12 cells | exact | ≥ 0.999 | exact | ≤ 1 ms | ≤ 1 ms |
+
+- **MP3 length is whole frames.** A 2 s tone encodes to 78 frames of 1152 at 44.1 kHz (89856
+  frames) and 85 at 48 kHz (97920): LAME's encoder delay plus padding to a frame boundary.
+  `Mp3FileReader` decodes exactly that many, and the probe issues exactly that many from all
+  three variants: the Info tag's count (`CbrInfo`, `Vbr`) and the audio bytes over the frame
+  size (`CbrBare`, so **no MP3 row forces a frame scan**; ticket 10's worry about VBR did not
+  materialise because ffmpeg/LAME write a Xing tag on VBR by default). `AudioProbeTests`'
+  "within two frames" is tightened to the exact count. A consequence worth knowing: an MP3's
+  `Length` includes up to about 50 ms of encoder silence at each end, on the same timeline as
+  the playhead, so the promise holds; whether to trim it (LAME's gapless info) is a restaging
+  question, noted on the map.
+- **MP3 seeks are sample-exact through NAudio**, before any read and into the last frame, on
+  all twelve cells, both channel counts and both rates. Ticket 09's "MP3 already trims within
+  the frame" is now proven rather than read from the source.
+- **Suite time** went from 2 s to 11 s: 72 cross-correlations in an unoptimised build. The
+  near-target search keeps it there; a full-file search on every cell was 30 s.
+
+### Not done, by decision
+
+- No AIFF, 8/32-bit, >96 kHz or Ogg cells: rejected formats, no row (ticket 08).
+- No long-file or real-music cell; still fog on the map ("Audio paths still unmeasured").
 
 ## Noted from ticket 07
 

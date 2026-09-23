@@ -30,19 +30,27 @@ per-format or per-transition tolerance. Set in
 recorded in [ADR 0009](adr/0009-authoring-exactness-is-bought-in-the-decoder.md). A cell that
 cannot reach it leaves this table; the tolerance never widens to meet a cell.
 
+Each row is proven by five theories over its `*Cells()` member data, one per assertion plus a
+second seek landing inside the decoder's last block (the seek the package FLAC decoder silently
+dropped, ticket 15): `<Format>_ReadsToCompletion`, `<Format>_ToneIsPure`,
+`<Format>_HeaderLengthEqualsDecoded`, `<Format>_SeekBeforeFirstRead_LandsWithin1ms` and
+`<Format>_SeekIntoLastBlock_LandsWithin1ms`. WAV cells are generated at test time; FLAC and
+MP3 cells are checked-in fixtures from `Fixtures/generate.sh`, a tone and a pink-noise file per
+cell, and a missing fixture is a red cell.
+
 | Format | Sample rates | Bit depths | Channels | Proven by | Status |
 |---|---|---|---|---|---|
-| WAV (PCM) | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | `Wav_ReadsToCompletion`, `Wav_ToneIsPure`, `Wav_SeekHalfway_ReadsHalfTheFrames` over `WavCells()` | proven (12 cells) |
-| FLAC | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | `Flac_ReadsToCompletion` and `Flac_ToneIsPure` over `FlacToneFixtures()`, `Flac_SeekBeforeFirstRead_LandsWithin1ms`, `Flac_SeekIntoLastBlock_LandsWithin1ms` | 44.1 kHz / 16-bit / stereo: all four assertions proven, seek landing at **1 ms** ([ticket 15](../.scratch/202609-faderio-v3/issues/15-make-flac-seek-exact.md)); 44.1 kHz / 24-bit and 96 kHz / 16-bit stereo: completeness and purity proven; the remaining cells and their landings land in [ticket 14](../.scratch/202609-faderio-v3/issues/14-fill-the-real-input-matrix.md) |
-| MP3, constant bitrate with a Xing/Info header | 44.1, 48 kHz | n/a (decodes to PCM) | mono, stereo | `Mp3_*` theories over `Mp3Cells()`, variant `CbrInfo` | pending ticket 14 |
-| MP3, constant bitrate with no Xing/Info/VBRI header | 44.1, 48 kHz | n/a | mono, stereo | same theories, variant `CbrBare` | pending ticket 14 |
-| MP3, variable bitrate | 44.1, 48 kHz | n/a | mono, stereo | same theories, variant `Vbr` | pending ticket 14; if seek landing misses the tolerance the cell is pinned and ticket 09 owns the fix |
+| WAV (PCM) | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | the five `Wav_*` theories over `WavCells()` | proven, 12 cells ([ticket 14](../.scratch/202609-faderio-v3/issues/14-fill-the-real-input-matrix.md)) |
+| FLAC | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | the five `Flac_*` theories over `FlacCells()` | proven, 12 cells (ticket 14; the first landing in [ticket 15](../.scratch/202609-faderio-v3/issues/15-make-flac-seek-exact.md)) |
+| MP3, constant bitrate with a Xing/Info header | 44.1, 48 kHz | n/a (decodes to PCM) | mono, stereo | the five `Mp3_*` theories over `Mp3Cells()`, variant `CbrInfo`: the length is the tag's frame count | proven, 4 cells (ticket 14) |
+| MP3, constant bitrate with no Xing/Info/VBRI header | 44.1, 48 kHz | n/a | mono, stereo | same theories, variant `CbrBare`: the length is the audio bytes over the frame size, no frame scan | proven, 4 cells (ticket 14) |
+| MP3, variable bitrate with a Xing header | 44.1, 48 kHz | n/a | mono, stereo | same theories, variant `Vbr`: the length is the tag's frame count | proven, 4 cells (ticket 14) |
 
-"Pending" rows exist because this table is written ahead of ticket 14, which fills the
-matrix. They are not a second tier: ticket 14 lands before the shell
-([ticket 13](../.scratch/202609-faderio-v3/issues/13-build-the-shell.md)) can add a file, so
-no user ever meets a pending row. A row ticket 14 cannot turn green is removed from this table
-before then, and those files are rejected.
+Every promised cell seeks to 1 ms; no cell is pinned. An MP3's decoded length is whole
+1152-frame blocks, so it is a little longer than the audio that was encoded (the encoder's
+delay and padding); the length the probe issues is that decoded length, which is what the
+completeness and length cells assert. A variable-bitrate MP3 without a Xing header is not a
+row: the probe would have to scan every frame, and no library file is one (ticket 08 survey).
 
 **Sample rate policy.** The engine runs at the output device's rate, fixed at launch
 ([ADR 0008](adr/0008-engine-runs-at-the-device-rate.md)). A file at any other promised rate
