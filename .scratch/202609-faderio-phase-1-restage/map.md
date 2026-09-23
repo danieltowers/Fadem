@@ -85,6 +85,10 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   applies at once to live voices. It is nearly inert: 2 of 342 sampled files are tagged. It
   also settles the audible-time rule: the `View` shows what is heard, and commands act as soon
   as possible.
+- [Does adding a folder need a background probe?](issues/07-does-adding-a-folder-need-a-background-probe.md):
+  yes. The 903-file library adds in 12.8 s cold (median 13 ms, max 112 ms, the slow files being
+  FLACs with 7 MB of cover art). Today's add probes under the lock the audio thread takes, so
+  adding must move off the lock and off the UI thread. `AddTimeBudgetTests` stays behind.
 
 ## Not yet specified
 

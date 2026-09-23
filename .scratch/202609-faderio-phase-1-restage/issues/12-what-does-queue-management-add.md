@@ -28,3 +28,12 @@ queue does, with one engine call per user intent (placement test 1):
 - **Shuffle and repeat controls.** Where they sit and how they show `View.Shuffle` and
   `View.Repeat`. What they do is decided in
   [What do skip, repeat and end-of-queue do?](02-what-do-skip-repeat-and-end-of-queue-do.md).
+
+## Comments
+
+- From [Does adding a folder need a background probe?](07-does-adding-a-folder-need-a-background-probe.md):
+  yes. The whole library takes 12.8 s cold, and today's `AddTracks` probes under the engine lock
+  that the audio thread also takes, so any add during playback stalls the audio. Adding (files,
+  folder, M3U) must probe off the lock and off the UI thread, with rows appended as files
+  resolve. Decide the command surface for that here: progress, cancelling a long add, and where
+  the rows land.
