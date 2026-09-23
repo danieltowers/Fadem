@@ -9,6 +9,9 @@ Phase 1 on v3's seam, written to `.scratch/202609-faderio-phase-1-build/` as a `
 numbered issues. The map is done when every decision those issues depend on is settled and the
 issues exist; no feature code is written on this map.
 
+**Reached 2026-09-23.** The spec and 18 issues are in
+[`.scratch/202609-faderio-phase-1-build/`](../202609-faderio-phase-1-build/spec.md).
+
 ## Notes
 
 **Domain.** Vocabulary per `CONTEXT.md`. A transition belongs to an *adjacency*, never to a
@@ -112,16 +115,15 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   trim when a LAME tag passes its CRC, MusicLength and range checks (546 of 654 library MP3s),
   from the first encoded sample; bare files and failing tags keep whole frames silently. A
   permanent test must pin the ACM offset, or the build stops. Staged late.
+- [Stage the build issues](issues/11-stage-the-build-issues.md): the destination.
+  [`spec.md`](../202609-faderio-phase-1-build/spec.md) and 18 `ready-for-agent` issues,
+  daily driver first (adding, queue editing, transport, failures, settings), then authoring,
+  then MP3 trimming.
 
 ## Not yet specified
 
-- **Unmeasured audio paths.** The WASAPI-exclusive resampling path, real music as opposed to
-  test signals, and files longer than two seconds are not proven by the real-input matrix.
-  Queue advance and long files will exercise them for the first time; whether any needs a
-  permanent test is open. The audit adds that no automated test reaches `NAudioAudioOutput` at
-  all: its device clock, WaveOut fallback and stop handling rest on the smoke checklist.
-  [What happens when a file or the device fails?](issues/05-what-happens-when-a-file-or-the-device-fails.md)
-  adds device loss, reopening on Play, and the exclusive → shared → WaveOut launch chain.
+None. **Unmeasured audio paths** graduated into build issue 11 as Sounds items; its automated
+part is out of scope (below).
 
 ## Out of scope
 
@@ -142,6 +144,9 @@ Beyond this map's destination; returns only if the destination is redrawn.
 - **Queue persistence across restarts.** Ruled out by
   [Which settings exist, and where do they live?](issues/10-which-settings-exist-and-where-do-they-live.md):
   saving the queue as M3U is the manual way; automatic restore returns as a fresh effort.
+- **Automated tests of `NAudioAudioOutput`.** Ruled out by
+  [Stage the build issues](issues/11-stage-the-build-issues.md): ADR 0002 leaves the device to
+  the human seam, and build issue 11 adds the Sounds items that prove its paths.
 - **v2/v3 store coexistence.** v2 is retired for listening, so the two never share the file.
 - Everything the predecessor ruled out: library manager, playlist manager, cross-platform,
   MusicBee interop, tag editing, sidecar transition files.
