@@ -71,6 +71,10 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   only as a clip light. The fade strip and the peak meter are cut. The light latches on
   audible time when the mix goes over full scale, and names the cause: the in-flight adjacency
   or the attended track, with a count. One engine command clears it, and it has no setting.
+- [What is preview?](issues/04-what-is-preview.md): preview voices in the main engine play
+  the editor's unsaved draft, from 5 s before the fade-out point to 5 s after the fades. The
+  queue is held and stays paused afterwards. Queue buttons end a preview, and Capture reads its
+  voices. Render stays; render-then-play and a second engine are rejected.
 
 ## Not yet specified
 

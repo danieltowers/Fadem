@@ -19,3 +19,9 @@ file that fails to open at add time is rejected with a message. Decide the rest:
   fallback change the engine rate (ADR 0008 fixes it at launch)?
 - **Where notices live.** The status strip, a log, both; and whether an engine error can ever
   be swallowed (v2 said never).
+
+## Comments
+
+- From [What is preview?](04-what-is-preview.md): a preview plays through the main engine on
+  its own voices while the queue is held. Decide what a decode failure or device loss during a
+  preview does too, and whether the held queue survives it.

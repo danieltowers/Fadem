@@ -73,6 +73,12 @@ fade-out point. Only the fade-out point moves, to the playhead; everything else 
 authored. It targets the same adjacency a skip would.
 _Avoid_: Mix now, crossfade on skip
 
+**Preview**:
+Hearing one adjacency's transition as currently drafted in the editor, saved or not: from
+shortly before its fade-out point to shortly after its fades complete. The queue is held where
+it was for the duration and is never moved by it.
+_Avoid_: Audition, test play, render (a render writes a file)
+
 ### Position
 
 **Voice**:
