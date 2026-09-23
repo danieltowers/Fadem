@@ -183,44 +183,11 @@ asking whether the current work could fail that way again.
 
 ## Not yet specified
 
-- **Restaging the rest of Phase 1.** Once the slice is trustworthy, how the remaining
-  features (queue management, repeat/shuffle, preview, visualiser, ReplayGain, settings,
-  file robustness) come back, and in what order. Likely mines v2's 14 issue files, but
-  whether those are reusable as written is unknown until the slice lands. Two costs land here
-  from tickets 09 and 10: **adding a folder** probes every file's header (fast) but any format
-  the matrix forces onto a frame scan reads the whole file at add time, and **opening a FLAC**
-  pre-scans it (about 250 ms on the longest library file, ticket 15). Whether folder adds need
-  a background probe is unexamined. The M3U writer
-  returns formatting the engine's `Length`, since tag duration no longer exists. Ticket 14
-  measured that an MP3's `Length` is whole encoder frames, so it carries up to about 50 ms of
-  encoder silence at each end; whether to trim it from LAME's gapless info is unexamined.
-- **The fate of the preview feature.** v2 built it with its own mixer and its own output
-  device. Whether that is the right design, or whether preview should just be the offline
-  render played back, is unclear until the render harness exists. Ticket 04 added a
-  constraint: a second engine over its own output cannot open WASAPI-exclusive twice, so
-  "preview as a second engine" is unavailable in that mode.
-- **Stable track identity.** The store keys transitions by full file path. v2's spec deferred
-  real identity to Phase 2 but claimed the schema could absorb the change. Untested, and it
-  touches the store format.
-- **What happens to v2's transition store data.** There *is* data: one authored transition in
-  `%APPDATA%aderio	ransitions.json`, a FLAC boundary with a 37.132 s fade-out point and a
-  20 s fade. Schema version 1, keyed by ordered full path pair, reads cleanly. The open part is
-  now narrower: v3 reuses the same store and would share that path, so whether the two builds
-  can coexist on one machine without schema drift is unexamined.
-- **Where the audible-time discipline stops.** Ticket 03 put the playhead, the seek bar, the
-  time readout and the visualiser on audible time. Whether *every* user-visible signal owes
-  the same honesty — end-of-track notifications, queue advance, ReplayGain switchover — is
-  unexamined, and only some of those surfaces exist yet.
-- **Formats rejected today, each with a named way back.** Ticket 08 drew the promise at what
-  the library holds and rejected the rest rather than play it unproven: AIFF (one row and a
-  fixture), M4A/WMA (only with a decoder that seeks them to 1 ms; Media Foundation does not), Ogg
-  Vorbis (a research ticket on a decoder that seeks any Ogg; NVorbis 0.10.5 cannot), more than
-  two channels (downmix), 8/32-bit PCM and rates beyond 96 kHz (a row each). Which of these
-  restaging brings back, and when, is fog until someone has such a file.
-- **Audio paths still unmeasured after ticket 08.** The WASAPI-exclusive resampling path,
-  real music as opposed to test signals, and files longer than two seconds are not proven by
-  the matrix. Length is deliberately not a promise column; the smoke checklist covers it by ear.
-  Whether any of these needs a permanent test is open.
+Nothing: this map's destination is reached. Its fog was carried forward on 2026-09-23 to
+[faderio v3: restage the rest of Phase 1](../202609-faderio-phase-1-restage/map.md). Restaging,
+preview, audible-time discipline, the folder-add probe, MP3 gapless padding and the M3U writer
+became tickets or fog there. Stable track identity, the rejected formats and v2/v3 store
+coexistence were ruled out of scope there; v2 is retired for listening.
 
 ## Out of scope
 
