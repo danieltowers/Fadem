@@ -1,144 +1,344 @@
+using System.Collections.Immutable;
 using Faderio.Core.Domain;
 using Faderio.Core.Queue;
 using Faderio.Core.Settings;
 using Faderio.Core.Transitions;
-using NAudio.Wave;
 
 namespace Faderio.Core.Playback;
 
-/// <summary>State for the visualiser (issue 0011): fade levels per active voice plus output
-/// peak. Level data comes from the engine's own observable state — never UI polling of the
-/// audio device. Raised on the rendering thread; the UI marshals or polls the latest value.</summary>
-public sealed record VisualiserVoiceLevel(int TrackIndex, double Level);
-
-public sealed record VisualiserState(
-    double Peak,
-    bool Clipping,
-    IReadOnlyList<VisualiserVoiceLevel> Voices);
-
 /// <summary>
-/// The transition engine: playback state, effective-transition resolution at boundaries, and
-/// sample-accurate fade triggering (spec: modules). All timing is driven from the mixer's
-/// sample position — the only injected seam is the audio output boundary.
+/// The transition engine behind a command surface and an immutable <see cref="View"/>
+/// (ADR 0003). Commands come from any thread and are serialised inside; the view is a lock-free
+/// read; the sink is called after the lock is released. Runs at the output's sample rate
+/// (ADR 0008). Every command is total: a stale row is a notice, never an exception. Only
+/// <see cref="ObjectDisposedException"/> escapes.
 /// </summary>
-public sealed partial class PlaybackEngine
+public sealed partial class PlaybackEngine : IDisposable
 {
-    private readonly IAudioOutputFactory _outputFactory;
-    private readonly IAudioSourceFactory _sourceFactory;
+    private readonly IAudioOutput _output;
     private readonly ITransitionStore _store;
+    private readonly IEngineSink _sink;
     private readonly TransitionResolver _resolver;
+    private readonly PlayerSettings _settings;
     private readonly Random _rng;
     private readonly object _sync = new();
-    private readonly TransitionMixer _mixer = new();
+    private readonly TransitionMixer _mixer;
+    private readonly int _rate;
+    private readonly PlaybackQueue _queue;
+    private readonly List<QueueEntry> _originalOrder = new();
+    private readonly Dictionary<MixerVoice, QueueEntry> _voiceEntry = new();
 
-    private PlayerSettings _settings;
-    private IAudioOutput? _output;
-    private LockingOutput? _lockingOutput;
+    /// <summary>The newest voice: where decoding is. Its boundary is the pending one.</summary>
     private MixerVoice? _currentVoice;
+
+    /// <summary>The voice fading out under <see cref="_currentVoice"/> during an overlap.</summary>
     private MixerVoice? _outgoingVoice;
+
+    /// <summary>The voice the listener is hearing (ADR 0001). Lags <see cref="_currentVoice"/>
+    /// until the audible handover at <see cref="_handoverAt"/>.</summary>
+    private MixerVoice? _attendedVoice;
+    private long? _handoverAt;
+
     private BoundarySchedule? _pendingBoundary;
-    private PreviewSession? _preview;
-    private readonly Dictionary<MixerVoice, int> _voiceTrackIndex = new();
-    private IReadOnlyList<Track> _originalOrder = new List<Track>();
-    private bool _finishedRaised;
+    private bool _finished;
     private bool _disposed;
-    private VisualiserState _latestVisualiser = new(0, false, Array.Empty<VisualiserVoiceLevel>());
+    private long _nextRowId = 1;
+    private long _version;
+    private long _queueVersion;
+    private bool _shuffle;
+    private RepeatMode _repeat;
+
+    private volatile Snapshot _snapshot;
+    private int _depth;
+    private bool _viewDirty;
+    private readonly List<string> _pendingNotices = new();
 
     public PlaybackEngine(
-        IAudioOutputFactory outputFactory,
-        IAudioSourceFactory sourceFactory,
+        IAudioOutput output,
         ITransitionStore store,
-        TransitionResolver resolver,
-        PlayerSettings settings,
+        IEngineSink sink,
+        PlayerSettings? settings = null,
         Random? rng = null)
     {
-        _outputFactory = outputFactory;
-        _sourceFactory = sourceFactory;
+        _output = output;
         _store = store;
-        _resolver = resolver;
-        _settings = settings;
+        _sink = sink;
+        _settings = settings ?? new PlayerSettings();
+        _resolver = new TransitionResolver(_settings);
         _rng = rng ?? new Random();
-        Queue = new PlaybackQueue(_rng);
+        _rate = output.SampleRate;
+        _mixer = new TransitionMixer(_rate);
+        _queue = new PlaybackQueue(_rng);
+        _snapshot = BuildSnapshot();
 
         _mixer.VoiceEnded += OnVoiceEnded;
-        _mixer.BlockRendered += OnBlockRendered;
-        RecreateOutput();
+        _output.Stopped += OnOutputStopped;
+        _output.Initialise(new EngineFrameSource(this));
     }
 
-    /// <summary>The sample stream the audio output device pulls.</summary>
-    public ISampleProvider Output => _lockingOutput ?? throw new InvalidOperationException("Engine not initialised.");
+    /// <summary>The player at this instant. Discrete state is whatever was last published; the
+    /// playhead and the attended voice are derived from the frames the device has emitted right
+    /// now, so polling this on a timer is honest without a publication per block.</summary>
+    public PlayerView View => _snapshot.At(_output.FramesEmitted.Count);
 
-    public PlaybackQueue Queue { get; }
+    /// <summary>The engine's sample rate: the output device's, fixed at launch.</summary>
+    public int SampleRate => _rate;
 
-    public PlayerSettings Settings
+    public void Dispose()
     {
-        get { lock (_sync) { return _settings; } }
-    }
-
-    public TransitionResolver Resolver => _resolver;
-
-    public RepeatMode Repeat { get; set; }
-
-    private bool _shuffle;
-
-    public bool Shuffle
-    {
-        get => _shuffle;
-        set
+        lock (_sync)
         {
-            _shuffle = value;
-            lock (_sync)
+            if (_disposed)
             {
-                if (value)
-                {
-                    Queue.ShuffleUpcoming();
-                }
-                else
-                {
-                    RestoreOriginalOrder();
-                }
+                return;
             }
+            _disposed = true;
+            ResetForRestart();
+            _output.Stopped -= OnOutputStopped;
+            _output.Dispose();
         }
     }
 
-    public PlaybackState State
-    {
-        get { lock (_sync) { return _output?.State ?? PlaybackState.Stopped; } }
-    }
+    // ── The lock, the drain and the publication ─────────────────────────────────────────
 
-    public Track? CurrentTrack
+    /// <summary>Runs <paramref name="body"/> under the engine lock, then delivers whatever it
+    /// queued for the sink after the lock is released: no handler ever runs under the lock, and
+    /// a re-entrant command from a handler is legal. <c>Changed</c> is coalesced to one delivery
+    /// carrying the latest view.</summary>
+    private T Run<T>(Func<T> body)
     {
-        get { lock (_sync) { return _currentVoice is null ? null : Queue.CurrentTrack; } }
-    }
-
-    /// <summary>Position within the current track, from the mixer's sample position.</summary>
-    public TimeSpan CurrentPosition
-    {
-        get
+        T result;
+        PlayerView? view = null;
+        string[]? notices = null;
+        lock (_sync)
         {
-            lock (_sync)
+            _depth++;
+            try
             {
-                return _currentVoice is null
-                    ? TimeSpan.Zero
-                    : TimeSpan.FromSeconds(_currentVoice.Source.Position / (double)TransitionMixer.SampleRate);
+                result = body();
             }
+            finally
+            {
+                _depth--;
+                if (_depth == 0)
+                {
+                    if (_viewDirty)
+                    {
+                        _viewDirty = false;
+                        view = View;
+                    }
+                    if (_pendingNotices.Count > 0)
+                    {
+                        notices = _pendingNotices.ToArray();
+                        _pendingNotices.Clear();
+                    }
+                }
+            }
+        }
+        if (notices is not null)
+        {
+            foreach (var notice in notices)
+            {
+                _sink.Notice(notice);
+            }
+        }
+        if (view is not null)
+        {
+            _sink.Changed(view);
+        }
+        return result;
+    }
+
+    private void Run(Action body) => Run(() =>
+    {
+        body();
+        return 0;
+    });
+
+    private void Publish()
+    {
+        _version++;
+        _snapshot = BuildSnapshot();
+        _viewDirty = true;
+    }
+
+    private void RaiseNotice(string message) => _pendingNotices.Add(message);
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(PlaybackEngine));
         }
     }
 
-    public VisualiserState LatestVisualiserState
+    /// <summary>Completes a pending audible handover once the device has emitted past it.
+    /// Called at the start of every locked section, so the published state is never behind
+    /// what the listener hears by more than one call.</summary>
+    private void ObserveClock()
     {
-        get { lock (_sync) { return _latestVisualiser; } }
+        if (_handoverAt is { } handover && _output.FramesEmitted.Count >= handover)
+        {
+            CompleteHandover();
+        }
     }
 
-    public event EventHandler? TrackChanged;
+    private void CompleteHandover()
+    {
+        var previous = _attendedVoice;
+        _attendedVoice = _currentVoice;
+        _handoverAt = null;
+        if (previous is not null && previous != _currentVoice && previous.IsFinished)
+        {
+            _voiceEntry.Remove(previous);
+        }
+        Publish();
+    }
 
-    /// <summary>Fires exactly once per playback run — when the queue plays out (including an
-    /// authored end-of-sequence fade) and is not looped by repeat.</summary>
-    public event EventHandler? PlaybackFinished;
+    /// <summary>Makes <paramref name="voice"/> the current voice. If another voice is attended,
+    /// the listener keeps hearing it until <paramref name="audibleAt"/>, the timeline frame at
+    /// which the new voice becomes audible and the old one falls silent.</summary>
+    private void BecomeCurrent(MixerVoice voice, long audibleAt)
+    {
+        _currentVoice = voice;
+        if (_attendedVoice is null || !_voiceEntry.ContainsKey(_attendedVoice))
+        {
+            _attendedVoice = voice;
+            _handoverAt = null;
+        }
+        else if (_attendedVoice != voice)
+        {
+            _handoverAt = audibleAt;
+        }
+    }
 
-    /// <summary>Non-blocking status notices (skipped files, output fallback, corrupt settings…).</summary>
-    public event EventHandler<string>? Notice;
+    private void OnOutputStopped(Exception? error)
+    {
+        if (error is not null)
+        {
+            Run(() =>
+            {
+                RaiseNotice($"Audio output stopped: {error.Message}");
+                Publish();
+            });
+        }
+    }
 
-    /// <summary>Raised on the rendering thread after every rendered block.</summary>
-    public event EventHandler<VisualiserState>? VisualiserStateChanged;
+    private long Frames(TimeSpan t) => EngineTime.Frames(t, _rate);
+
+    private TimeSpan TimeSpanOf(long frames) => EngineTime.TimeSpanOf(frames, _rate);
+
+    // ── The snapshot: what View is composed from ────────────────────────────────────────
+
+    private Snapshot BuildSnapshot()
+    {
+        var current = _currentVoice is { } cv && _voiceEntry.TryGetValue(cv, out var ce) ? VoiceSnap.Of(cv, ce) : null;
+        var attended = _attendedVoice is { } av && av != _currentVoice && _voiceEntry.TryGetValue(av, out var ae)
+            ? VoiceSnap.Of(av, ae)
+            : null;
+        return new Snapshot(
+            _version, _queueVersion, _output.State, _queue.Entries.ToImmutableArray(),
+            _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null,
+            _shuffle, _repeat, _rate);
+    }
+
+    /// <summary>One voice frozen for the view: its row, its reference history and its length.
+    /// The playhead is a pure function of the frames emitted, so the view can be recomputed
+    /// lock-free at any instant.</summary>
+    private sealed record VoiceSnap(QueueEntry Entry, ImmutableArray<(long Timeline, long Source)> Refs, long LengthFrames)
+    {
+        public static VoiceSnap Of(MixerVoice voice, QueueEntry entry) =>
+            new(entry, voice.References.ToImmutableArray(), voice.LengthFrames);
+
+        public long PlayheadFrames(long emitted)
+        {
+            var position = Refs[0].Source;
+            for (var i = Refs.Length - 1; i >= 0; i--)
+            {
+                if (Refs[i].Timeline <= emitted)
+                {
+                    position = Refs[i].Source + (emitted - Refs[i].Timeline);
+                    break;
+                }
+            }
+            return Math.Clamp(position, 0, Math.Max(LengthFrames, 0));
+        }
+
+        public VoiceView At(long emitted, bool isCurrent, int rate) =>
+            new(new QueueRow(Entry.Id, Entry.Track, isCurrent),
+                Playhead.FromFrames(PlayheadFrames(emitted), rate),
+                Entry.Track.Length);
+    }
+
+    private sealed record Snapshot(
+        long Version,
+        long QueueVersion,
+        Transport Transport,
+        ImmutableArray<QueueEntry> Entries,
+        RowId? CurrentRow,
+        VoiceSnap? Attended,
+        VoiceSnap? Current,
+        long? HandoverAt,
+        bool Overlap,
+        bool Shuffle,
+        RepeatMode Repeat,
+        int Rate)
+    {
+        public PlayerView At(long emitted)
+        {
+            VoiceSnap? attended = null, incoming = null;
+            if (Transport != Transport.Stopped)
+            {
+                var handedOver = HandoverAt is null || emitted >= HandoverAt;
+                attended = Attended is not null && !handedOver ? Attended : Current;
+                incoming = Overlap && attended == Attended ? Current : null;
+            }
+            var currentRow = attended?.Entry.Id ?? CurrentRow;
+            var rows = Entries.Select(e => new QueueRow(e.Id, e.Track, e.Id == currentRow)).ToList();
+            return new PlayerView(
+                Version, QueueVersion, Transport, rows,
+                attended?.At(emitted, true, Rate),
+                incoming?.At(emitted, false, Rate),
+                Shuffle, Repeat);
+        }
+    }
+
+    // ── The output seam ──────────────────────────────────────────────────────────────────
+
+    /// <summary>What the output pulls. Rendering and control calls share one lock; errors are
+    /// surfaced as a notice, never swallowed, and a block that failed renders as silence.</summary>
+    private sealed class EngineFrameSource : IFrameSource
+    {
+        private readonly PlaybackEngine _engine;
+
+        public EngineFrameSource(PlaybackEngine engine) => _engine = engine;
+
+        public int SampleRate => _engine._rate;
+
+        public int Channels => TransitionMixer.Channels;
+
+        public Frames Read(float[] interleaved, int offset, Frames wanted)
+        {
+            var count = (int)wanted.Count;
+            if (_engine._disposed)
+            {
+                Array.Clear(interleaved, offset, count * Channels);
+                return wanted;
+            }
+            return _engine.Run(() =>
+            {
+                _engine.ObserveClock();
+                try
+                {
+                    _engine._mixer.Read(interleaved, offset, count);
+                }
+                catch (Exception e)
+                {
+                    Array.Clear(interleaved, offset, count * Channels);
+                    _engine.RaiseNotice($"Audio rendering error: {e.Message}");
+                }
+                return wanted;
+            });
+        }
+    }
 }

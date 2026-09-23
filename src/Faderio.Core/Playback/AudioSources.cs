@@ -1,6 +1,4 @@
-using Faderio.Core.Domain;
 using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
 
 namespace Faderio.Core.Playback;
 
@@ -8,7 +6,7 @@ namespace Faderio.Core.Playback;
 /// A decodable, seekable stream of one audio file, in the file's own sample rate and channel
 /// count. Sample positions are frames (one frame = one sample of every channel).
 /// </summary>
-public interface ITrackSource : ISampleProvider, IDisposable
+internal interface ITrackSource : ISampleProvider, IDisposable
 {
     long TotalFrames { get; }
 
@@ -17,20 +15,14 @@ public interface ITrackSource : ISampleProvider, IDisposable
 }
 
 /// <summary>
-/// Opens audio files for playback. Errors are thrown to the caller (the engine surfaces them
-/// as a non-blocking notice and skips the track) — never silently swallowed.
+/// Opens audio files through the production decoders. Decoders are not a port (ADR 0003): one
+/// adapter would be a hypothetical seam, and the real-input matrix uses real files. Errors are
+/// thrown to the caller, which surfaces them as a notice and skips the track.
 /// </summary>
-public interface IAudioSourceFactory
+internal static class TrackSources
 {
-    ITrackSource Open(Track track);
-}
-
-/// <summary>Production source factory: NAudio decoders, OGG via NVorbis.</summary>
-public sealed class NAudioAudioSourceFactory : IAudioSourceFactory
-{
-    public ITrackSource Open(Track track)
+    public static ITrackSource Open(string path)
     {
-        var path = track.FilePath;
         if (!File.Exists(path))
         {
             throw new FileNotFoundException($"Audio file not found: {path}", path);
@@ -42,7 +34,9 @@ public sealed class NAudioAudioSourceFactory : IAudioSourceFactory
             ".wav" => WaveStreamTrackSource.Create(new WaveFileReader(path)),
             ".mp3" => WaveStreamTrackSource.Create(new Mp3FileReader(path)),
             ".aif" or ".aiff" => WaveStreamTrackSource.Create(new AiffFileReader(path)),
-            ".ogg" or ".oga" => new VorbisTrackSource(path),
+            // FLAC decodes through Media Foundation until ticket 15 swaps the decoder (ADR 0009);
+            // the catch-all goes with it. The probe rejects everything else before it gets here.
+            ".flac" => WaveStreamTrackSource.Create(new MediaFoundationReader(path)),
             _ => WaveStreamTrackSource.Create(new MediaFoundationReader(path)),
         };
     }
@@ -52,7 +46,7 @@ public sealed class NAudioAudioSourceFactory : IAudioSourceFactory
 /// Converts to IEEE float with correct *frame* semantics (count = frames, both channels filled) —
 /// NAudio's built-in sample converters interpret count as per-stream samples, which breaks for
 /// multi-channel sources.</summary>
-public sealed class WaveStreamTrackSource : ITrackSource
+internal sealed class WaveStreamTrackSource : ITrackSource
 {
     private readonly WaveStream _stream;
     private byte[] _sourceBytes = new byte[0];
@@ -184,52 +178,3 @@ public sealed class WaveStreamTrackSource : ITrackSource
     }
 }
 
-/// <summary>ITrackSource over an OGG Vorbis file via NVorbis.</summary>
-public sealed class VorbisTrackSource : ITrackSource
-{
-    private readonly NVorbis.VorbisReader _reader;
-    private readonly WaveFormat _format;
-    private float[] _scratch = new float[8192];
-    private bool _disposed;
-
-    public VorbisTrackSource(string path)
-    {
-        _reader = new NVorbis.VorbisReader(path);
-        _format = WaveFormat.CreateIeeeFloatWaveFormat(_reader.SampleRate, _reader.Channels);
-        // NVorbis throws on a seek issued before any read or length query. v2 survived only
-        // because the engine happened to touch TotalFrames first (ticket 01, defect C).
-        _ = _reader.TotalSamples;
-    }
-
-    public WaveFormat WaveFormat => _format;
-
-    public long TotalFrames => (long)_reader.TotalSamples;
-
-    public long Position
-    {
-        get => (long)_reader.SamplePosition;
-        set => _reader.SamplePosition = value;
-    }
-
-    public int Read(float[] buffer, int offset, int count)
-    {
-        var needed = count * _format.Channels;
-        if (_scratch.Length < needed)
-        {
-            _scratch = new float[needed];
-        }
-        var read = _reader.ReadSamples(_scratch, 0, needed);
-        Array.Copy(_scratch, 0, buffer, offset, read);
-        return read / _format.Channels;
-    }
-
-    public void Dispose()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-        _disposed = true;
-        _reader.Dispose();
-    }
-}

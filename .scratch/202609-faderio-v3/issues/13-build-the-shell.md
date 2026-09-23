@@ -46,3 +46,27 @@ _(pending)_
 The second test project (`net8.0-windows`, referencing `Faderio.App`) was deferred to here: it
 cannot exist before the shell does. `InternalsVisibleTo("Faderio.Core.Tests")` is already on
 Core; add the App project's own when it appears.
+
+## Noted from ticket 12
+
+The surface is final; read `PlaybackEngine`, `PlayerView.cs`, `IEngineSink.cs`, `IAudioOutput.cs`
+and `Domain/Units.cs`. Deviations from ticket 04's sketch, all packaging:
+
+- `Length`, `Playhead` and `Point` carry ticks, not frames; the shell sees `Milliseconds`,
+  `TotalSeconds` and `TimeSpan`. `Point.TimeSpan` feeds `FadePointSpec`; `Point.FromSeconds` is
+  the only parse path. `VoiceView.Remaining` is a `Length`. `QueueRow` is `(Id, Track, IsCurrent)`
+  and the length is `Track.Length`.
+- `AddReport` is `(Added, Rejected)` where each `Rejection` carries the path, the probed
+  `AudioShape` (may be null) and the `RejectedProperty`; `Summarise(AddReport)` formats these
+  and points at `docs/supported-audio.md`. Never compute from them.
+- The engine constructor is `PlaybackEngine(IAudioOutput, ITransitionStore, IEngineSink,
+  PlayerSettings? = null, Random? = null)`. Output mode is chosen by building the right
+  `IAudioOutput` at launch; there is no `ApplySettings`.
+- **`PostingSink`** is yours: `IEngineSink` over a `SynchronizationContext`, created before the
+  form so nothing is dropped. **`NAudioAudioOutput`** is yours too: wrap
+  `new FloatToBytesWaveProvider(new FrameSourceSampleProvider(source))`, report `SampleRate`
+  from the device, `FramesEmitted` from `IWavePosition.GetPosition()` in bytes over the output
+  format, and reset it on `Stop`. `Stopped` is `Action<Exception?>`.
+- `IsCurrent` flips at the audible handover, not at `QueueVersion`; render the current-row
+  highlight from `View.Queue` on every tick, and rebuild rows only when `QueueVersion` moves.
+- `Capture()` returns null when stopped; the capture button is disabled then.

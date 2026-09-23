@@ -1,50 +1,60 @@
 using Faderio.Core.Playback;
-using Faderio.Core.Settings;
-using NAudio.Wave;
 
 namespace Faderio.Core.Tests;
 
-using PlaybackState = Faderio.Core.Playback.PlaybackState;
-
 /// <summary>
-/// The test-side binding of the single injected seam (spec: Testing Decisions): advances the
-/// sample position deterministically and captures rendered sample blocks. The engine's mixer
-/// is pulled through <see cref="Advance"/>; nothing runs on a real audio device.
+/// The test-side binding of the output seam (ADR 0002, S1). It <em>is</em> the clock: the
+/// engine's mixer is pulled through <see cref="Advance(int)"/> deterministically, faster than
+/// real time, and every rendered block is captured. <see cref="Latency"/> models the device
+/// buffer: frames rendered but not yet audible, so <see cref="FramesEmitted"/> lags what has
+/// been pulled — exactly what a playhead derived from the device clock must cope with (ADR 0001).
 /// </summary>
 public sealed class FakeAudioOutput : IAudioOutput
 {
-    public AudioOutputMode? RequestedMode { get; set; }
-    public ISampleProvider? Source { get; private set; }
-    public PlaybackState State { get; private set; } = PlaybackState.Stopped;
+    public IFrameSource? Source { get; private set; }
+    public Transport State { get; private set; } = Transport.Stopped;
 
-    /// <summary>Frames pulled per clock step: 4410 = 100 ms at the engine's 44.1 kHz.</summary>
+    /// <summary>The engine rate this device declares (ADR 0008). 44.1 kHz keeps every existing
+    /// expectation in frames unchanged.</summary>
+    public int SampleRate { get; init; } = 44100;
+
+    /// <summary>Frames pulled per clock step: 4410 = 100 ms at 44.1 kHz.</summary>
     public int BlockFrames { get; init; } = 4410;
+
+    /// <summary>Frames the device holds before they become audible. Zero by default, so
+    /// emitted equals rendered and expectations read plainly.</summary>
+    public int Latency { get; init; }
 
     public List<float[]> Blocks { get; } = new();
     public long FramesRendered { get; private set; }
     public int ReadCallCount { get; private set; }
 
+    /// <summary>What the listener has actually heard: rendered frames minus the device buffer.</summary>
+    public Frames FramesEmitted => new(Math.Max(0, FramesRendered - Latency));
+
     private bool _stoppedRaised;
-    public event EventHandler<OutputStoppedEventArgs>? Stopped;
+    public event Action<Exception?>? Stopped;
 
-    public void Initialise(ISampleProvider source, AudioOutputMode mode)
+    public void Initialise(IFrameSource source) => Source = source;
+
+    public void Play() => State = Transport.Playing;
+
+    public void Pause() => State = Transport.Paused;
+
+    /// <summary>Stops and resets the emitted count: the engine resets its timeline in the same
+    /// call, so the two clocks share one origin.</summary>
+    public void Stop()
     {
-        Source = source;
-        RequestedMode = mode;
+        State = Transport.Stopped;
+        FramesRendered = 0;
     }
-
-    public void Play() => State = PlaybackState.Playing;
-
-    public void Pause() => State = PlaybackState.Paused;
-
-    public void Stop() => State = PlaybackState.Stopped;
 
     /// <summary>Drives the fake sample clock: pulls <paramref name="frames"/> frames from the
     /// source in block-sized steps, capturing every rendered block. A paused or stopped device
     /// pulls nothing — faithful to a real device.</summary>
     public void Advance(int frames)
     {
-        if (State != PlaybackState.Playing)
+        if (State != Transport.Playing)
         {
             return;
         }
@@ -53,8 +63,8 @@ public sealed class FakeAudioOutput : IAudioOutput
         var remaining = frames;
         while (remaining > 0)
         {
-            var toRead = (int)Math.Min(remaining, BlockFrames);
-            var read = source.Read(buffer, 0, toRead);
+            var toRead = Math.Min(remaining, BlockFrames);
+            var read = (int)source.Read(buffer, 0, new Frames(toRead)).Count;
             ReadCallCount++;
             var block = new float[read * 2];
             Array.Copy(buffer, block, block.Length);
@@ -68,24 +78,14 @@ public sealed class FakeAudioOutput : IAudioOutput
         }
     }
 
+    public void Advance(Frames frames) => Advance((int)frames.Count);
+
     public void Dispose()
     {
         if (!_stoppedRaised)
         {
             _stoppedRaised = true;
-            Stopped?.Invoke(this, new OutputStoppedEventArgs(null));
+            Stopped?.Invoke(null);
         }
-    }
-}
-
-public sealed class FakeAudioOutputFactory : IAudioOutputFactory
-{
-    public List<FakeAudioOutput> Created { get; } = new();
-
-    public IAudioOutput Create(AudioOutputMode requestedMode, Action<string> notifyFallback)
-    {
-        var output = new FakeAudioOutput { RequestedMode = requestedMode };
-        Created.Add(output);
-        return output;
     }
 }

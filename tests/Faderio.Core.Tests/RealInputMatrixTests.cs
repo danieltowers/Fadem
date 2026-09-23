@@ -13,7 +13,7 @@ namespace Faderio.Core.Tests;
 public class RealInputMatrixTests
 {
     private const double Seconds = 2.0;
-    private const int EngineRate = NormalizedTrackSource.EngineSampleRate;
+    private const int EngineRate = 44100; // the fake output declares it (ADR 0008)
     private const long ExpectedFrames = (long)(Seconds * EngineRate); // after normalisation
     private const int Tone = 1000;
 
@@ -29,7 +29,7 @@ public class RealInputMatrixTests
     /// <summary>Opens through the production factory and normaliser — the exact path a voice
     /// takes into the mixer.</summary>
     private static ITrackSource OpenNormalised(string path) =>
-        NormalizedTrackSource.Wrap(new NAudioAudioSourceFactory().Open(new Track { FilePath = path }));
+        NormalizedTrackSource.Wrap(TrackSources.Open(path), EngineRate);
 
     /// <summary>Reads to exhaustion in mixer-sized pulls; returns frames read and the left
     /// channel, so completeness and purity come from one pass.</summary>
@@ -123,7 +123,7 @@ public class RealInputMatrixTests
         // whole track, not (rate/44100)² of it. v2's suite asserted rendered length nowhere.
         var path = TestAudio.WriteWavAt("full", Seconds, _ => 0.4, rate, 16, 2);
         using var harness = TestEngine.Create();
-        harness.SetQueueOf(path);
+        harness.Add(path);
         harness.Engine.Play();
         harness.Output.Advance((int)(5 * EngineRate));
 
@@ -183,9 +183,8 @@ public class RealInputMatrixTests
 
     /// <summary>Pinned characterisation values (ticket 06): the measured residual plus margin,
     /// named for the ticket that will tighten them. FLAC measured +67 ms late on this fixture
-    /// (ticket 07); ticket 02 saw 31 ms on its own. OGG measured within 40 ms.</summary>
+    /// (ticket 07); ticket 02 saw 31 ms on its own.</summary>
     private const double FlacPinSeconds = 0.100;
-    private const double OggPinSeconds = 0.040;
 
     // ── Compressed cells, from checked-in fixtures (see Fixtures/generate.sh) ────────────
 
@@ -220,32 +219,4 @@ public class RealInputMatrixTests
         AssertLanded(landed, target, FlacPinSeconds);
     }
 
-    [Fact]
-    public void Ogg_ReadsToCompletion()
-    {
-        using var source = OpenNormalised(FixturePath("ramp.ogg"));
-        var (frames, _) = Drain(source);
-        Assert.InRange(frames, ExpectedFrames - 100, ExpectedFrames + 100);
-    }
-
-    [Fact]
-    public void Ogg_SeekAfterFirstRead_Lands()
-    {
-        // The order the engine happens to survive by (ticket 01, defect C): length, read, seek.
-        var target = ExpectedFrames * 3 / 4;
-        var landed = Landing(FixturePath("ramp.ogg"), target, readFirst: true);
-        AssertLanded(landed, target, OggPinSeconds);
-    }
-
-    [Fact]
-    public void Ogg_SeekBeforeFirstRead_DoesNotThrow_AndLands()
-    {
-        // Defect C (ticket 01): VorbisTrackSource.Position was reported to throw out of NVorbis
-        // if set before any Read or TotalFrames access. Measured in ticket 07: seek order makes
-        // no difference; what NVorbis rejects is ffmpeg's default 1 s page duration (see
-        // Fixtures/generate.sh). The constructor now touches the length anyway.
-        var target = ExpectedFrames * 3 / 4;
-        var landed = Landing(FixturePath("ramp.ogg"), target, readFirst: false);
-        AssertLanded(landed, target, OggPinSeconds);
-    }
 }

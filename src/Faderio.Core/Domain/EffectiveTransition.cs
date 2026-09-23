@@ -5,7 +5,7 @@ namespace Faderio.Core.Domain;
 /// ready to be turned into sample positions by the engine. An adjacency with no transition
 /// (and no global default crossfade setting) resolves to <see cref="HardCut"/>.
 /// </summary>
-public sealed record EffectiveTransition
+internal sealed record EffectiveTransition
 {
     public bool IsHardCut { get; init; }
 

@@ -96,3 +96,21 @@ the three variants earn their rows: Xing/Info frame count for `CbrInfo`, file si
 size for `CbrBare`, and `Vbr` is the one most likely to force a frame scan. A red cell here does
 not widen to a tolerance; it changes how the probe learns the length for that format, and the
 doc row records the add-time cost.
+
+## Noted from ticket 12
+
+The harness moved under you; the matrix skeleton is green on it:
+
+- `TrackSources.Open(path)` (internal static) replaces `new NAudioAudioSourceFactory().Open(track)`;
+  `NormalizedTrackSource.Wrap(source, engineRate)` takes the rate. `EngineRate` in the matrix is
+  the literal 44100 the fake declares.
+- `TestEngine.Add(paths)` / `Play(paths)` replace `SetQueueOf`; both go through the production
+  probe, so an unpromised fixture throws in the harness rather than being queued.
+  `TestEngine.TrackOf(path)` builds a track without the probe when a cell needs that.
+- `FakeAudioOutput.Advance(int)` and `Advance(Frames)`; `FramesEmitted`; `Latency` (default 0).
+- **The fourth assertion's helper exists**: `AudioProbe.Probe(path, out ProbeResult)` returns the
+  header's shape and frame count. `AudioProbeTests` already asserts it on WAV cells and the two
+  FLAC fixtures; the MP3 fixture `tone-1k.mp3` (CBR 320 kbps, Info tag, 2 s) is checked in and
+  its probe length is asserted to within two frames — tighten to exact equality against
+  `Mp3FileReader.Length` as the first MP3 cell.
+- Ogg is gone (reader, cells, fixture, package). `generate.sh` documents the MP3 line.

@@ -56,7 +56,7 @@ public sealed class FloatToBytesWaveProvider : IWaveProvider
 /// in the field with FLAC files; it affected every format). Wrap at every boundary between
 /// the engine's convention and an NAudio consumer.
 /// </summary>
-public sealed class FramesToSamplesProvider : ISampleProvider
+internal sealed class FramesToSamplesProvider : ISampleProvider
 {
     private readonly ISampleProvider _inner;
     private readonly int _channels;
@@ -77,5 +77,28 @@ public sealed class FramesToSamplesProvider : ISampleProvider
         var frames = count / _channels;
         var rendered = _inner.Read(buffer, offset, frames);
         return rendered * _channels;
+    }
+}
+
+/// <summary>Presents an <see cref="IFrameSource"/> (the engine's output seam) to NAudio as a
+/// samples-convention <see cref="ISampleProvider"/>. The device adapters and the file writer
+/// pull through this; the typed <see cref="Frames"/> parameter is where a samples count can no
+/// longer be mistaken for a frames count (ADR 0003).</summary>
+public sealed class FrameSourceSampleProvider : ISampleProvider
+{
+    private readonly IFrameSource _source;
+
+    public FrameSourceSampleProvider(IFrameSource source)
+    {
+        _source = source;
+        WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(source.SampleRate, source.Channels);
+    }
+
+    public WaveFormat WaveFormat { get; }
+
+    public int Read(float[] buffer, int offset, int count)
+    {
+        var frames = _source.Read(buffer, offset, new Frames(count / _source.Channels));
+        return (int)frames.Count * _source.Channels;
     }
 }

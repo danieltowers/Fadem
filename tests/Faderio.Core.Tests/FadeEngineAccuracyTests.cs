@@ -27,7 +27,7 @@ public sealed class FadeEngineAccuracyTests
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteToneWav("a.wav", 4, FA);
         var b = TestAudio.WriteToneWav("b.wav", 4, FB);
-        tc.SetQueueOf(a, b);
+        tc.Add(a, b);
         tc.Store.Upsert(a, b, CrossfadeSpec());
         tc.Engine.Play();
         tc.Output.Advance(44100 * 2);
@@ -72,7 +72,7 @@ public sealed class FadeEngineAccuracyTests
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteDcWav("a.wav", 4, 0.4);
         var b = TestAudio.WriteDcWav("b.wav", 4, 0.2);
-        tc.SetQueueOf(a, b);
+        tc.Add(a, b);
         tc.Store.Upsert(a, b, new TransitionSpec
         {
             FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1.5), FromEnd: false),
@@ -97,7 +97,7 @@ public sealed class FadeEngineAccuracyTests
         // A is 4 s; fade-out point measured from the end: 1 s before the end → 3.0 s.
         var a = TestAudio.WriteDcWav("a.wav", 4, 0.4);
         var b = TestAudio.WriteDcWav("b.wav", 4, 0.2);
-        tc.SetQueueOf(a, b);
+        tc.Add(a, b);
         tc.Store.Upsert(a, b, new TransitionSpec
         {
             FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1), FromEnd: true),
@@ -125,7 +125,7 @@ public sealed class FadeEngineAccuracyTests
         var a = TestAudio.WriteToneWav("a.wav", 4, FA);
         var b = TestAudio.WriteWav("b.wav", 4,
             f => f < 44100 ? 0 : 0.4 * Math.Sin(2 * Math.PI * FB * (f - 44100) / TestAudio.SampleRate));
-        tc.SetQueueOf(a, b);
+        tc.Add(a, b);
         tc.Store.Upsert(a, b, CrossfadeSpec());
         tc.Engine.Play();
         tc.Output.Advance(44100 * 2);

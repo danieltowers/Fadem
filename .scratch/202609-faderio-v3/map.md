@@ -133,6 +133,17 @@ asking whether the current work could fail that way again.
   whole file (ticket 09). Glossary gains **Length**; "duration" is reserved for fades.
   Recorded as [ADR 0010](../../docs/adr/0010-one-length-issued-from-the-header.md).
 
+- [Rework the engine seam](issues/12-rework-the-engine-seam.md):
+  Built. `PlaybackEngine` has ticket 04's surface and nothing else public: commands, an
+  immutable `View` composed lock-free from a snapshot plus the device's emitted frames, an
+  `IEngineSink` drained after the lock. `IAudioOutput` carries `SampleRate` and `FramesEmitted`
+  with a shared origin. Playhead from a per-voice reference history, honest through the
+  post-seek drain; attended voice flips at the audible handover; seek cancels a transition;
+  `Author()` reschedules. The add-time probe (WAV, FLAC, MP3 headers) issues `Length` and
+  structured rejections. Ogg, preview, visualiser and `Track.Duration` deleted. **The S3 null
+  test passes at 1 ms** with 100 ms of fake device latency. **162 tests pass.** Found on the way:
+  v2's ReplayGain reader threw on every ID3v2-tagged file, unreached by any v2 test.
+
 ## Not yet specified
 
 - **Restaging the rest of Phase 1.** Once the slice is trustworthy, how the remaining

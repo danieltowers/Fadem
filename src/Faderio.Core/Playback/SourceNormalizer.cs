@@ -2,15 +2,13 @@ using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 
 namespace Faderio.Core.Playback;
-
 /// <summary>
-/// Wraps a track source so every voice feeds the mixer in the engine's fixed format
-/// (44.1 kHz stereo float): mono is duplicated, other sample rates are resampled.
-/// Frame positions are expressed in the normalized (44.1 kHz) domain; seeking maps back.
+/// Wraps a track source so every voice feeds the mixer in the engine's format — the output
+/// device's rate (ADR 0008), stereo float: mono is duplicated, other sample rates are resampled.
+/// Frame positions are expressed in the engine-rate domain; seeking maps back.
 /// </summary>
-public sealed class NormalizedTrackSource : ITrackSource
+internal sealed class NormalizedTrackSource : ITrackSource
 {
-    public const int EngineSampleRate = 44100;
     public const int EngineChannels = 2;
 
     private readonly ITrackSource _inner;
@@ -19,18 +17,19 @@ public sealed class NormalizedTrackSource : ITrackSource
     private float[] _scratch = new float[0];
     private bool _disposed;
 
-    private NormalizedTrackSource(ITrackSource inner, ISampleProvider pipeline, double framesPerInnerFrame)
+    private NormalizedTrackSource(ITrackSource inner, ISampleProvider pipeline, double framesPerInnerFrame, int engineRate)
     {
         _inner = inner;
         _pipeline = pipeline;
         _framesPerInnerFrame = framesPerInnerFrame;
+        WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(engineRate, EngineChannels);
     }
 
-    public static ITrackSource Wrap(ITrackSource source)
+    public static ITrackSource Wrap(ITrackSource source, int engineRate)
     {
         var rate = source.WaveFormat.SampleRate;
         var channels = source.WaveFormat.Channels;
-        if (rate == EngineSampleRate && channels == EngineChannels)
+        if (rate == engineRate && channels == EngineChannels)
         {
             return source;
         }
@@ -46,22 +45,20 @@ public sealed class NormalizedTrackSource : ITrackSource
         }
 
         double framesPerInnerFrame;
-        if (pipelineRate != EngineSampleRate)
+        if (pipelineRate != engineRate)
         {
-            pipeline = new WdlResamplingSampleProvider(pipeline, EngineSampleRate);
-            framesPerInnerFrame = (double)EngineSampleRate / pipelineRate;
+            pipeline = new WdlResamplingSampleProvider(pipeline, engineRate);
+            framesPerInnerFrame = (double)engineRate / pipelineRate;
         }
         else
         {
             framesPerInnerFrame = 1.0;
         }
 
-        return new NormalizedTrackSource(source, pipeline, framesPerInnerFrame);
+        return new NormalizedTrackSource(source, pipeline, framesPerInnerFrame, engineRate);
     }
 
-    public WaveFormat WaveFormat { get; } =
-        WaveFormat.CreateIeeeFloatWaveFormat(EngineSampleRate, EngineChannels);
-
+    public WaveFormat WaveFormat { get; }
     public long TotalFrames => (long)Math.Round(_inner.TotalFrames * _framesPerInnerFrame);
 
     /// <summary>Position in normalized frames; mapped back to the file's own frames on seek.
@@ -103,7 +100,7 @@ public sealed class NormalizedTrackSource : ITrackSource
 
 /// <summary>Duplicates a mono float stream into both stereo channels. NAudio samples
 /// convention: count is interleaved samples, the return value is samples written.</summary>
-public sealed class MonoToStereoSampleProvider : ISampleProvider
+internal sealed class MonoToStereoSampleProvider : ISampleProvider
 {
     private readonly ISampleProvider _source;
     private float[] _scratch = new float[4096];

@@ -4,7 +4,8 @@ using Faderio.Core.Queue;
 
 namespace Faderio.Core.Tests;
 
-/// <summary>Repeat and shuffle semantics through the seam (issue 0008).</summary>
+/// <summary>Repeat and shuffle semantics through the seam. Out of the slice (ticket 05) but
+/// kept green: the engine still owns them and the shell will get them back at restaging.</summary>
 public sealed class RepeatShuffleSemanticsTests
 {
     private const double FA = 1000;
@@ -16,8 +17,8 @@ public sealed class RepeatShuffleSemanticsTests
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteToneWav("a.wav", 3, FA);
         var b = TestAudio.WriteToneWav("b.wav", 3, FB);
-        tc.SetQueueOf(a, b);
-        tc.Engine.Repeat = RepeatMode.All;
+        tc.Add(a, b);
+        tc.Engine.SetRepeat(RepeatMode.All);
         tc.Store.Upsert(b, a, new TransitionSpec
         {
             FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1), FromEnd: false),
@@ -35,6 +36,7 @@ public sealed class RepeatShuffleSemanticsTests
         Assert.InRange(gB, 0.6, 0.8);  // cos(π/4)
         Assert.InRange(gA, 0.6, 0.8);  // sin(π/4)
         Assert.Equal(0, tc.PlaybackFinishedCount);
+        Assert.Equal(RepeatMode.All, tc.View.Repeat);
     }
 
     [Fact]
@@ -42,8 +44,8 @@ public sealed class RepeatShuffleSemanticsTests
     {
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteDcWav("a.wav", 3, 0.4);
-        tc.SetQueueOf(a);
-        tc.Engine.Repeat = RepeatMode.One;
+        tc.Add(a);
+        tc.Engine.SetRepeat(RepeatMode.One);
         tc.Store.Upsert(a, a, new TransitionSpec
         {
             FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1), FromEnd: false),
@@ -68,8 +70,8 @@ public sealed class RepeatShuffleSemanticsTests
     {
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteDcWav("a.wav", 3, 0.4);
-        tc.SetQueueOf(a);
-        tc.Engine.Repeat = RepeatMode.One;
+        tc.Add(a);
+        tc.Engine.SetRepeat(RepeatMode.One);
 
         tc.Engine.Play();
         tc.Output.Advance(44100 * 3 + 4410);
@@ -77,6 +79,15 @@ public sealed class RepeatShuffleSemanticsTests
         // No dip, no fade: the track restarted at full volume at 3.0 s.
         Assert.Equal(0.4, tc.Rendered.Sample(132300, 0), 2);
         Assert.Equal(0, tc.PlaybackFinishedCount);
+    }
+
+    /// <summary>The order the engine's queue will produce for a seed, derived independently.</summary>
+    internal static List<string> ExpectedShuffle(int seed, params string[] paths)
+    {
+        var expected = new PlaybackQueue(new Random(seed));
+        expected.SetEntries(paths.Select((p, i) => new QueueEntry(new RowId(i + 1), new Track { FilePath = p })));
+        expected.ShuffleUpcoming();
+        return expected.Entries.Select(e => e.Track.FilePath).ToList();
     }
 
     [Fact]
@@ -87,15 +98,7 @@ public sealed class RepeatShuffleSemanticsTests
         var a = TestAudio.WriteDcWav("a.wav", 3, 0.4);
         var b = TestAudio.WriteDcWav("b.wav", 3, 0.2);
         var c = TestAudio.WriteDcWav("c.wav", 3, 0.3);
-
-        // Derive the deterministic shuffle the engine's queue will produce.
-        var expected = new Faderio.Core.Queue.PlaybackQueue(new Random(seed));
-        expected.SetTracks(new[]
-        {
-            new Track { FilePath = a }, new Track { FilePath = b }, new Track { FilePath = c },
-        });
-        expected.ShuffleUpcoming();
-        var order = expected.Tracks.Select(t => t.FilePath).ToList();
+        var order = ExpectedShuffle(seed, a, b, c);
 
         // Author a transition for whatever pair the shuffle makes adjacent first.
         tc.Store.Upsert(order[0], order[1], new TransitionSpec
@@ -106,17 +109,40 @@ public sealed class RepeatShuffleSemanticsTests
             FadeInDuration = TimeSpan.FromSeconds(0.5),
         });
 
-        tc.SetQueueOf(a, b, c);
-        tc.Engine.Shuffle = true;
+        tc.Add(a, b, c);
+        tc.Engine.SetShuffle(true);
+        Assert.Equal(order, tc.View.Queue.Select(r => r.Track.FilePath).ToList());
         tc.Engine.Play();
         tc.Output.Advance(44100 * 2 + 22050); // 2.5 s: the authored handoff has fired
 
-        Assert.Equal(order[1], tc.Engine.CurrentTrack!.FilePath);
+        Assert.Equal(order[1], tc.CurrentTrack!.FilePath);
         // The fade fired mid-transition even though the order came from a shuffle:
         // at 1.25 s the outgoing track is neither flat (its level) nor silent.
         var midFadeFrame = (long)(1.25 * 44100);
         var outgoingLevel = tc.Rendered.DcLevel(midFadeFrame);
         Assert.NotEqual(0.4, outgoingLevel, 1);
         Assert.NotEqual(0.0, outgoingLevel, 2);
+    }
+
+    [Fact]
+    public void ShuffleOnThenOff_RestoresTheOriginalOrder_AndLosesNothing()
+    {
+        // v2's shuffle-empties-queue bug: rows added past SetQueue were never in the original
+        // order. Rows now enter through one door, so the queue cannot vanish.
+        using var tc = TestEngine.Create(rngSeed: 1);
+        var a = TestAudio.WriteDcWav("a.wav", 1, 0.4);
+        var b = TestAudio.WriteDcWav("b.wav", 1, 0.2);
+        var c = TestAudio.WriteDcWav("c.wav", 1, 0.3);
+        tc.Add(a, b);
+        tc.Add(c);
+        var ids = tc.View.Queue.Select(r => r.Id).ToList();
+
+        tc.Engine.SetShuffle(true);
+        Assert.True(tc.View.Shuffle);
+        Assert.Equal(3, tc.View.Queue.Count);
+        tc.Engine.SetShuffle(false);
+
+        Assert.Equal(ids, tc.View.Queue.Select(r => r.Id).ToList());
+        Assert.Equal(new[] { a, b, c }, tc.View.Queue.Select(r => r.Track.FilePath).ToArray());
     }
 }

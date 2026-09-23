@@ -14,7 +14,7 @@ public static class M3UPlaylist
         writer.WriteLine("#EXTM3U");
         foreach (var track in tracks)
         {
-            var seconds = (int)Math.Round(track.Duration.TotalSeconds);
+            var seconds = (int)Math.Round(track.Length.TotalSeconds);
             var label = string.IsNullOrEmpty(track.Artist) ? track.Title : $"{track.Artist} - {track.Title}";
             writer.WriteLine($"#EXTINF:{seconds},{label}");
             writer.WriteLine(track.FilePath);

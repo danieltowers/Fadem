@@ -27,7 +27,7 @@ public sealed class CrossfadeShapeTests
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteToneWav("a.wav", 4, FA);
         var b = TestAudio.WriteToneWav("b.wav", 4, FB);
-        tc.SetQueueOf(a, b);
+        tc.Add(a, b);
         tc.Store.Upsert(a, b, Crossfade(1.0));
         tc.Engine.Play();
         tc.Output.Advance(44100 * 2);
@@ -45,7 +45,7 @@ public sealed class CrossfadeShapeTests
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteToneWav("a.wav", 4, FA);
         var b = TestAudio.WriteToneWav("b.wav", 4, FB);
-        tc.SetQueueOf(a, b);
+        tc.Add(a, b);
         tc.Store.Upsert(a, b, Crossfade(1.0, curve));
         tc.Engine.Play();
         tc.Output.Advance(44100 * 2);
@@ -65,7 +65,7 @@ public sealed class CrossfadeShapeTests
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteToneWav("a.wav", 4, FA);
         var b = TestAudio.WriteToneWav("b.wav", 4, FB);
-        tc.SetQueueOf(a, b);
+        tc.Add(a, b);
         tc.Store.Upsert(a, b, Crossfade(1.0, FadeCurveKind.Linear));
         tc.Engine.Play();
         tc.Output.Advance(44100 * 2);
@@ -85,7 +85,7 @@ public sealed class CrossfadeShapeTests
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteToneWav("a.wav", 4, FA);
         var b = TestAudio.WriteToneWav("b.wav", 4, FB);
-        tc.SetQueueOf(a, b);
+        tc.Add(a, b);
         tc.Store.Upsert(a, b, new TransitionSpec
         {
             FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1), FromEnd: false),

@@ -7,7 +7,7 @@ namespace Faderio.Core.Playback;
 /// Equal-power crossfades use sin/cos quadrature so combined loudness stays roughly constant
 /// mid-overlap (a linear crossfade audibly dips); linear is a straight 0→full / full→0 ramp.
 /// </summary>
-public static class FadeCurves
+internal static class FadeCurves
 {
     public static double FadeInGain(FadeCurveKind kind, double t) => kind switch
     {

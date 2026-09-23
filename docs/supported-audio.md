@@ -76,8 +76,9 @@ particular:
 | Ogg Vorbis | NVorbis 0.10.5 cannot seek into any file paged by ffmpeg's defaults (ticket 07). The reader is deleted rather than kept broken. | A research ticket on a decoder that seeks any Ogg, if the format is ever wanted. |
 | Opus, DSD, anything else | No reader, no row. | A row. |
 
-**How rejection works.** The engine probes the file when it is added: it opens it, reads the
-header and checks format, sample rate, bit depth and channel count against this table. A file
+**How rejection works.** The engine probes the file when it is added (`AudioProbe`, with this
+table as code in `SupportedAudio`): it opens it, reads the header and checks format, sample
+rate, bit depth and channel count against this table. A file
 that fails is never queued; a queued track is a track that will play. The engine reports a
 structured reason (the four probed properties and which one disqualified the file) and the
 shell formats it and points here. Failures during playback (a corrupt frame, the device gone)

@@ -1,19 +1,18 @@
 using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
 using Faderio.Core.Playback;
 
 namespace Faderio.Core.Tests;
 
 /// <summary>
 /// Read-convention boundaries (the field-reported FLAC-buzzing bug): the engine renders in
-/// frames convention, NAudio's consumers use interleaved-samples convention, and
-/// <see cref="FramesToSamplesProvider"/> is the adapter between them. The device binding uses
-/// <see cref="FloatToBytesWaveProvider"/> (exactly-sized buffers — NAudio's
-/// SampleToWaveProvider sizes its internal float buffer with the byte count, which corrupted
-/// everything past the first quarter of each device block).
+/// frames convention, NAudio's consumers use interleaved-samples convention, and the adapters
+/// in FramesToSamplesProvider.cs sit between them. At the output seam the count is a typed
+/// <see cref="Frames"/>, so the mistake can no longer be written there (ADR 0003).
 /// </summary>
 public class AudioConventionTests
 {
+    private const int EngineRate = 44100;
+
     /// <summary>A frames-convention ITrackSource emitting a constant DC level.</summary>
     private sealed class DcSource : ITrackSource
     {
@@ -70,7 +69,7 @@ public class AudioConventionTests
     [Fact]
     public void NormalizedSource_48kStereo_NoGaps()
     {
-        using var source = NormalizedTrackSource.Wrap(new DcSource(48000, 2, 0.5f));
+        using var source = NormalizedTrackSource.Wrap(new DcSource(48000, 2, 0.5f), EngineRate);
         var buffer = new float[4410 * 2];
         var read = source.Read(buffer, 0, 4410);
         Assert.Equal(4410, read);
@@ -80,7 +79,7 @@ public class AudioConventionTests
     [Fact]
     public void NormalizedSource_48kMono_NoGaps()
     {
-        using var source = NormalizedTrackSource.Wrap(new DcSource(48000, 1, 0.5f));
+        using var source = NormalizedTrackSource.Wrap(new DcSource(48000, 1, 0.5f), EngineRate);
         var buffer = new float[4410 * 2];
         var read = source.Read(buffer, 0, 4410);
         Assert.Equal(4410, read);
@@ -90,7 +89,7 @@ public class AudioConventionTests
     [Fact]
     public void NormalizedSource_44k1Mono_NoGaps()
     {
-        using var source = NormalizedTrackSource.Wrap(new DcSource(44100, 1, 0.5f));
+        using var source = NormalizedTrackSource.Wrap(new DcSource(44100, 1, 0.5f), EngineRate);
         var buffer = new float[4410 * 2];
         var read = source.Read(buffer, 0, 4410);
         Assert.Equal(4410, read);
@@ -100,7 +99,7 @@ public class AudioConventionTests
     [Fact]
     public void NormalizedSource_44k1Stereo_PassesThrough()
     {
-        using var source = NormalizedTrackSource.Wrap(new DcSource(44100, 2, 0.5f));
+        using var source = NormalizedTrackSource.Wrap(new DcSource(44100, 2, 0.5f), EngineRate);
         var buffer = new float[4410 * 2];
         var read = source.Read(buffer, 0, 4410);
         Assert.Equal(4410, read);
@@ -108,10 +107,19 @@ public class AudioConventionTests
     }
 
     [Fact]
+    public void NormalizedSource_AtTheDeviceRate_IsNotResampled()
+    {
+        // ADR 0008: a 48 kHz file on a 48 kHz engine passes straight through.
+        var inner = new DcSource(48000, 2, 0.5f);
+        using var source = NormalizedTrackSource.Wrap(inner, 48000);
+        Assert.Same(inner, source);
+    }
+
+    [Fact]
     public void NormalizedSource_MapsFramesAcrossResample()
     {
         // 48000 frames at 48 kHz = 1 s = 44100 normalized frames (within resampler rounding).
-        using var source = NormalizedTrackSource.Wrap(new DcSource(48000, 2, 0.5f));
+        using var source = NormalizedTrackSource.Wrap(new DcSource(48000, 2, 0.5f), EngineRate);
         Assert.InRange(source.TotalFrames, 44050, 44150);
         source.Position = 22050; // half a second
         Assert.InRange(source.Position, 22040, 22060);
@@ -119,35 +127,36 @@ public class AudioConventionTests
 
     // --- Production device boundary: bytes over the adapted engine output ---
 
-    /// <summary>An engine-convention provider whose level encodes the frame index: a ramp of
-    /// one unit per second, so dropped or repeated frames show up as discontinuities.</summary>
-    private sealed class RampMixer : ISampleProvider
+    /// <summary>An engine-convention frame source whose level encodes the frame index: a ramp
+    /// of one unit per second, so dropped or repeated frames show up as discontinuities.</summary>
+    private sealed class RampMixer : IFrameSource
     {
         private long _timeline;
-        public WaveFormat WaveFormat { get; } =
-            WaveFormat.CreateIeeeFloatWaveFormat(TestAudio.SampleRate, 2);
+        public int SampleRate => EngineRate;
+        public int Channels => 2;
 
-        public int Read(float[] buffer, int offset, int count)
+        public Frames Read(float[] buffer, int offset, Frames wanted)
         {
+            var count = (int)wanted.Count;
             for (var f = 0; f < count; f++)
             {
-                var value = (float)((_timeline + f) / (double)TestAudio.SampleRate);
+                var value = (float)((_timeline + f) / (double)EngineRate);
                 buffer[offset + f * 2] = value;
                 buffer[offset + f * 2 + 1] = value;
             }
             _timeline += count;
-            return count;
+            return wanted;
         }
     }
 
     /// <summary>Pulls from the engine exactly the way a real device does: the production chain
-    /// (frames→samples adapter, then the exact-sized float→bytes converter) in small (10 ms)
-    /// chunks, decoding the bytes back to floats.</summary>
-    private static List<float> PullThroughDevice(ISampleProvider source, int chunks, int msPerChunk = 10)
+    /// (frame source → samples adapter, then the exact-sized float→bytes converter) in small
+    /// (10 ms) chunks, decoding the bytes back to floats.</summary>
+    private static List<float> PullThroughDevice(IFrameSource source, int chunks, int msPerChunk = 10)
     {
-        var device = new FloatToBytesWaveProvider(new FramesToSamplesProvider(source));
+        var device = new FloatToBytesWaveProvider(new FrameSourceSampleProvider(source));
         var output = new List<float>();
-        var bytes = new byte[msPerChunk * 44100 / 1000 * 2 * 4]; // stereo float
+        var bytes = new byte[msPerChunk * EngineRate / 1000 * 2 * 4]; // stereo float
         for (var i = 0; i < chunks; i++)
         {
             var read = device.Read(bytes, 0, bytes.Length);
@@ -163,12 +172,12 @@ public class AudioConventionTests
     public void DevicePull_ThroughAdapter_RendersEveryFrameOnce()
     {
         var output = PullThroughDevice(new RampMixer(), 1000);
-        Assert.True(output.Count >= TestAudio.SampleRate, "A second of audio must be rendered.");
+        Assert.True(output.Count >= EngineRate, "A second of audio must be rendered.");
 
         // The ramp must be continuous per channel (interleaved L,R): consecutive frames of one
         // channel advance by 1/44100. With the old frames-as-samples bug, half of every block
         // was dropped — boundary jumps of ~0.005 per 10 ms.
-        var expectedStep = 1.0 / TestAudio.SampleRate;
+        var expectedStep = 1.0 / EngineRate;
         for (var i = 2; i < output.Count; i++)
         {
             var step = output[i] - output[i - 2];
@@ -177,7 +186,7 @@ public class AudioConventionTests
 
         // Every frame rendered exactly once: after one second of device time the ramp reads
         // ~1.0, not ~2.0 (double speed). Interleaved: frame 44099 sits at sample 2*44099+1.
-        var oneSecond = 2 * (TestAudio.SampleRate - 1) + 1;
+        var oneSecond = 2 * (EngineRate - 1) + 1;
         Assert.InRange(output[oneSecond], 0.95, 1.05);
     }
 
@@ -190,11 +199,10 @@ public class AudioConventionTests
         // signature (dropping half of every pull) caps the audible ramp near 0.45.
         var path = TestAudio.WriteWav("convention-ramp", 2.0, f => 0.9 * f / 88200.0);
         using var harness = TestEngine.Create();
-        harness.SetQueueOf(path);
-        harness.Engine.Play();
+        harness.Play(path);
 
         var output = PullThroughDevice(harness.Output.Source!, 300); // 3 s of device time
-        Assert.True(output.Count >= TestAudio.SampleRate, "A second of audio must be rendered.");
+        Assert.True(output.Count >= EngineRate, "A second of audio must be rendered.");
 
         // Continuous per channel (interleaved L,R) while the ramp is sounding; after the track
         // ends the engine renders silence, which the scan simply runs past.

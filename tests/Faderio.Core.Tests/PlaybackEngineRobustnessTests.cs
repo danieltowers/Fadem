@@ -3,46 +3,63 @@ using Faderio.Core.Playback;
 
 namespace Faderio.Core.Tests;
 
-/// <summary>Robust file handling through the seam (issue 0014) and ReplayGain (issue 0012).</summary>
+/// <summary>Robust file handling through the seam (ADR 0007, ADR 0010) and ReplayGain.</summary>
 public sealed class PlaybackEngineRobustnessTests
 {
     [Fact]
-    public void MissingFile_IsSkipped_WithANonBlockingNotice()
+    public void MissingFile_IsRejectedAtAddTime_WithTheReason()
     {
         using var tc = TestEngine.Create();
         var b = TestAudio.WriteDcWav("b.wav", 2, 0.2);
-        tc.SetQueueOf(@"C:\definitely\missing.wav", b);
-        tc.Engine.Play();
-        tc.Output.Advance(4410);
+        var report = tc.Engine.AddTracks(new[] { @"C:\definitely\missing.wav", b });
 
-        Assert.Equal(b, tc.Engine.CurrentTrack!.FilePath);
-        Assert.Contains(tc.Notices, n => n.Contains("missing.wav"));
+        var rejection = Assert.Single(report.Rejected);
+        Assert.Equal(RejectedProperty.File, rejection.Property);
+        Assert.Contains("missing.wav", rejection.Path);
+        Assert.Single(report.Added);
+        Assert.Single(tc.View.Queue); // a queued track is a track that will play
     }
 
     [Fact]
-    public void CorruptFile_IsSkipped_AndPlaybackContinues()
+    public void CorruptFile_IsRejectedAtAddTime()
     {
         using var tc = TestEngine.Create();
         var corrupt = TestAudio.WriteWav("corrupt.wav", 1, _ => 0.4);
         File.WriteAllText(corrupt, "this is not a wave file");
-        var b = TestAudio.WriteDcWav("b.wav", 2, 0.2);
-        tc.SetQueueOf(corrupt, b);
-        tc.Engine.Play();
-        tc.Output.Advance(4410);
+        var report = tc.Engine.AddTracks(new[] { corrupt });
 
-        Assert.Equal(b, tc.Engine.CurrentTrack!.FilePath);
-        Assert.NotEmpty(tc.Notices);
+        var rejection = Assert.Single(report.Rejected);
+        Assert.Equal(RejectedProperty.File, rejection.Property);
+        Assert.Empty(tc.View.Queue);
     }
 
     [Fact]
-    public void AllFilesBroken_FinishesPlayback_WithNotices()
+    public void FileThatFailsAfterPassingTheProbe_IsSkipped_WithOneNotice()
+    {
+        // The probe passed; the file vanished before play. Play-time failures are one notice
+        // and a skip, never a notice per block (ADR 0007).
+        using var tc = TestEngine.Create();
+        var a = TestAudio.WriteDcWav("a.wav", 1, 0.4);
+        var b = TestAudio.WriteDcWav("b.wav", 2, 0.2);
+        tc.Add(a, b);
+        File.Delete(a);
+        tc.Engine.Play();
+        tc.Output.Advance(4410);
+
+        Assert.Equal(b, tc.CurrentTrack!.FilePath);
+        Assert.Single(tc.Notices, n => n.Contains(Path.GetFileName(a)));
+    }
+
+    [Fact]
+    public void AllFilesBroken_LeavesNothingToPlay()
     {
         using var tc = TestEngine.Create();
-        tc.SetQueueOf(@"C:\missing-one.wav", @"C:\missing-two.wav");
+        var report = tc.Engine.AddTracks(new[] { @"C:\missing-one.wav", @"C:\missing-two.wav" });
         tc.Engine.Play();
 
-        Assert.Equal(1, tc.PlaybackFinishedCount);
-        Assert.Equal(2, tc.Notices.Count);
+        Assert.Equal(2, report.Rejected.Count);
+        Assert.Empty(report.Added);
+        Assert.Equal(Transport.Stopped, tc.View.Transport);
     }
 
     [Fact]
@@ -51,10 +68,10 @@ public sealed class PlaybackEngineRobustnessTests
         using var tc = TestEngine.Create();
         var loud = TestAudio.WriteDcWav("loud.wav", 2, 0.4);
         var quiet = TestAudio.WriteDcWav("quiet.wav", 2, 0.4);
-        tc.Engine.SetQueue(new List<Track>
+        tc.Engine.AddTracks(new List<Track>
         {
-            new() { FilePath = quiet, ReplayGainDb = -6.0 },
-            new() { FilePath = loud, ReplayGainDb = +24.0 }, // clamps to +12 dB → clipping
+            tc.TrackOf(quiet, replayGainDb: -6.0),
+            tc.TrackOf(loud, replayGainDb: +24.0), // clamps to +12 dB
         });
         tc.Engine.Play();
         tc.Output.Advance(44100);
@@ -63,7 +80,6 @@ public sealed class PlaybackEngineRobustnessTests
         tc.Engine.Next();
         tc.Output.Advance(44100);
         Assert.Equal(0.4 * ReplayGain.DbToMultiplier(12), tc.Rendered.DcLevel(88200), 1);
-        Assert.True(tc.Engine.LatestVisualiserState.Clipping);
     }
 
     [Fact]
@@ -72,7 +88,7 @@ public sealed class PlaybackEngineRobustnessTests
         var settings = new Faderio.Core.Settings.PlayerSettings { ReplayGainEnabled = false };
         using var tc = TestEngine.Create(settings);
         var a = TestAudio.WriteDcWav("a.wav", 2, 0.4);
-        tc.Engine.SetQueue(new List<Track> { new() { FilePath = a, ReplayGainDb = -6.0 } });
+        tc.Engine.AddTracks(new List<Track> { tc.TrackOf(a, replayGainDb: -6.0) });
         tc.Engine.Play();
         tc.Output.Advance(44100);
         Assert.Equal(0.4, tc.Rendered.DcLevel(22050), 2);

@@ -1,4 +1,5 @@
 using Faderio.Core.Domain;
+using Faderio.Core.Playback;
 
 namespace Faderio.Core.Queue;
 
@@ -10,50 +11,54 @@ public enum RepeatMode
     One,
 }
 
+/// <summary>A track in the queue under its engine-issued row identity.</summary>
+internal sealed record QueueEntry(RowId Id, Track Track);
+
 /// <summary>
 /// The runtime playback sequence — real tracks only; nothing that is not a track ever
-/// occupies a row (ADR 0001). Not a saved artifact: playlists load into it.
+/// occupies a row (ADR 0004). Not a saved artifact: playlists load into it. Engine-internal
+/// (ADR 0003): the shell sees an immutable list of rows, never this.
 /// </summary>
-public sealed class PlaybackQueue
+internal sealed class PlaybackQueue
 {
-    private readonly List<Track> _tracks = new();
+    private readonly List<QueueEntry> _entries = new();
     private readonly Random _rng;
 
     public PlaybackQueue(Random? rng = null) => _rng = rng ?? new Random();
 
-    public IReadOnlyList<Track> Tracks => _tracks;
-    public int Count => _tracks.Count;
+    public IReadOnlyList<QueueEntry> Entries => _entries;
+    public int Count => _entries.Count;
     public int CurrentIndex { get; private set; } = -1;
 
-    public Track? CurrentTrack =>
-        CurrentIndex >= 0 && CurrentIndex < _tracks.Count ? _tracks[CurrentIndex] : null;
+    public QueueEntry? Current =>
+        CurrentIndex >= 0 && CurrentIndex < _entries.Count ? _entries[CurrentIndex] : null;
 
-    public void SetTracks(IEnumerable<Track> tracks)
+    public int IndexOf(RowId id) => _entries.FindIndex(e => e.Id == id);
+
+    public void SetEntries(IEnumerable<QueueEntry> entries)
     {
-        _tracks.Clear();
-        _tracks.AddRange(tracks);
-        CurrentIndex = _tracks.Count > 0 ? 0 : -1;
+        _entries.Clear();
+        _entries.AddRange(entries);
+        CurrentIndex = _entries.Count > 0 ? 0 : -1;
     }
 
-    public void AddRange(IEnumerable<Track> tracks)
+    public void Add(QueueEntry entry)
     {
-        _tracks.AddRange(tracks);
-        if (CurrentIndex < 0 && _tracks.Count > 0)
+        _entries.Add(entry);
+        if (CurrentIndex < 0)
         {
             CurrentIndex = 0;
         }
     }
 
-    public void Add(Track track) => AddRange(new[] { track });
-
     public void RemoveAt(int index)
     {
-        if (index < 0 || index >= _tracks.Count)
+        if (index < 0 || index >= _entries.Count)
         {
             throw new ArgumentOutOfRangeException(nameof(index));
         }
-        _tracks.RemoveAt(index);
-        if (_tracks.Count == 0)
+        _entries.RemoveAt(index);
+        if (_entries.Count == 0)
         {
             CurrentIndex = -1;
         }
@@ -61,15 +66,15 @@ public sealed class PlaybackQueue
         {
             CurrentIndex--;
         }
-        else if (CurrentIndex >= _tracks.Count)
+        else if (CurrentIndex >= _entries.Count)
         {
-            CurrentIndex = _tracks.Count - 1;
+            CurrentIndex = _entries.Count - 1;
         }
     }
 
     public void Clear()
     {
-        _tracks.Clear();
+        _entries.Clear();
         CurrentIndex = -1;
     }
 
@@ -79,10 +84,10 @@ public sealed class PlaybackQueue
     /// </summary>
     public void ShuffleUpcoming()
     {
-        for (var i = Math.Max(CurrentIndex + 1, 0); i < _tracks.Count; i++)
+        for (var i = Math.Max(CurrentIndex + 1, 0); i < _entries.Count; i++)
         {
-            var j = _rng.Next(i, _tracks.Count);
-            (_tracks[i], _tracks[j]) = (_tracks[j], _tracks[i]);
+            var j = _rng.Next(i, _entries.Count);
+            (_entries[i], _entries[j]) = (_entries[j], _entries[i]);
         }
     }
 
@@ -90,7 +95,7 @@ public sealed class PlaybackQueue
     /// The repeat-all wrap is a real adjacency: last → first. Null when playback would end.</summary>
     public int? IndexAfter(int index, RepeatMode repeat)
     {
-        if (index < 0 || index >= _tracks.Count)
+        if (index < 0 || index >= _entries.Count)
         {
             return null;
         }
@@ -98,22 +103,19 @@ public sealed class PlaybackQueue
         {
             return index;
         }
-        if (index + 1 < _tracks.Count)
+        if (index + 1 < _entries.Count)
         {
             return index + 1;
         }
         return repeat == RepeatMode.All ? 0 : null;
     }
 
-    /// <summary>The index that plays next for the current track, or null when playback ends.</summary>
-    public int? NextIndex(RepeatMode repeat) => IndexAfter(CurrentIndex, repeat);
-
     /// <summary>The previous track index, or null when at the start of the queue.</summary>
     public int? PreviousIndex() => CurrentIndex > 0 ? CurrentIndex - 1 : null;
 
     public void SetCurrent(int index)
     {
-        if (index < 0 || index >= _tracks.Count)
+        if (index < 0 || index >= _entries.Count)
         {
             throw new ArgumentOutOfRangeException(nameof(index));
         }

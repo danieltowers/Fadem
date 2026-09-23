@@ -3,8 +3,9 @@ using NAudio.Wave;
 
 namespace Faderio.Core.Playback;
 
-/// <summary>A voice: one track source playing in the mix, with its own gain chain.</summary>
-public sealed class MixerVoice
+/// <summary>A voice: one track source playing in the mix, with its own gain chain. Engine-internal
+/// (ADR 0003); the shell sees a <see cref="VoiceView"/>.</summary>
+internal sealed class MixerVoice
 {
     internal MixerVoice(
         ITrackSource source, long timelineStart, long sourceStart,
@@ -16,6 +17,7 @@ public sealed class MixerVoice
         BaseGain = baseGain;
         FadeInFrames = fadeInFrames;
         FadeInCurve = fadeInCurve;
+        References.Add((timelineStart, sourceStart));
     }
 
     internal ITrackSource Source { get; }
@@ -29,15 +31,30 @@ public sealed class MixerVoice
     internal FadeCurveKind FadeOutCurve { get; set; } = FadeCurveKind.EqualPower;
     internal bool IsFinished { get; set; }
 
+    /// <summary>The track's issued length in engine frames; the playhead never exceeds it.</summary>
+    internal long LengthFrames { get; set; }
+
+    /// <summary>The (timeline, source) reference pairs that map audible time onto this voice's
+    /// track (ADR 0001): one at creation, one per seek. Audio still in the device buffer belongs
+    /// to the pre-seek mapping, so the playhead stays honest through the post-seek drain.</summary>
+    internal List<(long Timeline, long Source)> References { get; } = new();
+
     /// <summary>Set when the voice is removed deliberately (skip/seek/stop); its end must not
     /// trigger the engine's advance logic.</summary>
     internal bool EndSuppressed { get; set; }
 
-    /// <summary>Current fade envelope (0–1), as observed over the last rendered block.
-    /// This is what the visualiser shows — level data from the engine, not UI polling.</summary>
-    public double CurrentLevel { get; internal set; }
-
-    internal double EnvelopeAt(long timeline) => TransitionMixer.Envelope(this, timeline);
+    internal void NoteSeek(long timeline, long source)
+    {
+        // A second seek within the same rendered frame replaces the first.
+        if (References.Count > 0 && References[^1].Timeline == timeline)
+        {
+            References[^1] = (timeline, source);
+        }
+        else
+        {
+            References.Add((timeline, source));
+        }
+    }
 
     internal void CancelFadeIn() => FadeInFrames = 0;
 
@@ -45,7 +62,7 @@ public sealed class MixerVoice
 }
 
 /// <summary>Handle for a scheduled timeline event; cancellable before it fires.</summary>
-public sealed class ScheduledEventHandle
+internal sealed class ScheduledEventHandle
 {
     internal ScheduledEventHandle(long timeline) => Timeline = timeline;
 
@@ -56,21 +73,17 @@ public sealed class ScheduledEventHandle
 
 /// <summary>
 /// The transition mixer: mixes the currently active track voices with per-sample gain,
-/// applies fade envelopes exactly on the sample-clock timeline, fires scheduled events at
-/// authored sample positions, and tracks peak/level state for the visualiser.
+/// applies fade envelopes exactly on the sample-clock timeline and fires scheduled events at
+/// authored sample positions. Runs at the engine rate the output supplies (ADR 0008).
 ///
 /// All trigger timing is driven from the mixer's sample position — never a wall-clock or UI
-/// timer. Unlike the prototype: no silence-pump buffers (silence is rendered directly when
-/// there is nothing to mix), completed voices are cleaned up exactly once, and there is no
-/// exception swallowing.
+/// timer. A voice ends when its source is exhausted or when its fade-out has completed,
+/// whichever comes first: a faded-out voice is silent, and rendering its remaining minutes at
+/// zero gain would only delay the audible handover.
 /// </summary>
-public sealed class TransitionMixer : ISampleProvider
+internal sealed class TransitionMixer : ISampleProvider
 {
-    public const int SampleRate = 44100;
     public const int Channels = 2;
-
-    private static readonly WaveFormat OutputFormat =
-        WaveFormat.CreateIeeeFloatWaveFormat(SampleRate, Channels);
 
     private readonly List<MixerVoice> _voices = new();
     private readonly List<ScheduledEventHandle> _events = new();
@@ -79,24 +92,22 @@ public sealed class TransitionMixer : ISampleProvider
 
     private long _timeline;
 
-    public WaveFormat WaveFormat => OutputFormat;
+    public TransitionMixer(int sampleRate)
+    {
+        SampleRate = sampleRate;
+        WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, Channels);
+    }
+
+    public int SampleRate { get; }
+
+    public WaveFormat WaveFormat { get; }
 
     /// <summary>Frames rendered since the last reset — the mixer's sample position.</summary>
     public long Timeline => _timeline;
 
-    /// <summary>Peak absolute sample value of the last rendered block (post-gain).</summary>
-    public double Peak { get; private set; }
-
-    /// <summary>Sticky clip flag: true once output has reached or exceeded full scale.</summary>
-    public bool Clipping { get; private set; }
-
-    /// <summary>Raised (on the rendering thread) when a voice's source is exhausted, with the
-    /// exact timeline frame at which it ended — hard-cut boundaries chain sample-accurately.</summary>
+    /// <summary>Raised (on the rendering thread) when a voice ends, with the exact timeline frame
+    /// at which it ended — hard-cut boundaries chain sample-accurately.</summary>
     public event Action<MixerVoice, long>? VoiceEnded;
-
-    /// <summary>Raised after each rendered block — the engine's per-block observable state
-    /// hook for the visualiser.</summary>
-    public event Action? BlockRendered;
 
     public IReadOnlyList<MixerVoice> Voices => _voices;
 
@@ -153,8 +164,6 @@ public sealed class TransitionMixer : ISampleProvider
         _events.Clear();
         _handleActions.Clear();
         _timeline = 0;
-        Peak = 0;
-        Clipping = false;
     }
 
     public int Read(float[] buffer, int offset, int count)
@@ -209,17 +218,11 @@ public sealed class TransitionMixer : ISampleProvider
 
                 var framesToRender = (int)(count - runStart);
                 var read = voice.Source.Read(_scratch, 0, framesToRender);
-                var voiceLevel = 0.0;
 
                 for (var f = 0; f < read; f++)
                 {
                     var timeline = start + runStart + f;
-                    var envelope = Envelope(voice, timeline);
-                    if (envelope > voiceLevel)
-                    {
-                        voiceLevel = envelope;
-                    }
-                    var gain = voice.BaseGain * envelope;
+                    var gain = voice.BaseGain * Envelope(voice, timeline);
                     var target = offset + (runStart + f) * Channels;
                     var source0 = f * Channels;
                     for (var c = 0; c < Channels; c++)
@@ -228,7 +231,6 @@ public sealed class TransitionMixer : ISampleProvider
                     }
                 }
 
-                voice.CurrentLevel = voiceLevel;
                 processed.Add(voice);
                 progressed = true;
 
@@ -236,35 +238,28 @@ public sealed class TransitionMixer : ISampleProvider
                 {
                     // The source is exhausted. This must be detected even when the track ends
                     // exactly at a block boundary (read == requested).
-                    voice.IsFinished = true;
-                    _voices.Remove(voice);
-                    if (!voice.EndSuppressed)
-                    {
-                        VoiceEnded?.Invoke(voice, start + runStart + read);
-                    }
+                    End(voice, start + runStart + read);
+                }
+                else if (voice.FadeOutStart is { } fadeOutStart && start + count >= fadeOutStart + voice.FadeOutFrames)
+                {
+                    // The fade-out completed inside this block: the voice has fallen silent.
+                    End(voice, fadeOutStart + voice.FadeOutFrames);
                 }
             }
         }
 
-        // Peak/clip measurement over the rendered block.
-        var blockPeak = 0.0;
-        for (var i = offset; i < offset + needed; i++)
-        {
-            var abs = Math.Abs(buffer[i]);
-            if (abs > blockPeak)
-            {
-                blockPeak = abs;
-            }
-        }
-        Peak = blockPeak;
-        if (blockPeak >= 1.0)
-        {
-            Clipping = true;
-        }
-
         _timeline = start + count;
-        BlockRendered?.Invoke();
         return count;
+    }
+
+    private void End(MixerVoice voice, long endTimeline)
+    {
+        voice.IsFinished = true;
+        _voices.Remove(voice);
+        if (!voice.EndSuppressed)
+        {
+            VoiceEnded?.Invoke(voice, endTimeline);
+        }
     }
 
     private void Fire(ScheduledEventHandle handle)

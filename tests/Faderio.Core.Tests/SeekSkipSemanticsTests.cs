@@ -1,10 +1,9 @@
-using Faderio.Core.Settings;
-
 using Faderio.Core.Domain;
+using Faderio.Core.Settings;
 
 namespace Faderio.Core.Tests;
 
-/// <summary>Seek and skip interaction semantics through the seam (issue 0008).</summary>
+/// <summary>Seek and skip interaction semantics through the seam.</summary>
 public sealed class SeekSkipSemanticsTests
 {
     private const double FA = 1000;
@@ -19,23 +18,30 @@ public sealed class SeekSkipSemanticsTests
     };
 
     [Fact]
-    public void SeekDuringActiveFade_CancelsTheFade_AndSnapsToFullVolume()
+    public void SeekDuringACrossfade_CancelsTheTransition_AndScrubsTheAttendedVoice()
     {
+        // ADR 0001: the attended voice is the outgoing one until it falls silent, so a seek
+        // mid-crossfade scrubs the *outgoing* track and drops the incoming voice.
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteToneWav("a.wav", 4, FA);
         var b = TestAudio.WriteToneWav("b.wav", 4, FB);
-        tc.SetQueueOf(a, b);
+        tc.Add(a, b);
         tc.Store.Upsert(a, b, CrossfadeAt1s(1.0));
         tc.Engine.Play();
-        tc.Output.Advance(44100 + 11025); // 1.25 s: B is mid fade-in (gain sin(π/4) ≈ 0.707)
+        tc.Output.Advance(44100 + 11025); // 1.25 s: B is mid fade-in
 
-        // Seek the current (incoming) track: its fade is cancelled, it plays clean and full
-        // from the seek point.
-        tc.Engine.Seek(TimeSpan.FromSeconds(2));
+        Assert.Equal(a, tc.View.Attended!.Row.Track.FilePath);
+        Assert.Equal(b, tc.View.Incoming!.Row.Track.FilePath);
+
+        tc.Engine.Seek(Playhead.FromMilliseconds(2000));
         tc.Output.Advance(11025); // 0.25 s more
 
-        var gB = tc.Rendered.ToneAmplitude(FB, 44100 + 11025 + 11025) / 0.4;
-        Assert.InRange(gB, 0.95, 1.05); // full volume, no fade
+        Assert.Null(tc.View.Incoming);
+        Assert.Equal(a, tc.View.Attended!.Row.Track.FilePath);
+        Assert.Equal(2.25, tc.Playhead.TotalSeconds, 2);
+        var end = 44100 + 11025 + 11025;
+        Assert.InRange(tc.Rendered.ToneAmplitude(FA, end) / 0.4, 0.95, 1.05); // A full, no fade
+        Assert.True(tc.Rendered.ToneAmplitude(FB, end) < 0.05, "the incoming voice must be gone");
     }
 
     [Fact]
@@ -44,12 +50,12 @@ public sealed class SeekSkipSemanticsTests
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteToneWav("a.wav", 3, FA);
         var b = TestAudio.WriteToneWav("b.wav", 3, FB);
-        tc.SetQueueOf(a, b);
+        tc.Add(a, b);
         tc.Store.Upsert(a, b, CrossfadeAt1s(1.0));
         tc.Engine.Play();
-        tc.Output.Advance(22050);                 // 0.5 s
-        tc.Engine.Seek(TimeSpan.FromSeconds(2)); // past the 1.0 s fade-out point
-        tc.Output.Advance(44100);                 // 1.0 s more (rendered 1.5 s total)
+        tc.Output.Advance(22050);                          // 0.5 s
+        tc.Engine.Seek(Playhead.FromMilliseconds(2000));  // past the 1.0 s fade-out point
+        tc.Output.Advance(44100);                          // 1.0 s more (rendered 1.5 s total)
 
         // A plays flat from the seek point: rendered 1.0 s ↔ source 2.5 s, well past where
         // the fade would have started.
@@ -67,7 +73,7 @@ public sealed class SeekSkipSemanticsTests
         var a = TestAudio.WriteToneWav("a.wav", 4, FA);
         var b = TestAudio.WriteToneWav("b.wav", 4, FB);
         var c = TestAudio.WriteToneWav("c.wav", 4, 3000);
-        tc.SetQueueOf(a, b, c);
+        tc.Add(a, b, c);
         tc.Store.Upsert(a, b, CrossfadeAt1s(1.0));
         // B→C is authored with no outgoing fade and a 1 s fade-in (B's own adjacency).
         tc.Store.Upsert(b, c, new TransitionSpec
@@ -81,10 +87,11 @@ public sealed class SeekSkipSemanticsTests
         tc.Engine.Next();
         tc.Output.Advance(11025); // 0.25 s later
 
-        // The outgoing track is gone; the incoming track plays at full volume.
+        // The outgoing track is gone; the incoming track plays at full volume and is attended.
         Assert.True(tc.Rendered.ToneAmplitude(FA, 66150) < 0.05,
             $"outgoing must be gone (was {tc.Rendered.ToneAmplitude(FA, 66150):F3})");
         Assert.Equal(0.4, tc.Rendered.ToneAmplitude(FB, 66150), 2);
+        Assert.Equal(b, tc.CurrentTrack!.FilePath);
 
         // The next adjacency begins with its own transition: B runs to its end (no fade),
         // then C starts (at 5.0 s on the timeline — B began at 1.0 s), fading in over its
@@ -100,7 +107,7 @@ public sealed class SeekSkipSemanticsTests
         using var tc = TestEngine.Create(settings);
         var a = TestAudio.WriteToneWav("a.wav", 4, FA);
         var b = TestAudio.WriteToneWav("b.wav", 4, FB);
-        tc.SetQueueOf(a, b);
+        tc.Add(a, b);
         tc.Store.Upsert(a, b, CrossfadeAt1s(1.0));
 
         tc.Engine.Play();

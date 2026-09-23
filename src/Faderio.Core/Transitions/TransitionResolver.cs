@@ -10,7 +10,7 @@ namespace Faderio.Core.Transitions;
 /// player defaults; an unauthored adjacency resolves to the player's default adjacency
 /// behaviour (hard cut, or a global default crossfade when opted in).
 /// </summary>
-public sealed class TransitionResolver
+internal sealed class TransitionResolver
 {
     public PlayerSettings Settings { get; set; }
 

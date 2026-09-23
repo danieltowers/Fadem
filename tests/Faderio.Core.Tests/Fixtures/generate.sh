@@ -8,7 +8,7 @@
 #
 #   tone-1k.flac   1 kHz sine            purity and completeness
 #   ramp.flac      0 -> 0.9 linear ramp  seek landing: the sample value IS the position
-#   ramp.ogg       same ramp, Vorbis     defect C (seek before first read) and seek landing
+#   tone-1k.mp3    1 kHz sine, MP3 CBR   the add-time probe: first frame header + Info tag
 #
 # Levels: lavfi sources are mono and "-ac 2" upmixes through swresample, which applies -3 dB
 # (0.707). So the ramp peaks at ~0.64 on disk, not 0.9, and the tone is quieter than written.
@@ -25,10 +25,8 @@ ffmpeg -y -loglevel error -f lavfi -i "sine=frequency=1000:sample_rate=44100:dur
 ffmpeg -y -loglevel error -f lavfi -i "aevalsrc='0.9*t/2':s=44100:d=2" \
   -ac 2 -sample_fmt s16 ramp.flac
 
-# -page_duration: ffmpeg's ogg muxer defaults to 1 s pages, and NVorbis 0.10.5 throws
-# "GranulePos mismatch" on ANY seek into such a file (sequential decode is fine). oggenc-style
-# short pages seek cleanly. Recorded against ticket 08; found while pinning in ticket 07.
-ffmpeg -y -loglevel error -f lavfi -i "aevalsrc='0.9*t/2':s=44100:d=2" \
-  -ac 2 -c:a libvorbis -q:a 6 -page_duration 10000 ramp.ogg
+# CBR 320 kbps with LAME's Info tag, like 447 of the library's 654 MP3s (ticket 08 survey).
+ffmpeg -y -loglevel error -f lavfi -i "sine=frequency=1000:sample_rate=44100:duration=2" \
+  -ac 2 -c:a libmp3lame -b:a 320k tone-1k.mp3
 
-ls -l *.flac *.ogg
+ls -l *.flac *.mp3

@@ -1,38 +1,42 @@
 using Faderio.Core.Domain;
+using Faderio.Core.Playback;
 using Faderio.Core.Queue;
 
 namespace Faderio.Core.Tests;
 
 public sealed class PlaybackQueueTests
 {
-    private static Track T(string path) => new() { FilePath = path };
+    private static long _nextId;
+
+    private static QueueEntry E(string path) =>
+        new(new RowId(Interlocked.Increment(ref _nextId)), new Track { FilePath = path });
+
+    private static IEnumerable<string> Paths(PlaybackQueue queue) => queue.Entries.Select(e => e.Track.FilePath);
 
     [Fact]
-    public void SetTracks_ResetsCurrentToFirst()
+    public void SetEntries_ResetsCurrentToFirst()
     {
         var queue = new PlaybackQueue();
-        queue.SetTracks(new[] { T("a"), T("b"), T("c") });
+        queue.SetEntries(new[] { E("a"), E("b"), E("c") });
         Assert.Equal(3, queue.Count);
         Assert.Equal(0, queue.CurrentIndex);
-        Assert.Equal("a", queue.CurrentTrack!.FilePath);
+        Assert.Equal("a", queue.Current!.Track.FilePath);
     }
 
     [Fact]
-    public void NextIndex_FollowsOrder()
+    public void IndexAfter_FollowsOrder()
     {
         var queue = new PlaybackQueue();
-        queue.SetTracks(new[] { T("a"), T("b"), T("c") });
-        Assert.Equal(1, queue.NextIndex(RepeatMode.Off));
-        queue.SetCurrent(2);
-        Assert.Null(queue.NextIndex(RepeatMode.Off));
+        queue.SetEntries(new[] { E("a"), E("b"), E("c") });
+        Assert.Equal(1, queue.IndexAfter(0, RepeatMode.Off));
+        Assert.Null(queue.IndexAfter(2, RepeatMode.Off));
     }
 
     [Fact]
     public void RepeatAll_WrapsToFirst_AsARealAdjacency()
     {
         var queue = new PlaybackQueue();
-        queue.SetTracks(new[] { T("a"), T("b"), T("c") });
-        queue.SetCurrent(2);
+        queue.SetEntries(new[] { E("a"), E("b"), E("c") });
         Assert.Equal(0, queue.IndexAfter(2, RepeatMode.All));
     }
 
@@ -40,7 +44,7 @@ public sealed class PlaybackQueueTests
     public void RepeatOne_RepeatsTheSameTrack()
     {
         var queue = new PlaybackQueue();
-        queue.SetTracks(new[] { T("a"), T("b") });
+        queue.SetEntries(new[] { E("a"), E("b") });
         Assert.Equal(1, queue.IndexAfter(1, RepeatMode.One));
     }
 
@@ -48,7 +52,7 @@ public sealed class PlaybackQueueTests
     public void PreviousIndex_StopsAtTheStart()
     {
         var queue = new PlaybackQueue();
-        queue.SetTracks(new[] { T("a"), T("b") });
+        queue.SetEntries(new[] { E("a"), E("b") });
         Assert.Null(queue.PreviousIndex());
         queue.SetCurrent(1);
         Assert.Equal(0, queue.PreviousIndex());
@@ -58,37 +62,49 @@ public sealed class PlaybackQueueTests
     public void RemoveAt_AdjustsCurrent()
     {
         var queue = new PlaybackQueue();
-        queue.SetTracks(new[] { T("a"), T("b"), T("c") });
+        queue.SetEntries(new[] { E("a"), E("b"), E("c") });
         queue.SetCurrent(2);
         queue.RemoveAt(0);
         Assert.Equal(1, queue.CurrentIndex);
-        Assert.Equal("c", queue.CurrentTrack!.FilePath);
+        Assert.Equal("c", queue.Current!.Track.FilePath);
         queue.RemoveAt(1);
         Assert.Equal(0, queue.CurrentIndex);
+    }
+
+    [Fact]
+    public void RowIds_SurviveAShuffle()
+    {
+        var queue = new PlaybackQueue(new Random(7));
+        var entries = new[] { E("a"), E("b"), E("c"), E("d"), E("e") };
+        queue.SetEntries(entries);
+        queue.ShuffleUpcoming();
+
+        foreach (var entry in entries)
+        {
+            var index = queue.IndexOf(entry.Id);
+            Assert.True(index >= 0);
+            Assert.Equal(entry.Track.FilePath, queue.Entries[index].Track.FilePath);
+        }
     }
 
     [Fact]
     public void ShuffleUpcoming_IsDeterministicWithASeed_AndKeepsTheCurrentTrack()
     {
         var queue = new PlaybackQueue(new Random(1234));
-        queue.SetTracks(new[] { T("a"), T("b"), T("c"), T("d"), T("e") });
+        queue.SetEntries(new[] { E("a"), E("b"), E("c"), E("d"), E("e") });
         queue.SetCurrent(2);
 
         queue.ShuffleUpcoming();
 
-        Assert.Equal("c", queue.CurrentTrack!.FilePath);
+        Assert.Equal("c", queue.Current!.Track.FilePath);
         // Deterministic for the same seed.
         var queue2 = new PlaybackQueue(new Random(1234));
-        queue2.SetTracks(new[] { T("a"), T("b"), T("c"), T("d"), T("e") });
+        queue2.SetEntries(new[] { E("a"), E("b"), E("c"), E("d"), E("e") });
         queue2.SetCurrent(2);
         queue2.ShuffleUpcoming();
-        Assert.Equal(
-            queue.Tracks.Select(t => t.FilePath).ToList(),
-            queue2.Tracks.Select(t => t.FilePath).ToList());
+        Assert.Equal(Paths(queue).ToList(), Paths(queue2).ToList());
         // And it is a genuine permutation of the same tracks.
-        Assert.Equal(
-            new[] { "a", "b", "c", "d", "e" }.OrderBy(x => x),
-            queue.Tracks.Select(t => t.FilePath).OrderBy(x => x));
+        Assert.Equal(new[] { "a", "b", "c", "d", "e" }.OrderBy(x => x), Paths(queue).OrderBy(x => x));
     }
 
     [Fact]
@@ -100,8 +116,8 @@ public sealed class PlaybackQueueTests
         {
             var tracks = new List<Track>
             {
-                new() { FilePath = Path.Combine(dir, "one.wav"), Title = "One", Artist = "Artist A", Duration = TimeSpan.FromSeconds(100.4) },
-                new() { FilePath = Path.Combine(dir, "two.wav"), Title = "Two", Duration = TimeSpan.FromSeconds(12) },
+                new() { FilePath = Path.Combine(dir, "one.wav"), Title = "One", Artist = "Artist A", Length = Length.FromFrames(4427640, 44100) },
+                new() { FilePath = Path.Combine(dir, "two.wav"), Title = "Two", Length = Length.FromFrames(529200, 44100) },
             };
             var playlistPath = Path.Combine(dir, "queue.m3u");
             M3UPlaylist.Save(playlistPath, tracks);
@@ -110,6 +126,7 @@ public sealed class PlaybackQueueTests
             Assert.Equal(2, loaded.Count);
             Assert.Equal(tracks[0].FilePath, loaded[0]);
             Assert.Equal(tracks[1].FilePath, loaded[1]);
+            Assert.Contains("#EXTINF:100,Artist A - One", File.ReadAllText(playlistPath));
         }
         finally
         {
@@ -125,7 +142,7 @@ public sealed class PlaybackQueueTests
         try
         {
             var playlistPath = Path.Combine(dir, "q.m3u");
-            M3UPlaylist.Save(playlistPath, new List<Track> { T("x.wav") });
+            M3UPlaylist.Save(playlistPath, new List<Track> { new() { FilePath = "x.wav" } });
             Assert.StartsWith("#EXTM3U", File.ReadAllText(playlistPath));
         }
         finally

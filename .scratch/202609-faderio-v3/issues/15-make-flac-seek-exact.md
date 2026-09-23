@@ -49,3 +49,13 @@ The engine-side S3 tolerance tightening (12).
 ## Answer
 
 _(pending)_
+
+## Noted from ticket 12
+
+`AudioSources.cs` is now `TrackSources.Open(string path)` (internal static) with an explicit
+`.flac` case that still routes to `MediaFoundationReader`, plus the `_ =>` catch-all and the
+`.aif/.aiff` case, all three of which this ticket deletes. The warm-up read in
+`WaveStreamTrackSource.Position` is unchanged and goes with them. The probe (`AudioProbe.ProbeFlac`)
+reads STREAMINFO itself, so the decoder swap does not touch add-time behaviour. The matrix's
+`Flac_SeekBeforeFirstRead_LandsWithin100ms_PendingTicket09` is the pinned test to tighten to
+1 ms and rename.

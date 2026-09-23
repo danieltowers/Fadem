@@ -3,7 +3,7 @@ using Faderio.Core.Playback;
 
 namespace Faderio.Core.Tests;
 
-/// <summary>End-of-sequence and non-overlapping fade shapes (issue 0006).</summary>
+/// <summary>End-of-sequence and non-overlapping fade shapes.</summary>
 public sealed class SequenceBoundaryTests
 {
     private const double FA = 1000;
@@ -15,7 +15,7 @@ public sealed class SequenceBoundaryTests
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteToneWav("a.wav", 4, FA);
         var b = TestAudio.WriteToneWav("b.wav", 4, FB);
-        tc.SetQueueOf(a); // B is not queued: the fade-out is honoured with no incoming track
+        tc.Add(a); // B is not queued: the fade-out is honoured with no incoming track
         tc.Store.Upsert(a, b, new TransitionSpec
         {
             FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(2), FromEnd: false),
@@ -30,9 +30,10 @@ public sealed class SequenceBoundaryTests
         Assert.InRange(tc.Rendered.ToneAmplitude(FA, 110250), 0.2, 0.32);
         // …silent after the fade completes at 3.0 s…
         Assert.Equal(0.0, tc.Rendered.ToneAmplitude(FA, 132300), 2);
-        // …and playback finished exactly once.
+        // …and playback finished exactly once: a faded-out voice has fallen silent, so the
+        // run ends at the fade's end, not a second later when the file would have run out.
         Assert.Equal(1, tc.PlaybackFinishedCount);
-        Assert.Equal(PlaybackState.Stopped, tc.Engine.State);
+        Assert.Equal(Transport.Stopped, tc.View.Transport);
     }
 
     [Fact]
@@ -42,7 +43,7 @@ public sealed class SequenceBoundaryTests
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteDcWav("a.wav", 3, 0.4);
         var b = TestAudio.WriteToneWav("b.wav", 4, FB);
-        tc.SetQueueOf(a, b);
+        tc.Add(a, b);
         tc.Store.Upsert(a, b, new TransitionSpec
         {
             FadeOutDuration = TimeSpan.Zero,
@@ -61,5 +62,6 @@ public sealed class SequenceBoundaryTests
         // nearly full fade-in gain by 0.68 s into B's voice.
         Assert.True(tc.Rendered.ToneAmplitude(FB, 132300 + 30000) > 0.3,
             $"B tone too quiet (was {tc.Rendered.ToneAmplitude(FB, 132300 + 30000):F3})");
+        Assert.Equal(b, tc.CurrentTrack!.FilePath);
     }
 }

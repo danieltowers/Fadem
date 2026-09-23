@@ -68,3 +68,21 @@ The shape is decided: `Renderer.RenderBoundary(Adjacency a, ITransitionStore sto
 a static entry point with no engine event plumbing, driving a `WavFileAudioOutput` adapter
 that drains synchronously. The harness passes an in-memory or temp-path `ITransitionStore` so
 it never touches the user's file. `IEngineSink` gets a `RecordingSink` or console adapter here.
+
+## Noted from ticket 12
+
+The seam is built; this ticket implements it once more, to a file:
+
+- **`IAudioOutput`** is now `SampleRate` (declare 44.1 kHz, or the file's rate), `Initialise(IFrameSource)`,
+  `Play/Pause/Stop`, `State` (`Transport`), `FramesEmitted` (`Frames`; reset by `Stop`) and
+  `event Action<Exception?> Stopped`. A file output has no latency: emitted equals rendered, as
+  the fake does with `Latency = 0`. Pull the engine with `IFrameSource.Read(buffer, offset, Frames)`
+  and write through `WaveFileWriter`; `FrameSourceSampleProvider` adapts to NAudio if useful.
+- **`Renderer.RenderBoundary(Adjacency, ITransitionStore, string wavPath)`** stays the static
+  shape from ticket 04: a fresh `PlaybackEngine(fileOutput, store, new RecordingSink())`, two
+  rows from `AddTracks`, `PlayRow` on the outgoing row, `Seek` to pre-roll before the fade-out
+  point, and advance the file clock until the incoming voice has run its tail. The engine
+  constructor takes `PlayerSettings` and `Random` as optional extras.
+- The S3 in-memory assertion this ticket mirrors is
+  `SeamTests.CaptureThenAuthor_TheFadeStartsWhereTheListenerHeardIt_Within1ms`; its
+  `FadeOnset` extrapolation is the measuring instrument to reuse on the file.
