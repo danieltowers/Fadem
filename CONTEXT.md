@@ -122,8 +122,15 @@ _Avoid_: Supported, compatible, works
 
 **Rejected**:
 A file the player refuses at the moment it is added, naming the property that disqualifies it.
-Rejection never happens during playback: a queued track is a track that will play.
+Rejection never happens during playback: a queued track was promised when it was probed. If its
+file later becomes unreadable, that is not a rejection.
 _Avoid_: Unsupported, failed, skipped
+
+**Unreadable**:
+A queued track whose file can no longer be read when the player comes to play it: deleted,
+moved, truncated or on a drive that has gone. The player passes over it with a notice and keeps
+its row, trying it again next time.
+_Avoid_: Broken, missing, rejected, skipped (a skip is the user's action)
 
 **Probe**:
 Reading a file's header when it is added to decide whether it is promised or rejected. The

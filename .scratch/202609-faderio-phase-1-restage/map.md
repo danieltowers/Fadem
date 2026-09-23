@@ -75,6 +75,11 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   the editor's unsaved draft, from 5 s before the fade-out point to 5 s after the fades. The
   queue is held and stays paused afterwards. Queue buttons end a preview, and Capture reads its
   voices. Render stays; render-then-play and a second engine are rejected.
+- [What happens when a file or the device fails?](issues/05-what-happens-when-a-file-or-the-device-fails.md):
+  an unreadable track is passed over and its row kept, marked. The incoming track opens when
+  its boundary is scheduled, so a failure re-targets the boundary. A decode error ends the audio
+  there. Device loss pauses without resuming; the launch fallback is exclusive → shared →
+  WaveOut. Notices go to a strip with a session list, and nothing is swallowed.
 
 ## Not yet specified
 
@@ -83,6 +88,8 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   Queue advance and long files will exercise them for the first time; whether any needs a
   permanent test is open. The audit adds that no automated test reaches `NAudioAudioOutput` at
   all: its device clock, WaveOut fallback and stop handling rest on the smoke checklist.
+  [What happens when a file or the device fails?](issues/05-what-happens-when-a-file-or-the-device-fails.md)
+  adds device loss, reopening on Play, and the exclusive → shared → WaveOut launch chain.
 - **Queue persistence across restarts.** v2 never persisted the queue itself. Whether a daily
   driver needs it may surface from the settings or robust-file tickets.
 
