@@ -7,7 +7,8 @@ Blocked by: 02, 03, 04, 05, 06
 ## Question
 
 v2 issue 0013 persisted settings as JSON in the user profile: output mode, default adjacency
-behaviour (hard cut, or a global default crossfade of N seconds), skip behaviour, ReplayGain
+behaviour (hard cut, or a global default crossfade of N seconds), skip behaviour (since dropped
+by [What do skip, repeat and end-of-queue do?](02-what-do-skip-repeat-and-end-of-queue-do.md)), ReplayGain
 on/off, preview pre-roll, visualiser on/off; a `schemaVersion`; missing keys fall back to
 defaults; a corrupt file warns and resets. v3 has launch arguments instead
 (`--output=`, `--play`, `--edit-first`).

@@ -62,6 +62,11 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   the visualiser. To fix: the end-of-queue fade borrows an arbitrary A→x transition, decode
   failures after a file opens are not skipped, device loss leaves the engine half-stopped,
   and `Remove`/`Clear` are untested.
+- [What do skip, repeat and end-of-queue do?](issues/02-what-do-skip-repeat-and-end-of-queue-do.md):
+  ⏭ lands on the incoming track, or hard-cuts from 0:00 outside a transition, and the let-finish
+  setting is dropped. A new **Transition now** button plays the next adjacency's transition
+  from the playhead. ⏮ wraps under repeat-all, and ⏭ leaves repeat-one. The end-of-queue fade
+  is cut, and *Stopped* follows the playhead.
 
 ## Not yet specified
 
@@ -82,6 +87,10 @@ Beyond this map's destination; returns only if the destination is redrawn.
   rates beyond 96 kHz). The library holds none; each keeps its named way back in
   `docs/supported-audio.md`.
 - **The per-playlist override UI.** v2 Phase 3; the store already carries the schema.
+- **An authored end-of-queue fade-out ("A → end").** Cut by
+  [What do skip, repeat and end-of-queue do?](issues/02-what-do-skip-repeat-and-end-of-queue-do.md):
+  it needs a store key, an editor mode and a glossary term to serve the last track of a
+  session. It returns as a fresh effort if daily use misses it.
 - **v2/v3 store coexistence.** v2 is retired for listening, so the two never share the file.
 - Everything the predecessor ruled out: library manager, playlist manager, cross-platform,
   MusicBee interop, tag editing, sidecar transition files.

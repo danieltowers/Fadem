@@ -31,6 +31,8 @@ _Avoid_: Track pair, boundary, junction
 
 **Skip**:
 The user action of abandoning the current adjacency to advance immediately to the next one.
+During a transition the current adjacency is the one in flight, so a skip lands on its
+incoming track at full volume; it never passes over that track.
 
 ### Transitions
 
@@ -64,6 +66,12 @@ once. One kind of transition, not a synonym for it.
 
 **Hard cut**:
 Switching from outgoing to incoming instantly, with no fade on either side.
+
+**Transition now**:
+The user action of starting the current adjacency's transition immediately, instead of at its
+fade-out point. Only the fade-out point moves, to the playhead; everything else plays as
+authored. It targets the same adjacency a skip would.
+_Avoid_: Mix now, crossfade on skip
 
 ### Position
 
