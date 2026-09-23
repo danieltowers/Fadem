@@ -91,6 +91,13 @@ _Avoid_: Set from here, mark, grab
 The voice whose playhead the shell displays and the seek bar scrubs. During a crossfade it
 remains the outgoing voice until that voice falls silent.
 
+
+**Length**:
+How long a track is, as the engine issues it: the span the playhead lives within, the value a
+from-end point resolves against, and what the seek bar spans. There is exactly one length per
+track; a length read from tags does not exist. "Duration" is reserved for fades.
+_Avoid_: Duration (of a track), total time, tag length, decoded length
+
 ### Supported audio
 
 **Promised**:

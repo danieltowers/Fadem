@@ -82,3 +82,19 @@ Two amendments from [ticket 09](09-how-exact-is-the-authoring-promise.md):
   that change to `AudioSources.cs`. This ticket still owns the **probe and the structured
   rejection**; until 15 lands, the probe may treat `.flac` as promised and leave the decoder
   alone. Whichever lands second reconciles the factory switch.
+
+## Noted from ticket 10
+
+[Ticket 10](10-which-length-is-a-track.md) adds three items, all engine-side (ADR 0010):
+
+- **The probe issues `Length`** from the stream header alongside format, rate, depth and
+  channels: FLAC STREAMINFO sample count, WAV data-chunk size over block align, MP3 Xing/Info
+  frame count × 1152 or file size over frame size for bare CBR. `QueueRow.Length` and
+  `VoiceView.Length` carry it. If ticket 14's fourth assertion shows a format's header cannot
+  give an exact length, the probe scans frames for that format instead.
+- **`Track.Duration` is deleted.** `TrackMetadataReader` keeps title, artist and ReplayGain.
+  The M3U writer is outside the slice; when it returns it formats the engine's `Length`.
+- **Audio ending before `Length`** is one `Notice` naming the file and the shortfall; the track
+  ends where the audio ends and the boundary fires there (hard cut if the fade had not started).
+  One engine-seam test: a WAV fixture whose header claims twice its data, through the fake
+  output, asserting the notice and where the boundary fired.

@@ -124,12 +124,25 @@ asking whether the current work could fail that way again.
   budget on the longest library file.
   Recorded as [ADR 0009](../../docs/adr/0009-authoring-exactness-is-bought-in-the-decoder.md).
 
+- [Which length is a track's length?](issues/10-which-length-is-a-track.md):
+  **One length, issued by the add-time probe from the stream header, proven equal to the decoded
+  length exactly in frames** by a fourth assertion on every matrix cell. `Track.Duration` (the
+  tag duration) is deleted; TagLib stays for title, artist and ReplayGain. Audio that ends
+  before `Length` is one notice and the track ends there. From-end points resolve against
+  `Length`. Opening files to learn length was rejected because a FLAC open now pre-scans the
+  whole file (ticket 09). Glossary gains **Length**; "duration" is reserved for fades.
+  Recorded as [ADR 0010](../../docs/adr/0010-one-length-issued-from-the-header.md).
+
 ## Not yet specified
 
 - **Restaging the rest of Phase 1.** Once the slice is trustworthy, how the remaining
   features (queue management, repeat/shuffle, preview, visualiser, ReplayGain, settings,
   file robustness) come back, and in what order. Likely mines v2's 14 issue files, but
-  whether those are reusable as written is unknown until the slice lands.
+  whether those are reusable as written is unknown until the slice lands. Two costs land here
+  from tickets 09 and 10: **adding a folder** probes every file's header (fast) but any format
+  the matrix forces onto a frame scan reads the whole file at add time, and **opening a FLAC**
+  pre-scans it. Whether folder adds need a background probe is unexamined. The M3U writer
+  returns formatting the engine's `Length`, since tag duration no longer exists.
 - **The fate of the preview feature.** v2 built it with its own mixer and its own output
   device. Whether that is the right design, or whether preview should just be the offline
   render played back, is unclear until the render harness exists. Ticket 04 added a

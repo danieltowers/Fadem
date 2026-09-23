@@ -16,9 +16,12 @@ Nothing plays on a best-effort basis.
 ## Promised
 
 A file is promised when its format, sample rate, bit depth and channel count all appear in one
-row. Every promised cell is proven three ways through the production decoder chain:
+row. Every promised cell is proven four ways through the production decoder chain:
 **completeness** (every frame the file holds is rendered), **purity** (a test tone comes out as
-that tone) and **seek landing** (a seek lands where it was asked to, within the tolerance below).
+that tone), **seek landing** (a seek lands where it was asked to, within the tolerance below)
+and **length** (the length the add-time probe reads from the header equals the decoded length,
+exactly, in frames; [ADR 0010](adr/0010-one-length-issued-from-the-header.md)). A format whose
+header cannot give an exact length has its probe scan frames instead, and its row says so.
 
 **Tolerance: 1 ms, at every promised cell, globally.** An authored point plays within 1 ms of
 where it was placed, on every format, rate, depth and channel count in the table. There is no

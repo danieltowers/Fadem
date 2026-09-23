@@ -85,3 +85,14 @@ The tolerance is set: **1 ms landing at every promised cell.** Consequences for 
   decoder one; ticket 08 decided the engine compensates known resampler latency rather than
   the tolerance absorbing it. Measure it, and if it is a constant, that constant is a finding
   for ticket 12.
+
+## Noted from ticket 10
+
+**A fourth assertion on every cell**: the length the add-time probe issues from the header
+equals the decoded length, **exactly, in frames** (ADR 0010). Build a `ProbeLength(path)` helper
+beside `Landing()` that reads only the header the way the production probe does, and a
+`*_HeaderLengthEqualsDecoded` theory over each `*Cells()` member data. For MP3 this is where
+the three variants earn their rows: Xing/Info frame count for `CbrInfo`, file size over frame
+size for `CbrBare`, and `Vbr` is the one most likely to force a frame scan. A red cell here does
+not widen to a tolerance; it changes how the probe learns the length for that format, and the
+doc row records the add-time cost.
