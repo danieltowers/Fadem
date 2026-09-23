@@ -37,13 +37,14 @@ internal static class Program
 
             // Plain arguments are files to queue (drop them on the executable); --play starts
             // them and --edit-first opens the editor on the first boundary. For smoke runs.
-            // Queued behind the posted notices so the add summary is the last thing shown.
-            form.BeginInvoke(() =>
+            // Queued behind the posted notices, so a rejection notice from the add is the last
+            // thing shown. The add runs in the background; the other two arguments wait for its rows.
+            form.BeginInvoke(async () =>
             {
                 var paths = args.Where(a => !a.StartsWith("--", StringComparison.Ordinal)).ToList();
                 if (paths.Count > 0)
                 {
-                    form.AddPaths(paths);
+                    await form.AddPaths(paths);
                 }
                 if (args.Contains("--edit-first", StringComparer.OrdinalIgnoreCase))
                 {

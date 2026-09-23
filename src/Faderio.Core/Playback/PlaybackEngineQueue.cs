@@ -7,36 +7,6 @@ public sealed partial class PlaybackEngine
 {
     // ── Queue: the only way rows come to exist or move ──────────────────────────────────
 
-    /// <summary>Probes each file's header (ADR 0007, ADR 0010) and queues the promised ones with
-    /// their metadata. Rejected files come back with the property that disqualified them; a
-    /// queued track is a track that will play.</summary>
-    public AddReport AddTracks(IEnumerable<string> paths)
-    {
-        ThrowIfDisposed();
-        return Run(() =>
-        {
-            var added = new List<QueueRow>();
-            var rejected = new List<Rejection>();
-            foreach (var path in paths)
-            {
-                var rejection = AudioProbe.Probe(path, out var probed);
-                if (rejection is not null)
-                {
-                    rejected.Add(rejection);
-                    continue;
-                }
-                added.Add(Append(TrackMetadataReader.Read(path, probed!.Length)));
-            }
-            if (added.Count > 0)
-            {
-                _queueVersion++;
-                RescheduleCurrentBoundary();
-                Publish();
-            }
-            return new AddReport(added, rejected);
-        });
-    }
-
     /// <summary>Test seam: queues tracks the caller built, bypassing the probe and the tags.
     /// Lets a Core test set ReplayGain or a deliberate length without writing tags.</summary>
     internal IReadOnlyList<QueueRow> AddTracks(IEnumerable<Track> tracks)

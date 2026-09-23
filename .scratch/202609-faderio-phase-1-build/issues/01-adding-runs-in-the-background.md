@@ -1,6 +1,6 @@
 # 01: Adding runs in the background
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 
 Decided in [What does queue management add?](../../202609-faderio-phase-1-restage/issues/12-what-does-queue-management-add.md) (Adding)
@@ -33,14 +33,14 @@ arguments. Folders and playlists are issues 02 and 03.
 
 ## Acceptance
 
-- [ ] While a track plays, adding 50 files does not hold the engine lock for any probe; only
+- [x] While a track plays, adding 50 files does not hold the engine lock for any probe; only
       the row appends take it.
-- [ ] Rows appear in the given order as they resolve; the view's progress counts them.
-- [ ] Cancel mid-add stops further probing and keeps the rows already added.
-- [ ] A second `Add` issued mid-add runs after the first, in order.
-- [ ] Rejections are reported once, on completion, with each reason (ADR 0007).
-- [ ] Adding to an empty, stopped queue does not start playback.
-- [ ] `AddTimeBudgetTests` still pass.
+- [x] Rows appear in the given order as they resolve; the view's progress counts them.
+- [x] Cancel mid-add stops further probing and keeps the rows already added.
+- [x] A second `Add` issued mid-add runs after the first, in order.
+- [x] Rejections are reported once, on completion, with each reason (ADR 0007).
+- [x] Adding to an empty, stopped queue does not start playback.
+- [x] `AddTimeBudgetTests` still pass.
 
 ## Tests
 
@@ -55,3 +55,14 @@ arguments. Folders and playlists are issues 02 and 03.
   shows progress and a Cancel.
 - **Sounds:** add the whole `MUSIC` library while a track plays; the track plays on without a
   dropout.
+
+## Comments
+
+- Built 2026-09-23. `Add(paths)` returns a `Task<AddReport>` at once; `CancelAdd()` ends the
+  run; `View.Adding` is *resolved of total* across queued adds. The worker probes off the lock
+  and takes it once per file to append. Decisions made in the build: a run that refuses nothing
+  raises **no** notice (the rows are the news; "Added N tracks." is gone), and Cancel ends queued
+  adds too, discarding the probe in flight. The add summary moved from the presenter to
+  `AddReport` (ADR 0003 addendum). Tests: `AddInTheBackgroundTests` (fake) and two form tests.
+  Looks passed by the agent; the Sounds item (the whole library added while a track plays) is
+  the user's.

@@ -46,6 +46,10 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
       showed at that moment.
 - [ ] After Save, the status strip shows a confirmation and nothing else changed.
 - [ ] Resizing the window narrower does not hide the transport or the editor's buttons.
+- [ ] While adding a folder's worth of files (fifty or more, through **Add files…** or as
+      arguments), the window stays responsive — it moves and repaints — and the status strip
+      shows *Adding N of M…* and a **Cancel**. Rows appear in order as files resolve. Both
+      disappear when the add ends, and Cancel ends it at once, keeping the rows already listed.
 - [ ] Adding a rejected file (an `.m4a`, an `.ogg`, or a file with more than two channels)
       leaves the list unchanged and shows one notice naming the property that failed and
       pointing at `docs/supported-audio.md`. Nothing is queued, nothing plays.
@@ -72,3 +76,5 @@ sharp percussive transient; the realism check is the authored boundary from the 
 - [ ] Run the same capture-and-listen on WASAPI shared, WASAPI exclusive and WaveOut; the
       fade lands in the same place on all three.
 - [ ] Reaching the end of the second track stops playback cleanly with no error.
+- [ ] Add the whole `MUSIC` library (every file, through **Add files…**) while a track plays;
+      the track plays on without a dropout, and adding never starts or stops playback.

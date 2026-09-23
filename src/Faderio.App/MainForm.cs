@@ -24,6 +24,8 @@ internal sealed class MainForm : Form
     internal readonly Button _stop;
     internal readonly Button _next;
     internal readonly ToolStripStatusLabel _status;
+    internal readonly ToolStripStatusLabel _addProgress;
+    internal readonly ToolStripButton _cancelAdd;
     internal readonly TransitionEditorPanel _editor;
     internal readonly ToolStripMenuItem _editTransition;
     private readonly System.Windows.Forms.Timer _timer;
@@ -41,7 +43,9 @@ internal sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
 
         _status = new ToolStripStatusLabel("Ready.") { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
-        var statusStrip = new StatusStrip { Items = { _status } };
+        _addProgress = new ToolStripStatusLabel { Available = false };
+        _cancelAdd = new ToolStripButton("Cancel") { Available = false, DisplayStyle = ToolStripItemDisplayStyle.Text };
+        var statusStrip = new StatusStrip { Items = { _status, _addProgress, _cancelAdd } };
 
         _addFiles = new Button { Text = "Add files…", Width = 90, Height = 28, Margin = new Padding(4, 8, 8, 4) };
         var symbols = new Font("Segoe UI Symbol", 9f);
@@ -111,6 +115,7 @@ internal sealed class MainForm : Form
         Controls.Add(transport);
 
         _addFiles.Click += (_, _) => AddFiles();
+        _cancelAdd.Click += (_, _) => _engine.CancelAdd();
         _playPause.Click += (_, _) => _engine.TogglePlayPause();
         _prev.Click += (_, _) => _engine.Previous();
         _stop.Click += (_, _) => _engine.Stop();
@@ -171,17 +176,31 @@ internal sealed class MainForm : Form
             ? "0:00 / -0:00"
             : $"{Presenter.Fmt(attended.Playhead)} / -{Presenter.FmtRemaining(attended.Remaining)}";
 
+        _addProgress.Text = Presenter.FmtAdding(view.Adding);
+        _addProgress.Available = view.Adding is not null;
+        _cancelAdd.Available = view.Adding is not null;
+
         _editor.Refresh(view);
     }
 
+    /// <summary>A background add publishes once per file, so rows the list already shows in
+    /// the same places are kept and only the new ones are made: a whole library would otherwise
+    /// rebuild the list once per file, and the window would stop answering.</summary>
     private void RebuildRows(PlayerView view)
     {
         _queueList.BeginUpdate();
-        _queueList.Items.Clear();
-        var n = 1;
-        foreach (var row in view.Queue)
+        var kept = 0;
+        while (kept < _queueList.Items.Count && kept < view.Queue.Count && RowOf(_queueList.Items[kept]) == view.Queue[kept].Id)
         {
-            var item = new ListViewItem((n++).ToString()) { Tag = row.Id };
+            kept++;
+        }
+        while (_queueList.Items.Count > kept)
+        {
+            _queueList.Items.RemoveAt(_queueList.Items.Count - 1);
+        }
+        foreach (var row in view.Queue.Skip(kept))
+        {
+            var item = new ListViewItem((++kept).ToString()) { Tag = row.Id };
             item.SubItems.Add(string.IsNullOrEmpty(row.Track.Title) ? Path.GetFileName(row.Track.FilePath) : row.Track.Title);
             item.SubItems.Add(row.Track.Artist);
             item.SubItems.Add(Presenter.Fmt(row.Track.Length));
@@ -210,15 +229,13 @@ internal sealed class MainForm : Form
         };
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
-            AddPaths(dialog.FileNames);
+            _ = AddPaths(dialog.FileNames);
         }
     }
 
-    internal void AddPaths(IEnumerable<string> paths)
-    {
-        var report = _engine.AddTracks(paths);
-        ShowNotice(Presenter.Summarise(report));
-    }
+    /// <summary>Returns at once; rows, progress and the closing notice arrive through the sink.
+    /// The task is for the launch arguments, which must wait for the rows before --play.</summary>
+    internal Task AddPaths(IEnumerable<string> paths) => _engine.Add(paths);
 
     internal static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
 

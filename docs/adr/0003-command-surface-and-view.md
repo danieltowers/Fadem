@@ -67,3 +67,15 @@ by decision (ADR 0002).
 The shell's whole display loop is one `Render(PlayerView)` of about ten lines. Its presenter holds
 exactly: seconds parse/format, row→adjacency with a bounds check, add-report summary, and
 transition-store open/recovery. Anything else that appears there fails the placement rule.
+
+## Addendum: adding is a background run, and its outcome is a notice (2026-09-23)
+
+`Add(paths)` returns at once and probes off the engine lock, one row appended under it per
+file, with the run's progress in `View.Adding` and `CancelAdd()` to end it. Its outcome
+reaches the user after the command has returned, so it cannot be a return value the shell
+formats: when a run refuses anything, the engine raises one notice naming every rejection, and
+a run that refuses nothing raises none. The add-report summary therefore moved from the
+presenter to `AddReport`; the presenter formats the progress instead. `Rejection` stays
+structured as ADR 0007 requires; only the one sentence the notice carries is worded in Core. Settled in
+[What does queue management add?](../../.scratch/202609-faderio-phase-1-restage/issues/12-what-does-queue-management-add.md)
+and built in [issue 01](../../.scratch/202609-faderio-phase-1-build/issues/01-adding-runs-in-the-background.md).

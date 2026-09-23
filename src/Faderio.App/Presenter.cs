@@ -16,9 +16,11 @@ internal sealed record SecondsField(Point? Point, string? Error)
 }
 
 /// <summary>
-/// The shell's remaining logic, with no WinForms in it (ADR 0002, S4). Exactly ticket 06's list:
-/// format and parse seconds, row → adjacency with its bounds check, the add-files summary, the
-/// store open/recovery path, and the launch-time output mode. Everything here formats engine
+/// The shell's remaining logic, with no WinForms in it (ADR 0002, S4). Ticket 06's list, amended
+/// by build issue 01:
+/// format and parse seconds, row → adjacency with its bounds check, the add's progress, the
+/// store open/recovery path, and the launch-time output mode. The add's outcome is an engine
+/// notice since build issue 01, so its summary moved to <see cref="AddReport"/>. Everything here formats engine
 /// values or parses text; nothing computes a position.
 /// </summary>
 internal static class Presenter
@@ -78,24 +80,10 @@ internal static class Presenter
         $"{Path.GetFileNameWithoutExtension(adjacency.Outgoing.FilePath)} → " +
         $"{Path.GetFileNameWithoutExtension(adjacency.Incoming.FilePath)}";
 
-    /// <summary>One line for the status strip: what was added, what was refused and why. Every
-    /// outcome gets a sentence, including "all of them were rejected", which v2 left blank.</summary>
-    public static string Summarise(AddReport report)
-    {
-        var added = report.Added.Count;
-        var rejected = report.Rejected.Count;
-        var tracks = added == 1 ? "1 track" : $"{added} tracks";
-        if (rejected == 0)
-        {
-            return added == 0 ? "Nothing to add." : $"Added {tracks}.";
-        }
-        var reasons = string.Join("; ", report.Rejected.Select(r =>
-            $"{Path.GetFileName(r.Path)}: {r.Detail}"));
-        var head = added == 0
-            ? (rejected == 1 ? "Nothing added: the file was rejected" : $"Nothing added: all {rejected} files were rejected")
-            : $"Added {tracks}; rejected {rejected}";
-        return $"{head} — {reasons} See docs/supported-audio.md.";
-    }
+    /// <summary>The running add's progress for the status strip; blank when nothing is being
+    /// added. The add's outcome arrives later as a notice, which the engine words.</summary>
+    public static string FmtAdding(AddProgress? adding) =>
+        adding is null ? "" : $"Adding {adding.Resolved} of {adding.Total}…";
 
     public static string PlayPauseGlyph(Transport transport) => transport == Transport.Playing ? "⏸" : "▶";
 

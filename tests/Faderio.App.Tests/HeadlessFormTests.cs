@@ -31,7 +31,9 @@ public sealed class HeadlessFormTests
             Output = new FakeAudioOutput { Latency = latency };
             Store = new JsonTransitionStore(Path.Combine(TempDir, "transitions.json"));
             var sink = new PostingSink(null); // inline: no message pump in a headless test
-            Engine = new PlaybackEngine(Output, Store, sink);
+            // The add worker runs inline, so an add completes on this STA thread and the inline
+            // sink never touches a control from another thread.
+            Engine = new PlaybackEngine(Output, Store, sink) { StartAddWorker = work => work() };
             Form = new MainForm(Engine, Store, sink);
         }
 
@@ -83,7 +85,55 @@ public sealed class HeadlessFormTests
         Assert.Equal(Path.GetFileNameWithoutExtension(a), h.Form._queueList.Items[0].SubItems[1].Text);
         Assert.Equal("0:03", h.Form._queueList.Items[0].SubItems[3].Text);
         Assert.Equal("0:02", h.Form._queueList.Items[1].SubItems[3].Text);
-        Assert.Equal("Added 2 tracks.", h.Form._status.Text);
+        Assert.Equal("Ready.", h.Form._status.Text); // a clean add raises no notice: the rows are the news
+    });
+
+    [Fact]
+    public void WhileAdding_TheStripShowsProgress_AndCancelStopsTheAdd() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var files = Enumerable.Range(0, 3).Select(i => TestAudio.WriteDcWav($"add{i}.wav", 1, 0.2)).ToArray();
+        Assert.False(h.Form._addProgress.Available);
+        Assert.False(h.Form._cancelAdd.Available);
+        string? progressMidAdd = null;
+        var cancelShownMidAdd = false;
+        var real = h.Engine.ResolvePath;
+        h.Engine.ResolvePath = path =>
+        {
+            if (path == files[1])
+            {
+                // The second file's probe is in flight: the first row is in, and the strip says so.
+                progressMidAdd = h.Form._addProgress.Available ? h.Form._addProgress.Text : null;
+                cancelShownMidAdd = h.Form._cancelAdd.Available;
+                h.Form._cancelAdd.PerformClick();
+            }
+            return real(path);
+        };
+
+        h.Form.AddPaths(files);
+
+        Assert.Equal("Adding 1 of 3…", progressMidAdd);
+        Assert.True(cancelShownMidAdd);
+        Assert.Single(h.Form._queueList.Items);
+        Assert.False(h.Form._addProgress.Available);
+        Assert.False(h.Form._cancelAdd.Available);
+        Assert.Equal("Ready.", h.Form._status.Text);
+    });
+
+    [Fact]
+    public void AddingMore_KeepsTheRowsAlreadyListed_AndNumbersOnFromThem() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 1, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 1, 0.2);
+        h.Form.AddPaths(new[] { a });
+        var first = h.Form._queueList.Items[0];
+
+        h.Form.AddPaths(new[] { b, a });
+
+        Assert.Same(first, h.Form._queueList.Items[0]);
+        Assert.Equal(new[] { "1", "2", "3" }, h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
+        Assert.Equal(h.Engine.View.Queue.Select(r => r.Id), h.Form._queueList.Items.Cast<ListViewItem>().Select(MainForm.RowOf));
     });
 
     [Fact]

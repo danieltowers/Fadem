@@ -30,7 +30,7 @@ public static class Renderer
         var sink = new RecordingSink();
         using var engine = new PlaybackEngine(output, store, sink);
 
-        var report = engine.AddTracks(new[] { adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath });
+        var report = engine.Add(new[] { adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath }).GetAwaiter().GetResult();
         if (report.Rejected.Count > 0)
         {
             throw new InvalidOperationException("Cannot render: " + string.Join("; ", report.Rejected));

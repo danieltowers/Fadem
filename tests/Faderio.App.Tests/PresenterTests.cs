@@ -76,27 +76,11 @@ public sealed class PresenterTests
         Assert.Null(Presenter.AdjacencyAt(ViewOf(), 0));
     }
 
-    private static Rejection Rejected(string path) =>
-        new(path, new AudioShape(AudioFormat.Wav, 44100, 16, 4), RejectedProperty.Channels,
-            SupportedAudio.Describe(RejectedProperty.Channels, new AudioShape(AudioFormat.Wav, 44100, 16, 4)));
-
     [Fact]
-    public void Summarise_SaysWhatHappened_InEveryCase()
+    public void FmtAdding_CountsTheFilesResolved_AndIsBlankWhenIdle()
     {
-        var row = new QueueRow(new RowId(1), new Track { FilePath = @"C:\a.wav" }, true);
-
-        Assert.Equal("Added 1 track.", Presenter.Summarise(new AddReport(new[] { row }, Array.Empty<Rejection>())));
-        Assert.Equal("Added 2 tracks.", Presenter.Summarise(new AddReport(new[] { row, row }, Array.Empty<Rejection>())));
-        Assert.Equal("Nothing to add.", Presenter.Summarise(new AddReport(Array.Empty<QueueRow>(), Array.Empty<Rejection>())));
-
-        var mixed = Presenter.Summarise(new AddReport(new[] { row }, new[] { Rejected(@"C:\quad.wav") }));
-        Assert.StartsWith("Added 1 track; rejected 1", mixed);
-        Assert.Contains("quad.wav: 4 channels is not promised", mixed);
-        Assert.EndsWith("See docs/supported-audio.md.", mixed);
-
-        // v2 gave no summary at all when every file failed.
-        var none = Presenter.Summarise(new AddReport(Array.Empty<QueueRow>(), new[] { Rejected(@"C:\x.wav"), Rejected(@"C:\y.wav") }));
-        Assert.StartsWith("Nothing added: all 2 files were rejected", none);
+        Assert.Equal("Adding 120 of 903…", Presenter.FmtAdding(new AddProgress(120, 903)));
+        Assert.Equal("", Presenter.FmtAdding(null));
     }
 
     [Theory]

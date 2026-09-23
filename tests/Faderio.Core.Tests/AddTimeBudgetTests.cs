@@ -4,7 +4,7 @@ using System.Diagnostics;
 namespace Faderio.Core.Tests;
 
 /// <summary>
-/// Add-time budget: how long <c>AddTracks</c> takes to probe a file and read its tags. Measured
+/// Add-time budget: how long <c>Add</c> takes to probe a file and read its tags. Measured
 /// over the user's 903-file library in the restage map's "Does adding a folder need a background
 /// probe?", which holds the library numbers; these budgets catch an order-of-magnitude regression
 /// (a whole-file scan creeping into the probe), not a few milliseconds. The heaviest real case is
@@ -21,10 +21,10 @@ public sealed class AddTimeBudgetTests
         var files = Directory.EnumerateFiles(Path.Combine(AppContext.BaseDirectory, "Fixtures"))
             .Where(f => f.EndsWith(".flac") || f.EndsWith(".mp3")).ToList();
         using var tc = TestEngine.Create();
-        tc.Engine.AddTracks([files[0]]); // JIT and TagLib warm-up, outside the budget
+        tc.Engine.Add([files[0]]).Wait(); // JIT and TagLib warm-up, outside the budget
 
         var sw = Stopwatch.StartNew();
-        var report = tc.Engine.AddTracks(files);
+        var report = tc.Engine.Add(files).Result;
         sw.Stop();
 
         Assert.Empty(report.Rejected);
@@ -39,10 +39,10 @@ public sealed class AddTimeBudgetTests
         var heavy = Path.Combine(Path.GetTempPath(), $"faderio-cover-{Guid.NewGuid():N}.flac");
         File.WriteAllBytes(heavy, WithPicture(File.ReadAllBytes(plain), 8 * 1024 * 1024));
         using var tc = TestEngine.Create();
-        var expected = tc.Engine.AddTracks([plain]).Added.Single().Track.Length; // also the warm-up
+        var expected = tc.Engine.Add([plain]).Result.Added.Single().Track.Length; // also the warm-up
 
         var sw = Stopwatch.StartNew();
-        var report = tc.Engine.AddTracks([heavy]);
+        var report = tc.Engine.Add([heavy]).Result;
         sw.Stop();
 
         Assert.Equal(expected, report.Added.Single().Track.Length);

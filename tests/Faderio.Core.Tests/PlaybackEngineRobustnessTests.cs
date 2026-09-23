@@ -11,7 +11,7 @@ public sealed class PlaybackEngineRobustnessTests
     {
         using var tc = TestEngine.Create();
         var b = TestAudio.WriteDcWav("b.wav", 2, 0.2);
-        var report = tc.Engine.AddTracks(new[] { @"C:\definitely\missing.wav", b });
+        var report = tc.Engine.Add(new[] { @"C:\definitely\missing.wav", b }).Result;
 
         var rejection = Assert.Single(report.Rejected);
         Assert.Equal(RejectedProperty.File, rejection.Property);
@@ -26,7 +26,7 @@ public sealed class PlaybackEngineRobustnessTests
         using var tc = TestEngine.Create();
         var corrupt = TestAudio.WriteWav("corrupt.wav", 1, _ => 0.4);
         File.WriteAllText(corrupt, "this is not a wave file");
-        var report = tc.Engine.AddTracks(new[] { corrupt });
+        var report = tc.Engine.Add(new[] { corrupt }).Result;
 
         var rejection = Assert.Single(report.Rejected);
         Assert.Equal(RejectedProperty.File, rejection.Property);
@@ -54,7 +54,7 @@ public sealed class PlaybackEngineRobustnessTests
     public void AllFilesBroken_LeavesNothingToPlay()
     {
         using var tc = TestEngine.Create();
-        var report = tc.Engine.AddTracks(new[] { @"C:\missing-one.wav", @"C:\missing-two.wav" });
+        var report = tc.Engine.Add(new[] { @"C:\missing-one.wav", @"C:\missing-two.wav" }).Result;
         tc.Engine.Play();
 
         Assert.Equal(2, report.Rejected.Count);

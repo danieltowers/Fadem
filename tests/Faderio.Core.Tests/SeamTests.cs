@@ -249,7 +249,7 @@ public sealed class SeamTests
         engine = new PlaybackEngine(output, new Faderio.Core.Transitions.JsonTransitionStore(Path.Combine(dir, "t.json")), sink);
         using var _ = engine;
         var a = TestAudio.WriteDcWav("a.wav", 1, 0.4);
-        engine.AddTracks(new[] { a });
+        engine.Add(new[] { a }).Wait();
         engine.Play();
 
         Assert.Equal(1, reentered);

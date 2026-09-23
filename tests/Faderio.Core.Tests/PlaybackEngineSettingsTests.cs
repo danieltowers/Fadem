@@ -55,7 +55,7 @@ public sealed class PlaybackEngineSettingsTests
         var a = TestAudio.WriteWavAt("a48", 2, _ => 0.4, 48000, 16, 2);
 
         Assert.Equal(48000, engine.SampleRate);
-        engine.AddTracks(new[] { a });
+        engine.Add(new[] { a }).Wait();
         engine.Play();
         output.Advance(48000);
 

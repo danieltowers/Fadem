@@ -28,7 +28,7 @@ public sealed record VoiceView(QueueRow Row, Playhead Playhead, Length Length)
 /// crosses the seam (ADR 0003). <see cref="Queue"/> is a fresh list per <see cref="QueueVersion"/>;
 /// <see cref="Attended"/> is the voice the listener attends to — the outgoing voice until it
 /// falls silent — and is null exactly when stopped; <see cref="Incoming"/> is non-null only
-/// while two voices overlap.
+/// while two voices overlap. <see cref="Adding"/> is non-null exactly while an add is running.
 /// </summary>
 public sealed record PlayerView(
     long Version,
@@ -38,9 +38,32 @@ public sealed record PlayerView(
     VoiceView? Attended,
     VoiceView? Incoming,
     bool Shuffle,
-    RepeatMode Repeat);
+    RepeatMode Repeat,
+    AddProgress? Adding = null);
 
-/// <summary>What <c>AddTracks</c> did: the rows it created and the files it refused, each with
-/// the probed shape and the property that disqualified it (ADR 0007). The shell formats these
-/// and points at <c>docs/supported-audio.md</c>.</summary>
-public sealed record AddReport(IReadOnlyList<QueueRow> Added, IReadOnlyList<Rejection> Rejected);
+/// <summary>How far the running add has got: files resolved (queued or rejected) out of every
+/// file given to it, including those of an add waiting behind the first.</summary>
+public sealed record AddProgress(int Resolved, int Total);
+
+/// <summary>What one <c>Add</c> did: the rows it created and the files it refused, each with the
+/// probed shape and the property that disqualified it (ADR 0007). <see cref="Cancelled"/> when
+/// <c>CancelAdd</c> ended it early; the rows already added stay.</summary>
+public sealed record AddReport(IReadOnlyList<QueueRow> Added, IReadOnlyList<Rejection> Rejected, bool Cancelled = false)
+{
+    /// <summary>The one notice an add run raises when it refused a file: what was added, every
+    /// rejection with its reason, and whether the add was cut short. "All of them were rejected"
+    /// gets a sentence too, which v2 left blank. A run that refused nothing raises no notice: its
+    /// rows are the news.</summary>
+    internal string Summarise()
+    {
+        var added = Added.Count;
+        var rejected = Rejected.Count;
+        var tracks = added == 1 ? "1 track" : $"{added} tracks";
+        var cancelled = Cancelled ? "Add cancelled. " : "";
+        var reasons = string.Join("; ", Rejected.Select(r => $"{System.IO.Path.GetFileName(r.Path)}: {r.Detail}"));
+        var head = added == 0
+            ? (rejected == 1 ? "Nothing added: the file was rejected" : $"Nothing added: all {rejected} files were rejected")
+            : $"Added {tracks}; rejected {rejected}";
+        return $"{cancelled}{head} — {reasons} See docs/supported-audio.md.";
+    }
+}

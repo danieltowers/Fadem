@@ -22,7 +22,7 @@ public sealed class TestEngine : IDisposable
     /// <summary>The fake's emitted frames at each publication, parallel to <c>Sink.Views</c>.</summary>
     public List<long> EmittedAtPublication { get; } = new();
 
-    private TestEngine(string tempDir, PlayerSettings settings, Random? rng, int latency)
+    private TestEngine(string tempDir, PlayerSettings settings, Random? rng, int latency, bool backgroundAdd)
     {
         TempDir = tempDir;
         Directory.CreateDirectory(tempDir);
@@ -31,13 +31,22 @@ public sealed class TestEngine : IDisposable
         Output = new FakeAudioOutput { Latency = latency };
         Sink.OnChanged = _ => EmittedAtPublication.Add(Output.FramesEmitted.Count);
         Engine = new PlaybackEngine(Output, Store, Sink, settings, rng);
+        if (!backgroundAdd)
+        {
+            Engine.StartAddWorker = work => work();
+        }
     }
 
-    public static TestEngine Create(PlayerSettings? settings = null, int? rngSeed = null, int latency = 0)
+    /// <summary>The add worker runs inline unless <paramref name="backgroundAdd"/>: <c>Add</c> is
+    /// then synchronous and the whole test stays on one thread. Only a test about the lock or
+    /// about adding in the background needs a real worker thread.</summary>
+    public static TestEngine Create(
+        PlayerSettings? settings = null, int? rngSeed = null, int latency = 0, bool backgroundAdd = false)
     {
         var dir = Path.Combine(Path.GetTempPath(), "faderio-engine", Guid.NewGuid().ToString("N"));
         return new TestEngine(
-            dir, settings ?? new PlayerSettings(), rngSeed is null ? null : new Random(rngSeed.Value), latency);
+            dir, settings ?? new PlayerSettings(), rngSeed is null ? null : new Random(rngSeed.Value), latency,
+            backgroundAdd);
     }
 
     public RenderedAudio Rendered => new(Output.Blocks);
@@ -49,7 +58,7 @@ public sealed class TestEngine : IDisposable
     /// <summary>Adds files through the production probe; every path must be promised.</summary>
     public IReadOnlyList<QueueRow> Add(params string[] filePaths)
     {
-        var report = Engine.AddTracks(filePaths);
+        var report = Engine.Add(filePaths).Result;
         if (report.Rejected.Count > 0)
         {
             throw new InvalidOperationException("Rejected: " + string.Join("; ", report.Rejected));

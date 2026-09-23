@@ -86,6 +86,7 @@ public sealed partial class PlaybackEngine : IDisposable
 
     public void Dispose()
     {
+        List<AddCompletion> unanswered;
         lock (_sync)
         {
             if (_disposed)
@@ -93,10 +94,12 @@ public sealed partial class PlaybackEngine : IDisposable
                 return;
             }
             _disposed = true;
+            unanswered = EndAddRun(cancelled: true, notify: false);
             ResetForRestart();
             _output.Stopped -= OnOutputStopped;
             _output.Dispose();
         }
+        Complete(unanswered);
     }
 
     // ── The lock, the drain and the publication ─────────────────────────────────────────
@@ -239,7 +242,7 @@ public sealed partial class PlaybackEngine : IDisposable
         return new Snapshot(
             _version, _queueVersion, _output.State, _queue.Entries.ToImmutableArray(),
             _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null,
-            _shuffle, _repeat, _rate);
+            _shuffle, _repeat, Adding, _rate);
     }
 
     /// <summary>One voice frozen for the view: its row, its reference history and its length.
@@ -282,6 +285,7 @@ public sealed partial class PlaybackEngine : IDisposable
         bool Overlap,
         bool Shuffle,
         RepeatMode Repeat,
+        AddProgress? Adding,
         int Rate)
     {
         public PlayerView At(long emitted)
@@ -299,7 +303,7 @@ public sealed partial class PlaybackEngine : IDisposable
                 Version, QueueVersion, Transport, rows,
                 attended?.At(emitted, true, Rate),
                 incoming?.At(emitted, false, Rate),
-                Shuffle, Repeat);
+                Shuffle, Repeat, Adding);
         }
     }
 
