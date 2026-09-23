@@ -17,8 +17,16 @@ item in the session's hand-off. Plain arguments are files to queue; `--play` sta
 `--edit-first` opens the editor on the first boundary; `--output=` picks the mode:
 
 ```
-dotnet run --project src/Faderio.App -- "a.wav" "b.wav" --play --edit-first --output=wasapi-shared
+dotnet run --project src/Faderio.App -- "<outgoing>" "<incoming>" --play --edit-first --output=wasapi-shared
 ```
+
+`<outgoing>` and `<incoming>` are **absolute paths to two real, promised files**; there are no
+sample files in the repo. `dotnet run` runs the app from `src/Faderio.App`, so a relative path
+resolves there, not where you typed the command. A path that does not exist is rejected like
+any other file: nothing is queued and the only sign is one line in the status strip
+("Nothing added: … The file does not exist."). The agent generates its own WAVs for the Looks
+half; the Sounds half uses the two tracks of a boundary already in the store
+(`%APPDATA%\faderio\transitions.json` lists them by full path).
 
 Capture the window with `PrintWindow` rather than a screen grab, so it need not be in front.
 
