@@ -89,6 +89,10 @@ for anything that adds an engine member, `tdd` for task tickets that measure.
   yes. The 903-file library adds in 12.8 s cold (median 13 ms, max 112 ms, the slow files being
   FLACs with 7 MB of cover art). Today's add probes under the lock the audio thread takes, so
   adding must move off the lock and off the UI thread. `AddTimeBudgetTests` stays behind.
+- [Should MP3 length trim the encoder's gapless padding?](issues/08-should-mp3-length-trim-the-encoders-gapless-padding.md):
+  trimming is exact from the LAME tag for Info/Xing files and impossible from headers for bare
+  CBR. In the library, 546 of 654 MP3s carry a valid tag and 103 are bare, none with
+  `iTunSMPB`. The ACM decoder's offset is unmeasured. The choice itself graduates to a new ticket.
 
 ## Not yet specified
 
