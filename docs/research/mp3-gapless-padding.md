@@ -268,3 +268,21 @@ as done; this would be a narrower new question.
 - Rockbox master: `lib/rbcodec/metadata/mp3data.c`, `lib/rbcodec/metadata/mp3.c`, `lib/rbcodec/codecs/mpa.c` at <https://github.com/Rockbox/rockbox>
 - Apple TN2258: <https://developer.apple.com/library/archive/technotes/tn2258/_index.html>
 - faderio: `src/Faderio.Core/Playback/AudioProbe.cs`, `AudioSources.cs`; `tests/Faderio.Core.Tests/Fixtures/generate.sh` and the checked-in MP3 fixtures (bytes read directly); ticket 14 and ticket 08 of `.scratch/202609-faderio-v3/`
+
+## Addendum: the library survey (2026-09-23)
+
+This is the "cheap step" from section 5, run with `docs/research/mp3-lame-tag-survey.py`. It
+read headers only, over all 654 MP3s under `the user's music folder`.
+
+- **551 have an Info frame, 103 are bare.** No file has a `Xing`/VBR frame. Every tag sits at
+  the offset `AudioProbe.XingFrames` checks (byte 36 from the frame, or 21 for mono), so this
+  is the split the probe sees. The predecessor survey's 447/207 was not reproduced; why was
+  not investigated.
+- **549 of the 551 carry a LAME-style extension, and 546 pass both the tag CRC and the
+  MusicLength check** against the audio bytes on disk. Encoder strings: `LAME3.93` (224),
+  `LAME3.98` (208), `Lavc57.x` (60), `LAME3.92` (34), `LAME3.99` (20), `Lavf` (3), empty (2).
+  Every delay is 576. Padding ranges from 0 to 2304.
+- **Of the 103 bare files, none has `iTunSMPB` and none has VBRI.** Option C would gain nothing
+  on this library.
+- **No MP3 transition is persisted** in `%APPDATA%\faderio\transitions.json`; both authored
+  pairs are FLAC. Trimming would migrate nothing.
