@@ -79,3 +79,9 @@ presenter to `AddReport`; the presenter formats the progress instead. `Rejection
 structured as ADR 0007 requires; only the one sentence the notice carries is worded in Core. Settled in
 [What does queue management add?](../../.scratch/202609-faderio-phase-1-restage/issues/12-what-does-queue-management-add.md)
 and built in [issue 01](../../.scratch/202609-faderio-phase-1-build/issues/01-adding-runs-in-the-background.md).
+
+`Add` also takes folders ([issue 02](../../.scratch/202609-faderio-phase-1-build/issues/02-add-a-folder-or-drop-files-on-the-queue.md)).
+The worker lists a folder off the lock when the add reaches it and puts its files where the
+folder stood, so a drop of files and folders keeps its order. Until then the folder counts as
+one path in `View.Adding`. **Add files…**, **Add folder…** and a drop from Explorer each pass
+their paths straight to `Add`; the shell never lists a directory.

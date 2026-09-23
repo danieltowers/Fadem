@@ -7,12 +7,13 @@ public sealed partial class PlaybackEngine
     // ── Adding: probes off the lock, rows appended under it one at a time ───────────────
 
     /// <summary>One call to <see cref="Add"/>: its paths still to resolve, in order, and what
-    /// became of the ones resolved so far. Touched only under the engine lock.</summary>
+    /// became of the ones resolved so far. A folder is replaced in place by its files once listed.
+    /// Touched only under the engine lock.</summary>
     private sealed class AddJob
     {
-        public AddJob(IReadOnlyList<string> paths) => Remaining = new Queue<string>(paths);
+        public AddJob(IReadOnlyList<string> paths) => Remaining = new LinkedList<string>(paths);
 
-        public Queue<string> Remaining { get; }
+        public LinkedList<string> Remaining { get; }
         public List<QueueRow> Added { get; } = new();
         public List<Rejection> Rejected { get; } = new();
         public bool Reported { get; set; }
@@ -40,13 +41,19 @@ public sealed partial class PlaybackEngine
     /// (ADR 0007, ADR 0010) by default. Always called off the engine lock.</summary>
     internal Func<string, (Track? Track, Rejection? Rejection)> ResolvePath { get; set; } = ResolveFromDisk;
 
+    /// <summary>Test seam: how a folder becomes the files it adds, in order.
+    /// <see cref="FolderContents.List"/> by default. Always called off the engine lock.</summary>
+    internal Func<string, IReadOnlyList<string>> ListFolder { get; set; } = FolderContents.List;
+
     /// <summary>Test seam: how the add worker is started. A background thread by default; a test
     /// may run it inline, which makes <see cref="Add"/> synchronous but changes nothing else.</summary>
     internal Action<Action> StartAddWorker { get; set; } = work =>
         new Thread(() => work()) { IsBackground = true, Name = "faderio add" }.Start();
 
     /// <summary>
-    /// Queues files at the end of the queue, in the given order, and returns at once. Each file
+    /// Queues files at the end of the queue, in the given order, and returns at once. A folder
+    /// stands for every promised file under it (<see cref="FolderContents"/>), listed when the add
+    /// reaches it and counted as one path until then; the shell never lists a directory. Each file
     /// is probed and its tags read off the engine lock and off the caller's thread; the lock is
     /// taken only to append its row. <see cref="PlayerView.Adding"/> counts the files resolved.
     /// A second add waits behind the first and shares its progress. When the run ends, one notice
@@ -118,6 +125,11 @@ public sealed partial class PlaybackEngine
                 {
                     return;
                 }
+                if (Directory.Exists(step.Path))
+                {
+                    Complete(Run(ListedOrRejected(step)));
+                    continue;
+                }
                 (Track? Track, Rejection? Rejection) resolved;
                 try
                 {
@@ -154,7 +166,9 @@ public sealed partial class PlaybackEngine
             {
                 if (job.Remaining.Count > 0)
                 {
-                    return new AddStep(job, job.Remaining.Dequeue(), _addRunId);
+                    var path = job.Remaining.First!.Value;
+                    job.Remaining.RemoveFirst();
+                    return new AddStep(job, path, _addRunId);
                 }
             }
         }
@@ -182,7 +196,46 @@ public sealed partial class PlaybackEngine
             job.Rejected.Add(resolved.Rejection!);
         }
         _addResolved++;
-        if (job.Remaining.Count == 0)
+        return FinishStep(job, done);
+    }
+
+    /// <summary>Lists <paramref name="step"/>'s folder off the lock and returns the locked step
+    /// that puts its files where the folder stood. A folder that cannot be listed is a rejection
+    /// like a file that cannot be read.</summary>
+    private Func<List<AddCompletion>> ListedOrRejected(AddStep step)
+    {
+        try
+        {
+            var files = ListFolder(step.Path);
+            return () => ApplyListed(step, files);
+        }
+        catch (Exception e)
+        {
+            var rejected = new Rejection(step.Path, null, RejectedProperty.File, e.Message);
+            return () => ApplyResolved(step, (null, rejected));
+        }
+    }
+
+    private List<AddCompletion> ApplyListed(AddStep step, IReadOnlyList<string> files)
+    {
+        if (_disposed || step.RunId != _addRunId)
+        {
+            return new List<AddCompletion>(); // the run was cancelled while this folder was listed
+        }
+        ObserveClock();
+        for (var i = files.Count - 1; i >= 0; i--)
+        {
+            step.Job.Remaining.AddFirst(files[i]);
+        }
+        _addTotal += files.Count - 1; // the folder counted as one path until now
+        return FinishStep(step.Job, new List<AddCompletion>());
+    }
+
+    /// <summary>After a path is dealt with: answers its job if that was the job's last path, and
+    /// ends the run if nothing is left anywhere. Publishes either way.</summary>
+    private List<AddCompletion> FinishStep(AddJob job, List<AddCompletion> done)
+    {
+        if (job.Remaining.Count == 0 && !job.Reported)
         {
             done.Add(Report(job, cancelled: false));
         }

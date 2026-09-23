@@ -5,9 +5,9 @@ using Faderio.Core.Transitions;
 namespace Faderio.App;
 
 /// <summary>
-/// The WinForms shell for the slice (ticket 05): add files, a plain list, a context menu for
-/// "Edit transition (this → next)", transport, a seek bar in milliseconds, and the transition
-/// editor. It renders <see cref="PlayerView"/>s and issues commands; it holds no engine state
+/// The WinForms shell for the slice (ticket 05): add files or a folder, or drop either on the
+/// list (build issue 02), a plain list, a context menu for "Edit transition (this → next)",
+/// transport, a seek bar in milliseconds, and the transition editor. It renders <see cref="PlayerView"/>s and issues commands; it holds no engine state
 /// between calls (the placement rule in CLAUDE.md). The seek bar's Maximum is the track length
 /// in milliseconds, so no scaling exists to get wrong (ticket 06).
 /// </summary>
@@ -19,6 +19,7 @@ internal sealed class MainForm : Form
     internal readonly TrackBar _seek;
     internal readonly Label _time;
     internal readonly Button _addFiles;
+    internal readonly Button _addFolder;
     internal readonly Button _prev;
     internal readonly Button _playPause;
     internal readonly Button _stop;
@@ -36,6 +37,8 @@ internal sealed class MainForm : Form
     public MainForm(PlaybackEngine engine, ITransitionStore store, PostingSink sink)
     {
         _engine = engine;
+        ChooseFiles = ShowFilesDialog;
+        ChooseFolders = ShowFolderDialog;
 
         Text = "faderio";
         MinimumSize = new Size(760, 480);
@@ -47,7 +50,8 @@ internal sealed class MainForm : Form
         _cancelAdd = new ToolStripButton("Cancel") { Available = false, DisplayStyle = ToolStripItemDisplayStyle.Text };
         var statusStrip = new StatusStrip { Items = { _status, _addProgress, _cancelAdd } };
 
-        _addFiles = new Button { Text = "Add files…", Width = 90, Height = 28, Margin = new Padding(4, 8, 8, 4) };
+        _addFiles = new Button { Text = "Add files…", Width = 90, Height = 28, Margin = new Padding(4, 8, 4, 4) };
+        _addFolder = new Button { Text = "Add folder…", Width = 90, Height = 28, Margin = new Padding(0, 8, 8, 4) };
         var symbols = new Font("Segoe UI Symbol", 9f);
         _prev = new Button { Text = "⏮", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
@@ -71,20 +75,21 @@ internal sealed class MainForm : Form
         };
         // A table, not anchors: the seek bar takes whatever width is left between the buttons
         // and the readout, at any window size.
-        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 7, RowCount = 1 };
-        foreach (var _ in Enumerable.Range(0, 5))
+        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 8, RowCount = 1 };
+        foreach (var _ in Enumerable.Range(0, 6))
         {
             transport.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         }
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
         transport.Controls.Add(_addFiles, 0, 0);
-        transport.Controls.Add(_prev, 1, 0);
-        transport.Controls.Add(_playPause, 2, 0);
-        transport.Controls.Add(_stop, 3, 0);
-        transport.Controls.Add(_next, 4, 0);
-        transport.Controls.Add(_seek, 5, 0);
-        transport.Controls.Add(_time, 6, 0);
+        transport.Controls.Add(_addFolder, 1, 0);
+        transport.Controls.Add(_prev, 2, 0);
+        transport.Controls.Add(_playPause, 3, 0);
+        transport.Controls.Add(_stop, 4, 0);
+        transport.Controls.Add(_next, 5, 0);
+        transport.Controls.Add(_seek, 6, 0);
+        transport.Controls.Add(_time, 7, 0);
 
         _queueList = new ListView
         {
@@ -93,6 +98,7 @@ internal sealed class MainForm : Form
             FullRowSelect = true,
             MultiSelect = false,
             HideSelection = false,
+            AllowDrop = true,
         };
         _queueList.Columns.Add("#", 36);
         _queueList.Columns.Add("Title", 320);
@@ -105,6 +111,15 @@ internal sealed class MainForm : Form
         _editTransition.Click += (_, _) => EditSelectedTransition();
         _queueList.ContextMenuStrip = menu;
         _queueList.DoubleClick += (_, _) => PlaySelected();
+        _queueList.DragEnter += (_, e) =>
+            e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true ? DragDropEffects.Copy : DragDropEffects.None;
+        _queueList.DragDrop += (_, e) =>
+        {
+            if (e.Data?.GetData(DataFormats.FileDrop) is string[] paths)
+            {
+                _ = AddPaths(paths); // files and folders alike, in the order dropped
+            }
+        };
 
         _editor = new TransitionEditorPanel(engine, store, ShowNotice, ChooseRenderPath);
 
@@ -114,7 +129,8 @@ internal sealed class MainForm : Form
         Controls.Add(statusStrip);
         Controls.Add(transport);
 
-        _addFiles.Click += (_, _) => AddFiles();
+        _addFiles.Click += (_, _) => AddChosen(ChooseFiles);
+        _addFolder.Click += (_, _) => AddChosen(ChooseFolders);
         _cancelAdd.Click += (_, _) => _engine.CancelAdd();
         _playPause.Click += (_, _) => _engine.TogglePlayPause();
         _prev.Click += (_, _) => _engine.Previous();
@@ -219,7 +235,25 @@ internal sealed class MainForm : Form
 
     // ── Commands: one intent, one engine call ───────────────────────────────────────────
 
-    private void AddFiles()
+    /// <summary>The paths picked in the Add files dialog, or none. A test replaces it, since a
+    /// headless form cannot show a dialog.</summary>
+    internal Func<IReadOnlyList<string>> ChooseFiles { get; set; }
+
+    /// <summary>The folder picked in the Add folder dialog, or none (one at a time: the dialog
+    /// picks several only from .NET 9; dropping takes any number). The engine lists them; the
+    /// shell only passes them on.</summary>
+    internal Func<IReadOnlyList<string>> ChooseFolders { get; set; }
+
+    private void AddChosen(Func<IReadOnlyList<string>> choose)
+    {
+        var paths = choose();
+        if (paths.Count > 0)
+        {
+            _ = AddPaths(paths);
+        }
+    }
+
+    private IReadOnlyList<string> ShowFilesDialog()
     {
         using var dialog = new OpenFileDialog
         {
@@ -227,10 +261,17 @@ internal sealed class MainForm : Form
             Filter = "Promised audio (WAV, FLAC, MP3)|*.wav;*.flac;*.mp3|All files|*.*",
             Multiselect = true,
         };
-        if (dialog.ShowDialog(this) == DialogResult.OK)
+        return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileNames : Array.Empty<string>();
+    }
+
+    private IReadOnlyList<string> ShowFolderDialog()
+    {
+        using var dialog = new FolderBrowserDialog
         {
-            _ = AddPaths(dialog.FileNames);
-        }
+            Description = "Add every WAV, FLAC and MP3 in a folder and its subfolders",
+            UseDescriptionForTitle = true,
+        };
+        return dialog.ShowDialog(this) == DialogResult.OK ? new[] { dialog.SelectedPath } : Array.Empty<string>();
     }
 
     /// <summary>Returns at once; rows, progress and the closing notice arrive through the sink.

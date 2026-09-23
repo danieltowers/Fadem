@@ -53,6 +53,13 @@ public static class SupportedAudio
     private static readonly int[] PcmRates = { 44100, 48000, 96000 };
     private static readonly int[] PcmDepths = { 16, 24 };
     private static readonly int[] Mp3Rates = { 44100, 48000 };
+    private static readonly string[] Extensions = { ".wav", ".flac", ".mp3" };
+
+    /// <summary>Whether a file's extension names a promised format, in any case. Adding a folder
+    /// takes only these and ignores the rest silently; a file named on its own is probed whatever
+    /// its extension, so it is rejected with a reason instead.</summary>
+    public static bool IsPromisedExtension(string path) =>
+        Extensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
 
     public static RejectedProperty? Check(AudioShape shape)
     {

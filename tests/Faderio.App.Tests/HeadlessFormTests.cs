@@ -88,6 +88,91 @@ public sealed class HeadlessFormTests
         Assert.Equal("Ready.", h.Form._status.Text); // a clean add raises no notice: the rows are the news
     });
 
+    /// <summary>Delivers a drag to the list the way Explorer does: DragEnter, then, if the list
+    /// accepted it, DragDrop. Returns the effect the list offered.</summary>
+    private static DragDropEffects Drop(ListView list, IDataObject data)
+    {
+        var args = new DragEventArgs(data, 0, 0, 0, DragDropEffects.Copy | DragDropEffects.Move, DragDropEffects.None);
+        typeof(Control).GetMethod("OnDragEnter", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
+        if (args.Effect != DragDropEffects.None)
+        {
+            typeof(Control).GetMethod("OnDragDrop", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
+        }
+        return args.Effect;
+    }
+
+    [Fact]
+    public void AddFolder_PassesThePickedFolderToAdd_AndListsItsTracks() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var album = Path.Combine(h.TempDir, "Album");
+        Directory.CreateDirectory(album);
+        File.Copy(TestAudio.WriteDcWav("ten.wav", 1, 0.2), Path.Combine(album, "10 - Ten.wav"));
+        File.Copy(TestAudio.WriteDcWav("two.wav", 1, 0.2), Path.Combine(album, "2 - Two.wav"));
+        File.WriteAllText(Path.Combine(album, "cover.jpg"), "not audio");
+        h.Form.ChooseFolders = () => new[] { album };
+
+        Click(h.Form._addFolder);
+
+        Assert.Equal(new[] { "2 - Two", "10 - Ten" },
+            h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.SubItems[1].Text));
+        Assert.Equal("Ready.", h.Form._status.Text); // the picture is ignored without a word
+    });
+
+    [Fact]
+    public void AddFolder_Cancelled_AddsNothing() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Form.ChooseFolders = Array.Empty<string>;
+
+        Click(h.Form._addFolder);
+
+        Assert.Empty(h.Form._queueList.Items);
+        Assert.Null(h.Engine.View.Adding);
+    });
+
+    [Fact]
+    public void AddFiles_PassesThePickedFilesToAdd() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 1, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 1, 0.2);
+        h.Form.ChooseFiles = () => new[] { b, a };
+
+        Click(h.Form._addFiles);
+
+        Assert.Equal(new[] { b, a }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
+    });
+
+    [Fact]
+    public void DroppingFilesAndFolders_OnTheList_AddsThemInTheOrderDropped() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var loose = TestAudio.WriteDcWav("loose.wav", 1, 0.4);
+        var album = Path.Combine(h.TempDir, "Album");
+        Directory.CreateDirectory(album);
+        File.Copy(TestAudio.WriteDcWav("one.wav", 1, 0.2), Path.Combine(album, "1 - One.wav"));
+        var files = new DataObject(DataFormats.FileDrop, new[] { album, loose, loose });
+
+        var effect = Drop(h.Form._queueList, files);
+
+        Assert.Equal(DragDropEffects.Copy, effect);
+        Assert.Equal(new[] { Path.Combine(album, "1 - One.wav"), loose, loose },
+            h.Engine.View.Queue.Select(r => r.Track.FilePath));
+        Assert.Equal(3, h.Form._queueList.Items.Count);
+    });
+
+    [Fact]
+    public void DraggingSomethingOtherThanFiles_IsRefused() => RunSta(() =>
+    {
+        using var h = new Harness();
+
+        var effect = Drop(h.Form._queueList, new DataObject(DataFormats.UnicodeText, "not a path"));
+
+        Assert.Equal(DragDropEffects.None, effect);
+        Assert.Empty(h.Engine.View.Queue);
+    });
+
     [Fact]
     public void WhileAdding_TheStripShowsProgress_AndCancelStopsTheAdd() => RunSta(() =>
     {
