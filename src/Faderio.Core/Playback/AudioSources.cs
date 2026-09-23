@@ -33,16 +33,18 @@ internal static class TrackSources
         {
             ".wav" => WaveStreamTrackSource.Create(new WaveFileReader(path)),
             ".mp3" => WaveStreamTrackSource.Create(new Mp3FileReader(path)),
-            ".aif" or ".aiff" => WaveStreamTrackSource.Create(new AiffFileReader(path)),
-            // FLAC decodes through Media Foundation until ticket 15 swaps the decoder (ADR 0009);
-            // the catch-all goes with it. The probe rejects everything else before it gets here.
-            ".flac" => WaveStreamTrackSource.Create(new MediaFoundationReader(path)),
-            _ => WaveStreamTrackSource.Create(new MediaFoundationReader(path)),
+            // The managed decoder (FlacTrackReader) lands seeks on the exact sample. Media
+            // Foundation landed on the next block boundary, +67 ms on the ramp fixture, and is
+            // out of the chain (ADR 0009).
+            ".flac" => WaveStreamTrackSource.Create(FlacTrackReader.Open(path)),
+            // The add-time probe rejects everything else before it gets here (ADR 0007).
+            _ => throw new NotSupportedException(
+                $"Unsupported audio format '{extension}': not in docs/supported-audio.md."),
         };
     }
 }
 
-/// <summary>ITrackSource over any NAudio WaveStream (wav, mp3, aiff, Media Foundation formats).
+/// <summary>ITrackSource over any NAudio WaveStream (wav, mp3, flac).
 /// Converts to IEEE float with correct *frame* semantics (count = frames, both channels filled) —
 /// NAudio's built-in sample converters interpret count as per-stream samples, which breaks for
 /// multi-channel sources.</summary>
@@ -50,7 +52,6 @@ internal sealed class WaveStreamTrackSource : ITrackSource
 {
     private readonly WaveStream _stream;
     private byte[] _sourceBytes = new byte[0];
-    private bool _hasRead;
     private bool _disposed;
 
     private WaveStreamTrackSource(WaveStream stream) => _stream = stream;
@@ -66,15 +67,6 @@ internal sealed class WaveStreamTrackSource : ITrackSource
         get => _stream.Position / _stream.BlockAlign;
         set
         {
-            // The Media Foundation reader silently drops a seek issued before its first read,
-            // so an authored fade-in point on FLAC was discarded entirely (ticket 02). One
-            // warm-up read makes the seek stick; the residual ~31 ms is ticket 09's business.
-            if (!_hasRead && _stream is MediaFoundationReader)
-            {
-                var warmUp = new byte[_stream.BlockAlign * 4096]; // one full decode block
-                _stream.Read(warmUp, 0, warmUp.Length);
-                _hasRead = true;
-            }
             var clamped = Math.Clamp(value, 0, Math.Max(TotalFrames - 1, 0));
             _stream.Position = clamped * _stream.BlockAlign;
         }
@@ -89,7 +81,6 @@ internal sealed class WaveStreamTrackSource : ITrackSource
             _sourceBytes = new byte[bytesRequired];
         }
         var bytesRead = _stream.Read(_sourceBytes, 0, bytesRequired);
-        _hasRead = true;
         var frames = bytesRead / format.BlockAlign;
         ConvertToFloat(Encoding(format), format.BitsPerSample, _sourceBytes, frames * format.Channels, buffer, offset);
         return frames;

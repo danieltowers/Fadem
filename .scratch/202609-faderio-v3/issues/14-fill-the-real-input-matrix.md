@@ -114,3 +114,16 @@ The harness moved under you; the matrix skeleton is green on it:
   its probe length is asserted to within two frames — tighten to exact equality against
   `Mp3FileReader.Length` as the first MP3 cell.
 - Ogg is gone (reader, cells, fixture, package). `generate.sh` documents the MP3 line.
+
+## Noted from ticket 15
+
+The FLAC decoder is now `FlacTrackReader` over `BunLabs.NAudio.Flac` 2.0.1 and the 44.1 kHz /
+16-bit / stereo landing is proven at 1 ms in `Flac_SeekBeforeFirstRead_LandsWithin1ms`, with a
+second landing inside the last block (`Flac_SeekIntoLastBlock_LandsWithin1ms`). Completeness and
+purity are theories over `FlacToneFixtures()` (`tone-1k.flac`, `tone-1k-24bit.flac`,
+`tone-1k-96k.flac`); add the rest of the grid there. The landing cells need a ramp fixture per
+rate; only `ramp.flac` (44.1 kHz) exists. Two package facts worth knowing when a cell goes red:
+the package's `Position` counter skips any read that reaches end of stream (repaired in the
+subclass by counting frames), and its `FlacMetadataStreamInfo.MinBlockSize`/`MaxBlockSize` are
+read little-endian and so are wrong (4608 reads as 18); the decoder does not use them, and the
+add-time probe reads STREAMINFO itself.

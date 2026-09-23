@@ -181,42 +181,61 @@ public class RealInputMatrixTests
             $"off by {(landed - target) / EngineRate * 1000:F0} ms; {LastLandingReport}");
     }
 
-    /// <summary>Pinned characterisation values (ticket 06): the measured residual plus margin,
-    /// named for the ticket that will tighten them. FLAC measured +67 ms late on this fixture
-    /// (ticket 07); ticket 02 saw 31 ms on its own.</summary>
-    private const double FlacPinSeconds = 0.100;
+    /// <summary>The authoring promise (ticket 09, ADR 0009): 1 ms at every promised cell.</summary>
+    private const double LandingToleranceSeconds = 0.001;
 
     // ── Compressed cells, from checked-in fixtures (see Fixtures/generate.sh) ────────────
 
-    [Fact]
-    public void Flac_ReadsToCompletion()
+    /// <summary>The checked-in FLAC tone fixtures: the slice's cell plus one depth and one rate
+    /// step, a first check that the managed decoder (ticket 15) handles the promised depths and
+    /// rates. Ticket 14 fills the twelve-cell grid.</summary>
+    public static IEnumerable<object[]> FlacToneFixtures() =>
+        new[] { "tone-1k.flac", "tone-1k-24bit.flac", "tone-1k-96k.flac" }
+            .Select(name => new object[] { name });
+
+    [Theory, MemberData(nameof(FlacToneFixtures))]
+    public void Flac_ReadsToCompletion(string fixture)
     {
-        using var source = OpenNormalised(FixturePath("tone-1k.flac"));
+        using var source = OpenNormalised(FixturePath(fixture));
         var (frames, _) = Drain(source);
         Assert.InRange(frames, ExpectedFrames - 100, ExpectedFrames + 100);
+        Assert.Equal(source.TotalFrames, source.Position);
     }
 
-    [Fact]
-    public void Flac_ToneIsPure()
+    [Theory, MemberData(nameof(FlacToneFixtures))]
+    public void Flac_ToneIsPure(string fixture)
     {
-        using var source = OpenNormalised(FixturePath("tone-1k.flac"));
+        using var source = OpenNormalised(FixturePath(fixture));
         var (_, left) = Drain(source);
         var purity = TestAudio.Purity(left, start: 4410, frames: 4410, Tone, EngineRate);
         Assert.True(purity >= 0.999, $"purity {purity:F5} < 0.999");
     }
 
     [Fact]
-    public void Flac_SeekBeforeFirstRead_LandsWithin100ms_PendingTicket09()
+    public void Flac_SeekBeforeFirstRead_LandsWithin1ms()
     {
-        // Ticket 02: the Media Foundation FLAC reader silently drops a seek issued before any
-        // read, so an authored fade-in point was discarded entirely (-2267 ms). A warm-up read
-        // makes the seek stick. This is a PINNED characterisation test: green and documented,
-        // catching a regression to the catastrophic case. Ticket 09 sets the real number.
-        // Measured while pinning (ticket 07): +67 ms late on this fixture, independent of
-        // warm-up size. The catastrophic case would land at 0, 1.5 s off.
+        // Ticket 02: the Media Foundation FLAC reader silently dropped a seek issued before any
+        // read (an authored fade-in point discarded entirely, -2267 ms), and with a warm-up read
+        // still landed on the next decoder block boundary, +67 ms on this fixture (ticket 07).
+        // Ticket 09 set the promise at 1 ms and ticket 15 swapped the decoder for one that
+        // lands on the frame before the target and discards to the exact sample. Seek before
+        // any read is the production order: a voice seeks to its fade-in point, then plays.
         var target = ExpectedFrames * 3 / 4;
-        var landed = Landing(FixturePath("ramp.flac"), target, readFirst: false); // production order
-        AssertLanded(landed, target, FlacPinSeconds);
+        var landed = Landing(FixturePath("ramp.flac"), target, readFirst: false);
+        AssertLanded(landed, target, LandingToleranceSeconds);
+    }
+
+    [Fact]
+    public void Flac_SeekIntoLastBlock_LandsWithin1ms()
+    {
+        // BunLabs.NAudio.Flac 2.0.1 seeks by finding the first frame that starts at or after
+        // the target, so a target inside the last frame matched nothing and the seek was
+        // silently a no-op: the voice would have played from wherever it was. FlacTrackReader
+        // seeks into the last frame by hand. The fixture's last block is 648 frames (88200 mod
+        // 4608); 100 frames from the end is inside it.
+        var target = ExpectedFrames - 100;
+        var landed = Landing(FixturePath("ramp.flac"), target, readFirst: false);
+        AssertLanded(landed, target, LandingToleranceSeconds);
     }
 
 }

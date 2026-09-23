@@ -33,7 +33,7 @@ cannot reach it leaves this table; the tolerance never widens to meet a cell.
 | Format | Sample rates | Bit depths | Channels | Proven by | Status |
 |---|---|---|---|---|---|
 | WAV (PCM) | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | `Wav_ReadsToCompletion`, `Wav_ToneIsPure`, `Wav_SeekHalfway_ReadsHalfTheFrames` over `WavCells()` | proven (12 cells) |
-| FLAC | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | `Flac_*` theories over `FlacCells()`, same three assertions | 44.1 kHz / 16-bit / stereo: completeness and purity proven, seek landing **pinned at 100 ms until [ticket 15](../.scratch/202609-faderio-v3/issues/15-make-flac-seek-exact.md) swaps the decoder**; the other 11 cells land in [ticket 14](../.scratch/202609-faderio-v3/issues/14-fill-the-real-input-matrix.md) |
+| FLAC | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | `Flac_ReadsToCompletion` and `Flac_ToneIsPure` over `FlacToneFixtures()`, `Flac_SeekBeforeFirstRead_LandsWithin1ms`, `Flac_SeekIntoLastBlock_LandsWithin1ms` | 44.1 kHz / 16-bit / stereo: all four assertions proven, seek landing at **1 ms** ([ticket 15](../.scratch/202609-faderio-v3/issues/15-make-flac-seek-exact.md)); 44.1 kHz / 24-bit and 96 kHz / 16-bit stereo: completeness and purity proven; the remaining cells and their landings land in [ticket 14](../.scratch/202609-faderio-v3/issues/14-fill-the-real-input-matrix.md) |
 | MP3, constant bitrate with a Xing/Info header | 44.1, 48 kHz | n/a (decodes to PCM) | mono, stereo | `Mp3_*` theories over `Mp3Cells()`, variant `CbrInfo` | pending ticket 14 |
 | MP3, constant bitrate with no Xing/Info/VBRI header | 44.1, 48 kHz | n/a | mono, stereo | same theories, variant `CbrBare` | pending ticket 14 |
 | MP3, variable bitrate | 44.1, 48 kHz | n/a | mono, stereo | same theories, variant `Vbr` | pending ticket 14; if seek landing misses the tolerance the cell is pinned and ticket 09 owns the fix |
@@ -51,15 +51,18 @@ the seek-landing assertion runs per rate with one tolerance, and the engine comp
 resampler's known latency if it has to.
 
 **Decoders.** WAV through NAudio's `WaveFileReader`, MP3 through `Mp3FileReader`, FLAC through
-`BunLabs.NAudio.Flac` (from ticket 15; Media Foundation until then). Windows Media Foundation is
-not in the production chain: its FLAC decoder is undocumented and lands seeks on the next block
+`BunLabs.NAudio.Flac` 2.0.1 behind `FlacTrackReader`, which repairs two defects in the package
+(a position counter that stops short at end of stream, and a seek into the last block that did
+nothing) and leaves the decode and the exact seek to the package. Windows Media Foundation is
+not in the production chain: its FLAC decoder is undocumented and landed seeks on the next block
 boundary. Every decoder that remains is open source, so a red cell can be read to its cause.
 
 **Length.** Length is a property of a file, not a format, so it is not a column. The matrix
 fixtures are two seconds long; long-file playback is not proven by the suite. The library's
 longest file is about 26 minutes, and frame counts are 64-bit, so there is no arithmetic
 limit. The **Looks** half of [`docs/smoke.md`](smoke.md) checks that a 26-minute FLAC shows
-its length and seeks into its last minute.
+its length and seeks into its last minute. Opening that file pre-scans every FLAC frame header;
+ticket 15 measured it at about 250 ms, within the 500 ms budget.
 
 ## Rejected
 

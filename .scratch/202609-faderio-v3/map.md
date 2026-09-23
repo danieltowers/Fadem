@@ -158,6 +158,15 @@ asking whether the current work could fail that way again.
   two layout defects found and fixed only by the screenshot. **The Sounds half is the user's**
   and is the map's destination: it has not been run.
 
+- [Make FLAC seek exact](issues/15-make-flac-seek-exact.md):
+  Built. FLAC decodes through `BunLabs.NAudio.Flac` behind `FlacTrackReader`; the pinned 100 ms
+  cell is a **1 ms** landing, red at +67 ms on Media Foundation first, and Media Foundation is
+  out of the chain. The matrix caught two package defects (position stops short at end of
+  stream; a seek into the last block did nothing), both repaired in the subclass with a second
+  landing cell. 24-bit and 96 kHz FLAC decode clean. Opening the library's longest FLAC (26 min)
+  pre-scans in about 250 ms, within the 500 ms budget: no background pre-scan needed.
+  **Core 170, App 26 tests pass.**
+
 ## Not yet specified
 
 - **Restaging the rest of Phase 1.** Once the slice is trustworthy, how the remaining
@@ -166,7 +175,8 @@ asking whether the current work could fail that way again.
   whether those are reusable as written is unknown until the slice lands. Two costs land here
   from tickets 09 and 10: **adding a folder** probes every file's header (fast) but any format
   the matrix forces onto a frame scan reads the whole file at add time, and **opening a FLAC**
-  pre-scans it. Whether folder adds need a background probe is unexamined. The M3U writer
+  pre-scans it (about 250 ms on the longest library file, ticket 15). Whether folder adds need
+  a background probe is unexamined. The M3U writer
   returns formatting the engine's `Length`, since tag duration no longer exists.
 - **The fate of the preview feature.** v2 built it with its own mixer and its own output
   device. Whether that is the right design, or whether preview should just be the offline
