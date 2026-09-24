@@ -63,3 +63,22 @@ NAudio's open wrapper over Windows' closed ACM codec, as it did when this was wr
 faderio takes one number from that codec, its decoder delay (529), and
 `Mp3DecoderOffsetTests` pins it; see the addendum to
 [ADR 0010](0010-one-length-issued-from-the-header.md).
+
+## Addendum: a cut frame is kept from the decoder, not fixed in it (2026-09-24)
+
+The package decodes with unsafe code, and a truncated FLAC killed the process: a Rice code's
+unary run over the zeros past the cut ran off the end of the frame buffer, an access violation
+.NET cannot catch. Found in [build issue 10](../../.scratch/202609-faderio-phase-1-build/issues/10-unreadable-tracks-are-passed-over.md),
+built in [build issue 21](../../.scratch/202609-faderio-phase-1-build/issues/21-a-truncated-flac-crashes-the-app.md).
+
+The decision stands, and the package is not vendored for this. `FlacTrackReader` finds the last
+whole frame by the CRC-16 every FLAC frame ends with, and hands the package a stream that ends
+there, so no cut frame reaches the decoder. That covers a cut anywhere, including inside the final
+frame, and a tail of zeros where a copy never reached, which a comparison of the pre-scan with
+STREAMINFO's sample count would not. The track ends where its whole audio ends, which is
+[ADR 0010](0010-one-length-issued-from-the-header.md)'s one notice.
+
+Still open: the unsafe decode trusts the frame's contents. A frame damaged in place rather than
+cut, with a run of zeros longer than the rest of the decoder's 128 KB frame buffer, could still
+read past it. The noise-damaged file of
+issue 10 throws a managed exception instead, and no such file has been seen.

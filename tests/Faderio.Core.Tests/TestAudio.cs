@@ -1,3 +1,4 @@
+using Faderio.Core.Playback;
 using NAudio.Wave;
 
 namespace Faderio.Core.Tests;
@@ -207,6 +208,20 @@ public static class TestAudio
         var binPower = s1 * s1 + s2 * s2 - coeff * s1 * s2; // |X[k]|²
         // Parseval, for a real signal concentrated in one bin: 2·|X[k]|² = N·Σx².
         return total <= 0 ? 0.0 : 2.0 * binPower / (frames * total);
+    }
+
+    /// <summary>Reads <paramref name="source"/> to its end in the fake output's block size and
+    /// returns the frames it delivered.</summary>
+    internal static long ReadToEnd(ITrackSource source)
+    {
+        var buffer = new float[4410 * source.WaveFormat.Channels];
+        long read = 0;
+        int n;
+        while ((n = source.Read(buffer, 0, 4410)) > 0)
+        {
+            read += n;
+        }
+        return read;
     }
 }
 

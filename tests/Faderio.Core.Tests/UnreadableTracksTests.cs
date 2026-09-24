@@ -352,8 +352,8 @@ public sealed class UnreadableTracksTests
     /// <summary>A copy of a checked-in FLAC with 4 KB of its middle overwritten by seeded noise:
     /// the production decoder opens it and then throws partway, a real decode error.
     /// <paramref name="failsAt"/> is how many frames it delivers first, read in the fake output's
-    /// block size, measured by decoding it here. (A FLAC cut short instead crashes the decoder
-    /// package's process; build issue 21.)</summary>
+    /// block size, measured by decoding it here. (A FLAC cut short is not a decode error: it
+    /// ends after its last whole frame; build issue 21.)</summary>
     internal static string CorruptFlac(out long failsAt)
     {
         var fixture = Path.Combine(AppContext.BaseDirectory, "Fixtures", "noise-44100-16-2.flac");
