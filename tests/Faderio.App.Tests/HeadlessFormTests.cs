@@ -1674,4 +1674,73 @@ public sealed class HeadlessFormTests
         Assert.Equal((b, c), Opened(h));
         Assert.Null(h.Engine.View.Preview);
     });
+
+    // ── Build issue 17: the clip light ──────────────────────────────────────────────────
+
+    /// <summary>A 3 s track at 0.8 tagged +6 dB: with ReplayGain on, it plays at 1.6 throughout.</summary>
+    private static Track Boosted(string path) => new()
+    {
+        FilePath = path,
+        Length = Length.FromFrames(3 * 44100, 44100),
+        ReplayGainDb = 6.0,
+    };
+
+    [Fact]
+    public void TheClipLight_IsDarkByDefault() => RunSta(() =>
+    {
+        using var h = new Harness();
+
+        Assert.Equal("● No clips", h.Form._clip.Text);
+        Assert.Equal(SystemColors.GrayText, h.Form._clip.ForeColor);
+        Assert.Equal("Lights when the output goes beyond full scale.", h.Form._clip.ToolTipText);
+    });
+
+    [Fact]
+    public void AClipHeard_LightsIt_WithTheCountAndTheLatestCause_AndAClickClearsIt() => RunSta(() =>
+    {
+        using var h = new Harness(latency: 4410);
+        var c = TestAudio.WriteDcWav("c.wav", 3, 0.8);
+        h.Engine.AddTracks(new List<Track> { Boosted(c) });
+        h.Engine.Play();
+        h.Output.Advance(4410); // rendered, not yet heard
+        Assert.Equal("● No clips", h.Form._clip.Text);
+
+        h.Output.Advance(4410);
+        h.Form.Render(); // the timer's tick: the view lit when the listener heard it
+
+        var name = Path.GetFileNameWithoutExtension(c);
+        Assert.Equal($"● 1 clip · latest: {name}", h.Form._clip.Text);
+        Assert.Equal(Color.White, h.Form._clip.ForeColor);
+        Assert.Equal(Color.Firebrick, h.Form._clip.BackColor);
+
+        h.Engine.Stop(); // Stop leaves it lit
+        Assert.Equal($"● 1 clip · latest: {name}", h.Form._clip.Text);
+
+        Click(h.Form._clip);
+
+        Assert.Null(h.Engine.View.Clip);
+        Assert.Equal("● No clips", h.Form._clip.Text);
+        Assert.Equal(SystemColors.GrayText, h.Form._clip.ForeColor);
+    });
+
+    [Fact]
+    public void ALitLightWithALongCause_NeverPushesTheNoticeCountOffTheStrip() => RunSta(() =>
+    {
+        using var h = new Harness();
+        _ = h.Form.Handle; // laid out at its default size, still never shown
+        var c = Path.Combine(h.TempDir, string.Concat(Enumerable.Repeat("A very long title ", 12)) + ".wav");
+        File.Copy(TestAudio.WriteDcWav("c.wav", 3, 0.8), c);
+        h.Engine.AddTracks(new List<Track> { Boosted(c) });
+        h.Engine.Play();
+        h.Output.Advance(4410);
+        h.Form.Render();
+        h.Sink.Notice("Saved a → b.");
+        h.Form._clip.Owner!.PerformLayout();
+
+        Assert.StartsWith("● 1 clip", h.Form._clip.Text);
+        Assert.Contains(Path.GetFileNameWithoutExtension(c), h.Form._clip.ToolTipText); // whole there
+        Assert.Equal(ToolStripItemPlacement.Main, h.Form._noticeCount.Placement);
+        Assert.Equal(ToolStripItemPlacement.Main, h.Form._clip.Placement);
+        Assert.True(h.Form._clip.Bounds.Right <= h.Form._clip.Owner.DisplayRectangle.Right);
+    });
 }

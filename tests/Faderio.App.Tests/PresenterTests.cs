@@ -189,4 +189,23 @@ public sealed class PresenterTests
     [InlineData(2, "2 notices")]
     public void FmtNoticeCount_CountsTheListsEntries(int count, string expected) =>
         Assert.Equal(expected, Presenter.FmtNoticeCount(count));
+
+    private static Track Named(string name) => new() { FilePath = Path.Combine("C:\\music", name + ".flac") };
+
+    [Fact]
+    public void FmtClip_IsDarkWithNoClip_ElseTheCountAndTheLatestCause()
+    {
+        Assert.Equal("● No clips", Presenter.FmtClip(null));
+        Assert.Equal("● 1 clip · latest: A → B",
+            Presenter.FmtClip(new ClipView(1, ClipCause.Of(new Adjacency(Named("A"), Named("B"))))));
+        Assert.Equal("● 2 clips · latest: C", Presenter.FmtClip(new ClipView(2, ClipCause.Of(Named("C")))));
+    }
+
+    [Fact]
+    public void ClipTip_SaysWhatTheLightMeans_AndLit_HoldsItsWholeText()
+    {
+        Assert.Equal("Lights when the output goes beyond full scale.", Presenter.ClipTip(null));
+        Assert.Equal("2 clips · latest: C. The output went beyond full scale. Click to clear.",
+            Presenter.ClipTip(new ClipView(2, ClipCause.Of(Named("C")))));
+    }
 }

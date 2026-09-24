@@ -18,13 +18,13 @@ internal sealed record SecondsField(Point? Point, string? Error)
 
 /// <summary>
 /// The shell's remaining logic, with no WinForms in it (ADR 0002, S4). Ticket 06's list, amended
-/// by build issues 01, 07, 09, 12, 14 and 15: format and parse seconds, name the fade curves, the
-/// add's progress, the store open/recovery path, the output modes' names, the repeat button's
-/// cycle, the notice strip's wording and the render's file name. Row → adjacency went to the
-/// engine in build issue 15. The add's outcome is an engine notice since build issue 01, so its
-/// summary moved to <see cref="AddReport"/>. Everything here formats engine values, parses text,
-/// or picks the next state of a display control (ADR 0003's addendum); nothing computes a
-/// position.
+/// by build issues 01, 07, 09, 12, 14, 15 and 17: format and parse seconds, name the fade curves,
+/// the add's progress, the store open/recovery path, the output modes' names, the repeat button's
+/// cycle, the notice strip's wording, the clip light's wording and the render's file name.
+/// Row → adjacency went to the engine in build issue 15. The add's outcome is an engine notice
+/// since build issue 01, so its summary moved to <see cref="AddReport"/>. Everything here formats
+/// engine values, parses text, or picks the next state of a display control (ADR 0003's
+/// addendum); nothing computes a position.
 /// </summary>
 internal static class Presenter
 {
@@ -96,6 +96,24 @@ internal static class Presenter
         0 => "",
         1 => "1 notice",
         _ => $"{entries} notices",
+    };
+
+    /// <summary>The clip light's text (build issue 17): dark with no clip, else the count and the
+    /// latest cause, "2 clips · latest: C".</summary>
+    public static string FmtClip(ClipView? clip) => $"● {ClipSummary(clip)}";
+
+    /// <summary>The light's tooltip: what it means, and, lit, the whole of its text, which the
+    /// strip may cut short, and that a click clears it.</summary>
+    public static string ClipTip(ClipView? clip) =>
+        clip is null
+            ? "Lights when the output goes beyond full scale."
+            : $"{ClipSummary(clip)}. The output went beyond full scale. Click to clear.";
+
+    private static string ClipSummary(ClipView? clip) => clip switch
+    {
+        null => "No clips",
+        { Count: 1 } => $"1 clip · latest: {clip.Latest.Name}",
+        _ => $"{clip.Count} clips · latest: {clip.Latest.Name}",
     };
 
     /// <summary>A queue row's number, marked ⚠ while its file is unreadable (build issue 10).</summary>

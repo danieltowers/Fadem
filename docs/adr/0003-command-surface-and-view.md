@@ -197,3 +197,19 @@ fade-in point its incoming voice. When that voice is not heard, the capture retu
 the engine says why in a notice, so the editor leaves the field as it was. That is the one
 no-op here without a view flag, by the issue's own wording ("does nothing and says why"): the
 capture buttons stay live through a preview, so a capture a moment early is told, not hidden.
+
+## Addendum: the clip light is one command and one field (2026-09-24)
+
+`PlayerView.Clip` is null unless a clip has been heard since the light was last cleared
+([issue 17](../../.scratch/202609-faderio-phase-1-build/issues/17-the-clip-light.md)). It
+carries the count and the latest cause, a `ClipCause`: the adjacency whose transition was in
+flight when two voices overlapped at the clipped sample, or else the attended track, the one
+voice heard, queue or preview alike. A voice counts as heard from its start until its fade-out
+completes. A clip is detected at the mixer's output and latched when the device emits its
+sample: the view reads the latch at the device's count, like a playhead, so it lights at the
+frame the listener hears. Clipped samples sounded by the same voices within a second of the last
+are part of the same clip, so a transition or a boosted track that clips throughout counts once,
+and a track that clips again after a quiet stretch counts again. `ClearClip()` is the only way
+to clear it. Stop and Clear latch what the device played, drop what it never did, and publish
+once their state is whole. The shell holds no latch: the presenter gains `FmtClip`, the light's
+text, and `ClipTip`, its tooltip.

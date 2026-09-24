@@ -102,11 +102,14 @@ public sealed partial class PlaybackEngine : IDisposable
         _rate = output.SampleRate;
         _mixer = new TransitionMixer(_rate);
         _previewMixer = new TransitionMixer(_rate);
+        _clips = new ClipLatch(Frames(ClipGap));
         _queue = new PlaybackQueue(_rng);
         _snapshot = BuildSnapshot();
 
         _mixer.VoiceEnded += OnVoiceEnded;
         _previewMixer.VoiceEnded += OnPreviewVoiceEnded;
+        _mixer.Clipped += OnClipped;
+        _previewMixer.Clipped += OnPreviewClipped;
         _output.Stopped += OnOutputStopped;
         _output.Initialise(new EngineFrameSource(this));
 
@@ -213,8 +216,15 @@ public sealed partial class PlaybackEngine : IDisposable
     });
 
     /// <summary>The only way the device is stopped: never call <c>_output.Stop()</c> directly.
-    /// </summary>
-    private void StopOutput() => HaltOutput(_output.Stop);
+    /// Clips the device played are latched first, and those it still held are dropped. Neither
+    /// is published here, mid-command: every caller publishes once its state is whole.</summary>
+    private void StopOutput()
+    {
+        _clips.LatchHeard(_output.FramesEmitted.Count);
+        HaltOutput(_output.Stop);
+        _clips.DeviceStopped();
+        RefreshClips();
+    }
 
     /// <summary>Stops or disposes the device under the lock. The device may wait for its render
     /// thread (WASAPI joins it), and that thread may be waiting for this lock on its way into a
@@ -264,11 +274,12 @@ public sealed partial class PlaybackEngine : IDisposable
         }
     }
 
-    /// <summary>Completes a pending audible handover, or finishes playback, once the device has
-    /// emitted past it. Called at the start of every locked section, so the published state is
-    /// never behind what the listener hears by more than one call.</summary>
+    /// <summary>Latches the clips, completes a pending audible handover, or finishes playback, once
+    /// the device has emitted past it. Called at the start of every locked section, so the
+    /// published state is never behind what the listener hears by more than one call.</summary>
     private void ObserveClock()
     {
+        HearClips();
         if (_preview is not null)
         {
             ObservePreview(); // the queue is held: its clock stands still
@@ -338,7 +349,7 @@ public sealed partial class PlaybackEngine : IDisposable
             _version, _queueVersion, TransportNow, _queue.Entries.ToImmutableArray(),
             _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null, _finishAt is not null,
             _shuffle, _repeat, Adding, _rate, _unreadable.ToImmutableHashSet(), _settings,
-            _queueBase, _preview is null ? null : _mixer.Timeline, _previewOrigin, _preview?.Snap());
+            _queueBase, _preview is null ? null : _mixer.Timeline, _previewOrigin, _preview?.Snap(), _clips.Snap());
     }
 
     /// <summary>One voice's clock frozen for the view: its reference history and its length. The
@@ -394,7 +405,8 @@ public sealed partial class PlaybackEngine : IDisposable
         long QueueBase,
         long? QueueHeldAt,
         long PreviewOrigin,
-        PreviewSnap? Preview)
+        PreviewSnap? Preview,
+        ClipSnap Clips)
     {
         /// <param name="emitted">The device's count. The queue's clock is that from
         /// <see cref="QueueBase"/>; while a preview holds the queue, it stops where the queue's
@@ -402,6 +414,7 @@ public sealed partial class PlaybackEngine : IDisposable
         /// clock starts at <see cref="PreviewOrigin"/>, where the device began playing it.</param>
         public PlayerView At(long emitted)
         {
+            var clip = Clips.At(emitted);
             var preview = Preview?.At(emitted - PreviewOrigin, Rate);
             emitted = QueueHeldAt is { } held ? Math.Min(emitted + QueueBase, held) : emitted + QueueBase;
             VoiceSnap? attended = null, incoming = null;
@@ -425,6 +438,7 @@ public sealed partial class PlaybackEngine : IDisposable
             {
                 Settings = Settings,
                 Preview = preview,
+                Clip = clip,
             };
         }
 

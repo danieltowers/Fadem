@@ -157,7 +157,7 @@ public sealed partial class PlaybackEngine
             from ?? (spawn is null ? 0 : Frames(spawn.FadeInPoint)), 0, Math.Max(source.TotalFrames - 1, 0));
         var fadeInFrames = spawn is null ? 0 : Math.Max(0, Frames(spawn.FadeInDuration));
         var voice = mixer.AddVoice(
-            source, timelineStart, sourceStart, BaseGain(track),
+            source, track, timelineStart, sourceStart, BaseGain(track),
             fadeInFrames, spawn?.Curve ?? FadeCurveKind.EqualPower);
         voice.LengthFrames = track.Length.Frames(_rate) > 0 ? track.Length.Frames(_rate) : source.TotalFrames;
         return voice;

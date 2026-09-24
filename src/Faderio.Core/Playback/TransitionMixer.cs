@@ -16,10 +16,11 @@ internal sealed class MixerVoice
     private long _rampFrames;
 
     internal MixerVoice(
-        ITrackSource source, long timelineStart, long sourceStart,
+        ITrackSource source, Track? track, long timelineStart, long sourceStart,
         double baseGain, long fadeInFrames, FadeCurveKind fadeInCurve)
     {
         Source = source;
+        Track = track;
         TimelineStart = timelineStart;
         SourceStart = sourceStart;
         _gainFrom = baseGain;
@@ -30,6 +31,9 @@ internal sealed class MixerVoice
     }
 
     internal ITrackSource Source { get; }
+
+    /// <summary>The track the voice plays, which a clip it sounds in is named by (build issue 17).</summary>
+    internal Track? Track { get; }
     internal long TimelineStart { get; }
     internal long SourceStart { get; }
     internal long FadeInFrames { get; set; }
@@ -155,17 +159,24 @@ internal sealed class TransitionMixer : ISampleProvider
     /// at which it ended — hard-cut boundaries chain sample-accurately.</summary>
     public event Action<MixerVoice, long>? VoiceEnded;
 
+    /// <summary>Raised (on the rendering thread) after a block is mixed, for each run of samples
+    /// beyond full scale and the voices sounding there (build issue 17).</summary>
+    public event Action<ClippedRun>? Clipped;
+
+    private readonly ClipDetector _clips = new();
+
     public IReadOnlyList<MixerVoice> Voices => _voices;
 
     public MixerVoice AddVoice(
         ITrackSource source,
+        Track? track,
         long timelineStart,
         long sourceStart,
         double baseGain = 1.0,
         long fadeInFrames = 0,
         FadeCurveKind fadeInCurve = FadeCurveKind.EqualPower)
     {
-        var voice = new MixerVoice(source, timelineStart, sourceStart, baseGain, fadeInFrames, fadeInCurve);
+        var voice = new MixerVoice(source, track, timelineStart, sourceStart, baseGain, fadeInFrames, fadeInCurve);
         source.Position = sourceStart;
         _voices.Add(voice);
         return voice;
@@ -222,6 +233,11 @@ internal sealed class TransitionMixer : ISampleProvider
         }
 
         Array.Clear(buffer, offset, needed);
+        var detecting = Clipped is not null;
+        if (detecting)
+        {
+            _clips.Begin(count);
+        }
 
         // Fire every event whose timeline falls inside this block before mixing. This is exact:
         // fade events set absolute fade positions evaluated per sample, and spawned voices
@@ -289,6 +305,10 @@ internal sealed class TransitionMixer : ISampleProvider
                     {
                         buffer[target + c] += (float)(_scratch[source0 + c] * gain);
                     }
+                    if (detecting && !FadedOut(voice, timeline))
+                    {
+                        _clips.Sounds(runStart + f, voice);
+                    }
                 }
 
                 processed.Add(voice);
@@ -309,8 +329,19 @@ internal sealed class TransitionMixer : ISampleProvider
         }
 
         _timeline = start + count;
+        if (detecting)
+        {
+            foreach (var run in _clips.Runs(buffer, offset, count, Channels, start))
+            {
+                Clipped?.Invoke(run);
+            }
+        }
         return count;
     }
+
+    /// <summary>The voice's fade-out has completed by the timeline frame: it is silent there.</summary>
+    private static bool FadedOut(MixerVoice voice, long timeline) =>
+        voice.FadeOutStart is { } fadeOut && timeline >= fadeOut + voice.FadeOutFrames;
 
     private void End(MixerVoice voice, long endTimeline)
     {

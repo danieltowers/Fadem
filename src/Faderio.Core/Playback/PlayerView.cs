@@ -60,6 +60,40 @@ public sealed record PlayerView(
     /// queue is held: <see cref="Attended"/>, <see cref="Incoming"/> and <see cref="Transport"/>
     /// stay the queue's, paused where it was held, or stopped.</summary>
     public PreviewView? Preview { get; init; }
+
+    /// <summary>The clip light (build issue 17): the clips heard since it was last cleared, or null.
+    /// A clip is latched when the listener hears it, not when it is rendered.</summary>
+    public ClipView? Clip { get; init; }
+}
+
+/// <summary>The clips heard since the light was last cleared (build issue 17): how many, and the
+/// cause of the latest, which is what the listener most likely just heard.</summary>
+public sealed record ClipView(int Count, ClipCause Latest);
+
+/// <summary>What a clip is attributed to: the adjacency whose transition was in flight, when two
+/// voices overlapped at the clipped sample, or else the attended track, the one voice heard; a
+/// preview's alike. Named by tracks, not rows, so it stays valid after its rows are removed.</summary>
+public sealed record ClipCause
+{
+    private ClipCause(Adjacency? transition, Track? track)
+    {
+        Transition = transition;
+        Track = track;
+    }
+
+    /// <summary>The adjacency in flight, or null when one track clipped alone.</summary>
+    public Adjacency? Transition { get; }
+
+    /// <summary>The attended track, which clipped alone, or null when a transition was in flight.</summary>
+    public Track? Track { get; }
+
+    public static ClipCause Of(Adjacency transition) => new(transition, null);
+
+    public static ClipCause Of(Track track) => new(null, track);
+
+    /// <summary>How the cause is named to the user: the adjacency as it names itself, or the
+    /// track's file name without extension.</summary>
+    public string Name => Transition?.Name ?? Path.GetFileNameWithoutExtension(Track?.FilePath) ?? "";
 }
 
 /// <summary>Where a preview is: the outgoing track before its transition begins, the transition

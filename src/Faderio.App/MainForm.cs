@@ -14,10 +14,11 @@ namespace Faderio.App;
 /// 15), with Remove and Clear queue (build issue 04; Delete removes too), transport with a
 /// shuffle toggle and a repeat button (build issue 07), a seek bar in milliseconds, the
 /// transition editor, a status strip showing the latest notice and a count that opens this
-/// session's notice list (build issue 09), and a Settings… dialog (build issue 12). It renders
-/// <see cref="PlayerView"/>s and issues commands; it holds no engine state between calls (the
-/// placement rule in CLAUDE.md). The seek bar's Maximum is the track length in milliseconds, so
-/// no scaling exists to get wrong (ticket 06).
+/// session's notice list (build issue 09), a Settings… dialog (build issue 12), and the clip
+/// light, which a click clears (build issue 17). It renders <see cref="PlayerView"/>s and issues
+/// commands; it holds no engine state between calls (the placement rule in CLAUDE.md). The seek
+/// bar's Maximum is the track length in milliseconds, so no scaling exists to get wrong
+/// (ticket 06).
 /// </summary>
 internal sealed class MainForm : Form
 {
@@ -44,6 +45,7 @@ internal sealed class MainForm : Form
     internal readonly ToolStripStatusLabel _noticeCount;
     internal readonly ToolStripStatusLabel _addProgress;
     internal readonly ToolStripButton _cancelAdd;
+    internal readonly ToolStripStatusLabel _clip;
     internal readonly TransitionEditorPanel _editor;
     internal readonly ToolStripMenuItem _editNext;
     internal readonly ToolStripMenuItem _editPrevious;
@@ -97,7 +99,9 @@ internal sealed class MainForm : Form
         _noticeCount = new ToolStripStatusLabel { Available = false, IsLink = true, ToolTipText = "Show this session's notices" };
         _addProgress = new ToolStripStatusLabel { Available = false };
         _cancelAdd = new ToolStripButton("Cancel") { Available = false, DisplayStyle = ToolStripItemDisplayStyle.Text };
-        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _addProgress, _cancelAdd }, ShowItemToolTips = true };
+        // The clip light (build issue 17): dark until the engine latches a clip.
+        _clip = new ToolStripStatusLabel { ForeColor = SystemColors.GrayText, Margin = new Padding(8, 3, 0, 2) };
+        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _addProgress, _cancelAdd, _clip }, ShowItemToolTips = true };
 
         _addFiles = new Button { Text = "Add files…", Width = 90, Height = 28, Margin = new Padding(4, 8, 4, 0) };
         _addFolder = new Button { Text = "Add folder…", Width = 90, Height = 28, Margin = new Padding(0, 8, 4, 0) };
@@ -250,6 +254,7 @@ internal sealed class MainForm : Form
         _cancelAdd.Click += (_, _) => _engine.CancelAdd();
         _status.Click += (_, _) => OpenNotices();
         _noticeCount.Click += (_, _) => OpenNotices();
+        _clip.Click += (_, _) => _engine.ClearClip();
         _playPause.Click += (_, _) => _engine.TogglePlayPause();
         _prev.Click += (_, _) => _engine.Previous();
         _stop.Click += (_, _) => _engine.Stop();
@@ -342,9 +347,32 @@ internal sealed class MainForm : Form
         _addProgress.Text = Presenter.FmtAdding(view.Adding);
         _addProgress.Available = view.Adding is not null;
         _cancelAdd.Available = view.Adding is not null;
+        ShowClip(view.Clip);
 
         _editor.Refresh(view);
     }
+
+    /// <summary>The clip light: dark, or lit red with the count and the latest cause. Set only when
+    /// its text changes, as Render runs on every tick. It is kept short enough that a long cause
+    /// never pushes the notice count off the strip; the tooltip has it whole.</summary>
+    private void ShowClip(ClipView? clip)
+    {
+        var text = Presenter.FmtClip(clip);
+        if (_clip.Text == text)
+        {
+            return;
+        }
+        _clip.Text = text;
+        _clip.ToolTipText = Presenter.ClipTip(clip);
+        _clip.BackColor = clip is null ? Color.Empty : Color.Firebrick;
+        _clip.ForeColor = clip is null ? SystemColors.GrayText : Color.White;
+        _clip.AutoSize = true;
+        var width = Math.Min(_clip.GetPreferredSize(Size.Empty).Width, MaxClipWidth);
+        _clip.AutoSize = false;
+        _clip.Width = width;
+    }
+
+    private const int MaxClipWidth = 320;
 
     /// <summary>Render runs on every tick, and resetting a tip that is showing would close it.</summary>
     private void ShowTip(Control control, string tip)

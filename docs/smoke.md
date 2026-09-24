@@ -105,6 +105,11 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
       notice or the count opens the notice list: every notice this session, oldest first, with
       its time and its count, and the selected one in full below. Esc and the close box hide
       it, and clicking the strip again brings back the same list.
+- [ ] At the strip's far right, the clip light reads "● No clips", dark and greyed, by default.
+      Lit, it reads "● 2 clips · latest: A → B" in white on red, legible at a glance, and a
+      long cause is cut short without pushing the notice count off; its tooltip has it whole.
+      Clicking it turns it dark again. (A track tagged well above 0 dB, with ReplayGain on,
+      lights it.)
 - [ ] Launching with a corrupt `%APPDATA%\faderio\transitions.json` (back it up first) shows
       no dialog: the strip says the file was moved aside to `transitions.json.corrupt`.
 - [ ] A queued file renamed before the track ahead of it starts is marked when that track starts:
@@ -173,6 +178,9 @@ sharp percussive transient; the realism check is the authored boundary from the 
 - [ ] On a track with a ReplayGain tag (the library has two; tag one with rsgain or foobar2000
       if needed), toggling ReplayGain in **Settings…** mid-track changes the level at once,
       with no click. An untagged track does not change.
+- [ ] Author an overlap of two loud masters, or play a boosted track: the clip light comes on
+      as you hear the clip, not before, and names what you heard. Stop and Clear queue
+      leave it on; clicking it clears it.
 - [ ] With another app holding the device exclusively, launch in exclusive mode; faderio falls
       back to shared and says so.
 - [ ] Play a whole real album on WASAPI exclusive, through several queue advances and a track
