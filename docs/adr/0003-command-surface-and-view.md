@@ -102,3 +102,13 @@ one* is a display choice over the enum, not engine arithmetic, so `Presenter.Nex
 the next mode from the one the view holds when the button is pressed. It joins the presenter's
 list, with the glyph and tooltip for each state. The buttons read the view when pressed, not
 the state they last showed, so a change made elsewhere is never undone by a stale button.
+
+## Addendum: the view says whether a command would act (2026-09-24)
+
+Transition now ([issue 08](../../.scratch/202609-faderio-phase-1-build/issues/08-transition-now.md))
+does nothing while paused or stopped, with no next adjacency, and while a transition is in
+flight. "In flight" includes a hard cut or the final finish still in the device buffer, which
+no other view field shows. So the engine publishes `View.CanTransitionNow`, derived from the
+same frames-emitted instant as the playhead, and the command guards on that same flag. The
+shell sets the button's `Enabled` from it and does no logic of its own. If another command
+gains a no-op condition the shell must show, it gets a flag the same way.

@@ -32,6 +32,8 @@ public sealed record VoiceView(QueueRow Row, Playhead Playhead, Length Length)
 /// <see cref="NextAdjacency"/> is the adjacency ⏭ would reach from the current row: into the
 /// next row, or under repeat-all from the last row into the first. Repeat-one does not make it
 /// the row into itself. Null on the last row with repeat off, and when the queue is empty.
+/// <see cref="CanTransitionNow"/> is whether <c>TransitionNow</c> would act: playing, one voice
+/// heard alone with no handover or finish still in the device, and a next adjacency.
 /// </summary>
 public sealed record PlayerView(
     long Version,
@@ -43,7 +45,8 @@ public sealed record PlayerView(
     bool Shuffle,
     RepeatMode Repeat,
     AddProgress? Adding = null,
-    Adjacency? NextAdjacency = null);
+    Adjacency? NextAdjacency = null,
+    bool CanTransitionNow = false);
 
 /// <summary>How far the running add has got: files resolved (queued or rejected) out of every
 /// file given to it, including those of an add waiting behind the first.</summary>

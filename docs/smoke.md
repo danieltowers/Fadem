@@ -72,6 +72,9 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
 - [ ] Beside ⏭, the shuffle toggle (🔀) and the repeat button read clearly in every state:
       each shows pressed in while on and plain while off. Repeat cycles off (🔁, plain) → all
       (🔁, pressed in) → one (🔁1, pressed in) → off, and each tooltip names its state.
+- [ ] Between ⏭ and the shuffle toggle, the Transition now button (⤳) reads clearly and its
+      tooltip says "Transition now". It is greyed out while stopped, while paused, on the last
+      row with repeat off, and during a crossfade, and live otherwise.
 - [ ] Adding a rejected file (an `.m4a`, an `.ogg`, or a file with more than two channels)
       leaves the list unchanged and shows one notice naming the property that failed and
       pointing at `docs/supported-audio.md`. Nothing is queued, nothing plays.
@@ -104,5 +107,7 @@ sharp percussive transient; the realism check is the authored boundary from the 
       note, and no error.
 - [ ] With repeat-all on, the last track passes into the first through their adjacency, as
       any other boundary does.
+- [ ] Transition now mid-song fades into the next track as authored, starting from where you
+      pressed.
 - [ ] Add the whole `MUSIC` library (**Add folder…** on the `MUSIC` folder) while a track plays;
       the track plays on without a dropout, and adding never starts or stops playback.

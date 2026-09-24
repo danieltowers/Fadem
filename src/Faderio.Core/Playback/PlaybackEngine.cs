@@ -300,7 +300,7 @@ public sealed partial class PlaybackEngine : IDisposable
             : null;
         return new Snapshot(
             _version, _queueVersion, _output.State, _queue.Entries.ToImmutableArray(),
-            _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null,
+            _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null, _finishAt is not null,
             _shuffle, _repeat, Adding, _rate);
     }
 
@@ -342,6 +342,7 @@ public sealed partial class PlaybackEngine : IDisposable
         VoiceSnap? Current,
         long? HandoverAt,
         bool Overlap,
+        bool Finishing,
         bool Shuffle,
         RepeatMode Repeat,
         AddProgress? Adding,
@@ -350,19 +351,23 @@ public sealed partial class PlaybackEngine : IDisposable
         public PlayerView At(long emitted)
         {
             VoiceSnap? attended = null, incoming = null;
+            var heardAlone = false;
             if (Transport != Transport.Stopped)
             {
                 var handedOver = HandoverAt is null || emitted >= HandoverAt;
                 attended = Attended is not null && !handedOver ? Attended : Current;
                 incoming = Overlap && attended == Attended ? Current : null;
+                heardAlone = handedOver && !Overlap && !Finishing;
             }
             var currentRow = attended?.Entry.Id ?? CurrentRow;
             var rows = Entries.Select(e => new QueueRow(e.Id, e.Track, e.Id == currentRow)).ToList();
+            var next = NextAdjacencyFrom(currentRow);
             return new PlayerView(
                 Version, QueueVersion, Transport, rows,
                 attended?.At(emitted, true, Rate),
                 incoming?.At(emitted, false, Rate),
-                Shuffle, Repeat, Adding, NextAdjacencyFrom(currentRow));
+                Shuffle, Repeat, Adding, next,
+                CanTransitionNow: Transport == Transport.Playing && heardAlone && next is not null);
         }
 
         private Adjacency? NextAdjacencyFrom(RowId? row)

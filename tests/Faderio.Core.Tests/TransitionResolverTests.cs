@@ -115,4 +115,63 @@ public class TransitionResolverTests
         var result = resolver.Resolve(spec, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
         Assert.Equal(TimeSpan.Zero, result.FadeInPoint);
     }
+
+    // ── Transition now: the fade-out point moved to the playhead ────────────────────────
+
+    [Fact]
+    public void TransitionNow_MovesOnlyTheFadeOutPoint_AndKeepsTheAuthoredDuration()
+    {
+        var resolver = new TransitionResolver(Settings());
+        var spec = new TransitionSpec
+        {
+            FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(9.5), FromEnd: false),
+            FadeOutDuration = TimeSpan.FromSeconds(2), // clamped to 0.5 s at the authored point
+            FadeInPoint = new FadePointSpec(TimeSpan.FromSeconds(3), FromEnd: false),
+            FadeInDuration = TimeSpan.FromSeconds(4),
+            Curve = FadeCurveKind.Linear,
+        };
+        var result = resolver.Resolve(
+            spec, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10), fadeOutAt: TimeSpan.FromSeconds(2));
+
+        Assert.Equal(TimeSpan.FromSeconds(2), result.FadeOutPoint);
+        Assert.Equal(TimeSpan.FromSeconds(2), result.FadeOutDuration);
+        Assert.Equal(TimeSpan.FromSeconds(3), result.FadeInPoint);
+        Assert.Equal(TimeSpan.FromSeconds(4), result.FadeInDuration);
+        Assert.Equal(FadeCurveKind.Linear, result.Curve);
+    }
+
+    [Fact]
+    public void TransitionNow_ShortensAFadeOutThatWouldRunPastTheLength()
+    {
+        var resolver = new TransitionResolver(Settings());
+        var spec = new TransitionSpec { FadeOutDuration = TimeSpan.FromSeconds(4) };
+        var result = resolver.Resolve(
+            spec, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10), fadeOutAt: TimeSpan.FromSeconds(8.5));
+
+        Assert.Equal(TimeSpan.FromSeconds(8.5), result.FadeOutPoint);
+        Assert.Equal(TimeSpan.FromSeconds(1.5), result.FadeOutDuration);
+    }
+
+    [Fact]
+    public void TransitionNow_OnAnUnauthoredAdjacency_StartsTheDefaultCrossfadeThere_WhenItIsOn()
+    {
+        var resolver = new TransitionResolver(Settings(DefaultAdjacencyBehaviour.GlobalDefaultCrossfade, 3));
+        var result = resolver.Resolve(
+            null, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10), fadeOutAt: TimeSpan.FromSeconds(4));
+
+        Assert.False(result.IsHardCut);
+        Assert.Equal(TimeSpan.FromSeconds(4), result.FadeOutPoint);
+        Assert.Equal(TimeSpan.FromSeconds(3), result.FadeOutDuration);
+        Assert.Equal(TimeSpan.FromSeconds(3), result.FadeInDuration);
+    }
+
+    [Fact]
+    public void TransitionNow_OnAnUnauthoredAdjacency_IsStillAHardCut_ByDefault()
+    {
+        var resolver = new TransitionResolver(Settings());
+        var result = resolver.Resolve(
+            null, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10), fadeOutAt: TimeSpan.FromSeconds(4));
+
+        Assert.True(result.IsHardCut);
+    }
 }

@@ -21,18 +21,23 @@ internal sealed class TransitionResolver
     /// A per-playlist override: may specify any subset of parameters; each parameter it omits
     /// falls through to the global transition (ADR 0002).
     /// </param>
+    /// <param name="fadeOutAt">
+    /// Transition now: the fade-out point moved here, and nothing else. A fade-out that would then
+    /// run past the outgoing track's end is shortened, as an authored one is.
+    /// </param>
     public EffectiveTransition Resolve(
         TransitionSpec? global,
         TransitionSpec? playlistOverride,
         TimeSpan outgoingDuration,
-        TimeSpan incomingDuration)
+        TimeSpan incomingDuration,
+        TimeSpan? fadeOutAt = null)
     {
         var authored = Merge(global, playlistOverride);
 
         if (authored is null || authored.IsEmpty)
         {
             return Settings.DefaultAdjacencyBehaviour == DefaultAdjacencyBehaviour.GlobalDefaultCrossfade
-                ? DefaultCrossfade(outgoingDuration)
+                ? DefaultCrossfade(outgoingDuration, fadeOutAt)
                 : EffectiveTransition.HardCut;
         }
 
@@ -40,38 +45,34 @@ internal sealed class TransitionResolver
         var fadeInDuration = ClampDuration(authored.FadeInDuration);
 
         // Absent fade-out point: the track begins fading one fade-length before its end.
-        var fadeOutPoint = authored.FadeOutPoint is { } fp
-            ? AbsoluteFadePoint(fp, outgoingDuration)
-            : MaxZero(outgoingDuration - fadeOutDuration);
+        var fadeOutPoint = fadeOutAt is { } now
+            ? ClampToLength(now, outgoingDuration)
+            : authored.FadeOutPoint is { } fp
+                ? AbsoluteFadePoint(fp, outgoingDuration)
+                : MaxZero(outgoingDuration - fadeOutDuration);
 
         var fadeInPoint = authored.FadeInPoint is { } ip
             ? ip.Position < TimeSpan.Zero ? TimeSpan.Zero : ip.Position
             : TimeSpan.Zero;
 
-        // The fade-out cannot extend beyond the end of the outgoing track: the *duration*
-        // is clamped, the authored point is kept exactly where it was put.
-        if (fadeOutPoint + fadeOutDuration > outgoingDuration)
-        {
-            fadeOutDuration = MaxZero(outgoingDuration - fadeOutPoint);
-        }
-
         return new EffectiveTransition
         {
             FadeOutPoint = fadeOutPoint,
-            FadeOutDuration = fadeOutDuration,
+            FadeOutDuration = ShortenToEnd(fadeOutPoint, fadeOutDuration, outgoingDuration),
             FadeInPoint = fadeInPoint,
             FadeInDuration = fadeInDuration,
             Curve = authored.Curve ?? FadeCurveKind.EqualPower,
         };
     }
 
-    private EffectiveTransition DefaultCrossfade(TimeSpan outgoingDuration)
+    private EffectiveTransition DefaultCrossfade(TimeSpan outgoingDuration, TimeSpan? fadeOutAt)
     {
         var d = ClampDuration(null);
+        var point = fadeOutAt is { } now ? ClampToLength(now, outgoingDuration) : MaxZero(outgoingDuration - d);
         return new EffectiveTransition
         {
-            FadeOutPoint = MaxZero(outgoingDuration - d),
-            FadeOutDuration = d,
+            FadeOutPoint = point,
+            FadeOutDuration = ShortenToEnd(point, d, outgoingDuration),
             FadeInPoint = TimeSpan.Zero,
             FadeInDuration = d,
             Curve = FadeCurveKind.EqualPower,
@@ -106,20 +107,21 @@ internal sealed class TransitionResolver
         return d < TimeSpan.Zero ? TimeSpan.Zero : d;
     }
 
-    private static TimeSpan AbsoluteFadePoint(FadePointSpec point, TimeSpan trackDuration)
+    /// <summary>The fade-out cannot extend beyond the end of the outgoing track: the
+    /// <em>duration</em> is shortened, the point is kept exactly where it was put.</summary>
+    private static TimeSpan ShortenToEnd(TimeSpan fadeOutPoint, TimeSpan fadeOutDuration, TimeSpan length) =>
+        fadeOutPoint + fadeOutDuration > length ? MaxZero(length - fadeOutPoint) : fadeOutDuration;
+
+    private static TimeSpan AbsoluteFadePoint(FadePointSpec point, TimeSpan length) =>
+        ClampToLength(point.FromEnd ? length - point.Position : point.Position, length);
+
+    private static TimeSpan ClampToLength(TimeSpan point, TimeSpan length)
     {
-        var absolute = point.FromEnd
-            ? trackDuration - point.Position
-            : point.Position;
-        if (absolute < TimeSpan.Zero)
+        if (point < TimeSpan.Zero)
         {
-            absolute = TimeSpan.Zero;
+            return TimeSpan.Zero;
         }
-        if (absolute > trackDuration)
-        {
-            absolute = trackDuration;
-        }
-        return absolute;
+        return point > length ? length : point;
     }
 
     private static TimeSpan MaxZero(TimeSpan t) => t < TimeSpan.Zero ? TimeSpan.Zero : t;

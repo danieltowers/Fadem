@@ -138,6 +138,29 @@ public sealed partial class PlaybackEngine
         });
     }
 
+    /// <summary>Starts the transition into the adjacency ⏭ would reach, now (build issue 08). Only
+    /// the fade-out point moves, to the playhead: the fade-out duration (shortened if it would pass
+    /// the track's end), the fade-in point, the fade-in and the curve play as authored. With no
+    /// fade-out authored, the outgoing track stops now and the incoming one starts at its fade-in
+    /// point. An unauthored adjacency resolves as its natural boundary would: a hard cut from 0:00,
+    /// or the default crossfade from now when that is on. It acts exactly when
+    /// <see cref="PlayerView.CanTransitionNow"/> says so: not while a transition is in flight, nor
+    /// with no next adjacency, nor unless playing.</summary>
+    public void TransitionNow()
+    {
+        ThrowIfDisposed();
+        Run(() =>
+        {
+            ObserveClock();
+            // The guard is the view's own flag, so the button and the command cannot disagree.
+            if (!View.CanTransitionNow || _currentVoice is not { } voice)
+            {
+                return;
+            }
+            StartTransitionNow(voice);
+        });
+    }
+
     /// <summary>Acts on the attended voice (build issue 06). Past 3 s it restarts the track; so
     /// it does at the head of the queue, unless repeat-all wraps it to the last row. Otherwise it
     /// hard-cuts to the previous row from 0:00, never through a reverse adjacency. Restarting the

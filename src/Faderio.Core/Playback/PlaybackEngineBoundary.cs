@@ -145,17 +145,25 @@ public sealed partial class PlaybackEngine
                 return;
             }
             boundary.Triggered = true;
-            outgoingVoice.FadeOutStart = trig;
-            outgoingVoice.FadeOutFrames = dur;
-            outgoingVoice.FadeOutCurve = fadeCurve;
-            _outgoingVoice = outgoingVoice;
-            // The listener attends to the outgoing voice until it falls silent (ADR 0001).
-            StartTrack(nextIndex.Value, trig, spawn, null, audibleAt: trig + dur);
+            Crossfade(outgoingVoice, trig, dur, fadeCurve, nextIndex.Value, spawn);
         }
 
         boundary.SpawnAction = SpawnIncoming;
         boundary.Handles.Add(_mixer.Schedule(trig, SpawnIncoming));
         _pendingBoundary = boundary;
+    }
+
+    /// <summary>Fades <paramref name="outgoing"/> out from <paramref name="start"/> and spawns the
+    /// incoming track there under it.</summary>
+    private void Crossfade(
+        MixerVoice outgoing, long start, long fadeFrames, FadeCurveKind curve, int incomingIndex, TransitionSpawn spawn)
+    {
+        outgoing.FadeOutStart = start;
+        outgoing.FadeOutFrames = fadeFrames;
+        outgoing.FadeOutCurve = curve;
+        _outgoingVoice = outgoing;
+        // The listener attends to the outgoing voice until it falls silent (ADR 0001).
+        StartTrack(incomingIndex, start, spawn, null, audibleAt: start + fadeFrames);
     }
 
     private bool TryComputeFade(
@@ -188,6 +196,46 @@ public sealed partial class PlaybackEngine
         }
         fadeFrames = duration;
         return true;
+    }
+
+    // ── Transition now ───────────────────────────────────────────────────────────────────
+
+    /// <summary>The body of <see cref="TransitionNow"/>, for a current voice heard alone. The
+    /// adjacency is resolved afresh, since under repeat-one the scheduled boundary is the loop's.
+    /// "Now" is where decoding is: the listener hears the fade begin one device buffer later,
+    /// as with every command.</summary>
+    private void StartTransitionNow(MixerVoice voice)
+    {
+        var index = IndexOf(voice);
+        if (index < 0 || _queue.IndexSkippedTo(index, _repeat) is not { } next)
+        {
+            return;
+        }
+        var total = voice.Source.TotalFrames;
+        var decodePosition = voice.Source.Position;
+        var inTrack = _queue.Entries[next].Track;
+        var transition = _resolver.Resolve(
+            _store.Get(_queue.Entries[index].Track.FilePath, inTrack.FilePath), null,
+            TimeSpanOf(total), inTrack.Length.TimeSpan, fadeOutAt: TimeSpanOf(decodePosition));
+        if (transition.IsHardCut)
+        {
+            CutCurrentAndAdvance();
+            Publish();
+            return;
+        }
+
+        CancelPendingBoundaryFor(voice);
+        var spawn = new TransitionSpawn(transition.FadeInPoint, transition.FadeInDuration, transition.Curve);
+        var now = _mixer.Timeline;
+        // The resolver has shortened the fade to the track's end; this only absorbs rounding.
+        var fadeFrames = Math.Clamp(Frames(transition.FadeOutDuration), 0, total - decodePosition);
+        if (fadeFrames == 0)
+        {
+            CutAllVoices(); // the non-overlapping shape: the outgoing track stops now
+            StartTrack(next, now, spawn, null);
+            return;
+        }
+        Crossfade(voice, now, fadeFrames, transition.Curve, next, spawn);
     }
 
     // ── Voice lifecycle ──────────────────────────────────────────────────────────────────
@@ -260,6 +308,7 @@ public sealed partial class PlaybackEngine
             _voiceEntry[voice] = entry;
         }
         _finishAt = endTimeline;
+        Publish();
     }
 
     /// <summary>Audio that ends before the issued length says it should (a truncated file, a

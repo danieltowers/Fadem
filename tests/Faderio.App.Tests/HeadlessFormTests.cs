@@ -690,4 +690,61 @@ public sealed class HeadlessFormTests
 
         Assert.Equal(RepeatMode.Off, h.Engine.View.Repeat);
     });
+
+    [Fact]
+    public void TransitionNow_IsEnabledOnlyWhilePlaying_WithANextAdjacency_AndNoTransitionInFlight() => RunSta(() =>
+    {
+        using var h = new Harness();
+        Assert.False(h.Form._transitionNow.Enabled); // stopped, empty
+        var a = TestAudio.WriteDcWav("a.wav", 4, 0.4);
+        var b = TestAudio.WriteDcWav("b.wav", 4, 0.2);
+        var c = TestAudio.WriteDcWav("c.wav", 4, 0.3);
+        h.Form.AddPaths(new[] { a, b, c });
+        h.Store.Upsert(a, b, new TransitionSpec
+        {
+            FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1), FromEnd: false),
+            FadeOutDuration = TimeSpan.FromSeconds(1),
+        });
+        Assert.False(h.Form._transitionNow.Enabled); // stopped
+
+        h.Engine.Play();
+        Assert.True(h.Form._transitionNow.Enabled);
+        h.Engine.Pause();
+        Assert.False(h.Form._transitionNow.Enabled);
+        h.Engine.Play();
+        Assert.True(h.Form._transitionNow.Enabled);
+
+        h.Output.Advance(44100 + 11025); // into A → B's crossfade
+        h.Form.Render();
+        Assert.NotNull(h.Engine.View.Incoming);
+        Assert.False(h.Form._transitionNow.Enabled);
+
+        h.Engine.PlayRow(h.Engine.View.Queue[2].Id); // the last row, repeat off
+        Assert.Null(h.Engine.View.NextAdjacency);
+        Assert.False(h.Form._transitionNow.Enabled);
+        h.Engine.SetRepeat(RepeatMode.All); // the wrap into the first row
+        Assert.True(h.Form._transitionNow.Enabled);
+    });
+
+    [Fact]
+    public void ATransitionNowPress_IsOneCall_ThatStartsTheNextAdjacency() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("a.wav", 4, 0.4);
+        var b = TestAudio.WriteDcWav("b.wav", 4, 0.2);
+        h.Form.AddPaths(new[] { a, b });
+        h.Store.Upsert(a, b, new TransitionSpec
+        {
+            FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(3), FromEnd: false),
+            FadeOutDuration = TimeSpan.FromSeconds(1),
+        });
+        h.Engine.Play();
+        h.Output.Advance(44100);
+
+        Click(h.Form._transitionNow);
+
+        Assert.Equal(b, h.Engine.View.Incoming?.Row.Track.FilePath);
+        Assert.False(h.Form._transitionNow.Enabled);
+        Assert.Equal("Transition now", h.Form._tips.GetToolTip(h.Form._transitionNow));
+    });
 }
