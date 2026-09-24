@@ -1,6 +1,6 @@
 # 19: Stop can freeze the window
 
-Status: needs-triage
+Status: resolved
 Blocked by: —
 
 Found during the Looks smoke run for [issue 03](03-open-and-save-playlists.md) on 2026-09-23. Not
@@ -53,4 +53,31 @@ timer and UI Automation are not.
   - **⏹:** froze 0 in 4.
   - **Clear → OK while playing:** froze 1 in 2.
   The race is real and not rare.
-
+- Built 2026-09-24. **Decided:** the second option. Stopping the device outside the lock was
+  rejected: `Publish` reads the output's transport under the lock, so a stop published before
+  the device is told would show `Playing`, and a command slipping in between could be stopped by
+  a late `Stop`.
+  - Every device stop and the dispose go through `HaltOutput`, which raises a volatile flag for
+    as long as the device takes to stop. `StopOutput` is the only way the device is stopped.
+  - The render path takes the lock with `Monitor.TryEnter` in 1 ms steps and gives up while
+    the flag is up. It returns zero frames, which is end of stream to NAudio as it already was
+    for a stop from inside a render. The `IFrameSource.Read` contract now says so.
+  - Nothing is rendered or counted, so the shared origin (ADR 0001) holds.
+  - `Run` split into `Run` and `RunWithLockHeld`, so the render path enters the lock itself and
+    the sink is still called after it is released.
+- **Test:** the fake output could show it after all. `StoppingTheDeviceTests` binds a device
+  whose `Stop` joins a real render thread parked just past its stopped check. Stop, Clear,
+  removing the only playing row and ⏭ on the last row each froze before the fix (5 s timeout)
+  and return after it. Dispose already returned, since `Read` checks `_disposed` first, but it
+  is kept as a guard.
+- **Device trials** with the script behind the comment above, on the fixed build:
+  - ⏹ did not freeze in 10 trials.
+  - Delete on the only playing row did not freeze in 9 clean trials. A tenth hit a UI
+    Automation error and may not have exercised the path.
+  - Clear → OK was not rerun.
+  - A smoke item was added.
+- **Not covered:** `OnOutputStopped` still takes the lock with a blocking `Run`. If the device
+  raised `PlaybackStopped` with an error on its own thread during a halt, that could still wait.
+  In the app the event is posted to the UI thread, since the WinForms context exists before
+  `Initialise`. WaveOut's stop does not join, so it never froze. One block rendered after its
+  reset can still inflate `Rendered` before an immediate Play, which predates this change.

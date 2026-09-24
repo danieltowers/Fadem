@@ -48,6 +48,9 @@ public sealed partial class PlaybackEngine : IDisposable
     private bool _shuffle;
     private RepeatMode _repeat;
 
+    private volatile bool _haltingOutput;
+    private static readonly TimeSpan RenderWaitStep = TimeSpan.FromMilliseconds(1);
+
     private volatile Snapshot _snapshot;
     private int _depth;
     private bool _viewDirty;
@@ -97,7 +100,7 @@ public sealed partial class PlaybackEngine : IDisposable
             unanswered = EndAddRun(cancelled: true, notify: false);
             ResetForRestart();
             _output.Stopped -= OnOutputStopped;
-            _output.Dispose();
+            HaltOutput(_output.Dispose);
         }
         Complete(unanswered);
     }
@@ -110,10 +113,18 @@ public sealed partial class PlaybackEngine : IDisposable
     /// carrying the latest view.</summary>
     private T Run<T>(Func<T> body)
     {
+        Monitor.Enter(_sync);
+        return RunWithLockHeld(body);
+    }
+
+    /// <summary><see cref="Run{T}"/> once the lock is held: runs the body, releases the lock,
+    /// then delivers.</summary>
+    private T RunWithLockHeld<T>(Func<T> body)
+    {
         T result;
         PlayerView? view = null;
         string[]? notices = null;
-        lock (_sync)
+        try
         {
             _depth++;
             try
@@ -138,6 +149,10 @@ public sealed partial class PlaybackEngine : IDisposable
                 }
             }
         }
+        finally
+        {
+            Monitor.Exit(_sync);
+        }
         if (notices is not null)
         {
             foreach (var notice in notices)
@@ -157,6 +172,41 @@ public sealed partial class PlaybackEngine : IDisposable
         body();
         return 0;
     });
+
+    /// <summary>The only way the device is stopped: never call <c>_output.Stop()</c> directly.
+    /// </summary>
+    private void StopOutput() => HaltOutput(_output.Stop);
+
+    /// <summary>Stops or disposes the device under the lock. The device may wait for its render
+    /// thread (WASAPI joins it), and that thread may be waiting for this lock on its way into a
+    /// read: rendering gives up the wait while this runs, so neither waits on the other
+    /// (build issue 19).</summary>
+    private void HaltOutput(Action halt)
+    {
+        _haltingOutput = true;
+        try
+        {
+            halt();
+        }
+        finally
+        {
+            _haltingOutput = false;
+        }
+    }
+
+    /// <summary>Rendering's way into the lock: it waits like any command, but gives up while a
+    /// command holding the lock is halting the device.</summary>
+    private bool TryEnterToRender()
+    {
+        while (!Monitor.TryEnter(_sync, RenderWaitStep))
+        {
+            if (_haltingOutput)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 
     private void Publish()
     {
@@ -309,8 +359,9 @@ public sealed partial class PlaybackEngine : IDisposable
 
     // ── The output seam ──────────────────────────────────────────────────────────────────
 
-    /// <summary>What the output pulls. Rendering and control calls share one lock; errors are
-    /// surfaced as a notice, never swallowed, and a block that failed renders as silence.</summary>
+    /// <summary>What the output pulls. Rendering and control calls share one lock, except that a
+    /// render still waiting while the device is being stopped reads nothing; errors are surfaced as a notice,
+    /// never swallowed, and a block that failed renders as silence.</summary>
     private sealed class EngineFrameSource : IFrameSource
     {
         private readonly PlaybackEngine _engine;
@@ -329,7 +380,11 @@ public sealed partial class PlaybackEngine : IDisposable
                 Array.Clear(interleaved, offset, count * Channels);
                 return wanted;
             }
-            return _engine.Run(() =>
+            if (!_engine.TryEnterToRender())
+            {
+                return Playback.Frames.Zero; // the device is being stopped: end of stream
+            }
+            return _engine.RunWithLockHeld(() =>
             {
                 _engine.ObserveClock();
                 try

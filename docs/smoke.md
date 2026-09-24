@@ -63,6 +63,9 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
       when nothing is selected.
 - [ ] **Clear queue** in the context menu, with more than one row, shows a confirmation.
       Cancel leaves the queue as it was; OK empties it and playback stops.
+- [ ] While playing on WASAPI shared, pressing ⏹, **Delete** on the only row and **Clear
+      queue** each stop playback, and the window keeps rendering afterwards: the play button
+      shows ▶ and the readout resets. Repeat each a few times; the freeze was a race.
 - [ ] Adding a rejected file (an `.m4a`, an `.ogg`, or a file with more than two channels)
       leaves the list unchanged and shows one notice naming the property that failed and
       pointing at `docs/supported-audio.md`. Nothing is queued, nothing plays.

@@ -187,7 +187,7 @@ public sealed partial class PlaybackEngine
         Run(() =>
         {
             ResetForRestart();
-            _output.Stop();
+            StopOutput();
             _queue.Clear();
             _originalOrder.Clear();
             _queueVersion++;

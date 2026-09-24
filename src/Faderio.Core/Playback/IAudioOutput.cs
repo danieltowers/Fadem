@@ -29,8 +29,9 @@ public interface IFrameSource
     int Channels { get; }
 
     /// <summary>Fills <paramref name="wanted"/> frames into <paramref name="interleaved"/> at
-    /// <paramref name="offset"/> (in samples) and returns the frames written — always the full
-    /// count, silence when there is nothing to mix.</summary>
+    /// <paramref name="offset"/> (in samples) and returns the frames written — the full count,
+    /// silence when there is nothing to mix. Zero is end of stream: the device is being stopped
+    /// and nothing was written.</summary>
     Frames Read(float[] interleaved, int offset, Frames wanted);
 }
 

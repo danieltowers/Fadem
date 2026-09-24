@@ -77,7 +77,7 @@ public sealed partial class PlaybackEngine
         Run(() =>
         {
             ResetForRestart();
-            _output.Stop();
+            StopOutput();
             Publish();
         });
     }

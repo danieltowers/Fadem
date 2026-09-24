@@ -407,7 +407,7 @@ public sealed partial class PlaybackEngine
         _handoverAt = null;
         try
         {
-            _output.Stop();
+            StopOutput();
         }
         catch (Exception e)
         {
