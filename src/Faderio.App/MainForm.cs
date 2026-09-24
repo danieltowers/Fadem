@@ -9,15 +9,15 @@ namespace Faderio.App;
 /// <summary>
 /// The WinForms shell for the slice (ticket 05): add files or a folder, or drop either on the
 /// list (build issue 02), open a playlist or save the queue as one (build issue 03), a
-/// multi-select list whose rows drag to a new place (build issue 05), a context menu for "Edit
-/// transition (this → next)", Remove and Clear queue (build issue 04; Delete removes too),
-/// transport with a shuffle toggle and a repeat button (build issue 07), a seek bar in
-/// milliseconds, the transition editor, and a status strip showing the latest notice and a count
-/// that opens this session's notice list (build issue 09), and a Settings… dialog (build issue 12).
-/// It renders
+/// multi-select list whose rows drag to a new place (build issue 05), a context menu that opens
+/// the editor on this → next, previous → this or, under repeat-one, this → this (build issue
+/// 15), with Remove and Clear queue (build issue 04; Delete removes too), transport with a
+/// shuffle toggle and a repeat button (build issue 07), a seek bar in milliseconds, the
+/// transition editor, a status strip showing the latest notice and a count that opens this
+/// session's notice list (build issue 09), and a Settings… dialog (build issue 12). It renders
 /// <see cref="PlayerView"/>s and issues commands; it holds no engine state between calls (the
-/// placement rule in CLAUDE.md). The seek bar's Maximum is the track length
-/// in milliseconds, so no scaling exists to get wrong (ticket 06).
+/// placement rule in CLAUDE.md). The seek bar's Maximum is the track length in milliseconds, so
+/// no scaling exists to get wrong (ticket 06).
 /// </summary>
 internal sealed class MainForm : Form
 {
@@ -45,7 +45,9 @@ internal sealed class MainForm : Form
     internal readonly ToolStripStatusLabel _addProgress;
     internal readonly ToolStripButton _cancelAdd;
     internal readonly TransitionEditorPanel _editor;
-    internal readonly ToolStripMenuItem _editTransition;
+    internal readonly ToolStripMenuItem _editNext;
+    internal readonly ToolStripMenuItem _editPrevious;
+    internal readonly ToolStripMenuItem _editSelf;
     internal readonly ToolStripMenuItem _removeRows;
     internal readonly ToolStripMenuItem _clearQueue;
     internal readonly Panel _dropLine;
@@ -74,6 +76,7 @@ internal sealed class MainForm : Form
         ChoosePlaylists = ShowPlaylistDialog;
         ChoosePlaylistSavePath = ShowSavePlaylistDialog;
         ConfirmClear = ShowClearDialog;
+        AskUnsavedEdits = ShowUnsavedDialog;
         ShowSettings = dialog => dialog.ShowDialog(this) == DialogResult.OK;
         StartDrag = data => _queueList!.DoDragDrop(data, DragDropEffects.Move);
         ShowNoticeList = list =>
@@ -167,20 +170,27 @@ internal sealed class MainForm : Form
         _queueList.Columns.Add("Artist", 200);
         _queueList.Columns.Add("Length", 70, HorizontalAlignment.Right);
 
-        _editTransition = new ToolStripMenuItem("Edit transition (this → next)");
+        _editNext = new ToolStripMenuItem("Edit transition: this → next");
+        _editPrevious = new ToolStripMenuItem("Edit transition: previous → this");
+        _editSelf = new ToolStripMenuItem("Edit transition: this → this");
         _removeRows = new ToolStripMenuItem("Remove") { ShortcutKeyDisplayString = "Del" };
         _clearQueue = new ToolStripMenuItem("Clear queue");
         var menu = new ContextMenuStrip
         {
-            Items = { _editTransition, new ToolStripSeparator(), _removeRows, _clearQueue },
+            Items = { _editNext, _editPrevious, _editSelf, new ToolStripSeparator(), _removeRows, _clearQueue },
         };
         menu.Opening += (_, _) =>
         {
-            _editTransition.Enabled = SelectedAdjacency() is not null;
+            var adjacencies = SelectedAdjacencies();
+            _editNext.Enabled = adjacencies.Next is not null;
+            _editPrevious.Enabled = adjacencies.Previous is not null;
+            _editSelf.Available = adjacencies.Self is not null; // shown while repeat-one is on
             _removeRows.Enabled = _queueList.SelectedItems.Count > 0;
             _clearQueue.Enabled = _queueList.Items.Count > 0;
         };
-        _editTransition.Click += (_, _) => EditSelectedTransition();
+        _editNext.Click += (_, _) => EditSelected(t => t.Next);
+        _editPrevious.Click += (_, _) => EditSelected(t => t.Previous);
+        _editSelf.Click += (_, _) => EditSelected(t => t.Self);
         _removeRows.Click += (_, _) => RemoveSelected();
         _clearQueue.Click += (_, _) => ClearQueue();
         _queueList.KeyDown += (_, e) =>
@@ -223,7 +233,7 @@ internal sealed class MainForm : Form
             }
         };
 
-        _editor = new TransitionEditorPanel(engine, store, ShowNotice, ChooseRenderPath);
+        _editor = new TransitionEditorPanel(engine, store, ShowNotice, ChooseRenderPath, a => AskUnsavedEdits(a));
 
         // Docking order: right-docked editor and bottom strip first, the fill-docked list last.
         Controls.Add(_queueList);
@@ -262,8 +272,14 @@ internal sealed class MainForm : Form
         _timer.Tick += (_, _) => Render(_engine.View);
         _timer.Start();
 
-        FormClosing += (_, _) =>
+        FormClosing += (_, e) =>
         {
+            // Closing the window closes the editor, so unsaved edits ask first.
+            if (!_editor.ConfirmLeave())
+            {
+                e.Cancel = true;
+                return;
+            }
             _timer.Stop();
             _tips.Dispose();
             _engine.Dispose();
@@ -641,25 +657,48 @@ internal sealed class MainForm : Form
 
     internal void PlayRowAt(int index) => _engine.PlayRow(RowOf(_queueList.Items[index]));
 
-    internal Adjacency? SelectedAdjacency() =>
-        _queueList.SelectedIndices.Count == 1 ? Presenter.AdjacencyAt(_engine.View, _queueList.SelectedIndices[0]) : null;
+    /// <summary>The editor's adjacencies for the row at <paramref name="rowIndex"/>, from the
+    /// engine; none for a row out of range.</summary>
+    private RowAdjacencies AdjacenciesAt(int rowIndex) =>
+        rowIndex >= 0 && rowIndex < _queueList.Items.Count
+            ? _engine.AdjacenciesOf(RowOf(_queueList.Items[rowIndex]))
+            : RowAdjacencies.None;
 
-    internal Adjacency? AdjacencyAt(int rowIndex) => Presenter.AdjacencyAt(_engine.View, rowIndex);
+    /// <summary>The one selected row's adjacencies; none for no row or several.</summary>
+    private RowAdjacencies SelectedAdjacencies() =>
+        _queueList.SelectedIndices.Count == 1 ? AdjacenciesAt(_queueList.SelectedIndices[0]) : RowAdjacencies.None;
 
-    private void EditSelectedTransition()
+    private void EditSelected(Func<RowAdjacencies, Adjacency?> which) => Edit(which(SelectedAdjacencies()));
+
+    /// <summary>Opens the editor on the row's this → next, as the menu does.</summary>
+    internal void EditTransitionAt(int rowIndex) => Edit(AdjacenciesAt(rowIndex).Next);
+
+    private void Edit(Adjacency? adjacency)
     {
-        if (SelectedAdjacency() is { } adjacency)
+        if (adjacency is not null)
         {
-            _editor.Edit(adjacency);
+            _editor.Open(adjacency);
         }
     }
 
-    internal void EditTransitionAt(int rowIndex)
+    /// <summary>Asks what to do with the editor's unsaved edits before it leaves them.</summary>
+    internal Func<Adjacency, UnsavedEdits> AskUnsavedEdits { get; set; }
+
+    private UnsavedEdits ShowUnsavedDialog(Adjacency adjacency)
     {
-        if (AdjacencyAt(rowIndex) is { } adjacency)
+        var save = new TaskDialogButton("Save");
+        var discard = new TaskDialogButton("Discard");
+        var page = new TaskDialogPage
         {
-            _editor.Edit(adjacency);
-        }
+            Caption = "Unsaved transition",
+            Heading = $"Save your changes to {adjacency.Name}?",
+            Text = "The editor has changes that are not saved. Discard loses them.",
+            Icon = TaskDialogIcon.Warning,
+            Buttons = { save, discard, TaskDialogButton.Cancel },
+            DefaultButton = save,
+        };
+        var chosen = TaskDialog.ShowDialog(this, page);
+        return chosen == save ? UnsavedEdits.Save : chosen == discard ? UnsavedEdits.Discard : UnsavedEdits.Cancel;
     }
 
     private string? ChooseRenderPath(string suggestedName)

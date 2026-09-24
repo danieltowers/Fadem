@@ -42,6 +42,36 @@ public sealed partial class PlaybackEngine
         return point.TimeSpan > length ? point : Point.FromTimeSpan(length - point.TimeSpan);
     }
 
+    /// <summary>The adjacencies the editor can open from <paramref name="row"/>: this → next,
+    /// previous → this and, under repeat-one, this → this (build issue 15). Read from the same
+    /// published state as <see cref="View"/>, without the lock. A stale row has none.</summary>
+    public RowAdjacencies AdjacenciesOf(RowId row)
+    {
+        ThrowIfDisposed();
+        return _snapshot.AdjacenciesOf(row);
+    }
+
+    /// <summary>Whether saving <paramref name="draft"/> would leave the store as it is: it holds
+    /// this transition for the adjacency, or holds nothing and the draft is blank, since a blank
+    /// save stores nothing. A missing curve is equal-power, as the resolver reads it, and a blank
+    /// entry left by an older build is nothing. The editor's test for unsaved edits (build issue
+    /// 15).</summary>
+    public bool IsAuthored(Adjacency adjacency, TransitionSpec draft)
+    {
+        ThrowIfDisposed();
+        return Run(() =>
+        {
+            var stored = _store.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath) is { IsBlank: false } s ? s : null;
+            if (stored is null || draft.IsBlank)
+            {
+                return stored is null && draft.IsBlank;
+            }
+            return WithCurve(stored) == WithCurve(draft);
+        });
+
+        static TransitionSpec WithCurve(TransitionSpec spec) => spec with { Curve = spec.Curve ?? FadeCurveKind.EqualPower };
+    }
+
     /// <summary>The globally authored transition for the adjacency, or null.</summary>
     public TransitionSpec? Transition(Adjacency adjacency)
     {

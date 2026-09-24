@@ -38,8 +38,15 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
 - [ ] The seek bar has visible travel across the width of the transport area, not a stub.
 - [ ] While playing, the seek thumb moves smoothly — not in visible steps.
 - [ ] The time readout shows elapsed and remaining, and remaining never reads `0:00` mid-track.
-- [ ] Right-clicking a row shows "Edit transition (this → next)", enabled on the first row and
-      disabled on the last.
+- [ ] Right-clicking a row shows "Edit transition: this → next" and "Edit transition: previous
+      → this", and, only while repeat is on one, "Edit transition: this → this". All read
+      clearly, and a disabled one looks disabled. With repeat off, this → next is disabled on
+      the last row and previous → this on the first. Under repeat-all, this → next on the last
+      row opens last → first. This → this opens the row into itself.
+- [ ] With unsaved edits (a field, **From end** or the curve changed, or **Remove transition**
+      pressed), opening another adjacency asks **Save / Discard / Cancel**, and so does closing
+      the window. Cancel keeps the edits and stays; Discard drops them; Save saves and moves on,
+      unless the save is refused. With nothing unsaved it asks nothing.
 - [ ] The transition editor opens with its title fully visible — not clipped, not behind
       another control.
 - [ ] All four parameter fields, the capture buttons, **From end** beside the fade-out point

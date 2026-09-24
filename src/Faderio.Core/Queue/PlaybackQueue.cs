@@ -141,9 +141,14 @@ internal sealed class PlaybackQueue
 
     /// <summary>The index ⏮ reaches from <paramref name="index"/>: the row before it, or at the
     /// head under repeat-all the last row. Null at the head otherwise.</summary>
-    public int? IndexBefore(int index, RepeatMode repeat)
+    public int? IndexBefore(int index, RepeatMode repeat) => IndexBefore(index, _entries.Count, repeat);
+
+    /// <summary>The index ⏮ reaches from <paramref name="index"/> in a queue of
+    /// <paramref name="count"/> rows. It is also the row whose ⏭ reaches <paramref name="index"/>,
+    /// so it gives the adjacency into a row.</summary>
+    public static int? IndexBefore(int index, int count, RepeatMode repeat)
     {
-        if (index < 0 || index >= _entries.Count)
+        if (index < 0 || index >= count)
         {
             return null;
         }
@@ -151,7 +156,7 @@ internal sealed class PlaybackQueue
         {
             return index - 1;
         }
-        return repeat == RepeatMode.All ? _entries.Count - 1 : null;
+        return repeat == RepeatMode.All ? count - 1 : null;
     }
 
     public void SetCurrent(int index)

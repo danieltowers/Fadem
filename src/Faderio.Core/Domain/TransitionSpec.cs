@@ -14,6 +14,11 @@ public sealed record FadePointSpec(TimeSpan Position, bool FromEnd)
 {
     /// <summary>Convenience: a plain position means "measured from the start".</summary>
     public static implicit operator FadePointSpec(TimeSpan position) => new(position, FromEnd: false);
+
+    /// <summary>The position as a <see cref="Domain.Point"/>, exactly: the editor loads a stored
+    /// point through this, not through seconds, which can lose a tick (build issue 15).</summary>
+    [JsonIgnore]
+    public Point Point => Point.FromTimeSpan(Position);
 }
 
 /// <summary>

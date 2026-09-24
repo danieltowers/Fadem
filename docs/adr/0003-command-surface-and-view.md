@@ -157,3 +157,20 @@ playhead` of the attended track, and `FromOtherEnd(track, point)` gives the same
 measured from the other end, for ticking and unticking **From end**. The shell never subtracts
 from `Length`. The presenter gains the fade curve's name (`FmtCurve`), which the editor's list
 shows.
+
+## Addendum: the engine gives each row's adjacencies, and says whether a draft is stored (2026-09-24)
+
+`AdjacenciesOf(row)` returns a `RowAdjacencies`: this → next, previous → this and, under
+repeat-one, this → this
+([issue 15](../../.scratch/202609-faderio-phase-1-build/issues/15-editor-every-adjacency-and-unsaved-edits.md)).
+Next follows ⏭'s rule, and previous is the row whose ⏭ reaches this one, so the wrap under
+repeat-all and the rows marked unreadable are handled once, in the queue's rules. It reads the
+published snapshot, as `View` does. The presenter's row → adjacency, with its `rowIndex + 1`,
+is gone from the list in Consequences: the shell no longer computes "next" or "previous".
+
+`IsAuthored(adjacency, draft)` says whether saving the draft would leave the store as it is. The
+editor asks it for its unsaved-edits prompt, so the shell keeps no copy of the stored transition,
+and a save the store could not write still counts as unsaved. The engine owns the rules that
+decide it: a blank draft stores nothing, and a missing curve is equal-power. So that an
+untouched draft compares equal, the editor loads a stored point exactly through
+`FadePointSpec.Point`, not through seconds, which can lose a tick.

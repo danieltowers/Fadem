@@ -18,12 +18,13 @@ internal sealed record SecondsField(Point? Point, string? Error)
 
 /// <summary>
 /// The shell's remaining logic, with no WinForms in it (ADR 0002, S4). Ticket 06's list, amended
-/// by build issues 01, 07, 09, 12 and 14: format and parse seconds, name the fade curves, row →
-/// adjacency with its bounds check, the add's progress, the store open/recovery path, the
-/// output modes' names, the repeat button's cycle, the notice strip's wording and the render's
-/// file name. The add's outcome is an engine notice since build issue 01, so its summary moved to
-/// <see cref="AddReport"/>. Everything here formats engine values, parses text, or picks the next
-/// state of a display control (ADR 0003's addendum); nothing computes a position.
+/// by build issues 01, 07, 09, 12, 14 and 15: format and parse seconds, name the fade curves, the
+/// add's progress, the store open/recovery path, the output modes' names, the repeat button's
+/// cycle, the notice strip's wording and the render's file name. Row → adjacency went to the
+/// engine in build issue 15. The add's outcome is an engine notice since build issue 01, so its
+/// summary moved to <see cref="AddReport"/>. Everything here formats engine values, parses text,
+/// or picks the next state of a display control (ADR 0003's addendum); nothing computes a
+/// position.
 /// </summary>
 internal static class Presenter
 {
@@ -69,17 +70,6 @@ internal static class Presenter
 
     /// <summary>A fade curve as the editor's list names it.</summary>
     public static string FmtCurve(FadeCurveKind curve) => curve == FadeCurveKind.Linear ? "Linear" : "Equal-power";
-
-    /// <summary>The adjacency whose outgoing track is the row at <paramref name="rowIndex"/>, or
-    /// null for the last row and for anything out of range (v2's EditTransitionAt had no check).</summary>
-    public static Adjacency? AdjacencyAt(PlayerView view, int rowIndex)
-    {
-        if (rowIndex < 0 || rowIndex >= view.Queue.Count - 1)
-        {
-            return null;
-        }
-        return new Adjacency(view.Queue[rowIndex].Track, view.Queue[rowIndex + 1].Track);
-    }
 
     /// <summary>The file name the render dialog suggests: "outgoing - incoming boundary.wav".</summary>
     public static string RenderFileName(Adjacency adjacency) =>

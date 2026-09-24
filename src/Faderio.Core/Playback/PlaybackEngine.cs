@@ -387,22 +387,50 @@ public sealed partial class PlaybackEngine : IDisposable
             };
         }
 
-        private Adjacency? NextAdjacencyFrom(RowId? row)
+        private Adjacency? NextAdjacencyFrom(RowId? row) =>
+            IndexOf(row) is { } i && FirstReadable(i, After) is { } next
+                ? new Adjacency(Entries[i].Track, Entries[next].Track)
+                : null;
+
+        /// <summary>The editor's adjacencies for a row (build issue 15), by the rules ⏭ and ⏮ use.</summary>
+        public RowAdjacencies AdjacenciesOf(RowId row)
+        {
+            if (IndexOf(row) is not { } i)
+            {
+                return RowAdjacencies.None;
+            }
+            var track = Entries[i].Track;
+            return new RowAdjacencies(
+                FirstReadable(i, Before) is { } previous ? new Adjacency(Entries[previous].Track, track) : null,
+                NextAdjacencyFrom(row),
+                Repeat == RepeatMode.One ? new Adjacency(track, track) : null);
+        }
+
+        private int? After(int index) => PlaybackQueue.IndexSkippedTo(index, Entries.Length, Repeat);
+
+        private int? Before(int index) => PlaybackQueue.IndexBefore(index, Entries.Length, Repeat);
+
+        private int? IndexOf(RowId? row)
         {
             for (var i = 0; i < Entries.Length; i++)
             {
                 if (Entries[i].Id == row)
                 {
-                    // A skip passes over the rows marked unreadable, and so does this.
-                    int? After(int n) => PlaybackQueue.IndexSkippedTo(n, Entries.Length, Repeat);
-                    foreach (var next in PlaybackQueue.Walk(After(i), After))
-                    {
-                        if (!Unreadable.Contains(Entries[next].Id))
-                        {
-                            return new Adjacency(Entries[i].Track, Entries[next].Track);
-                        }
-                    }
-                    return null;
+                    return i;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>The first row <paramref name="step"/> reaches from <paramref name="index"/>
+        /// that is not marked unreadable: a skip passes over the marked rows, and so does this.</summary>
+        private int? FirstReadable(int index, Func<int, int?> step)
+        {
+            foreach (var other in PlaybackQueue.Walk(step(index), step))
+            {
+                if (!Unreadable.Contains(Entries[other].Id))
+                {
+                    return other;
                 }
             }
             return null;

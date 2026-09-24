@@ -57,27 +57,6 @@ public sealed class PresenterTests
         Assert.Equal(1.5, ok.Point!.Value.TotalSeconds, 9);
     }
 
-    private static PlayerView ViewOf(params string[] paths)
-    {
-        var rows = paths.Select((p, i) => new QueueRow(new RowId(i + 1), new Track { FilePath = p }, i == 0)).ToList();
-        return new PlayerView(1, 1, Transport.Stopped, rows, null, null, false, RepeatMode.Off);
-    }
-
-    [Fact]
-    public void AdjacencyAt_IsNullForTheLastRow_AndOutOfRange()
-    {
-        var view = ViewOf(@"C:\a.wav", @"C:\b.wav", @"C:\c.wav");
-
-        var first = Presenter.AdjacencyAt(view, 0)!;
-        Assert.Equal(@"C:\a.wav", first.Outgoing.FilePath);
-        Assert.Equal(@"C:\b.wav", first.Incoming.FilePath);
-        Assert.NotNull(Presenter.AdjacencyAt(view, 1));
-        Assert.Null(Presenter.AdjacencyAt(view, 2));  // the last row has no "next"
-        Assert.Null(Presenter.AdjacencyAt(view, -1));
-        Assert.Null(Presenter.AdjacencyAt(view, 3));
-        Assert.Null(Presenter.AdjacencyAt(ViewOf(), 0));
-    }
-
     [Fact]
     public void FmtAdding_CountsTheFilesResolved_AndIsBlankWhenIdle()
     {

@@ -57,6 +57,20 @@ public sealed record PlayerView(
     public PlayerSettings Settings { get; init; } = new();
 }
 
+/// <summary>The adjacencies the editor can open from one row, each as the queue would reach it
+/// (build issue 15). <see cref="Next"/> is this → next: the adjacency ⏭ would reach from the row,
+/// by the rule <see cref="PlayerView.NextAdjacency"/> follows from the current row.
+/// <see cref="Previous"/> is previous → this: the adjacency whose ⏭ reaches the row, so under
+/// repeat-all the first row's comes from the last. Both pass over rows marked unreadable.
+/// <see cref="Self"/> is this → this, the row into itself, present only under repeat-one, where it
+/// fires at the track's natural end. A row that is itself marked keeps all three, since its mark
+/// clears when its file opens again. Each is null where the queue has none.</summary>
+public sealed record RowAdjacencies(Adjacency? Previous, Adjacency? Next, Adjacency? Self)
+{
+    /// <summary>A row that is not in the queue has none.</summary>
+    public static RowAdjacencies None { get; } = new(null, null, null);
+}
+
 /// <summary>How far the running add has got: files resolved (queued or rejected) out of every
 /// file given to it, including those of an add waiting behind the first.</summary>
 public sealed record AddProgress(int Resolved, int Total);

@@ -6,6 +6,14 @@ using Point = Faderio.Core.Domain.Point;
 
 namespace Faderio.App;
 
+/// <summary>What to do with unsaved edits on leaving the editor (build issue 15).</summary>
+internal enum UnsavedEdits
+{
+    Save,
+    Discard,
+    Cancel,
+}
+
 /// <summary>
 /// The transition editor for one adjacency: four parameter fields, two capture buttons, a
 /// from-end box on the fade-out point, the fade curve, Save, Revert, Remove transition and
@@ -13,7 +21,8 @@ namespace Faderio.App;
 /// captured points as <see cref="Point"/>s, so the text boxes are a display of the value, never
 /// its source of truth: v2 formatted the capture with "0.###" before saving it and quantised
 /// every point to a millisecond (ticket 06). The fields are a draft; the engine converts,
-/// captures and validates, and each value it refuses is shown beside its field.
+/// captures and validates, and each value it refuses is shown beside its field. Leaving a draft
+/// that differs from what is stored asks Save / Discard / Cancel (build issue 15).
 /// </summary>
 internal sealed class TransitionEditorPanel : Panel
 {
@@ -21,6 +30,7 @@ internal sealed class TransitionEditorPanel : Panel
     private readonly ITransitionStore _store;
     private readonly Action<string> _notice;
     private readonly Func<string, string?> _chooseRenderPath;
+    private readonly Func<Adjacency, UnsavedEdits> _askUnsaved;
 
     internal readonly Label _title;
     internal readonly TextBox _fadeOutPoint;
@@ -50,12 +60,13 @@ internal sealed class TransitionEditorPanel : Panel
 
     public TransitionEditorPanel(
         PlaybackEngine engine, ITransitionStore store, Action<string> notice,
-        Func<string, string?> chooseRenderPath)
+        Func<string, string?> chooseRenderPath, Func<Adjacency, UnsavedEdits> askUnsaved)
     {
         _engine = engine;
         _store = store;
         _notice = notice;
         _chooseRenderPath = chooseRenderPath;
+        _askUnsaved = askUnsaved;
 
         Dock = DockStyle.Right;
         Width = 340;
@@ -175,8 +186,57 @@ internal sealed class TransitionEditorPanel : Panel
         row++;
     }
 
-    /// <summary>Opens the editor on an adjacency, loading what is authored for it.</summary>
-    public void Edit(Adjacency adjacency)
+    /// <summary>Opens the editor on an adjacency, loading what is authored for it, once any
+    /// unsaved edits to the one open now are saved or discarded. Reopening the adjacency already
+    /// open keeps its draft.</summary>
+    public void Open(Adjacency adjacency)
+    {
+        if ((adjacency == _adjacency && HasUnsavedEdits) || !ConfirmLeave())
+        {
+            return;
+        }
+        Load(adjacency);
+    }
+
+    /// <summary>Whether the editor may be left: asks Save / Discard / Cancel when there are
+    /// unsaved edits, and nothing otherwise. A save that is refused stays, with its reasons shown.</summary>
+    public bool ConfirmLeave()
+    {
+        if (!HasUnsavedEdits)
+        {
+            return true;
+        }
+        switch (_askUnsaved(_adjacency!))
+        {
+            case UnsavedEdits.Save:
+                Save();
+                return !HasUnsavedEdits;
+            case UnsavedEdits.Discard:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>Saving would change the store: the engine says whether it holds the draft. Text
+    /// that is not a number is an edit too. After Remove transition the store holds nothing, so
+    /// filled fields are unsaved.</summary>
+    internal bool HasUnsavedEdits
+    {
+        get
+        {
+            if (_adjacency is null)
+            {
+                return false;
+            }
+            var (draft, unparsed) = Draft();
+            return unparsed.Count > 0 || !_engine.IsAuthored(_adjacency, draft);
+        }
+    }
+
+    /// <summary>Loads the fields from the store: opening an adjacency, and Revert. A stored
+    /// point loads exactly, so a draft nobody touched is the transition stored.</summary>
+    private void Load(Adjacency adjacency)
     {
         _adjacency = adjacency;
         _title.Text = adjacency.Name;
@@ -185,8 +245,8 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeOutFromEnd.Checked = spec?.FadeOutPoint?.FromEnd ?? false;
         ShowCurve(spec?.Curve ?? FadeCurveKind.EqualPower);
         _loading = false;
-        _fadeOut = spec?.FadeOutPoint is { } fo ? Point.FromSeconds(fo.Position.TotalSeconds) : null;
-        _fadeIn = spec?.FadeInPoint is { } fi ? Point.FromSeconds(fi.Position.TotalSeconds) : null;
+        _fadeOut = spec?.FadeOutPoint?.Point;
+        _fadeIn = spec?.FadeInPoint?.Point;
         _fadeOutPoint.Text = Presenter.FmtSeconds(_fadeOut);
         _fadeInPoint.Text = Presenter.FmtSeconds(_fadeIn);
         _fadeOutDuration.Text = Presenter.FmtSeconds(spec?.FadeOutDuration);
@@ -238,6 +298,20 @@ internal sealed class TransitionEditorPanel : Panel
         {
             return;
         }
+        var (spec, unparsed) = Draft();
+        ShowReasons(unparsed);
+        if (unparsed.Count > 0)
+        {
+            _notice("Not saved: " + string.Join(" ", unparsed.Select(r => r.Reason)));
+            return;
+        }
+        ShowReasons(_engine.Author(_adjacency, spec)); // saved or not, the engine says which
+    }
+
+    /// <summary>The fields as the spec Save would author, and the fields whose text is not a
+    /// number of seconds.</summary>
+    private (TransitionSpec Spec, IReadOnlyList<Refusal> Unparsed) Draft()
+    {
         var fadeOut = PointOf(_fadeOutPoint, _fadeOut);
         var fadeIn = PointOf(_fadeInPoint, _fadeIn);
         var outDuration = Presenter.ParseSeconds(_fadeOutDuration.Text);
@@ -249,12 +323,6 @@ internal sealed class TransitionEditorPanel : Panel
             (TransitionField.FadeInPoint, fadeIn.Error),
             (TransitionField.FadeInDuration, inDuration.Error),
         }.Where(f => f.Error is not null).Select(f => new Refusal(f.Field, f.Error!)).ToList();
-        ShowReasons(unparsed);
-        if (unparsed.Count > 0)
-        {
-            _notice("Not saved: " + string.Join(" ", unparsed.Select(r => r.Reason)));
-            return;
-        }
         var spec = new TransitionSpec
         {
             FadeOutPoint = fadeOut.Point is { } fo ? new FadePointSpec(fo.TimeSpan, _fadeOutFromEnd.Checked) : null,
@@ -263,7 +331,7 @@ internal sealed class TransitionEditorPanel : Panel
             FadeInDuration = inDuration.Point?.TimeSpan,
             Curve = ((CurveItem)_curve.SelectedItem!).Curve,
         };
-        ShowReasons(_engine.Author(_adjacency, spec)); // saved or not, the engine says which
+        return (spec, unparsed);
     }
 
     /// <summary>Discards the draft and reloads the fields from the store.</summary>
@@ -271,7 +339,7 @@ internal sealed class TransitionEditorPanel : Panel
     {
         if (_adjacency is not null)
         {
-            Edit(_adjacency);
+            Load(_adjacency);
         }
     }
 

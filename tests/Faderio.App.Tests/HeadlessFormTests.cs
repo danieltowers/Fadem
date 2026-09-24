@@ -401,20 +401,6 @@ public sealed class HeadlessFormTests
     });
 
     [Fact]
-    public void EditTransition_IsOfferedOnEveryRowButTheLast() => RunSta(() =>
-    {
-        using var h = new Harness();
-        var a = TestAudio.WriteDcWav("alpha.wav", 1, 0.4);
-        var b = TestAudio.WriteDcWav("beta.wav", 1, 0.2);
-        h.Form.AddPaths(new[] { a, b });
-
-        Assert.NotNull(h.Form.AdjacencyAt(0));
-        Assert.Null(h.Form.AdjacencyAt(1));
-        h.Form.EditTransitionAt(1);
-        Assert.Equal("No boundary selected", h.Form._editor._title.Text);
-    });
-
-    [Fact]
     public void TheCapturedPoint_IsWhatGetsSaved_NotTheDisplayedText() => RunSta(() =>
     {
         // The field shows three decimals; the store gets the frame-exact point (ticket 06).
@@ -494,7 +480,9 @@ public sealed class HeadlessFormTests
     public void Edit_LoadsAFromEndPoint_WithFromEndTicked_AndTheCurve() => RunSta(() =>
     {
         using var h = new Harness();
-        var (a, b) = EditingAlphaToBeta(h);
+        var a = TestAudio.WriteDcWav("alpha.wav", 5, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 5, 0.2);
+        h.Form.AddPaths(new[] { a, b });
         h.Store.Upsert(a, b, new TransitionSpec
         {
             FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1.25), FromEnd: true),
@@ -1217,5 +1205,347 @@ public sealed class HeadlessFormTests
             return false;
         };
         Click(h.Form._settings);
+    });
+
+    // ── Build issue 15: every adjacency, and unsaved edits ─────────────────────────────
+
+    /// <summary>Right-clicks a row: selects it alone and opens the menu.</summary>
+    private static void OpenMenuOn(ListView list, int index)
+    {
+        _ = list.Handle;
+        foreach (ListViewItem item in list.Items)
+        {
+            item.Selected = false;
+        }
+        SelectRows(list, index);
+        OpenMenu(list);
+    }
+
+    /// <summary>The adjacency the editor has open, as its two files.</summary>
+    private static (string, string) Opened(Harness h) =>
+        (h.Form._editor.Adjacency!.Outgoing.FilePath, h.Form._editor.Adjacency.Incoming.FilePath);
+
+    private static (string A, string B, string C) ThreeQueued(Harness h)
+    {
+        var a = TestAudio.WriteDcWav("alpha.wav", 5, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 5, 0.2);
+        var c = TestAudio.WriteDcWav("gamma.wav", 5, 0.3);
+        h.Form.AddPaths(new[] { a, b, c });
+        return (a, b, c);
+    }
+
+    [Fact]
+    public void ThisToNext_OnTheLastRow_IsDisabledWithRepeatOff_AndWrapsUnderRepeatAll() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, _, c) = ThreeQueued(h);
+
+        OpenMenuOn(h.Form._queueList, 2);
+        Assert.False(h.Form._editNext.Enabled);
+
+        h.Engine.SetRepeat(RepeatMode.All);
+        OpenMenuOn(h.Form._queueList, 2);
+        Assert.True(h.Form._editNext.Enabled);
+        Click(h.Form._editNext);
+
+        Assert.Equal((c, a), Opened(h));
+    });
+
+    [Fact]
+    public void ThisToNext_OnAMiddleRow_OpensTheAdjacencyOutOfIt() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (_, b, c) = ThreeQueued(h);
+
+        OpenMenuOn(h.Form._queueList, 1);
+        Click(h.Form._editNext);
+
+        Assert.Equal((b, c), Opened(h));
+    });
+
+    [Fact]
+    public void PreviousToThis_OpensTheAdjacencyIntoTheRow_AndIsDisabledOnTheFirstRow() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b, _) = ThreeQueued(h);
+
+        OpenMenuOn(h.Form._queueList, 0);
+        Assert.False(h.Form._editPrevious.Enabled);
+
+        OpenMenuOn(h.Form._queueList, 1);
+        Assert.True(h.Form._editPrevious.Enabled);
+        Click(h.Form._editPrevious);
+
+        Assert.Equal((a, b), Opened(h));
+    });
+
+    [Fact]
+    public void ThisToThis_IsShownOnlyUnderRepeatOne_AndOpensTheRowIntoItself() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (_, b, _) = ThreeQueued(h);
+
+        OpenMenuOn(h.Form._queueList, 1);
+        Assert.False(h.Form._editSelf.Available);
+
+        h.Engine.SetRepeat(RepeatMode.One);
+        OpenMenuOn(h.Form._queueList, 1);
+        Assert.True(h.Form._editSelf.Available);
+        Assert.True(h.Form._editSelf.Enabled);
+        Click(h.Form._editSelf);
+
+        Assert.Equal((b, b), Opened(h));
+    });
+
+    [Fact]
+    public void TheMenuItems_SayWhichAdjacency_AndAreDisabledWithoutASingleRow() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+
+        OpenMenu(h.Form._queueList); // nothing selected
+        Assert.False(h.Form._editNext.Enabled);
+        Assert.False(h.Form._editPrevious.Enabled);
+        Assert.Contains("this → next", h.Form._editNext.Text);
+        Assert.Contains("previous → this", h.Form._editPrevious.Text);
+        Assert.Contains("this → this", h.Form._editSelf.Text);
+    });
+
+    [Fact]
+    public void EditTransitionAt_ARowOutOfRange_OpensNothing() => RunSta(() =>
+    {
+        using var h = new Harness();
+
+        h.Form.EditTransitionAt(0); // --edit-first with nothing queued
+
+        Assert.Null(h.Form._editor.Adjacency);
+        Assert.Equal("No boundary selected", h.Form._editor._title.Text);
+    });
+
+    [Fact]
+    public void Switching_WithNoUnsavedEdits_AsksNothing() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (_, b, c) = ThreeQueued(h);
+        h.Form.AskUnsavedEdits = _ => throw new InvalidOperationException("a clean editor must not ask");
+        h.Form.EditTransitionAt(0);
+        Fill(h.Form._editor, "1.5", "0.5", "0", "0.5");
+        Click(h.Form._editor._save); // saved: clean again
+
+        h.Form.EditTransitionAt(1);
+
+        Assert.Equal((b, c), Opened(h));
+    });
+
+    [Fact]
+    public void Switching_WithUnsavedEdits_Asks_AndCancelKeepsTheEdits() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b, _) = ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+        h.Form._editor._fadeOutPoint.Text = "2";
+        var asked = new List<(string, string)>();
+        h.Form.AskUnsavedEdits = adjacency =>
+        {
+            asked.Add((adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath));
+            return UnsavedEdits.Cancel;
+        };
+
+        h.Form.EditTransitionAt(1);
+
+        Assert.Equal(new[] { (a, b) }, asked);
+        Assert.Equal((a, b), Opened(h));
+        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
+    });
+
+    [Fact]
+    public void Switching_WithUnsavedEdits_DiscardDropsThem() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b, c) = ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+        h.Form._editor._fadeOutPoint.Text = "2";
+        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Discard;
+
+        h.Form.EditTransitionAt(1);
+
+        Assert.Equal((b, c), Opened(h));
+        Assert.Equal("", h.Form._editor._fadeOutPoint.Text);
+        Assert.Null(h.Store.Get(a, b));
+    });
+
+    [Fact]
+    public void Switching_WithUnsavedEdits_SaveSavesThem_ThenOpensTheOther() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b, c) = ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+        h.Form._editor._fadeOutPoint.Text = "2";
+        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Save;
+
+        h.Form.EditTransitionAt(1);
+
+        Assert.Equal(TimeSpan.FromSeconds(2), h.Store.Get(a, b)!.FadeOutPoint!.Position);
+        Assert.Equal((b, c), Opened(h));
+    });
+
+    [Fact]
+    public void Switching_WhenTheSaveIsRefused_StaysWithTheEdits() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b, _) = ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+        h.Form._editor._fadeOutPoint.Text = "9"; // past alpha's end
+        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Save;
+
+        h.Form.EditTransitionAt(1);
+
+        Assert.Null(h.Store.Get(a, b));
+        Assert.Equal((a, b), Opened(h));
+        Assert.True(IsSetVisible(h.Form._editor.ReasonFor(TransitionField.FadeOutPoint)));
+    });
+
+    [Fact]
+    public void TheFromEndBox_AndTheCurve_AreUnsavedEditsToo() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+        Fill(h.Form._editor, "1.5", "0.5", "0", "0.5");
+        Click(h.Form._editor._save);
+        Assert.False(h.Form._editor.HasUnsavedEdits);
+
+        h.Form._editor._curve.SelectedIndex = h.Form._editor._curve.FindStringExact("Linear");
+        Assert.True(h.Form._editor.HasUnsavedEdits);
+        Click(h.Form._editor._revert);
+        Assert.False(h.Form._editor.HasUnsavedEdits);
+
+        h.Form._editor._fadeOutFromEnd.Checked = true;
+        Assert.True(h.Form._editor.HasUnsavedEdits);
+    });
+
+    [Fact]
+    public void AfterRemoveTransition_TheFilledFieldsAreUnsaved_AndLeavingAsks() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b, _) = ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+        Fill(h.Form._editor, "1.5", "0.5", "0", "0.5");
+        Click(h.Form._editor._save);
+
+        Click(h.Form._editor._remove);
+
+        Assert.True(h.Form._editor.HasUnsavedEdits);
+        var asked = 0;
+        h.Form.AskUnsavedEdits = _ => { asked++; return UnsavedEdits.Cancel; };
+        h.Form.EditTransitionAt(1);
+        Assert.Equal(1, asked);
+        Assert.Equal((a, b), Opened(h));
+    });
+
+    [Fact]
+    public void ABlankDraft_OnAnAdjacencyWithNothingStored_IsNotUnsaved() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+
+        h.Form._editor._curve.SelectedIndex = h.Form._editor._curve.FindStringExact("Linear");
+
+        Assert.False(h.Form._editor.HasUnsavedEdits); // saving it would store nothing
+    });
+
+    [Fact]
+    public void ATypedNumberThatCannotBeRead_IsAnUnsavedEdit() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+
+        h.Form._editor._fadeInDuration.Text = "abc";
+
+        Assert.True(h.Form._editor.HasUnsavedEdits);
+    });
+
+    [Fact]
+    public void ReopeningTheSameAdjacency_KeepsTheDraft_WithoutAsking() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+        h.Form._editor._fadeOutPoint.Text = "2";
+        h.Form.AskUnsavedEdits = _ => throw new InvalidOperationException("the same adjacency must not ask");
+
+        h.Form.EditTransitionAt(0);
+
+        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
+    });
+
+    [Fact]
+    public void ClosingTheWindow_WithUnsavedEdits_Asks_AndCancelKeepsItOpen() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+        h.Form._editor._fadeOutPoint.Text = "2";
+        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Cancel;
+
+        var closing = new FormClosingEventArgs(CloseReason.UserClosing, cancel: false);
+        typeof(Form).GetMethod("OnFormClosing", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(h.Form, new object[] { closing });
+
+        Assert.True(closing.Cancel);
+        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
+        h.Engine.Play(); // the engine was not disposed: it would throw
+    });
+
+    [Fact]
+    public void AStoredPoint_LoadsToTheTick_SoAnUntouchedDraftIsNotUnsaved() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b, _) = ThreeQueued(h);
+        // A captured point whose span does not survive a trip through seconds: loading it that
+        // way made the untouched draft differ from the store by a tick.
+        var frames = Enumerable.Range(1, 44100).First(f =>
+        {
+            var span = Ticks.SpanOf(f, 44100);
+            return TimeSpan.FromSeconds(span.TotalSeconds) != span;
+        });
+        var stored = new TransitionSpec
+        {
+            FadeOutPoint = new FadePointSpec(Ticks.SpanOf(frames, 44100), FromEnd: false),
+            Curve = FadeCurveKind.EqualPower,
+        };
+        h.Store.Upsert(a, b, stored);
+
+        h.Form.EditTransitionAt(0);
+
+        Assert.False(h.Form._editor.HasUnsavedEdits);
+        Click(h.Form._editor._save);
+        Assert.Equal(stored, h.Store.Get(a, b));
+    });
+
+    [Fact]
+    public void ASaveTheStoreCouldNotWrite_LeavesTheEditsUnsaved() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b, _) = ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+        Fill(h.Form._editor, "1.5", "0.5", "0", "0.5");
+        Click(h.Form._editor._save);
+        var path = Path.Combine(h.TempDir, "transitions.json");
+        File.SetAttributes(path, FileAttributes.ReadOnly);
+        try
+        {
+            h.Form._editor._fadeOutPoint.Text = "2";
+            Click(h.Form._editor._save);
+
+            Assert.StartsWith("Not saved", h.Form._status.Text);
+            Assert.True(h.Form._editor.HasUnsavedEdits);
+        }
+        finally
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+        }
     });
 }
