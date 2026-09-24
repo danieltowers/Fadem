@@ -17,23 +17,21 @@ internal static class Program
 
         var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "faderio");
         Directory.CreateDirectory(appData);
-        // What goes wrong before the window exists is shown as the first notices once it does.
-        var startupNotices = new List<string>();
-        var store = Presenter.OpenTransitionStore(Path.Combine(appData, "transitions.json"), startupNotices.Add);
+        // What goes wrong before the window exists is posted like any notice, and shown in order
+        // once the form's message loop runs. The output's notices (each fallback step) are posted
+        // too, so none is handled under the engine lock while the output reopens.
+        Action<string> notify = ((IEngineSink)sink).Notice;
+        var store = Presenter.OpenTransitionStore(Path.Combine(appData, "transitions.json"), notify);
 
-        var mode = Presenter.ParseOutputMode(args);
-        var output = new NAudioAudioOutput(mode, startupNotices.Add);
+        var output = new NAudioAudioOutput(
+            Presenter.ParseOutputMode(args), notify, Presenter.ParseUnavailableOutputs(args));
         var engine = new PlaybackEngine(output, store, sink);
 
         var form = new MainForm(engine, store, sink);
-        form.Text = $"faderio — {mode} at {engine.SampleRate} Hz";
+        form.Text = Presenter.Title(output.Mode, engine.SampleRate);
+        output.ModeChanged += () => form.BeginInvoke(() => form.Text = Presenter.Title(output.Mode, engine.SampleRate));
         form.Shown += (_, _) =>
         {
-            foreach (var notice in startupNotices)
-            {
-                ((IEngineSink)sink).Notice(notice);
-            }
-
             // Plain arguments are files to queue (drop them on the executable); --play starts
             // them and --edit-first opens the editor on the first boundary. For smoke runs.
             // Queued behind the posted notices, so a rejection notice from the add is the last

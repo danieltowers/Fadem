@@ -137,6 +137,32 @@ internal static class Presenter
 
     public static string ShuffleTip(bool shuffle) => shuffle ? "Shuffle: on" : "Shuffle: off";
 
+    public static string FmtOutputMode(AudioOutputMode mode) => mode switch
+    {
+        AudioOutputMode.WasapiExclusive => "WASAPI exclusive",
+        AudioOutputMode.WaveOut => "WaveOut",
+        _ => "WASAPI shared",
+    };
+
+    /// <summary>The window title names the mode actually in use, not the one asked for.</summary>
+    public static string Title(AudioOutputMode? inUse, int sampleRate) =>
+        inUse is { } mode ? $"faderio — {FmtOutputMode(mode)} at {sampleRate} Hz" : "faderio — no audio output";
+
+    /// <summary>"--unavailable=exclusive,shared": for smoke runs, the output treats these modes
+    /// as if their device were taken, so the fallback chain can be seen.</summary>
+    public static IReadOnlyList<AudioOutputMode> ParseUnavailableOutputs(IEnumerable<string> args)
+    {
+        var modes = new List<AudioOutputMode>();
+        foreach (var arg in args)
+        {
+            if (arg.StartsWith("--unavailable=", StringComparison.OrdinalIgnoreCase))
+            {
+                modes.AddRange(arg["--unavailable=".Length..].Split(',').Select(ParseMode));
+            }
+        }
+        return modes;
+    }
+
     /// <summary>"--output=wasapi-shared|wasapi-exclusive|waveout"; shared by default (ticket 05:
     /// selectable by argument, no settings dialog).</summary>
     public static AudioOutputMode ParseOutputMode(IEnumerable<string> args)
@@ -147,15 +173,17 @@ internal static class Presenter
             {
                 continue;
             }
-            return arg["--output=".Length..].ToLowerInvariant() switch
-            {
-                "wasapi-exclusive" or "exclusive" => AudioOutputMode.WasapiExclusive,
-                "waveout" => AudioOutputMode.WaveOut,
-                _ => AudioOutputMode.WasapiShared,
-            };
+            return ParseMode(arg["--output=".Length..]);
         }
         return AudioOutputMode.WasapiShared;
     }
+
+    private static AudioOutputMode ParseMode(string name) => name.Trim().ToLowerInvariant() switch
+    {
+        "wasapi-exclusive" or "exclusive" => AudioOutputMode.WasapiExclusive,
+        "waveout" => AudioOutputMode.WaveOut,
+        _ => AudioOutputMode.WasapiShared,
+    };
 
     /// <summary>Opens the transition store; a corrupt or newer-version file is reported visibly
     /// and playback continues with a fresh store, never silently. The corrupt file is moved

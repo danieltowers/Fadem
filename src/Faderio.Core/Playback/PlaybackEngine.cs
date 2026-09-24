@@ -49,6 +49,10 @@ public sealed partial class PlaybackEngine : IDisposable
     private readonly HashSet<RowId> _unreadable = new();
     private bool _finished;
 
+    /// <summary>The output failed on its own and has not been reopened: the next start reopens
+    /// it (build issue 11).</summary>
+    private bool _outputLost;
+
     /// <summary>The timeline frame after the last voice's last frame, while the device has yet
     /// to emit it: playback finishes when it has.</summary>
     private long? _finishAt;
@@ -281,17 +285,10 @@ public sealed partial class PlaybackEngine : IDisposable
         }
     }
 
-    private void OnOutputStopped(Exception? error)
-    {
-        if (error is not null)
-        {
-            Run(() =>
-            {
-                RaiseNotice($"Audio output stopped: {error.Message}");
-                Publish();
-            });
-        }
-    }
+    /// <summary>The engine's transport: the device's, except that a lost device with a track to
+    /// resume is paused, never half-stopped (build issue 11).</summary>
+    private Transport TransportNow =>
+        _outputLost && _currentVoice is not null && _output.State == Transport.Stopped ? Transport.Paused : _output.State;
 
     private long Frames(TimeSpan t) => EngineTime.Frames(t, _rate);
 
@@ -306,7 +303,7 @@ public sealed partial class PlaybackEngine : IDisposable
             ? VoiceSnap.Of(av, ae)
             : null;
         return new Snapshot(
-            _version, _queueVersion, _output.State, _queue.Entries.ToImmutableArray(),
+            _version, _queueVersion, TransportNow, _queue.Entries.ToImmutableArray(),
             _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null, _finishAt is not null,
             _shuffle, _repeat, Adding, _rate, _unreadable.ToImmutableHashSet());
     }

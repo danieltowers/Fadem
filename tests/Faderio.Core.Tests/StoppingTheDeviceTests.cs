@@ -155,6 +155,8 @@ public sealed class StoppingTheDeviceTests : IDisposable
 
         public void Pause() => State = Transport.Paused;
 
+        public int Reopen() => SampleRate;
+
         public void Stop()
         {
             State = Transport.Stopped;

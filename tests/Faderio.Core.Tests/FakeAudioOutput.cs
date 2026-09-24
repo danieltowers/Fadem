@@ -36,12 +36,52 @@ public sealed class FakeAudioOutput : IAudioOutput
     /// <summary>What the listener has actually heard: rendered frames minus the device buffer.</summary>
     public Frames FramesEmitted => new(Math.Max(0, FramesRendered - Latency));
 
+    /// <summary>The rate of the device <see cref="Reopen"/> finds; the declared rate unless set.</summary>
+    public int? DeviceRate { get; set; }
+
+    /// <summary>No device is available: <see cref="Reopen"/> throws.</summary>
+    public bool NoDevice { get; set; }
+
+    public int ReopenCount { get; private set; }
+
+    /// <summary>Failed and not yet reopened: a lost device does not play.</summary>
+    public bool Lost { get; private set; }
+
     private bool _stoppedRaised;
     public event Action<Exception?>? Stopped;
 
     public void Initialise(IFrameSource source) => Source = source;
 
-    public void Play() => State = Transport.Playing;
+    public void Play()
+    {
+        if (!Lost)
+        {
+            State = Transport.Playing;
+        }
+    }
+
+    /// <summary>The device fails on its own, as an unplugged one does: it stops, what was heard
+    /// stays in <see cref="FramesEmitted"/> until <see cref="Stop"/>, and it raises
+    /// <see cref="Stopped"/> with the error.</summary>
+    public void Fail(Exception error)
+    {
+        Lost = true;
+        State = Transport.Stopped;
+        Stopped?.Invoke(error);
+    }
+
+    public int Reopen()
+    {
+        if (NoDevice)
+        {
+            throw new InvalidOperationException("No audio output device is available.");
+        }
+        ReopenCount++;
+        Lost = false;
+        State = Transport.Stopped;
+        FramesRendered = 0;
+        return DeviceRate ?? SampleRate;
+    }
 
     public void Pause() => State = Transport.Paused;
 

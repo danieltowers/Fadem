@@ -57,8 +57,17 @@ public interface IAudioOutput : IDisposable
 
     Transport State { get; }
 
+    /// <summary>Frames made audible. When the device fails on its own it holds what was heard at
+    /// the failure until <see cref="Stop"/> resets it: the engine lands there (build issue 11).</summary>
     Frames FramesEmitted { get; }
 
-    /// <summary>Raised when the device stops on its own; the exception is null for a clean end.</summary>
+    /// <summary>Opens the output again on the current default device, after <see cref="Stopped"/>
+    /// reported a failure, for the same source at the same <see cref="SampleRate"/>: a device at
+    /// another rate is converted to. Returns that device's own rate. Throws when no device can be
+    /// opened. Leaves the output stopped, ready for <see cref="Play"/>.</summary>
+    int Reopen();
+
+    /// <summary>Raised when the device stops on its own; the exception is null for a clean end
+    /// and says why for a failure, such as the device being unplugged.</summary>
     event Action<Exception?>? Stopped;
 }

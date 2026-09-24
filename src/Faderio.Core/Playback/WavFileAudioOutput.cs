@@ -49,6 +49,13 @@ public sealed class WavFileAudioOutput : IAudioOutput
         _rendered = 0;
     }
 
+    /// <summary>A file never fails, so there is nothing to reopen: it only stops.</summary>
+    public int Reopen()
+    {
+        Stop();
+        return SampleRate;
+    }
+
     /// <summary>Pulls <paramref name="frames"/> from the engine and writes them, in blocks the
     /// size of a real device buffer. A paused or stopped output writes nothing.</summary>
     public void Advance(Frames frames, int blockFrames = 4410)

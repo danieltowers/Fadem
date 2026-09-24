@@ -118,15 +118,16 @@ public sealed partial class PlaybackEngine
 
     /// <summary>Makes the opened track a new voice starting at <paramref name="timelineStart"/>.
     /// <paramref name="audibleAt"/> is when the listener will attend to it: its own start, unless
-    /// an outgoing voice fades over it until later.</summary>
-    private void StartTrack(OpenedTrack opened, long timelineStart, TransitionSpawn? spawn, long? audibleAt = null)
+    /// an outgoing voice fades over it until later. <paramref name="from"/> starts it part-way
+    /// in, at full volume: where a lost device left the listener.</summary>
+    private void StartTrack(
+        OpenedTrack opened, long timelineStart, TransitionSpawn? spawn, long? audibleAt = null, long? from = null)
     {
         var (index, source) = opened;
         var entry = _queue.Entries[index];
         var track = entry.Track;
-        var sourceStart = spawn is null
-            ? 0
-            : Math.Clamp(Frames(spawn.FadeInPoint), 0, Math.Max(source.TotalFrames - 1, 0));
+        var sourceStart = Math.Clamp(
+            from ?? (spawn is null ? 0 : Frames(spawn.FadeInPoint)), 0, Math.Max(source.TotalFrames - 1, 0));
         var fadeInFrames = spawn is null ? 0 : Math.Max(0, Frames(spawn.FadeInDuration));
 
         var voice = _mixer.AddVoice(
@@ -460,7 +461,7 @@ public sealed partial class PlaybackEngine
     /// so the listener is on the new row now.</summary>
     private void LandWhilePaused()
     {
-        if (_output.State == Transport.Paused && _handoverAt is not null)
+        if (TransportNow == Transport.Paused && _handoverAt is not null)
         {
             CompleteHandover();
         }

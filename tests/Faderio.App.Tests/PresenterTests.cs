@@ -1,4 +1,5 @@
 using Faderio.App;
+using Faderio.App.Audio;
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;
 using Faderio.Core.Queue;
@@ -117,6 +118,31 @@ public sealed class PresenterTests
     [InlineData("--output=nonsense", AudioOutputMode.WasapiShared)]
     public void ParseOutputMode_ReadsTheArgument(string arg, AudioOutputMode expected) =>
         Assert.Equal(expected, Presenter.ParseOutputMode(arg.Length == 0 ? Array.Empty<string>() : new[] { arg }));
+
+    [Theory]
+    [InlineData(AudioOutputMode.WasapiExclusive, new[] { AudioOutputMode.WasapiExclusive, AudioOutputMode.WasapiShared, AudioOutputMode.WaveOut })]
+    [InlineData(AudioOutputMode.WasapiShared, new[] { AudioOutputMode.WasapiShared, AudioOutputMode.WaveOut })]
+    [InlineData(AudioOutputMode.WaveOut, new[] { AudioOutputMode.WaveOut })]
+    public void OutputFallbacks_RunExclusiveSharedWaveOut_FromTheModeAsked(AudioOutputMode asked, AudioOutputMode[] expected) =>
+        Assert.Equal(expected, NAudioAudioOutput.Fallbacks(asked));
+
+    [Fact]
+    public void ParseUnavailableOutputs_ReadsTheSmokeArgument()
+    {
+        Assert.Empty(Presenter.ParseUnavailableOutputs(new[] { "--play" }));
+        Assert.Equal(
+            new[] { AudioOutputMode.WasapiExclusive, AudioOutputMode.WasapiShared },
+            Presenter.ParseUnavailableOutputs(new[] { "--unavailable=wasapi-exclusive,shared" }));
+    }
+
+    [Fact]
+    public void Title_NamesTheModeInUse_OrThatThereIsNone()
+    {
+        Assert.Equal("faderio — WASAPI shared at 48000 Hz", Presenter.Title(AudioOutputMode.WasapiShared, 48000));
+        Assert.Equal("faderio — WASAPI exclusive at 44100 Hz", Presenter.Title(AudioOutputMode.WasapiExclusive, 44100));
+        Assert.Equal("faderio — WaveOut at 44100 Hz", Presenter.Title(AudioOutputMode.WaveOut, 44100));
+        Assert.Equal("faderio — no audio output", Presenter.Title(null, 44100));
+    }
 
     [Fact]
     public void OpenTransitionStore_RecoversACorruptFile_Visibly()

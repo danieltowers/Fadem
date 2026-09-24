@@ -12,9 +12,9 @@ public sealed partial class PlaybackEngine
         Run(() =>
         {
             ObserveClock();
-            if (_output.State == Transport.Paused)
+            if (TransportNow == Transport.Paused)
             {
-                _output.Play();
+                PlayOutput();
                 Publish();
                 return;
             }
@@ -42,7 +42,7 @@ public sealed partial class PlaybackEngine
                 }
                 StartTrack(first.Value, 0, null);
             }
-            _output.Play();
+            PlayOutput();
             Publish();
         });
     }
@@ -119,7 +119,7 @@ public sealed partial class PlaybackEngine
             }
             _queue.SetCurrent(index);
             StartTrack(new OpenedTrack(index, source), _mixer.Timeline, null);
-            _output.Play();
+            PlayOutput();
             Publish();
         });
     }
