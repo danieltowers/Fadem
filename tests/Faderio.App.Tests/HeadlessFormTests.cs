@@ -526,4 +526,98 @@ public sealed class HeadlessFormTests
         Assert.False(h.Form._clearQueue.Enabled);
         Assert.False(h.Form._removeRows.Enabled);
     });
+
+    /// <summary>Starts a drag of the selected rows as a user would, but hands back what the list
+    /// would drag instead of entering the modal drag loop.</summary>
+    private static IDataObject DragSelectedRows(MainForm form)
+    {
+        IDataObject? dragged = null;
+        form.StartDrag = data => dragged = data;
+        typeof(ListView).GetMethod("OnItemDrag", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(form._queueList, new object[] { new ItemDragEventArgs(MouseButtons.Left, form._queueList.SelectedItems[0]) });
+        return dragged ?? throw new InvalidOperationException("nothing was dragged");
+    }
+
+    /// <summary>Carries a drag over the list to a point in it, then drops it there. Returns the
+    /// effect the list offered, and leaves the drop line as the drag over it left it.</summary>
+    private static DragDropEffects DropAt(ListView list, IDataObject data, System.Drawing.Point client, bool drop = true)
+    {
+        var screen = list.PointToScreen(client);
+        var args = new DragEventArgs(data, 0, screen.X, screen.Y, DragDropEffects.Copy | DragDropEffects.Move, DragDropEffects.None);
+        typeof(Control).GetMethod("OnDragEnter", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
+        typeof(Control).GetMethod("OnDragOver", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
+        if (drop && args.Effect != DragDropEffects.None)
+        {
+            typeof(Control).GetMethod("OnDragDrop", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
+        }
+        return args.Effect;
+    }
+
+    /// <summary>Whether the control itself is set visible. <see cref="Control.Visible"/> also
+    /// asks every parent, and a form that is never shown has none visible.</summary>
+    private static bool IsSetVisible(Control control)
+    {
+        var getState = typeof(Control).GetMethod("GetState", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var visible = Enum.ToObject(getState.GetParameters()[0].ParameterType, 0x2); // States.Visible
+        return (bool)getState.Invoke(control, new[] { visible })!;
+    }
+
+    private static System.Drawing.Point UpperHalfOf(ListView list, int index) =>
+        new(list.Items[index].Bounds.Left + 8, list.Items[index].Bounds.Top + 2);
+
+    private static System.Drawing.Point LowerHalfOf(ListView list, int index) =>
+        new(list.Items[index].Bounds.Left + 8, list.Items[index].Bounds.Bottom - 2);
+
+    [Fact]
+    public void DraggingTwoRows_OntoTheLastRowsLowerHalf_MovesThemToTheEnd_AndKeepsThemSelected() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var paths = new[] { "one", "two", "three", "four" }.Select(n => TestAudio.WriteDcWav(n + ".wav", 1, 0.2)).ToArray();
+        h.Form.AddPaths(paths);
+        SelectRows(h.Form._queueList, 0, 2);
+        var list = h.Form._queueList;
+
+        var effect = DropAt(list, DragSelectedRows(h.Form), LowerHalfOf(list, 3));
+
+        Assert.Equal(DragDropEffects.Move, effect);
+        Assert.Equal(new[] { paths[1], paths[3], paths[0], paths[2] }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
+        Assert.Equal(new[] { "two", "four", "one", "three" }, Titles(list).Select(t => t.Split('-')[0]));
+        Assert.Equal(new[] { "1", "2", "3", "4" }, list.Items.Cast<ListViewItem>().Select(i => i.Text));
+        Assert.Equal(new[] { 2, 3 }, list.SelectedIndices.Cast<int>());
+        Assert.False(IsSetVisible(h.Form._dropLine));
+    });
+
+    [Fact]
+    public void DraggingARow_OverAnotherRowsUpperHalf_ShowsTheLineAboveIt_AndDropsItThere() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var paths = new[] { "one", "two", "three" }.Select(n => TestAudio.WriteDcWav(n + ".wav", 1, 0.2)).ToArray();
+        h.Form.AddPaths(paths);
+        SelectRows(h.Form._queueList, 2);
+        var list = h.Form._queueList;
+        var dragged = DragSelectedRows(h.Form);
+
+        DropAt(list, dragged, UpperHalfOf(list, 1), drop: false);
+        Assert.True(IsSetVisible(h.Form._dropLine));
+        Assert.InRange(h.Form._dropLine.Top, list.Items[1].Bounds.Top - 2, list.Items[1].Bounds.Top);
+
+        DropAt(list, dragged, UpperHalfOf(list, 1));
+        Assert.Equal(new[] { paths[0], paths[2], paths[1] }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
+    });
+
+    [Fact]
+    public void DroppingPastTheLastColumn_LandsByTheRowUnderTheCursor() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var paths = new[] { "one", "two", "three" }.Select(n => TestAudio.WriteDcWav(n + ".wav", 1, 0.2)).ToArray();
+        h.Form.AddPaths(paths);
+        SelectRows(h.Form._queueList, 2);
+        var list = h.Form._queueList;
+        var right = list.Columns.Cast<ColumnHeader>().Sum(c => c.Width) + 10;
+        Assert.True(right < list.ClientSize.Width, "the list must be wider than its columns");
+
+        DropAt(list, DragSelectedRows(h.Form), new System.Drawing.Point(right, UpperHalfOf(list, 1).Y));
+
+        Assert.Equal(new[] { paths[0], paths[2], paths[1] }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
+    });
 }

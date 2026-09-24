@@ -63,6 +63,9 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
       when nothing is selected.
 - [ ] **Clear queue** in the context menu, with more than one row, shows a confirmation.
       Cancel leaves the queue as it was; OK empties it and playback stops.
+- [ ] Dragging selected rows shows a line where they will land, and dropping moves them there,
+      still selected and in their order. In a queue longer than the list, a drag held at the
+      bottom edge scrolls it.
 - [ ] While playing on WASAPI shared, pressing ⏹, **Delete** on the only row and **Clear
       queue** each stop playback, and the window keeps rendering afterwards: the play button
       shows ▶ and the readout resets. Repeat each a few times; the freeze was a race.
@@ -92,6 +95,8 @@ sharp percussive transient; the realism check is the authored boundary from the 
 - [ ] Run the same capture-and-listen on WASAPI shared, WASAPI exclusive and WaveOut; the
       fade lands in the same place on all three.
 - [ ] Delete the playing row; the next one starts cleanly from its beginning.
+- [ ] Mid-song, drag a different track into the next place; it is the one that plays next.
+      Dragging the playing row elsewhere does not interrupt it.
 - [ ] Reaching the end of the second track stops playback cleanly with no error.
 - [ ] Add the whole `MUSIC` library (**Add folder…** on the `MUSIC` folder) while a track plays;
       the track plays on without a dropout, and adding never starts or stops playback.

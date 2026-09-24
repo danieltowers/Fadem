@@ -40,9 +40,7 @@ public sealed partial class PlaybackEngine
                 var target = _rng.Next(upcomingFrom, entries.Count);
                 entries.RemoveAt(entries.Count - 1);
                 entries.Insert(target, entry);
-                var current = _queue.CurrentIndex;
-                _queue.SetEntries(entries);
-                _queue.SetCurrent(current);
+                _queue.Reorder(entries);
             }
         }
         return new QueueRow(entry.Id, track, _queue.Current == entry && _attendedVoice is null);
@@ -87,26 +85,7 @@ public sealed partial class PlaybackEngine
         Run(() =>
         {
             ObserveClock();
-            var removing = new HashSet<QueueEntry>();
-            var gone = new List<RowId>();
-            foreach (var id in ids)
-            {
-                var index = _queue.IndexOf(id);
-                if (index < 0)
-                {
-                    gone.Add(id);
-                }
-                else
-                {
-                    removing.Add(_queue.Entries[index]);
-                }
-            }
-            if (gone.Count > 0)
-            {
-                RaiseNotice(gone.Count == 1
-                    ? $"That row is no longer in the queue ({gone[0]})."
-                    : $"{gone.Count} of those rows are no longer in the queue.");
-            }
+            var removing = EntriesOf(ids);
             if (removing.Count == 0)
             {
                 return;
@@ -163,6 +142,76 @@ public sealed partial class PlaybackEngine
             _queueVersion++;
             Publish();
         });
+    }
+
+    /// <summary>Moves the given rows, in their queue order, to just before
+    /// <paramref name="before"/>, or to the end when it is null (build issue 05). Rows keep their
+    /// identity, so what plays is never interrupted. If the move changes which row comes next,
+    /// the pending boundary follows it, unless its transition has started: one in flight plays
+    /// out. Under shuffle it changes the shuffled order, which is the visible one; unshuffled it
+    /// is also the order that turning shuffle off returns to. Rows already gone are one notice,
+    /// and the rest still move; a <paramref name="before"/> that is gone moves nothing.</summary>
+    public void Move(IEnumerable<RowId> rows, RowId? before)
+    {
+        ThrowIfDisposed();
+        var ids = rows.Distinct().ToList();
+        Run(() =>
+        {
+            ObserveClock();
+            var entries = _queue.Entries.ToList();
+            var beforeIndex = before is { } b ? _queue.IndexOf(b) : entries.Count;
+            if (beforeIndex < 0)
+            {
+                RaiseNotice($"That row is no longer in the queue ({before}).");
+                return;
+            }
+            var moving = EntriesOf(ids);
+            // Dropped before one of the moving rows, they land before the next row that stays.
+            var anchor = entries.Skip(beforeIndex).FirstOrDefault(e => !moving.Contains(e));
+            var order = entries.Where(e => !moving.Contains(e)).ToList();
+            order.InsertRange(anchor is null ? order.Count : order.IndexOf(anchor), entries.Where(moving.Contains));
+            if (order.SequenceEqual(entries))
+            {
+                return;
+            }
+            _queue.Reorder(order);
+            if (!_shuffle)
+            {
+                // Unshuffled, the visible order is the original order.
+                _originalOrder.Clear();
+                _originalOrder.AddRange(order);
+            }
+            RescheduleCurrentBoundary();
+            _queueVersion++;
+            Publish();
+        });
+    }
+
+    /// <summary>The queue's entries for <paramref name="ids"/>. Rows already gone are one
+    /// notice.</summary>
+    private HashSet<QueueEntry> EntriesOf(IEnumerable<RowId> ids)
+    {
+        var found = new HashSet<QueueEntry>();
+        var gone = new List<RowId>();
+        foreach (var id in ids)
+        {
+            var index = _queue.IndexOf(id);
+            if (index < 0)
+            {
+                gone.Add(id);
+            }
+            else
+            {
+                found.Add(_queue.Entries[index]);
+            }
+        }
+        if (gone.Count > 0)
+        {
+            RaiseNotice(gone.Count == 1
+                ? $"That row is no longer in the queue ({gone[0]})."
+                : $"{gone.Count} of those rows are no longer in the queue.");
+        }
+        return found;
     }
 
     /// <summary>The row that takes the place of <paramref name="playing"/> when it and
@@ -238,19 +287,7 @@ public sealed partial class PlaybackEngine
         });
     }
 
-    private void RestoreOriginalOrder()
-    {
-        var current = _queue.Current;
-        _queue.SetEntries(_originalOrder);
-        if (current is not null)
-        {
-            var index = _queue.IndexOf(current.Id);
-            if (index >= 0)
-            {
-                _queue.SetCurrent(index);
-            }
-        }
-    }
+    private void RestoreOriginalOrder() => _queue.Reorder(_originalOrder);
 
     private int IndexOf(MixerVoice voice) =>
         _voiceEntry.TryGetValue(voice, out var entry) ? _queue.IndexOf(entry.Id) : -1;
@@ -265,11 +302,16 @@ public sealed partial class PlaybackEngine
         }
         if (_pendingBoundary is { } boundary)
         {
-            if (boundary.Triggered || boundary.OutgoingVoice != voice)
+            var endFadeStarted = boundary.EndOfSequence && boundary.FadeOutTrigger <= _mixer.Timeline;
+            if (boundary.Triggered || endFadeStarted || boundary.OutgoingVoice != voice)
             {
                 return; // in flight, or not this voice's: nothing to move
             }
             CancelBoundary(boundary);
+            if (boundary.EndOfSequence)
+            {
+                voice.CancelFadeOut(); // an end fade is written on the voice, not scheduled
+            }
             _pendingBoundary = null;
         }
         var index = IndexOf(voice);

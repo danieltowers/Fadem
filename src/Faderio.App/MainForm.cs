@@ -7,10 +7,11 @@ namespace Faderio.App;
 /// <summary>
 /// The WinForms shell for the slice (ticket 05): add files or a folder, or drop either on the
 /// list (build issue 02), open a playlist or save the queue as one (build issue 03), a
-/// multi-select list, a context menu for "Edit transition (this → next)", Remove and Clear queue
-/// (build issue 04; Delete removes too), transport, a seek bar in milliseconds, and the
-/// transition editor. It renders <see cref="PlayerView"/>s and issues commands; it holds no engine state
-/// between calls (the placement rule in CLAUDE.md). The seek bar's Maximum is the track length
+/// multi-select list whose rows drag to a new place (build issue 05), a context menu for "Edit
+/// transition (this → next)", Remove and Clear queue (build issue 04; Delete removes too),
+/// transport, a seek bar in milliseconds, and the transition editor. It renders
+/// <see cref="PlayerView"/>s and issues commands; it holds no engine state between calls (the
+/// placement rule in CLAUDE.md). The seek bar's Maximum is the track length
 /// in milliseconds, so no scaling exists to get wrong (ticket 06).
 /// </summary>
 internal sealed class MainForm : Form
@@ -35,7 +36,12 @@ internal sealed class MainForm : Form
     internal readonly ToolStripMenuItem _editTransition;
     internal readonly ToolStripMenuItem _removeRows;
     internal readonly ToolStripMenuItem _clearQueue;
+    internal readonly Panel _dropLine;
     private readonly System.Windows.Forms.Timer _timer;
+    private readonly System.Windows.Forms.Timer _dragScroll;
+
+    /// <summary>What a drag of rows carries: their ids, private to this window.</summary>
+    private const string RowsFormat = "faderio.rows";
 
     private long _shownQueue = -1;
     private bool _seekDragging;
@@ -48,6 +54,7 @@ internal sealed class MainForm : Form
         ChoosePlaylists = ShowPlaylistDialog;
         ChoosePlaylistSavePath = ShowSavePlaylistDialog;
         ConfirmClear = ShowClearDialog;
+        StartDrag = data => _queueList!.DoDragDrop(data, DragDropEffects.Move);
 
         Text = "faderio";
         MinimumSize = new Size(760, 480);
@@ -143,11 +150,31 @@ internal sealed class MainForm : Form
         };
         _queueList.ContextMenuStrip = menu;
         _queueList.DoubleClick += (_, _) => PlaySelected();
-        _queueList.DragEnter += (_, e) =>
-            e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true ? DragDropEffects.Copy : DragDropEffects.None;
+        // The drop line: where dragged rows will land. A ListView draws no insertion mark in
+        // details view, so it is a thin panel over the list.
+        _dropLine = new Panel { Height = 2, BackColor = SystemColors.Highlight, Visible = false };
+        _queueList.Controls.Add(_dropLine);
+        // A drag raises DragOver only when the mouse moves, so a drag held still at an edge is
+        // scrolled on a timer.
+        _dragScroll = new System.Windows.Forms.Timer { Interval = 60 };
+        _dragScroll.Tick += (_, _) =>
+        {
+            var client = _queueList.PointToClient(Cursor.Position);
+            ScrollNearEdge(client);
+            ShowDropLine(DropIndex(client));
+        };
+        _queueList.ItemDrag += (_, _) => DragSelectedRows();
+        _queueList.DragEnter += (_, e) => DragOverList(e);
+        _queueList.DragOver += (_, e) => DragOverList(e);
+        _queueList.DragLeave += (_, _) => EndRowDrag();
         _queueList.DragDrop += (_, e) =>
         {
-            if (e.Data?.GetData(DataFormats.FileDrop) is string[] paths)
+            EndRowDrag();
+            if (e.Data?.GetData(RowsFormat) is RowId[] rows)
+            {
+                MoveRows(rows, DropIndex(ClientPoint(e)));
+            }
+            else if (e.Data?.GetData(DataFormats.FileDrop) is string[] paths)
             {
                 _ = AddPaths(paths); // files and folders alike, in the order dropped
             }
@@ -240,6 +267,8 @@ internal sealed class MainForm : Form
     private void RebuildRows(PlayerView view)
     {
         _queueList.BeginUpdate();
+        // A row keeps its selection wherever it moves to.
+        var selected = _queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToHashSet();
         var kept = 0;
         while (kept < _queueList.Items.Count && kept < view.Queue.Count && RowOf(_queueList.Items[kept]) == view.Queue[kept].Id)
         {
@@ -256,6 +285,7 @@ internal sealed class MainForm : Form
             item.SubItems.Add(row.Track.Artist);
             item.SubItems.Add(Presenter.Fmt(row.Track.Length));
             _queueList.Items.Add(item);
+            item.Selected = selected.Contains(row.Id);
         }
         _queueList.EndUpdate();
     }
@@ -289,6 +319,10 @@ internal sealed class MainForm : Form
     /// <summary>Whether the user confirms clearing a queue of this many rows. A test replaces
     /// it, since a headless form cannot show a dialog.</summary>
     internal Func<int, bool> ConfirmClear { get; set; }
+
+    /// <summary>Starts a drag of the selected rows. A test replaces it, since a headless form
+    /// cannot enter the modal drag loop.</summary>
+    internal Action<IDataObject> StartDrag { get; set; }
 
     private void AddChosen(Func<IReadOnlyList<string>> choose)
     {
@@ -361,6 +395,97 @@ internal sealed class MainForm : Form
     /// <summary>The selected rows go in one call; what that does to playback is the engine's.</summary>
     private void RemoveSelected() =>
         _engine.Remove(_queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToList());
+
+    private void DragSelectedRows()
+    {
+        var rows = _queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToArray();
+        if (rows.Length > 0)
+        {
+            StartDrag(new DataObject(RowsFormat, rows));
+            EndRowDrag();
+        }
+    }
+
+    private void EndRowDrag()
+    {
+        _dragScroll.Stop();
+        _dropLine.Visible = false;
+    }
+
+    /// <summary>Rows move and show where they will land; files copy in; anything else is
+    /// refused.</summary>
+    private void DragOverList(DragEventArgs e)
+    {
+        if (e.Data?.GetDataPresent(RowsFormat) == true)
+        {
+            e.Effect = DragDropEffects.Move;
+            _dragScroll.Start();
+            ShowDropLine(DropIndex(ClientPoint(e)));
+        }
+        else
+        {
+            e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true ? DragDropEffects.Copy : DragDropEffects.None;
+        }
+    }
+
+    private System.Drawing.Point ClientPoint(DragEventArgs e) =>
+        _queueList.PointToClient(new System.Drawing.Point(e.X, e.Y));
+
+    /// <summary>The list position a drop at the cursor lands in: before the row under it when
+    /// over its upper half, after it when over its lower half, and after the last row when
+    /// below them all. Only the height counts: past the last column is still that row.</summary>
+    private int DropIndex(System.Drawing.Point client)
+    {
+        if (RowAtHeight(client.Y) is { } item)
+        {
+            var bounds = item.Bounds;
+            return client.Y < bounds.Top + bounds.Height / 2 ? item.Index : item.Index + 1;
+        }
+        return _queueList.TopItem is { } top && client.Y < top.Bounds.Top ? top.Index : _queueList.Items.Count;
+    }
+
+    private ListViewItem? RowAtHeight(int y) => _queueList.HitTest(2, y).Item;
+
+    /// <summary>A drag held near the top or bottom edge scrolls the list a row at a time, so a
+    /// row can be dragged past what is in view.</summary>
+    private void ScrollNearEdge(System.Drawing.Point client)
+    {
+        if (_queueList.TopItem is not { } top)
+        {
+            return;
+        }
+        var margin = top.Bounds.Height;
+        if (client.Y < top.Bounds.Top + margin && top.Index > 0)
+        {
+            _queueList.EnsureVisible(top.Index - 1);
+        }
+        else if (client.Y > _queueList.ClientSize.Height - margin
+            && RowAtHeight(_queueList.ClientSize.Height - 1) is { } bottom
+            && bottom.Index + 1 < _queueList.Items.Count)
+        {
+            _queueList.EnsureVisible(bottom.Index + 1);
+        }
+    }
+
+    private void ShowDropLine(int index)
+    {
+        var count = _queueList.Items.Count;
+        if (count == 0)
+        {
+            _dropLine.Visible = false;
+            return;
+        }
+        var y = index < count ? _queueList.Items[index].Bounds.Top - 1 : _queueList.Items[count - 1].Bounds.Bottom - 1;
+        _dropLine.SetBounds(0, y, _queueList.ClientSize.Width, _dropLine.Height);
+        _dropLine.Visible = true;
+        _dropLine.BringToFront();
+    }
+
+    /// <summary>One drop, one call: the drop position is passed as the row the dragged rows
+    /// land before, or none for the end. Where they land, and what that does to playback, is
+    /// the engine's.</summary>
+    private void MoveRows(IReadOnlyList<RowId> rows, int index) =>
+        _engine.Move(rows, index < _queueList.Items.Count ? RowOf(_queueList.Items[index]) : null);
 
     /// <summary>There is no undo, so a queue of more than one row asks first.</summary>
     private void ClearQueue()

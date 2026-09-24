@@ -42,6 +42,17 @@ internal sealed class PlaybackQueue
         CurrentIndex = _entries.Count > 0 ? 0 : -1;
     }
 
+    /// <summary>Puts the same entries in a new order; the current entry stays current.</summary>
+    public void Reorder(IEnumerable<QueueEntry> order)
+    {
+        var current = Current;
+        SetEntries(order);
+        if (current is not null && IndexOf(current.Id) is var index and >= 0)
+        {
+            CurrentIndex = index;
+        }
+    }
+
     public void Add(QueueEntry entry)
     {
         _entries.Add(entry);
