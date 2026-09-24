@@ -1,6 +1,6 @@
 # 14: Editor: curve, from-end, revert, remove, validation
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 
 Decided in [What completes the editor?](../../202609-faderio-phase-1-restage/issues/09-what-completes-the-editor.md) (From-end, Curve,
@@ -37,13 +37,13 @@ Closes audit finding 15.
 
 ## Acceptance
 
-- [ ] Ticking from-end on 3:12 of a 3:40 track shows 0:28, and the resolved fade starts at the
+- [x] Ticking from-end on 3:12 of a 3:40 track shows 0:28, and the resolved fade starts at the
       same moment.
-- [ ] Capture with from-end on stores the distance to the end.
-- [ ] Linear, saved, plays linear, and the store round-trips it.
-- [ ] Remove transition leaves the fields filled; Save puts the transition back.
-- [ ] A blank save leaves no entry in `transitions.json`.
-- [ ] Each impossible value is refused with its reason shown beside the field, and nothing is
+- [x] Capture with from-end on stores the distance to the end.
+- [x] Linear, saved, plays linear, and the store round-trips it.
+- [x] Remove transition leaves the fields filled; Save puts the transition back.
+- [x] A blank save leaves no entry in `transitions.json`.
+- [x] Each impossible value is refused with its reason shown beside the field, and nothing is
       stored.
 
 ## Tests

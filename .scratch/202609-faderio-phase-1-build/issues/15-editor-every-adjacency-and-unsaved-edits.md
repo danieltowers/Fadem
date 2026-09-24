@@ -43,3 +43,10 @@ Leaving with unsaved edits, by opening another adjacency or closing the editor, 
 ## Smoke
 
 - **Looks:** all three menu items read clearly, and disabled ones look disabled.
+
+## Comments
+
+- From issue 14: the draft now includes the **From end** box and the **Fade curve**, so the
+  dirty check must compare them as well as the four fields. `TransitionEditorPanel.Edit` is the
+  load, and Revert calls it. After **Remove transition** the store holds nothing, so the filled
+  fields are an unsaved draft and leaving should prompt.

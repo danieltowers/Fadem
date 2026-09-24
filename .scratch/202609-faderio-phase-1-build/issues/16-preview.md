@@ -69,3 +69,6 @@ and the correction in [What does queue management add?](../../202609-faderio-pha
   voice-to-row map (`RampLiveVoicesToTheirGain`, `PlaybackEngineSettings.cs`). Preview voices
   must be reached too: give them their track's base gain when created, and make sure that
   loop covers them.
+- From issue 14: `Capture(fromEnd: true)` returns `Length − playhead` of the attended voice's
+  track. When Capture reads the preview's voices, the from-end form must measure against the
+  previewed outgoing track's `Length` in the same way.

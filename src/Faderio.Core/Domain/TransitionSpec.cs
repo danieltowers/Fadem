@@ -35,8 +35,12 @@ public sealed record TransitionSpec
     /// <summary>Equal-power by default; linear selectable. Individually optional.</summary>
     public FadeCurveKind? Curve { get; init; }
 
+    /// <summary>All four parameters absent. A curve alone shapes fades nobody placed, so a
+    /// blank spec is no transition: <c>Author</c> removes rather than stores one (build issue 14).</summary>
     [JsonIgnore]
-    public bool IsEmpty =>
-        FadeOutPoint is null && FadeInPoint is null &&
-        FadeOutDuration is null && FadeInDuration is null && Curve is null;
+    public bool IsBlank =>
+        FadeOutPoint is null && FadeInPoint is null && FadeOutDuration is null && FadeInDuration is null;
+
+    [JsonIgnore]
+    public bool IsEmpty => IsBlank && Curve is null;
 }

@@ -435,6 +435,208 @@ public sealed class HeadlessFormTests
         Assert.Equal(12345, Ticks.FramesOf(saved, 44100));
     });
 
+    // ── Build issue 14: curve, from-end, revert, remove, validation ────────────────────
+
+    /// <summary>Two DC tracks queued, 5 s each, with the editor open on alpha → beta.</summary>
+    private static (string A, string B) EditingAlphaToBeta(Harness h)
+    {
+        var a = TestAudio.WriteDcWav("alpha.wav", 5, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 5, 0.2);
+        h.Form.AddPaths(new[] { a, b });
+        h.Form.EditTransitionAt(0);
+        return (a, b);
+    }
+
+    private static void Fill(TransitionEditorPanel editor, string fadeOutPoint, string fadeOutDuration, string fadeInPoint, string fadeInDuration)
+    {
+        editor._fadeOutPoint.Text = fadeOutPoint;
+        editor._fadeOutDuration.Text = fadeOutDuration;
+        editor._fadeInPoint.Text = fadeInPoint;
+        editor._fadeInDuration.Text = fadeInDuration;
+    }
+
+    [Fact]
+    public void FromEnd_TickedAndUnticked_ConvertsTheFadeOutPoint_KeepingTheMoment() => RunSta(() =>
+    {
+        using var h = new Harness();
+        EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        editor._fadeOutPoint.Text = "3.5";
+
+        editor._fadeOutFromEnd.Checked = true;
+        Assert.Equal("1.5", editor._fadeOutPoint.Text);
+
+        editor._fadeOutFromEnd.Checked = false;
+        Assert.Equal("3.5", editor._fadeOutPoint.Text);
+    });
+
+    [Fact]
+    public void CaptureWithFromEnd_StoresTheDistanceToTheEnd() => RunSta(() =>
+    {
+        using var h = new Harness(latency: 4410);
+        var (a, b) = EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        editor._fadeOutFromEnd.Checked = true;
+        h.Form.PlayRowAt(0);
+        h.Output.Advance(66150 + 4410); // audible 1.5 s
+        h.Form.Render();
+
+        Click(editor._captureOut);
+        Click(editor._save);
+
+        Assert.Equal("3.5", editor._fadeOutPoint.Text);
+        var saved = h.Store.Get(a, b)!.FadeOutPoint!;
+        Assert.True(saved.FromEnd);
+        Assert.Equal(5 * 44100 - 66150, Ticks.FramesOf(saved.Position, 44100));
+    });
+
+    [Fact]
+    public void Edit_LoadsAFromEndPoint_WithFromEndTicked_AndTheCurve() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b) = EditingAlphaToBeta(h);
+        h.Store.Upsert(a, b, new TransitionSpec
+        {
+            FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1.25), FromEnd: true),
+            Curve = FadeCurveKind.Linear,
+        });
+
+        h.Form.EditTransitionAt(0);
+
+        Assert.True(h.Form._editor._fadeOutFromEnd.Checked);
+        Assert.Equal("1.25", h.Form._editor._fadeOutPoint.Text); // loading converts nothing
+        Assert.Equal("Linear", h.Form._editor._curve.Text);
+    });
+
+    [Fact]
+    public void Linear_Saved_IsStored_AndShownAgainOnReopening() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b) = EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        Assert.Equal("Equal-power", editor._curve.Text);
+        Fill(editor, "1.5", "0.5", "0", "0.5");
+        editor._curve.SelectedIndex = editor._curve.FindStringExact("Linear");
+
+        Click(editor._save);
+        h.Form.EditTransitionAt(0);
+
+        Assert.Equal(FadeCurveKind.Linear, h.Store.Get(a, b)!.Curve);
+        Assert.Equal("Linear", editor._curve.Text);
+    });
+
+    [Fact]
+    public void Revert_DiscardsTheDraft_AndReloadsFromTheStore() => RunSta(() =>
+    {
+        using var h = new Harness();
+        EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        Fill(editor, "1.5", "0.5", "0", "0.5");
+        Click(editor._save);
+        Fill(editor, "2", "", "", "");
+        editor._fadeOutFromEnd.Checked = true;
+
+        Click(editor._revert);
+
+        Assert.Equal("1.5", editor._fadeOutPoint.Text);
+        Assert.Equal("0.5", editor._fadeOutDuration.Text);
+        Assert.False(editor._fadeOutFromEnd.Checked);
+    });
+
+    [Fact]
+    public void RemoveTransition_Unauthors_KeepsTheFields_AndSavePutsItBack() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b) = EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        Fill(editor, "1.5", "0.5", "0", "0.5");
+        Click(editor._save);
+        var saved = h.Store.Get(a, b);
+
+        Click(editor._remove);
+
+        Assert.Null(h.Store.Get(a, b));
+        Assert.StartsWith("Removed alpha", h.Form._status.Text);
+        Assert.Equal("1.5", editor._fadeOutPoint.Text);
+        Assert.Equal("0.5", editor._fadeInDuration.Text);
+
+        Click(editor._save);
+
+        Assert.Equal(saved, h.Store.Get(a, b));
+    });
+
+    [Fact]
+    public void ABlankSave_LeavesNoEntryInTheStore() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b) = EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        Fill(editor, "1.5", "0.5", "0", "0.5");
+        Click(editor._save);
+
+        Fill(editor, "", "", "", "");
+        Click(editor._save);
+
+        Assert.Null(h.Store.Get(a, b));
+        Assert.DoesNotContain("alpha", File.ReadAllText(Path.Combine(h.TempDir, "transitions.json")));
+    });
+
+    [Fact]
+    public void AnImpossibleValue_IsRefused_WithItsReasonBesideItsField() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b) = EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        Fill(editor, "9", "0.5", "7", "0.5");
+
+        Click(editor._save);
+
+        Assert.Null(h.Store.Get(a, b));
+        var outReason = editor.ReasonFor(TransitionField.FadeOutPoint);
+        var inReason = editor.ReasonFor(TransitionField.FadeInPoint);
+        Assert.True(IsSetVisible(outReason));
+        Assert.Contains("past the end of alpha", outReason.Text);
+        Assert.True(IsSetVisible(inReason));
+        Assert.Contains("past the end of beta", inReason.Text);
+        Assert.False(IsSetVisible(editor.ReasonFor(TransitionField.FadeOutDuration)));
+        Assert.StartsWith("Not saved: alpha", h.Form._status.Text);
+
+        Fill(editor, "1.5", "0.5", "0", "0.5");
+        Click(editor._save);
+
+        Assert.NotNull(h.Store.Get(a, b));
+        Assert.False(IsSetVisible(outReason)); // a good save clears the reasons
+    });
+
+    [Fact]
+    public void AFromEndPointLongerThanTheTrack_IsRefusedBesideTheFadeOutPoint() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b) = EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        editor._fadeOutFromEnd.Checked = true;
+        editor._fadeOutPoint.Text = "6";
+
+        Click(editor._save);
+
+        Assert.Null(h.Store.Get(a, b));
+        Assert.Contains("measured from the end", editor.ReasonFor(TransitionField.FadeOutPoint).Text);
+    });
+
+    [Fact]
+    public void ANumberThatCannotBeRead_IsShownBesideItsField() => RunSta(() =>
+    {
+        using var h = new Harness();
+        EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        editor._fadeInDuration.Text = "abc";
+
+        Click(editor._save);
+
+        Assert.True(IsSetVisible(editor.ReasonFor(TransitionField.FadeInDuration)));
+        Assert.Contains("\"abc\"", editor.ReasonFor(TransitionField.FadeInDuration).Text);
+    });
+
     /// <summary>Fires the list's context menu Opening, which sets what is enabled.</summary>
     private static void OpenMenu(ListView list)
     {

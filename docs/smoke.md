@@ -42,9 +42,17 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
       disabled on the last.
 - [ ] The transition editor opens with its title fully visible — not clipped, not behind
       another control.
-- [ ] All four parameter fields and the capture buttons are visible without scrolling at the
-      default window size.
-- [ ] The Save and Render buttons are visible and enabled once a boundary is selected.
+- [ ] All four parameter fields, the capture buttons, **From end** beside the fade-out point
+      and the **Fade curve** list are visible without scrolling at the default window size.
+- [ ] Save, Revert, Remove transition and Render are visible and enabled once the editor is
+      open on an adjacency.
+- [ ] Ticking **From end** on a fade-out point of 3.5 on a 5 s track shows 1.5; unticking shows
+      3.5 again. The fade curve lists Equal-power and Linear.
+- [ ] Saving a fade-out point past the end of its track stores nothing: the strip says "Not
+      saved", and the reason shows in red under the field, readable in full, without pushing
+      the buttons out of sight. The next good save clears it.
+- [ ] **Remove transition** says "Removed …" in the strip and leaves the fields filled; Save
+      puts the transition back. **Revert** reloads what is stored.
 - [ ] Pressing capture writes a number into the field, and it is the number the time readout
       showed at that moment.
 - [ ] After Save, the status strip shows a confirmation and nothing else changed.
@@ -119,6 +127,8 @@ sharp percussive transient; the realism check is the authored boundary from the 
       grid point.
 - [ ] Capture at a drum hit; play the boundary; the fade **starts on the hit**, not after it.
 - [ ] Seek back a few seconds and listen again; the point still lands on the hit.
+- [ ] Tick **From end**, capture the fade-out point on a drum hit and save. Play through into
+      the next track; the fade starts on the hit.
 - [ ] During the crossfade, the time readout keeps following the outgoing track until it
       falls silent — it does not jump to the incoming track early.
 - [ ] Seeking during the crossfade cancels the transition and the outgoing track continues

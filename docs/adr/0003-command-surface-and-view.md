@@ -140,3 +140,20 @@ holds nothing between calls. The output mode in the view is the one chosen for t
 root hands the form a read of it, as it already did for the title. `Presenter.FmtModeInUse`
 words the difference. The store's trouble at launch (a corrupt file moved aside, a newer
 schema) reaches the sink from the engine's constructor, before any lock is taken.
+
+## Addendum: `Author` refuses impossible values and returns them (2026-09-24)
+
+`Author` now returns the values it refused, each as a `Refusal` naming its `TransitionField`
+and a reason worded for the user
+([issue 14](../../.scratch/202609-faderio-phase-1-build/issues/14-editor-curve-from-end-revert-remove-validation.md)).
+Only the engine holds both tracks' lengths, so only it can say a point is past the end
+(placement test 2). A refusal is data the editor shows beside each field, not an exception:
+every command stays total. The outcome is also a notice, as for any save. A duration that only
+runs past the end is not refused; the resolver shortens it. A spec with all four parameters
+blank removes the transition instead of storing it, so the store never holds an empty one.
+
+The from-end arithmetic is the engine's too. `Capture(fromEnd: true)` returns `Length −
+playhead` of the attended track, and `FromOtherEnd(track, point)` gives the same moment
+measured from the other end, for ticking and unticking **From end**. The shell never subtracts
+from `Length`. The presenter gains the fade curve's name (`FmtCurve`), which the editor's list
+shows.

@@ -77,6 +77,26 @@ public class TransitionResolverTests
     }
 
     [Fact]
+    public void FromEnd_0m28On3m40_ResolvesTo3m12_TheMomentTheEditorConvertedFrom()
+    {
+        // Build issue 14's example: ticking from-end on 3:12 shows 0:28, and it fades at 3:12.
+        var resolver = new TransitionResolver(Settings());
+        var spec = new TransitionSpec { FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(28), FromEnd: true) };
+        var result = resolver.Resolve(spec, null, TimeSpan.FromSeconds(220), TimeSpan.FromSeconds(10));
+        Assert.Equal(TimeSpan.FromSeconds(192), result.FadeOutPoint);
+    }
+
+    [Fact]
+    public void AFromEndFadeInPoint_IsStillReadFromTheStart()
+    {
+        // The editor never writes one (build issue 14); an old file's is handled as before.
+        var resolver = new TransitionResolver(Settings());
+        var spec = new TransitionSpec { FadeInPoint = new FadePointSpec(TimeSpan.FromSeconds(2), FromEnd: true) };
+        var result = resolver.Resolve(spec, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+        Assert.Equal(TimeSpan.FromSeconds(2), result.FadeInPoint);
+    }
+
+    [Fact]
     public void Curve_IsIndividuallyOptional_AndDefaultsToEqualPower()
     {
         var resolver = new TransitionResolver(Settings());
