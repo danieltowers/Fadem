@@ -25,6 +25,7 @@ public sealed class HeadlessFormTests
         public JsonTransitionStore Store { get; }
         public PlaybackEngine Engine { get; }
         public MainForm Form { get; }
+        public IEngineSink Sink { get; }
 
         public Harness(int latency = 0)
         {
@@ -32,6 +33,7 @@ public sealed class HeadlessFormTests
             Output = new FakeAudioOutput { Latency = latency };
             Store = new JsonTransitionStore(Path.Combine(TempDir, "transitions.json"));
             var sink = new PostingSink(null); // inline: no message pump in a headless test
+            Sink = sink;
             // The add worker runs inline, so an add completes on this STA thread and the inline
             // sink never touches a control from another thread.
             Engine = new PlaybackEngine(Output, Store, sink) { StartAddWorker = work => work() };
@@ -746,5 +748,115 @@ public sealed class HeadlessFormTests
         Assert.Equal(b, h.Engine.View.Incoming?.Row.Track.FilePath);
         Assert.False(h.Form._transitionNow.Enabled);
         Assert.Equal("Transition now", h.Form._tips.GetToolTip(h.Form._transitionNow));
+    });
+
+    /// <summary>Clicks a strip item through its own handler, as <see cref="Click"/> does.</summary>
+    private static void Click(ToolStripItem item)
+    {
+        var onClick = typeof(ToolStripItem).GetMethod("OnClick", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        onClick.Invoke(item, new object[] { EventArgs.Empty });
+    }
+
+    /// <summary>The list as a user reads it: the notice column of each row.</summary>
+    private static string[] ListedNotices(MainForm form) =>
+        form._noticeList!._list.Items.Cast<ListViewItem>().Select(i => i.SubItems[1].Text).ToArray();
+
+    [Fact]
+    public void TwoNoticesInARow_TheStripShowsTheLatestAndACount_AndTheListHoldsBoth() => RunSta(() =>
+    {
+        using var h = new Harness();
+        Assert.False(h.Form._noticeCount.Available); // nothing to count yet
+
+        h.Sink.Notice("Skipped \"a.wav\": gone.");
+        h.Sink.Notice("Saved a → b.");
+
+        Assert.Equal("Saved a → b.", h.Form._status.Text);
+        Assert.True(h.Form._noticeCount.Available);
+        Assert.Equal("2 notices", h.Form._noticeCount.Text);
+
+        h.Form.ShowNoticeList = _ => { }; // a headless form shows no window
+        Click(h.Form._noticeCount);
+
+        Assert.Equal(new[] { "Skipped \"a.wav\": gone.", "Saved a → b." }, ListedNotices(h.Form));
+    });
+
+    [Fact]
+    public void ANoticeRepeatedFiftyTimes_ShowsOnce_WithItsCount() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Sink.Notice("Audio rendering error: boom");
+        h.Sink.Notice("Saved a → b.");
+        for (var i = 0; i < 49; i++)
+        {
+            h.Sink.Notice("Audio rendering error: boom");
+        }
+
+        Assert.Equal("Audio rendering error: boom ×50", h.Form._status.Text);
+        Assert.Equal("2 notices", h.Form._noticeCount.Text);
+
+        h.Form.ShowNoticeList = _ => { };
+        Click(h.Form._status);
+
+        var rows = h.Form._noticeList!._list.Items.Cast<ListViewItem>().ToArray();
+        Assert.Equal(new[] { "Audio rendering error: boom", "Saved a → b." }, rows.Select(r => r.SubItems[1].Text));
+        Assert.Equal(new[] { "×50", "" }, rows.Select(r => r.SubItems[2].Text));
+    });
+
+    [Fact]
+    public void TheOpenList_FollowsNewNotices_AndSelectingOneShowsItInFull() => RunSta(() =>
+    {
+        using var h = new Harness();
+        Form? shown = null;
+        h.Form.ShowNoticeList = form => shown = form;
+        h.Sink.Notice("first");
+        Click(h.Form._noticeCount);
+        Assert.Same(h.Form._noticeList, shown);
+        Assert.Equal("first", h.Form._noticeList!._detail.Text); // the latest is selected on open
+
+        h.Sink.Notice("second");
+        h.Sink.Notice("first");
+
+        Assert.Equal(new[] { "first", "second" }, ListedNotices(h.Form));
+        Assert.Equal("×2", h.Form._noticeList._list.Items[0].SubItems[2].Text);
+
+        h.Form._noticeList._list.Items[1].Selected = true;
+        Assert.Equal("second", h.Form._noticeList._detail.Text);
+
+        var list = h.Form._noticeList;
+        Click(h.Form._noticeCount); // a second click brings back the same list, not another
+        Assert.Same(list, h.Form._noticeList);
+
+        list.Dispose(); // closed by something other than the user, which hides it
+        h.Sink.Notice("third");
+        Click(h.Form._noticeCount);
+        Assert.False(h.Form._noticeList.IsDisposed);
+        Assert.Equal(new[] { "first", "second", "third" }, ListedNotices(h.Form));
+    });
+
+    [Fact]
+    public void BeforeAnyNotice_TheStripOpensNothing() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Form.ShowNoticeList = _ => Assert.Fail("an empty list was opened");
+
+        Click(h.Form._status);
+
+        Assert.Equal("Ready.", h.Form._status.Text);
+        Assert.Null(h.Form._noticeList);
+    });
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(40)]
+    public void ALongNotice_IsClipped_AndNeverPushesTheCountOffTheStrip(int words) => RunSta(() =>
+    {
+        using var h = new Harness();
+        _ = h.Form.Handle; // laid out at its default size, still never shown
+        h.Sink.Notice(string.Join(" ", Enumerable.Repeat("Transition store file is corrupt.", words)));
+        h.Form._noticeCount.Owner!.PerformLayout();
+
+        Assert.Equal(ToolStripItemPlacement.Main, h.Form._status.Placement);
+        Assert.Equal(ToolStripItemPlacement.Main, h.Form._noticeCount.Placement);
+        Assert.True(h.Form._noticeCount.Bounds.Right <= h.Form._noticeCount.Owner.DisplayRectangle.Right);
     });
 }

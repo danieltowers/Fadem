@@ -17,11 +17,10 @@ internal static class Program
 
         var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "faderio");
         Directory.CreateDirectory(appData);
-        var store = Presenter.OpenTransitionStore(
-            Path.Combine(appData, "transitions.json"),
-            message => MessageBox.Show(message, "faderio — transition store", MessageBoxButtons.OK, MessageBoxIcon.Warning));
-
+        // What goes wrong before the window exists is shown as the first notices once it does.
         var startupNotices = new List<string>();
+        var store = Presenter.OpenTransitionStore(Path.Combine(appData, "transitions.json"), startupNotices.Add);
+
         var mode = Presenter.ParseOutputMode(args);
         var output = new NAudioAudioOutput(mode, startupNotices.Add);
         var engine = new PlaybackEngine(output, store, sink);

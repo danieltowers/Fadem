@@ -29,28 +29,61 @@ public sealed partial class PlaybackEngine
 
     /// <summary>Upserts the transition and, if the adjacency's boundary is pending in the current
     /// playback, reschedules it: editing a transition during the very playback it governs is the
-    /// slice's main authoring loop. A boundary already in flight is left alone.</summary>
+    /// slice's main authoring loop. A boundary already in flight is left alone. The outcome is a
+    /// notice: saved, or not saved and why. A store that cannot be written changes nothing, and
+    /// the command stays total (build issue 09).</summary>
     public void Author(Adjacency adjacency, TransitionSpec spec)
     {
         ThrowIfDisposed();
         Run(() =>
         {
             ObserveClock();
-            _store.Upsert(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath, spec);
+            try
+            {
+                _store.Upsert(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath, spec);
+            }
+            catch (Exception e) when (IsStoreWriteFailure(e))
+            {
+                RaiseStoreWriteFailure("Not saved", adjacency, e);
+                return;
+            }
+            RaiseNotice($"Saved {adjacency.Name}.");
             RescheduleIfPending(adjacency);
         });
     }
 
+    /// <summary>Removes the authored transition, rescheduling as <see cref="Author"/> does. Says
+    /// so when there was one to remove, and says why when the store cannot be written.</summary>
     public void Unauthor(Adjacency adjacency)
     {
         ThrowIfDisposed();
         Run(() =>
         {
             ObserveClock();
-            _store.Remove(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
-            RescheduleIfPending(adjacency);
+            bool removed;
+            try
+            {
+                removed = _store.Remove(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
+            }
+            catch (Exception e) when (IsStoreWriteFailure(e))
+            {
+                RaiseStoreWriteFailure("Not removed", adjacency, e);
+                return;
+            }
+            if (removed)
+            {
+                RaiseNotice($"Removed {adjacency.Name}.");
+                RescheduleIfPending(adjacency);
+            }
         });
     }
+
+    /// <summary>What a file write can throw, as <see cref="SaveAsPlaylist"/> catches it.</summary>
+    private static bool IsStoreWriteFailure(Exception e) =>
+        e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException;
+
+    private void RaiseStoreWriteFailure(string outcome, Adjacency adjacency, Exception e) =>
+        RaiseNotice($"{outcome}: {adjacency.Name}. The transition store could not be written: {e.Message}");
 
     private void RescheduleIfPending(Adjacency adjacency)
     {

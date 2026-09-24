@@ -3,6 +3,7 @@ using Faderio.Core.Domain;
 using Faderio.Core.Playback;
 using Faderio.Core.Queue;
 using Faderio.Core.Settings;
+using Faderio.Core.Transitions;
 
 using Point = Faderio.Core.Domain.Point;
 
@@ -133,4 +134,55 @@ public sealed class PresenterTests
         Assert.True(File.Exists(path + ".corrupt"), "the corrupt file is moved aside, not deleted");
         Directory.Delete(dir, recursive: true);
     }
+
+    [Fact]
+    public void OpenTransitionStore_ACorruptFileThatCannotBeMovedAside_IsANotice_NotACrash()
+    {
+        // Build issue 09: the move-aside's failure was swallowed, and the fresh store then
+        // reopened the same corrupt file and threw at launch.
+        var dir = Path.Combine(Path.GetTempPath(), "faderio-app", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, "transitions.json");
+        File.WriteAllText(path, "{ this is not json");
+        var warnings = new List<string>();
+        ITransitionStore store;
+
+        using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) // no delete, so no move
+        {
+            store = Presenter.OpenTransitionStore(path, warnings.Add);
+            store.Upsert(@"C:\a.wav", @"C:\b.wav", new TransitionSpec { FadeOutDuration = TimeSpan.FromSeconds(1) });
+        }
+
+        var warning = Assert.Single(warnings);
+        Assert.Contains("could not be moved aside", warning);
+        Assert.Equal("{ this is not json", File.ReadAllText(path)); // left untouched
+        Assert.False(File.Exists(path + ".corrupt"));
+        Assert.True(File.Exists(path + ".recovered"), "writes go to a fresh file beside it");
+        Directory.Delete(dir, recursive: true);
+    }
+
+    [Fact]
+    public void NoticeLog_MergesARepeatIntoItsFirstEntry_WithACount()
+    {
+        var log = new NoticeLog();
+        log.Add("one");
+        log.Add("two");
+        for (var i = 0; i < 49; i++)
+        {
+            log.Add("one");
+        }
+
+        Assert.Equal(new[] { "one", "two" }, log.Entries.Select(e => e.Message));
+        Assert.Equal(new[] { 50, 1 }, log.Entries.Select(e => e.Count));
+        Assert.Same(log.Entries[0], log.Latest); // the latest delivery, wherever its entry sits
+        Assert.Equal("one ×50", Presenter.FmtNotice(log.Latest!));
+        Assert.Equal("two", Presenter.FmtNotice(log.Entries[1]));
+    }
+
+    [Theory]
+    [InlineData(0, "")]
+    [InlineData(1, "1 notice")]
+    [InlineData(2, "2 notices")]
+    public void FmtNoticeCount_CountsTheListsEntries(int count, string expected) =>
+        Assert.Equal(expected, Presenter.FmtNoticeCount(count));
 }

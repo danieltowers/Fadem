@@ -39,20 +39,18 @@ public sealed class JsonTransitionStore : ITransitionStore
             : null;
     }
 
-    public void Upsert(string outgoingPath, string incomingPath, TransitionSpec spec)
-    {
-        _model.Transitions[PairKey(outgoingPath, incomingPath)] = spec;
-        Persist();
-    }
+    public void Upsert(string outgoingPath, string incomingPath, TransitionSpec spec) =>
+        Commit(model => model.Transitions[PairKey(outgoingPath, incomingPath)] = spec);
 
     public bool Remove(string outgoingPath, string incomingPath)
     {
-        var removed = _model.Transitions.Remove(PairKey(outgoingPath, incomingPath));
-        if (removed)
+        var key = PairKey(outgoingPath, incomingPath);
+        if (!_model.Transitions.ContainsKey(key))
         {
-            Persist();
+            return false;
         }
-        return removed;
+        Commit(model => model.Transitions.Remove(key));
+        return true;
     }
 
     public TransitionSpec? GetOverride(string playlistName, string outgoingPath, string incomingPath)
@@ -64,28 +62,32 @@ public sealed class JsonTransitionStore : ITransitionStore
         return byPair.TryGetValue(PairKey(outgoingPath, incomingPath), out var spec) ? spec : null;
     }
 
-    public void UpsertOverride(string playlistName, string outgoingPath, string incomingPath, TransitionSpec partial)
-    {
-        var byPair = _model.PlaylistOverrides.TryGetValue(playlistName, out var existing)
-            ? existing
-            : new Dictionary<string, TransitionSpec>();
-        byPair[PairKey(outgoingPath, incomingPath)] = partial;
-        _model.PlaylistOverrides[playlistName] = byPair;
-        Persist();
-    }
+    public void UpsertOverride(string playlistName, string outgoingPath, string incomingPath, TransitionSpec partial) =>
+        Commit(model =>
+        {
+            var byPair = model.PlaylistOverrides.TryGetValue(playlistName, out var existing)
+                ? existing
+                : new Dictionary<string, TransitionSpec>();
+            byPair[PairKey(outgoingPath, incomingPath)] = partial;
+            model.PlaylistOverrides[playlistName] = byPair;
+        });
 
     public bool RemoveOverride(string playlistName, string outgoingPath, string incomingPath)
     {
-        if (!_model.PlaylistOverrides.TryGetValue(playlistName, out var byPair) ||
-            !byPair.Remove(PairKey(outgoingPath, incomingPath)))
+        var key = PairKey(outgoingPath, incomingPath);
+        if (!_model.PlaylistOverrides.TryGetValue(playlistName, out var existing) || !existing.ContainsKey(key))
         {
             return false;
         }
-        if (byPair.Count == 0)
+        Commit(model =>
         {
-            _model.PlaylistOverrides.Remove(playlistName);
-        }
-        Persist();
+            var byPair = model.PlaylistOverrides[playlistName];
+            byPair.Remove(key);
+            if (byPair.Count == 0)
+            {
+                model.PlaylistOverrides.Remove(playlistName);
+            }
+        });
         return true;
     }
 
@@ -123,9 +125,14 @@ public sealed class JsonTransitionStore : ITransitionStore
         _model = model;
     }
 
-    private void Persist()
+    /// <summary>Applies a change to a copy and keeps the copy only once it is on disk, so a
+    /// write that fails changes nothing and the caller can truthfully say "not saved".</summary>
+    private void Commit(Action<StoreFileModel> change)
     {
-        AtomicJson.Write(_path, _model, JsonOptions);
+        var next = _model.Copy();
+        change(next);
+        AtomicJson.Write(_path, next, JsonOptions);
+        _model = next;
     }
 }
 
@@ -140,4 +147,14 @@ internal sealed class StoreFileModel
 
     [JsonPropertyName("playlistOverrides")]
     public Dictionary<string, Dictionary<string, TransitionSpec>> PlaylistOverrides { get; set; } = new();
+
+    /// <summary>A copy whose dictionaries can change without touching this one. The specs are
+    /// immutable records, so they are shared.</summary>
+    public StoreFileModel Copy() => new()
+    {
+        SchemaVersion = SchemaVersion,
+        Transitions = new Dictionary<string, TransitionSpec>(Transitions),
+        PlaylistOverrides = PlaylistOverrides.ToDictionary(
+            playlist => playlist.Key, playlist => new Dictionary<string, TransitionSpec>(playlist.Value)),
+    };
 }

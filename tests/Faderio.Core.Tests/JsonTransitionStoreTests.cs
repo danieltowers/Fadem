@@ -114,4 +114,29 @@ public sealed class JsonTransitionStoreTests : IDisposable
         Assert.Null(store.Get(@"C:\a.wav", @"C:\b.wav"));
         Assert.False(store.Remove(@"C:\a.wav", @"C:\b.wav"));
     }
+
+    [Fact]
+    public void AWriteThatFails_ChangesNothing_AndLeavesNoTempFile()
+    {
+        // Build issue 09: the engine reports a failed save as "not saved", so the store must
+        // not keep in memory what it could not write.
+        var store = new JsonTransitionStore(_path);
+        store.Upsert(@"C:\a.wav", @"C:\b.wav", FullSpec());
+        File.SetAttributes(_path, FileAttributes.ReadOnly);
+        try
+        {
+            var changed = FullSpec() with { FadeOutDuration = TimeSpan.FromSeconds(9) };
+            Assert.Throws<UnauthorizedAccessException>(() => store.Upsert(@"C:\a.wav", @"C:\b.wav", changed));
+            Assert.Throws<UnauthorizedAccessException>(() => store.Upsert(@"C:\c.wav", @"C:\d.wav", changed));
+            Assert.Throws<UnauthorizedAccessException>(() => store.Remove(@"C:\a.wav", @"C:\b.wav"));
+
+            Assert.Equal(TimeSpan.FromSeconds(2.5), store.Get(@"C:\a.wav", @"C:\b.wav")!.FadeOutDuration);
+            Assert.Null(store.Get(@"C:\c.wav", @"C:\d.wav"));
+            Assert.False(File.Exists(_path + ".tmp"));
+        }
+        finally
+        {
+            File.SetAttributes(_path, FileAttributes.Normal);
+        }
+    }
 }

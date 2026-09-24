@@ -11,7 +11,8 @@ namespace Faderio.App;
 /// multi-select list whose rows drag to a new place (build issue 05), a context menu for "Edit
 /// transition (this → next)", Remove and Clear queue (build issue 04; Delete removes too),
 /// transport with a shuffle toggle and a repeat button (build issue 07), a seek bar in
-/// milliseconds, and the transition editor. It renders
+/// milliseconds, the transition editor, and a status strip showing the latest notice and a count
+/// that opens this session's notice list (build issue 09). It renders
 /// <see cref="PlayerView"/>s and issues commands; it holds no engine state between calls (the
 /// placement rule in CLAUDE.md). The seek bar's Maximum is the track length
 /// in milliseconds, so no scaling exists to get wrong (ticket 06).
@@ -36,6 +37,7 @@ internal sealed class MainForm : Form
     internal readonly CheckBox _repeat;
     internal readonly ToolTip _tips;
     internal readonly ToolStripStatusLabel _status;
+    internal readonly ToolStripStatusLabel _noticeCount;
     internal readonly ToolStripStatusLabel _addProgress;
     internal readonly ToolStripButton _cancelAdd;
     internal readonly TransitionEditorPanel _editor;
@@ -49,6 +51,11 @@ internal sealed class MainForm : Form
     /// <summary>What a drag of rows carries: their ids, private to this window.</summary>
     private const string RowsFormat = "faderio.rows";
 
+    /// <summary>Notices already delivered, as the strip and the list show them: formatting of
+    /// messages, not engine state (build issue 09).</summary>
+    private readonly NoticeLog _notices = new();
+    internal NoticeListForm? _noticeList;
+
     private long _shownQueue = -1;
     private bool _seekDragging;
 
@@ -61,16 +68,25 @@ internal sealed class MainForm : Form
         ChoosePlaylistSavePath = ShowSavePlaylistDialog;
         ConfirmClear = ShowClearDialog;
         StartDrag = data => _queueList!.DoDragDrop(data, DragDropEffects.Move);
+        ShowNoticeList = list =>
+        {
+            if (!list.Visible)
+            {
+                list.Show(this);
+            }
+            list.Activate();
+        };
 
         Text = "faderio";
         MinimumSize = new Size(760, 480);
         Size = new Size(1040, 600);
         StartPosition = FormStartPosition.CenterScreen;
 
-        _status = new ToolStripStatusLabel("Ready.") { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
+        _status = new SpringLabel("Ready.") { TextAlign = ContentAlignment.MiddleLeft };
+        _noticeCount = new ToolStripStatusLabel { Available = false, IsLink = true, ToolTipText = "Show this session's notices" };
         _addProgress = new ToolStripStatusLabel { Available = false };
         _cancelAdd = new ToolStripButton("Cancel") { Available = false, DisplayStyle = ToolStripItemDisplayStyle.Text };
-        var statusStrip = new StatusStrip { Items = { _status, _addProgress, _cancelAdd } };
+        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _addProgress, _cancelAdd }, ShowItemToolTips = true };
 
         _addFiles = new Button { Text = "Add files…", Width = 90, Height = 28, Margin = new Padding(4, 8, 4, 0) };
         _addFolder = new Button { Text = "Add folder…", Width = 90, Height = 28, Margin = new Padding(0, 8, 4, 0) };
@@ -211,6 +227,8 @@ internal sealed class MainForm : Form
         _openPlaylist.Click += (_, _) => AddChosen(ChoosePlaylists);
         _saveAsPlaylist.Click += (_, _) => SaveAsPlaylist();
         _cancelAdd.Click += (_, _) => _engine.CancelAdd();
+        _status.Click += (_, _) => OpenNotices();
+        _noticeCount.Click += (_, _) => OpenNotices();
         _playPause.Click += (_, _) => _engine.TogglePlayPause();
         _prev.Click += (_, _) => _engine.Previous();
         _stop.Click += (_, _) => _engine.Stop();
@@ -327,12 +345,42 @@ internal sealed class MainForm : Form
         _queueList.EndUpdate();
     }
 
+    /// <summary>Every notice, the engine's and the shell's own, goes into the session's list;
+    /// the strip shows the latest and how many the list holds.</summary>
     private void ShowNotice(string message)
     {
-        if (!IsDisposed)
+        if (IsDisposed)
         {
-            _status.Text = message;
+            return;
         }
+        _notices.Add(message);
+        _status.Text = Presenter.FmtNotice(_notices.Latest!);
+        _status.ToolTipText = _status.Text; // in full, where the strip clips it
+        _noticeCount.Text = Presenter.FmtNoticeCount(_notices.Entries.Count);
+        _noticeCount.Available = true;
+        if (_noticeList is { IsDisposed: false } list)
+        {
+            list.ShowEntries(_notices, selectLatest: false);
+        }
+    }
+
+    /// <summary>Shows a list window. A test replaces it, since a headless form shows no window.</summary>
+    internal Action<Form> ShowNoticeList { get; set; }
+
+    /// <summary>Opens this session's notice list on the latest notice; one list, reused. The
+    /// list hides when the user closes it, but a close from elsewhere disposes it.</summary>
+    private void OpenNotices()
+    {
+        if (_notices.Latest is null)
+        {
+            return;
+        }
+        if (_noticeList is null || _noticeList.IsDisposed)
+        {
+            _noticeList = new NoticeListForm();
+        }
+        _noticeList.ShowEntries(_notices, selectLatest: true);
+        ShowNoticeList(_noticeList);
     }
 
     // ── Commands: one intent, one engine call ───────────────────────────────────────────
@@ -586,4 +634,15 @@ internal sealed class MainForm : Form
         };
         return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
     }
+}
+
+/// <summary>A status label that takes the strip's spare width and asks for none of its own. Sized
+/// to its text, a long notice would push the notice count and the add's Cancel off the strip.
+/// </summary>
+internal sealed class SpringLabel : ToolStripStatusLabel
+{
+    public SpringLabel(string text) : base(text) => Spring = true;
+
+    public override Size GetPreferredSize(Size constrainingSize) =>
+        base.GetPreferredSize(constrainingSize) with { Width = 0 };
 }

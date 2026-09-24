@@ -112,3 +112,18 @@ no other view field shows. So the engine publishes `View.CanTransitionNow`, deri
 same frames-emitted instant as the playhead, and the command guards on that same flag. The
 shell sets the button's `Enabled` from it and does no logic of its own. If another command
 gains a no-op condition the shell must show, it gets a flag the same way.
+
+## Addendum: authoring reports its outcome, and the shell keeps the session's notices (2026-09-24)
+
+A store that cannot be written made `Author` and `Unauthor` throw, against "every command is
+total" ([issue 09](../../.scratch/202609-faderio-phase-1-build/issues/09-notices-a-strip-and-a-session-list.md)).
+Both now catch the write failure under `Run` and raise a notice, and both report success as a
+notice too, as `SaveAsPlaylist` does. The editor no longer says "Saved" itself, so a failure
+can never follow a confirmation. `JsonTransitionStore` keeps a change only once it is on disk,
+so "not saved" is true: nothing plays that the file does not hold. `Adjacency.Name` is the one
+wording of an adjacency, used by the engine's notices and the editor's title.
+
+The shell keeps a `NoticeLog` of what the sink has delivered this session: a repeat merges into
+its first entry with a count. It holds delivered messages, not engine state, so it passes the
+placement rule. The presenter gains the strip's wording (`FmtNotice`, `FmtNoticeCount`). The
+store open path reports its warnings as startup notices instead of a message box.

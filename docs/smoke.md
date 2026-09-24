@@ -75,6 +75,14 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
 - [ ] Between ⏭ and the shuffle toggle, the Transition now button (⤳) reads clearly and its
       tooltip says "Transition now". It is greyed out while stopped, while paused, on the last
       row with repeat off, and during a crossfade, and live otherwise.
+- [ ] The status strip shows the latest notice and, at its right, a count ("3 notices").
+      Pressing Save on the same boundary several times shows one "Saved … ×n", not n notices.
+      A notice longer than the strip is clipped and never pushes the count off. Clicking the
+      notice or the count opens the notice list: every notice this session, oldest first, with
+      its time and its count, and the selected one in full below. Esc and the close box hide
+      it, and clicking the strip again brings back the same list.
+- [ ] Launching with a corrupt `%APPDATA%\faderio\transitions.json` (back it up first) shows
+      no dialog: the strip says the file was moved aside to `transitions.json.corrupt`.
 - [ ] Adding a rejected file (an `.m4a`, an `.ogg`, or a file with more than two channels)
       leaves the list unchanged and shows one notice naming the property that failed and
       pointing at `docs/supported-audio.md`. Nothing is queued, nothing plays.

@@ -18,11 +18,12 @@ internal sealed record SecondsField(Point? Point, string? Error)
 
 /// <summary>
 /// The shell's remaining logic, with no WinForms in it (ADR 0002, S4). Ticket 06's list, amended
-/// by build issues 01 and 07: format and parse seconds, row → adjacency with its bounds check,
-/// the add's progress, the store open/recovery path, the launch-time output mode, and the repeat
-/// button's cycle. The add's outcome is an engine notice since build issue 01, so its summary
-/// moved to <see cref="AddReport"/>. Everything here formats engine values, parses text, or picks
-/// the next state of a display control (ADR 0003's addendum); nothing computes a position.
+/// by build issues 01, 07 and 09: format and parse seconds, row → adjacency with its bounds
+/// check, the add's progress, the store open/recovery path, the launch-time output mode, the
+/// repeat button's cycle, the notice strip's wording and the render's file name. The add's
+/// outcome is an engine notice since build issue 01, so its summary moved to
+/// <see cref="AddReport"/>. Everything here formats engine values, parses text, or picks the next
+/// state of a display control (ADR 0003's addendum); nothing computes a position.
 /// </summary>
 internal static class Presenter
 {
@@ -77,14 +78,32 @@ internal static class Presenter
         return new Adjacency(view.Queue[rowIndex].Track, view.Queue[rowIndex + 1].Track);
     }
 
-    public static string Describe(Adjacency adjacency) =>
-        $"{Path.GetFileNameWithoutExtension(adjacency.Outgoing.FilePath)} → " +
-        $"{Path.GetFileNameWithoutExtension(adjacency.Incoming.FilePath)}";
+    /// <summary>The file name the render dialog suggests: "outgoing - incoming boundary.wav".</summary>
+    public static string RenderFileName(Adjacency adjacency) =>
+        $"{Path.GetFileNameWithoutExtension(adjacency.Outgoing.FilePath)} - " +
+        $"{Path.GetFileNameWithoutExtension(adjacency.Incoming.FilePath)} boundary.wav";
 
     /// <summary>The running add's progress for the status strip; blank when nothing is being
     /// added. The add's outcome arrives later as a notice, which the engine words.</summary>
     public static string FmtAdding(AddProgress? adding) =>
         adding is null ? "" : $"Adding {adding.Resolved} of {adding.Total}…";
+
+    /// <summary>A notice as the strip and the list show it: the message, and "×n" once it has
+    /// been delivered more than once.</summary>
+    public static string FmtNotice(NoticeEntry entry) =>
+        entry.Count > 1 ? $"{entry.Message} {FmtRepeats(entry)}" : entry.Message;
+
+    /// <summary>The list's count column: blank for a notice delivered once.</summary>
+    public static string FmtRepeats(NoticeEntry entry) => entry.Count > 1 ? $"×{entry.Count}" : "";
+
+    /// <summary>The strip's count of this session's notices, as the list holds them: a repeat
+    /// is one entry. Blank when there are none.</summary>
+    public static string FmtNoticeCount(int entries) => entries switch
+    {
+        0 => "",
+        1 => "1 notice",
+        _ => $"{entries} notices",
+    };
 
     public static string PlayPauseGlyph(Transport transport) => transport == Transport.Playing ? "⏸" : "▶";
 
@@ -132,7 +151,8 @@ internal static class Presenter
 
     /// <summary>Opens the transition store; a corrupt or newer-version file is reported visibly
     /// and playback continues with a fresh store, never silently. The corrupt file is moved
-    /// aside, so recovery is visible on disk too.</summary>
+    /// aside, so recovery is visible on disk too. When it cannot be moved, it is left where it
+    /// is and the fresh store is written beside it, as for a newer version.</summary>
     public static ITransitionStore OpenTransitionStore(string path, Action<string> warn)
     {
         try
@@ -146,14 +166,17 @@ internal static class Presenter
         }
         catch (InvalidDataException e)
         {
-            warn(e.Message + " The corrupt file is moved aside and a fresh store is used.");
             try
             {
                 File.Move(path, path + ".corrupt", overwrite: true);
             }
-            catch (IOException)
+            catch (Exception moveFailure) when (moveFailure is IOException or UnauthorizedAccessException)
             {
+                warn(e.Message + $" It could not be moved aside ({moveFailure.Message}), so it is left " +
+                    $"untouched and a fresh store is used in {Path.GetFileName(path)}.recovered.");
+                return new JsonTransitionStore(path + ".recovered");
             }
+            warn(e.Message + $" It was moved aside to {Path.GetFileName(path)}.corrupt and a fresh store is used.");
             return new JsonTransitionStore(path);
         }
     }

@@ -116,7 +116,7 @@ internal sealed class TransitionEditorPanel : Panel
     public void Edit(Adjacency adjacency)
     {
         _adjacency = adjacency;
-        _title.Text = Presenter.Describe(adjacency);
+        _title.Text = adjacency.Name;
         var spec = _engine.Transition(adjacency);
         _fadeOut = spec?.FadeOutPoint is { FromEnd: false } fo ? Point.FromSeconds(fo.Position.TotalSeconds) : null;
         _fadeIn = spec?.FadeInPoint is { } fi ? Point.FromSeconds(fi.Position.TotalSeconds) : null;
@@ -171,8 +171,7 @@ internal sealed class TransitionEditorPanel : Panel
             FadeOutDuration = outDuration.Point?.TimeSpan,
             FadeInDuration = inDuration.Point?.TimeSpan,
         };
-        _engine.Author(_adjacency, spec);
-        _notice($"Saved {Presenter.Describe(_adjacency)}.");
+        _engine.Author(_adjacency, spec); // saved or not, the engine says which
     }
 
     /// <summary>The captured point when the field still shows it; the typed text otherwise.</summary>
@@ -187,7 +186,7 @@ internal sealed class TransitionEditorPanel : Panel
         {
             return;
         }
-        var suggested = Presenter.Describe(_adjacency).Replace(" → ", " - ") + " boundary.wav";
+        var suggested = Presenter.RenderFileName(_adjacency);
         var path = _chooseRenderPath(suggested);
         if (path is null)
         {
