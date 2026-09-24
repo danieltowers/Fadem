@@ -32,6 +32,9 @@ half; the Sounds half uses the two tracks of a boundary already in the store
 (`%APPDATA%\faderio\transitions.json` lists them by full path).
 
 Capture the window with `PrintWindow` rather than a screen grab, so it need not be in front.
+UI Automation matches ⏹ and ⏸ as the same name, so find a transport button by comparing names
+ordinally, not with a name condition. The status strip's items are not exposed to it; read them
+from a capture.
 
 - [ ] The window opens without an error dialog.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
@@ -71,7 +74,8 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
       button shows ▶. When the preview ends, the line clears and the readout loses "Held".
 - [ ] Resizing the window narrower does not hide the transport or the editor's buttons.
 - [ ] While adding a folder's worth of files (fifty or more, through **Add files…**, **Add
-      folder…** or as arguments), the window stays responsive — it moves and repaints — and
+      folder…** or as arguments, and once the whole `MUSIC` library), the window stays
+      responsive — it moves and repaints — and
       the status strip shows *Adding N of M…* and a **Cancel**. Rows appear in order as files resolve. Both
       disappear when the add ends, and Cancel ends it at once, keeping the rows already listed.
 - [ ] **Add folder…** on a folder of several albums

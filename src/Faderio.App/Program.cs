@@ -15,6 +15,9 @@ internal static class Program
         // ever dropped for want of a window handle.
         SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
         var sink = new PostingSink(SynchronizationContext.Current);
+        // A pushed render waits for the UI thread to go idle, so paint and input run between
+        // renders however fast the engine publishes (build issue 20).
+        Application.Idle += (_, _) => sink.UiThreadIdle();
 
         var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "faderio");
         Directory.CreateDirectory(appData);

@@ -320,9 +320,12 @@ internal sealed class MainForm : Form
         {
             var row = view.Queue[i];
             var item = _queueList.Items[i];
-            var current = row.IsCurrent && view.Transport != Transport.Stopped;
-            item.BackColor = current ? SystemColors.Info : SystemColors.Window;
-            // Render runs on every tick: the mark is set only when it changes (build issue 20).
+            // Render runs on every tick: each row's look is set only when it changes (build issue 20).
+            var back = row.IsCurrent && view.Transport != Transport.Stopped ? SystemColors.Info : SystemColors.Window;
+            if (item.BackColor != back)
+            {
+                item.BackColor = back;
+            }
             var fore = row.IsUnreadable ? SystemColors.GrayText : SystemColors.WindowText;
             if (item.ForeColor != fore)
             {

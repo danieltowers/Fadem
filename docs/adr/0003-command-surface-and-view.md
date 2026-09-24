@@ -213,3 +213,16 @@ and a track that clips again after a quiet stretch counts again. `ClearClip()` i
 to clear it. Stop and Clear latch what the device played, drop what it never did, and publish
 once their state is whole. The shell holds no latch: the presenter gains `FmtClip`, the light's
 text, and `ClipTip`, its tooltip.
+
+## Addendum: the posting sink keeps the coalescing promise, and renders when the UI thread is idle (2026-09-24)
+
+The engine coalesces `Changed` to one delivery per command, but only the sink knows whether a
+delivery is still pending, so "at most one pending delivery" is `PostingSink`'s to keep
+([issue 20](../../.scratch/202609-faderio-phase-1-build/issues/20-adding-a-large-folder-stalls-the-window.md)).
+It holds the latest view until the UI thread renders it, which is a delivery buffer, not
+engine state. It posts the next render only once the UI thread has been idle
+(`Application.Idle`). WinForms runs every pending post in one pass without pumping, so a
+background add that publishes once per file otherwise kept the window from answering until the
+add ended. A notice renders any view still waiting first, so no view published before a notice
+shows after it. The form's timer still renders `View` every 100 ms, including inside native
+modal loops, which raise no idle.

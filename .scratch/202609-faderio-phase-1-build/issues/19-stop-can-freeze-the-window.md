@@ -81,3 +81,10 @@ timer and UI Automation are not.
   In the app the event is posted to the UI thread, since the WinForms context exists before
   `Initialise`. WaveOut's stop does not join, so it never froze. One block rendered after its
   reset can still inflate `Rendered` before an immediate Play, which predates this change.
+- 2026-09-24, found during [issue 20](20-adding-a-large-folder-stalls-the-window.md)'s Looks
+  run: UI Automation matches ⏹ and ⏸ as the same name, and ⏸ comes first in the tree. The
+  device trials above found ⏹ by name, so "⏹ did not freeze in 10 trials" may have pressed
+  play/pause instead. The Delete trials are unaffected. Issue 20's run pressed the real ⏹ (found
+  by an ordinal comparison) three times while playing on WASAPI shared: each stopped, the window
+  kept answering in 0 ms, ▶ showed and the readout reset. The ⏹ trials are worth rerunning.
+  `docs/smoke.md` now says how to find the button.
