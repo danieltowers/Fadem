@@ -1,5 +1,6 @@
 using Faderio.App.Audio;
 using Faderio.Core.Playback;
+using Faderio.Core.Settings;
 
 namespace Faderio.App;
 
@@ -23,11 +24,14 @@ internal static class Program
         Action<string> notify = ((IEngineSink)sink).Notice;
         var store = Presenter.OpenTransitionStore(Path.Combine(appData, "transitions.json"), notify);
 
+        // The engine owns the settings file; only the output mode is read here, since the output
+        // is opened before the engine that runs at its rate (ADR 0008).
+        var settings = new SettingsStore(Path.Combine(appData, "settings.json"));
         var output = new NAudioAudioOutput(
-            Presenter.ParseOutputMode(args), notify, Presenter.ParseUnavailableOutputs(args));
-        var engine = new PlaybackEngine(output, store, sink);
+            settings.Settings.OutputMode, notify, Presenter.ParseUnavailableOutputs(args));
+        var engine = new PlaybackEngine(output, store, sink, settings);
 
-        var form = new MainForm(engine, store, sink);
+        var form = new MainForm(engine, store, sink, () => output.Mode);
         form.Text = Presenter.Title(output.Mode, engine.SampleRate);
         output.ModeChanged += () => form.BeginInvoke(() => form.Text = Presenter.Title(output.Mode, engine.SampleRate));
         form.Shown += (_, _) =>

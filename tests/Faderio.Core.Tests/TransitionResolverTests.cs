@@ -7,12 +7,12 @@ namespace Faderio.Core.Tests;
 public class TransitionResolverTests
 {
     private static PlayerSettings Settings(
-        DefaultAdjacencyBehaviour behaviour = DefaultAdjacencyBehaviour.HardCut,
-        double defaultCrossfadeSeconds = 5.0) =>
+        UnauthoredAdjacency behaviour = UnauthoredAdjacency.HardCut,
+        int defaultCrossfadeSeconds = 5) =>
         new()
         {
-            DefaultAdjacencyBehaviour = behaviour,
-            DefaultCrossfadeDuration = TimeSpan.FromSeconds(defaultCrossfadeSeconds),
+            UnauthoredAdjacency = behaviour,
+            DefaultCrossfadeSeconds = defaultCrossfadeSeconds,
         };
 
     [Fact]
@@ -24,9 +24,9 @@ public class TransitionResolverTests
     }
 
     [Fact]
-    public void UnauthoredAdjacency_WithGlobalDefaultCrossfadeSetting_UsesDefaultDuration()
+    public void UnauthoredAdjacency_WithTheDefaultCrossfadeOn_CrossfadesForNSeconds()
     {
-        var resolver = new TransitionResolver(Settings(DefaultAdjacencyBehaviour.GlobalDefaultCrossfade, 7));
+        var resolver = new TransitionResolver(Settings(UnauthoredAdjacency.DefaultCrossfade, 7));
         var result = resolver.Resolve(null, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
         Assert.False(result.IsHardCut);
         Assert.Equal(TimeSpan.FromSeconds(3), result.FadeOutPoint); // 10 − 7
@@ -49,6 +49,22 @@ public class TransitionResolverTests
         Assert.Equal(TimeSpan.FromSeconds(5), result.FadeOutDuration);
         Assert.Equal(TimeSpan.FromSeconds(5), result.FadeOutPoint); // 10 − 5
         Assert.Equal(FadeCurveKind.EqualPower, result.Curve);
+    }
+
+    [Theory]
+    [InlineData(UnauthoredAdjacency.HardCut, 5)]
+    [InlineData(UnauthoredAdjacency.DefaultCrossfade, 12)]
+    [InlineData(UnauthoredAdjacency.DefaultCrossfade, 1)]
+    public void ABlankAuthoredDuration_IsAFixedFiveSeconds_WhateverTheDefaultCrossfade(
+        UnauthoredAdjacency behaviour, int n)
+    {
+        // A global setting never alters an authored transition (build issue 12).
+        var resolver = new TransitionResolver(Settings(behaviour, n));
+        var spec = new TransitionSpec { FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(20), FromEnd: false) };
+        var result = resolver.Resolve(spec, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
+        Assert.Equal(TimeSpan.FromSeconds(20), result.FadeOutPoint);
+        Assert.Equal(TimeSpan.FromSeconds(5), result.FadeOutDuration);
+        Assert.Equal(TimeSpan.FromSeconds(5), result.FadeInDuration);
     }
 
     [Fact]
@@ -155,7 +171,7 @@ public class TransitionResolverTests
     [Fact]
     public void TransitionNow_OnAnUnauthoredAdjacency_StartsTheDefaultCrossfadeThere_WhenItIsOn()
     {
-        var resolver = new TransitionResolver(Settings(DefaultAdjacencyBehaviour.GlobalDefaultCrossfade, 3));
+        var resolver = new TransitionResolver(Settings(UnauthoredAdjacency.DefaultCrossfade, 3));
         var result = resolver.Resolve(
             null, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10), fadeOutAt: TimeSpan.FromSeconds(4));
 

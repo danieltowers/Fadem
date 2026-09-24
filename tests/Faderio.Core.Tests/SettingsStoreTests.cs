@@ -21,61 +21,104 @@ public sealed class SettingsStoreTests : IDisposable
     }
 
     [Fact]
-    public void MissingFile_LoadsBuiltInDefaults_WithoutWarnings()
+    public void MissingFile_LoadsBuiltInDefaults_WithoutANotice()
     {
-        var result = new SettingsStore(_path).Load();
-        Assert.False(result.HasWarning);
-        Assert.Equal(AudioOutputMode.WasapiShared, result.Settings.OutputMode);
-        Assert.Equal(DefaultAdjacencyBehaviour.HardCut, result.Settings.DefaultAdjacencyBehaviour);
-        Assert.Equal(5, result.Settings.PreviewPreRollSeconds);
+        var store = new SettingsStore(_path);
+        Assert.Null(store.LoadNotice);
+        Assert.Equal(AudioOutputMode.WasapiShared, store.Settings.OutputMode);
+        Assert.Equal(UnauthoredAdjacency.HardCut, store.Settings.UnauthoredAdjacency);
+        Assert.Equal(5, store.Settings.DefaultCrossfadeSeconds);
+        Assert.True(store.Settings.ReplayGainEnabled);
     }
 
     [Fact]
-    public void RoundTrip_PreservesAllSettings()
+    public void SavedSettings_SurviveARestart()
     {
-        var store = new SettingsStore(_path);
         var settings = new PlayerSettings
         {
             OutputMode = AudioOutputMode.WasapiExclusive,
-            DefaultAdjacencyBehaviour = DefaultAdjacencyBehaviour.GlobalDefaultCrossfade,
-            DefaultCrossfadeDuration = TimeSpan.FromSeconds(8),
+            UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade,
+            DefaultCrossfadeSeconds = 8,
             ReplayGainEnabled = false,
-            PreviewPreRollSeconds = 10,
-            VisualiserVisible = false,
         };
-        store.Save(settings);
+        new SettingsStore(_path).Save(settings);
 
-        var result = new SettingsStore(_path).Load();
-        Assert.False(result.HasWarning);
-        Assert.Equal(settings, result.Settings);
+        var reopened = new SettingsStore(_path);
+        Assert.Null(reopened.LoadNotice);
+        Assert.Equal(settings, reopened.Settings);
+    }
+
+    [Fact]
+    public void TheFile_NamesItsChoicesInWords()
+    {
+        new SettingsStore(_path).Save(new PlayerSettings { UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade });
+
+        var json = File.ReadAllText(_path);
+        Assert.Contains("\"schemaVersion\": 1", json);
+        Assert.Contains("\"DefaultCrossfade\"", json);
+        Assert.Contains("\"WasapiShared\"", json);
     }
 
     [Fact]
     public void MissingKeys_FallBackToDefaults()
     {
-        File.WriteAllText(_path, "{}");
-        var result = new SettingsStore(_path).Load();
-        Assert.False(result.HasWarning);
-        Assert.Equal(new PlayerSettings(), result.Settings);
+        File.WriteAllText(_path, "{\"defaultCrossfadeSeconds\": 12}");
+        var store = new SettingsStore(_path);
+        Assert.Null(store.LoadNotice);
+        Assert.Equal(new PlayerSettings { DefaultCrossfadeSeconds = 12 }, store.Settings);
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(31, 30)]
+    [InlineData(-4, 1)]
+    public void AnOutOfRangeN_IsBroughtIntoRange(int written, int loaded)
+    {
+        File.WriteAllText(_path, $"{{\"defaultCrossfadeSeconds\": {written}}}");
+        Assert.Equal(loaded, new SettingsStore(_path).Settings.DefaultCrossfadeSeconds);
     }
 
     [Fact]
-    public void CorruptFile_ProducesAVisibleWarning_AndResetsToDefaults()
+    public void ACorruptFile_IsMovedAside_WithANotice_AndDefaultsLoad()
     {
         File.WriteAllText(_path, "{ definitely not json");
-        var result = new SettingsStore(_path).Load();
-        Assert.True(result.HasWarning);
-        Assert.Contains("corrupt", result.Warning, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(new PlayerSettings(), result.Settings);
+
+        var store = new SettingsStore(_path);
+
+        Assert.Equal(new PlayerSettings(), store.Settings);
+        Assert.NotNull(store.LoadNotice);
+        Assert.Contains("corrupt", store.LoadNotice, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("settings.json.corrupt", store.LoadNotice);
+        Assert.False(File.Exists(_path));
+        Assert.Equal("{ definitely not json", File.ReadAllText(_path + ".corrupt")); // still recoverable
     }
 
     [Fact]
-    public void UnknownSchemaVersion_IsReported_AndResetsToDefaults()
+    public void ACorruptFile_ThatCannotBeMovedAside_IsLeftWhereItIs_AndSaysSo()
     {
-        File.WriteAllText(_path, "{\"schemaVersion\": 42}");
-        var result = new SettingsStore(_path).Load();
-        Assert.True(result.HasWarning);
-        Assert.Equal(new PlayerSettings(), result.Settings);
+        File.WriteAllText(_path, "{ definitely not json");
+        using var held = new FileStream(_path, FileMode.Open, FileAccess.Read, FileShare.Read); // no delete, no move
+
+        var store = new SettingsStore(_path);
+
+        Assert.Equal(new PlayerSettings(), store.Settings);
+        Assert.Contains("could not be moved aside", store.LoadNotice);
+        Assert.False(File.Exists(_path + ".corrupt"));
+    }
+
+    [Theory]
+    [InlineData("{\"schemaVersion\": 42, \"defaultCrossfadeSeconds\": 9}")]
+    [InlineData("{\"schemaVersion\": 2, \"outputMode\": \"Asio\"}")] // a mode this version does not know
+    [InlineData("{\"schemaVersion\": 2, \"defaultCrossfadeSeconds\": 7.5}")] // a field that changed shape
+    public void ANewerSchema_RaisesANotice_LoadsDefaults_AndLeavesTheFileAlone(string newer)
+    {
+        File.WriteAllText(_path, newer);
+
+        var store = new SettingsStore(_path);
+
+        Assert.Equal(new PlayerSettings(), store.Settings);
+        Assert.Contains("newer", store.LoadNotice);
+        Assert.Equal(newer, File.ReadAllText(_path));
     }
 }
 

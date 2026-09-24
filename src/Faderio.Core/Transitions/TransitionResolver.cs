@@ -6,12 +6,16 @@ namespace Faderio.Core.Transitions;
 /// <summary>
 /// Pure resolution: adjacency + store contents + settings → effective transition parameters.
 /// Directionality is pinned here: the caller supplies an already-ordered (outgoing, incoming)
-/// pair; A→B and B→A are distinct lookups. Absent parameters fall through per-parameter to
-/// player defaults; an unauthored adjacency resolves to the player's default adjacency
-/// behaviour (hard cut, or a global default crossfade when opted in).
+/// pair; A→B and B→A are distinct lookups. An authored transition's blank durations are a fixed
+/// built-in 5 s, never the default crossfade's N: a global setting never alters an authored
+/// transition (build issue 12). An unauthored adjacency resolves to a hard cut, or to the default
+/// crossfade when opted in.
 /// </summary>
 internal sealed class TransitionResolver
 {
+    /// <summary>What a blank authored duration resolves to.</summary>
+    public static readonly TimeSpan BlankAuthoredDuration = TimeSpan.FromSeconds(5);
+
     public PlayerSettings Settings { get; set; }
 
     public TransitionResolver(PlayerSettings settings) => Settings = settings;
@@ -36,7 +40,7 @@ internal sealed class TransitionResolver
 
         if (authored is null || authored.IsEmpty)
         {
-            return Settings.DefaultAdjacencyBehaviour == DefaultAdjacencyBehaviour.GlobalDefaultCrossfade
+            return Settings.UnauthoredAdjacency == UnauthoredAdjacency.DefaultCrossfade
                 ? DefaultCrossfade(outgoingDuration, fadeOutAt)
                 : EffectiveTransition.HardCut;
         }
@@ -67,7 +71,7 @@ internal sealed class TransitionResolver
 
     private EffectiveTransition DefaultCrossfade(TimeSpan outgoingDuration, TimeSpan? fadeOutAt)
     {
-        var d = ClampDuration(null);
+        var d = TimeSpan.FromSeconds(Settings.DefaultCrossfadeSeconds);
         var point = fadeOutAt is { } now ? ClampToLength(now, outgoingDuration) : MaxZero(outgoingDuration - d);
         return new EffectiveTransition
         {
@@ -101,9 +105,9 @@ internal sealed class TransitionResolver
         };
     }
 
-    private TimeSpan ClampDuration(TimeSpan? duration)
+    private static TimeSpan ClampDuration(TimeSpan? duration)
     {
-        var d = duration ?? Settings.DefaultCrossfadeDuration;
+        var d = duration ?? BlankAuthoredDuration;
         return d < TimeSpan.Zero ? TimeSpan.Zero : d;
     }
 

@@ -1,5 +1,6 @@
 using Faderio.Core.Domain;
 using Faderio.Core.Queue;
+using Faderio.Core.Settings;
 
 namespace Faderio.Core.Playback;
 
@@ -37,6 +38,8 @@ public sealed record VoiceView(QueueRow Row, Playhead Playhead, Length Length)
 /// off, when every row after is marked, and when the queue is empty.
 /// <see cref="CanTransitionNow"/> is whether <c>TransitionNow</c> would act: playing, one voice
 /// heard alone with no handover or finish still in the device, and a next adjacency.
+/// <see cref="Settings"/> are the settings in force, as last saved: the output mode among them is
+/// the one chosen for the next launch, not necessarily the one in use (build issue 12).
 /// </summary>
 public sealed record PlayerView(
     long Version,
@@ -49,7 +52,10 @@ public sealed record PlayerView(
     RepeatMode Repeat,
     AddProgress? Adding = null,
     Adjacency? NextAdjacency = null,
-    bool CanTransitionNow = false);
+    bool CanTransitionNow = false)
+{
+    public PlayerSettings Settings { get; init; } = new();
+}
 
 /// <summary>How far the running add has got: files resolved (queued or rejected) out of every
 /// file given to it, including those of an add waiting behind the first.</summary>

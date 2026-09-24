@@ -15,22 +15,28 @@ public sealed class TestEngine : IDisposable
     public string TempDir { get; }
     public FakeAudioOutput Output { get; }
     public JsonTransitionStore Store { get; }
-    public PlayerSettings Settings { get; }
+    /// <summary>The engine's settings.json, in the temp dir.</summary>
+    public string SettingsPath { get; }
     public RecordingSink Sink { get; } = new();
     public PlaybackEngine Engine { get; }
 
     /// <summary>The fake's emitted frames at each publication, parallel to <c>Sink.Views</c>.</summary>
     public List<long> EmittedAtPublication { get; } = new();
 
-    private TestEngine(string tempDir, PlayerSettings settings, Random? rng, int latency, bool backgroundAdd)
+    private TestEngine(string tempDir, PlayerSettings? settings, Random? rng, int latency, bool backgroundAdd)
     {
         TempDir = tempDir;
         Directory.CreateDirectory(tempDir);
-        Settings = settings;
+        SettingsPath = Path.Combine(tempDir, "settings.json");
+        var settingsStore = new SettingsStore(SettingsPath);
+        if (settings is not null)
+        {
+            settingsStore.Save(settings);
+        }
         Store = new JsonTransitionStore(Path.Combine(tempDir, "transitions.json"));
         Output = new FakeAudioOutput { Latency = latency };
         Sink.OnChanged = _ => EmittedAtPublication.Add(Output.FramesEmitted.Count);
-        Engine = new PlaybackEngine(Output, Store, Sink, settings, rng);
+        Engine = new PlaybackEngine(Output, Store, Sink, settingsStore, rng);
         if (!backgroundAdd)
         {
             Engine.StartAddWorker = work => work();
@@ -45,7 +51,7 @@ public sealed class TestEngine : IDisposable
     {
         var dir = Path.Combine(Path.GetTempPath(), "faderio-engine", Guid.NewGuid().ToString("N"));
         return new TestEngine(
-            dir, settings ?? new PlayerSettings(), rngSeed is null ? null : new Random(rngSeed.Value), latency,
+            dir, settings, rngSeed is null ? null : new Random(rngSeed.Value), latency,
             backgroundAdd);
     }
 

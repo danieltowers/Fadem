@@ -4,6 +4,7 @@ using Faderio.App;
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;
 using Faderio.Core.Queue;
+using Faderio.Core.Settings;
 using Faderio.Core.Tests;
 using Faderio.Core.Transitions;
 
@@ -26,8 +27,10 @@ public sealed class HeadlessFormTests
         public PlaybackEngine Engine { get; }
         public MainForm Form { get; }
         public IEngineSink Sink { get; }
+        public string SettingsPath { get; }
 
-        public Harness(int latency = 0)
+        /// <param name="inUse">The mode the output opened in, as the NAudio adapter reports it.</param>
+        public Harness(int latency = 0, AudioOutputMode? inUse = AudioOutputMode.WasapiShared)
         {
             Directory.CreateDirectory(TempDir);
             Output = new FakeAudioOutput { Latency = latency };
@@ -36,8 +39,9 @@ public sealed class HeadlessFormTests
             Sink = sink;
             // The add worker runs inline, so an add completes on this STA thread and the inline
             // sink never touches a control from another thread.
-            Engine = new PlaybackEngine(Output, Store, sink) { StartAddWorker = work => work() };
-            Form = new MainForm(Engine, Store, sink);
+            SettingsPath = Path.Combine(TempDir, "settings.json");
+            Engine = new PlaybackEngine(Output, Store, sink, new SettingsStore(SettingsPath)) { StartAddWorker = work => work() };
+            Form = new MainForm(Engine, Store, sink, () => inUse);
         }
 
         public void Dispose()
@@ -887,5 +891,113 @@ public sealed class HeadlessFormTests
         Assert.Equal(ToolStripItemPlacement.Main, h.Form._status.Placement);
         Assert.Equal(ToolStripItemPlacement.Main, h.Form._noticeCount.Placement);
         Assert.True(h.Form._noticeCount.Bounds.Right <= h.Form._noticeCount.Owner.DisplayRectangle.Right);
+    });
+
+    // ── Settings (build issue 12) ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void TheSettingsDialog_OpensOnTheViewsSettings_AndOKSendsTheChoiceInOneCall() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Engine.ChangeSettings(new PlayerSettings
+        {
+            OutputMode = AudioOutputMode.WasapiExclusive,
+            UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade,
+            DefaultCrossfadeSeconds = 8,
+        });
+        var opened = false;
+        h.Form.ShowSettings = dialog =>
+        {
+            opened = true;
+            Assert.Equal("WASAPI exclusive", dialog._outputMode.Text);
+            Assert.True(dialog._crossfade.Checked);
+            Assert.False(dialog._hardCut.Checked);
+            Assert.Equal(8, dialog._seconds.Value);
+            Assert.True(dialog._seconds.Enabled);
+            Assert.True(dialog._replayGain.Checked);
+
+            dialog._outputMode.SelectedIndex = dialog._outputMode.FindStringExact("WaveOut");
+            dialog._seconds.Value = 12;
+            dialog._replayGain.Checked = false;
+            return true;
+        };
+
+        Click(h.Form._settings);
+
+        Assert.True(opened);
+        var expected = new PlayerSettings
+        {
+            OutputMode = AudioOutputMode.WaveOut,
+            UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade,
+            DefaultCrossfadeSeconds = 12,
+            ReplayGainEnabled = false,
+        };
+        Assert.Equal(expected, h.Engine.View.Settings);
+        Assert.Equal(expected, new SettingsStore(h.SettingsPath).Settings); // saved for the next launch
+    });
+
+    [Fact]
+    public void ChoosingHardCut_GreysOutN_AndIsWhatOKSends() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Engine.ChangeSettings(new PlayerSettings { UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade });
+        h.Form.ShowSettings = dialog =>
+        {
+            dialog._hardCut.Checked = true;
+            Assert.False(dialog._crossfade.Checked);
+            Assert.False(dialog._seconds.Enabled);
+            return true;
+        };
+
+        Click(h.Form._settings);
+
+        Assert.Equal(UnauthoredAdjacency.HardCut, h.Engine.View.Settings.UnauthoredAdjacency);
+    });
+
+    [Fact]
+    public void CancellingTheSettingsDialog_ChangesNothing() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Form.ShowSettings = dialog =>
+        {
+            dialog._crossfade.Checked = true;
+            dialog._outputMode.SelectedIndex = dialog._outputMode.FindStringExact("WaveOut");
+            return false;
+        };
+
+        Click(h.Form._settings);
+
+        Assert.Equal(new PlayerSettings(), h.Engine.View.Settings);
+        Assert.False(File.Exists(h.SettingsPath));
+    });
+
+    [Fact]
+    public void TheSettingsDialog_SaysTheOutputModeAppliesAtTheNextLaunch_AndNamesNoOtherModeWithoutAFallback() => RunSta(() =>
+    {
+        using var h = new Harness(inUse: AudioOutputMode.WasapiShared);
+        h.Form.ShowSettings = dialog =>
+        {
+            Assert.Equal("Applies at the next launch.", dialog._nextLaunch.Text);
+            Assert.Equal("", dialog._inUse.Text);
+            return false;
+        };
+        Click(h.Form._settings);
+    });
+
+    [Theory]
+    [InlineData(AudioOutputMode.WaveOut, "In use now: WaveOut")]
+    [InlineData(null, "In use now: no audio output")]
+    public void WhenAFallbackIsActive_TheSettingsDialogShowsTheModeInUse_BesideTheOneChosen(
+        AudioOutputMode? inUse, string shown) => RunSta(() =>
+    {
+        using var h = new Harness(inUse: inUse);
+        h.Engine.ChangeSettings(new PlayerSettings { OutputMode = AudioOutputMode.WasapiExclusive });
+        h.Form.ShowSettings = dialog =>
+        {
+            Assert.Equal("WASAPI exclusive", dialog._outputMode.Text);
+            Assert.Equal(shown, dialog._inUse.Text);
+            return false;
+        };
+        Click(h.Form._settings);
     });
 }

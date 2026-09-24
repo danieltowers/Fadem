@@ -14,12 +14,13 @@ Extend it when the shell grows; never let an item go stale.
 
 Launch the app, take a screenshot, and check each item against it. Report the result item by
 item in the session's hand-off. Plain arguments are files to queue; `--play` starts them and
-`--edit-first` opens the editor on the first boundary; `--output=` picks the mode;
+`--edit-first` opens the editor on the first boundary;
 `--unavailable=exclusive,shared` treats those modes as if their device were taken, to force the
-fallback chain:
+fallback chain. The output mode is a setting, chosen in **Settings…** and used from the next
+launch:
 
 ```
-dotnet run --project src/Faderio.App -- "<outgoing>" "<incoming>" --play --edit-first --output=wasapi-shared
+dotnet run --project src/Faderio.App -- "<outgoing>" "<incoming>" --play --edit-first
 ```
 
 `<outgoing>` and `<incoming>` are **absolute paths to two real, promised files**; there are no
@@ -92,10 +93,18 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
 - [ ] Adding a rejected file (an `.m4a`, an `.ogg`, or a file with more than two channels)
       leaves the list unchanged and shows one notice naming the property that failed and
       pointing at `docs/supported-audio.md`. Nothing is queued, nothing plays.
-- [ ] Launched with `--output=wasapi-exclusive --unavailable=exclusive`, the title names
-      WASAPI shared, not exclusive, and the strip says exclusive was unavailable. With
-      `--unavailable=exclusive,shared` the title names WaveOut at 44100 Hz, with a notice for
-      each step.
+- [ ] With WASAPI exclusive chosen in **Settings…**, launched with `--unavailable=exclusive`,
+      the title names WASAPI shared, not exclusive, and the strip says exclusive was
+      unavailable. With `--unavailable=exclusive,shared` the title names WaveOut at 44100 Hz,
+      with a notice for each step.
+- [ ] **Settings…** opens a dialog with OK and Cancel showing the three settings: the output
+      mode with "Applies at the next launch." under it; *Hard cut* or *Crossfade for N s*, with
+      N greyed out under *Hard cut*; and ReplayGain. Launched into a fallback as above, it also
+      reads "In use now: WASAPI shared" (or WaveOut) under the mode chosen.
+- [ ] A setting changed and saved with OK is still set after a restart; Cancel keeps nothing.
+- [ ] Launching with a corrupt `%APPDATA%\faderio\settings.json` (back it up first) shows no
+      dialog: the strip says the file was moved aside to `settings.json.corrupt`, and
+      **Settings…** shows the defaults.
 - [ ] Adding the library's longest FLAC (about 26 minutes) shows its full length in the time
       readout, and seeking into its last minute lands there. Length is not proven by the test
       suite; this is where it is checked.
@@ -131,6 +140,8 @@ sharp percussive transient; the realism check is the authored boundary from the 
       without a gap or a fade into silence.
 - [ ] Unplug headphones mid-song; playback pauses and nothing plays from the speakers. Replug
       and press Play; it resumes where it paused.
+- [ ] With *Crossfade for 8 s* on in **Settings…**, two tracks with no authored transition
+      crossfade over 8 s. Switched on mid-track, the very next boundary crossfades.
 - [ ] With another app holding the device exclusively, launch in exclusive mode; faderio falls
       back to shared and says so.
 - [ ] Play a whole real album on WASAPI exclusive, through several queue advances and a track

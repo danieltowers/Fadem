@@ -12,42 +12,46 @@ public enum AudioOutputMode
     WaveOut,
 }
 
-/// <summary>What an adjacency with no authored transition does.</summary>
-public enum DefaultAdjacencyBehaviour
+/// <summary>What an adjacency nobody authored plays.</summary>
+public enum UnauthoredAdjacency
 {
     /// <summary>The default: fades never happen unless authored.</summary>
     HardCut,
 
-    /// <summary>Opt-in classic behaviour: a global default crossfade of N seconds.</summary>
-    GlobalDefaultCrossfade,
+    /// <summary>Opted in: the default crossfade of <see cref="PlayerSettings.DefaultCrossfadeSeconds"/>.</summary>
+    DefaultCrossfade,
 }
 
 /// <summary>
-/// Player settings per design.md D4. Persisted as JSON at %APPDATA%\faderio\settings.json;
-/// missing keys fall back to these built-in defaults.
+/// The player's three settings (wayfinder ticket 10), persisted as JSON at
+/// %APPDATA%\faderio\settings.json; missing keys fall back to these built-in defaults. The
+/// output mode takes effect at the next launch (ADR 0008); the others at once.
 /// </summary>
 public sealed record PlayerSettings
 {
     public const int CurrentSchemaVersion = 1;
+    public const int MinDefaultCrossfadeSeconds = 1;
+    public const int MaxDefaultCrossfadeSeconds = 30;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public AudioOutputMode OutputMode { get; init; } = AudioOutputMode.WasapiShared;
-    public DefaultAdjacencyBehaviour DefaultAdjacencyBehaviour { get; init; } = DefaultAdjacencyBehaviour.HardCut;
+    public UnauthoredAdjacency UnauthoredAdjacency { get; init; } = UnauthoredAdjacency.HardCut;
 
-    /// <summary>The N-second duration used by the global default crossfade and as the fallback
-    /// duration for individually optional authored fade durations.</summary>
-    public TimeSpan DefaultCrossfadeDuration { get; init; } = TimeSpan.FromSeconds(5);
+    /// <summary>N, the default crossfade's length in whole seconds, 1 to 30. It never applies to
+    /// an authored transition, even one with blank durations.</summary>
+    public int DefaultCrossfadeSeconds { get; init; } = 5;
 
     /// <summary>ReplayGain track gain applied with symmetric clamping. On by default.</summary>
     public bool ReplayGainEnabled { get; init; } = true;
 
-    /// <summary>Preview pre-roll in seconds: 2, 5 (default) or 10.</summary>
-    public int PreviewPreRollSeconds { get; init; } = 5;
-
-    public bool VisualiserVisible { get; init; } = true;
-}
-
-public sealed record SettingsLoadResult(PlayerSettings Settings, string? Warning)
-{
-    public bool HasWarning => Warning is not null;
+    /// <summary>These settings as the engine keeps them: the current schema, N brought into
+    /// range, and a mode or choice no version knows replaced by its default. A hand-edited file
+    /// and a caller alike get the same settings back.</summary>
+    public PlayerSettings Normalised() => this with
+    {
+        SchemaVersion = CurrentSchemaVersion,
+        OutputMode = Enum.IsDefined(OutputMode) ? OutputMode : AudioOutputMode.WasapiShared,
+        UnauthoredAdjacency = Enum.IsDefined(UnauthoredAdjacency) ? UnauthoredAdjacency : UnauthoredAdjacency.HardCut,
+        DefaultCrossfadeSeconds = Math.Clamp(DefaultCrossfadeSeconds, MinDefaultCrossfadeSeconds, MaxDefaultCrossfadeSeconds),
+    };
 }

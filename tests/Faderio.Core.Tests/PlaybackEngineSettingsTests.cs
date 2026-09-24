@@ -21,12 +21,12 @@ public sealed class PlaybackEngineSettingsTests
     }
 
     [Fact]
-    public void UnauthoredAdjacency_WithGlobalDefaultCrossfadeSetting_Crossfades()
+    public void UnauthoredAdjacency_WithTheDefaultCrossfadeOn_Crossfades()
     {
         var settings = new PlayerSettings
         {
-            DefaultAdjacencyBehaviour = DefaultAdjacencyBehaviour.GlobalDefaultCrossfade,
-            DefaultCrossfadeDuration = TimeSpan.FromSeconds(1),
+            UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade,
+            DefaultCrossfadeSeconds = 1,
         };
         using var tc = TestEngine.Create(settings);
         var a = TestAudio.WriteToneWav("a.wav", 3, 1000);

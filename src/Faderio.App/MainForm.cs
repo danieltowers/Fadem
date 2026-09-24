@@ -1,6 +1,7 @@
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;
 using Faderio.Core.Queue;
+using Faderio.Core.Settings;
 using Faderio.Core.Transitions;
 
 namespace Faderio.App;
@@ -12,7 +13,8 @@ namespace Faderio.App;
 /// transition (this → next)", Remove and Clear queue (build issue 04; Delete removes too),
 /// transport with a shuffle toggle and a repeat button (build issue 07), a seek bar in
 /// milliseconds, the transition editor, and a status strip showing the latest notice and a count
-/// that opens this session's notice list (build issue 09). It renders
+/// that opens this session's notice list (build issue 09), and a Settings… dialog (build issue 12).
+/// It renders
 /// <see cref="PlayerView"/>s and issues commands; it holds no engine state between calls (the
 /// placement rule in CLAUDE.md). The seek bar's Maximum is the track length
 /// in milliseconds, so no scaling exists to get wrong (ticket 06).
@@ -20,6 +22,7 @@ namespace Faderio.App;
 internal sealed class MainForm : Form
 {
     private readonly PlaybackEngine _engine;
+    private readonly Func<AudioOutputMode?> _outputModeInUse;
 
     internal readonly ListView _queueList;
     internal readonly TrackBar _seek;
@@ -28,6 +31,7 @@ internal sealed class MainForm : Form
     internal readonly Button _addFolder;
     internal readonly Button _openPlaylist;
     internal readonly Button _saveAsPlaylist;
+    internal readonly Button _settings;
     internal readonly Button _prev;
     internal readonly Button _playPause;
     internal readonly Button _stop;
@@ -59,14 +63,18 @@ internal sealed class MainForm : Form
     private long _shownQueue = -1;
     private bool _seekDragging;
 
-    public MainForm(PlaybackEngine engine, ITransitionStore store, PostingSink sink)
+    /// <param name="outputModeInUse">The mode the output opened in, or null when none could be:
+    /// the output adapter's, for the settings dialog.</param>
+    public MainForm(PlaybackEngine engine, ITransitionStore store, PostingSink sink, Func<AudioOutputMode?> outputModeInUse)
     {
         _engine = engine;
+        _outputModeInUse = outputModeInUse;
         ChooseFiles = ShowFilesDialog;
         ChooseFolders = ShowFolderDialog;
         ChoosePlaylists = ShowPlaylistDialog;
         ChoosePlaylistSavePath = ShowSavePlaylistDialog;
         ConfirmClear = ShowClearDialog;
+        ShowSettings = dialog => dialog.ShowDialog(this) == DialogResult.OK;
         StartDrag = data => _queueList!.DoDragDrop(data, DragDropEffects.Move);
         ShowNoticeList = list =>
         {
@@ -92,9 +100,10 @@ internal sealed class MainForm : Form
         _addFolder = new Button { Text = "Add folder…", Width = 90, Height = 28, Margin = new Padding(0, 8, 4, 0) };
         _openPlaylist = new Button { Text = "Open playlist…", Width = 104, Height = 28, Margin = new Padding(0, 8, 4, 0) };
         _saveAsPlaylist = new Button { Text = "Save as playlist…", Width = 116, Height = 28, Margin = new Padding(0, 8, 4, 0) };
+        _settings = new Button { Text = "Settings…", Width = 90, Height = 28, Margin = new Padding(16, 8, 4, 0) };
         // The queue's own commands get a row of their own, so the seek bar keeps its travel.
         var queueBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36, WrapContents = false };
-        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _openPlaylist, _saveAsPlaylist });
+        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _openPlaylist, _saveAsPlaylist, _settings });
         var symbols = new Font("Segoe UI Symbol", 9f);
         _prev = new Button { Text = "⏮", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
@@ -227,6 +236,7 @@ internal sealed class MainForm : Form
         _addFolder.Click += (_, _) => AddChosen(ChooseFolders);
         _openPlaylist.Click += (_, _) => AddChosen(ChoosePlaylists);
         _saveAsPlaylist.Click += (_, _) => SaveAsPlaylist();
+        _settings.Click += (_, _) => EditSettings();
         _cancelAdd.Click += (_, _) => _engine.CancelAdd();
         _status.Click += (_, _) => OpenNotices();
         _noticeCount.Click += (_, _) => OpenNotices();
@@ -423,6 +433,20 @@ internal sealed class MainForm : Form
     /// <summary>Starts a drag of the selected rows. A test replaces it, since a headless form
     /// cannot enter the modal drag loop.</summary>
     internal Action<IDataObject> StartDrag { get; set; }
+
+    /// <summary>Shows the settings dialog and says whether the user pressed OK. A test replaces
+    /// it, since a headless form cannot show a dialog.</summary>
+    internal Func<SettingsForm, bool> ShowSettings { get; set; }
+
+    /// <summary>The dialog opens on the view's settings; OK sends what it says in one call.</summary>
+    private void EditSettings()
+    {
+        using var dialog = new SettingsForm(_engine.View.Settings, _outputModeInUse());
+        if (ShowSettings(dialog))
+        {
+            _engine.ChangeSettings(dialog.Chosen);
+        }
+    }
 
     private void AddChosen(Func<IReadOnlyList<string>> choose)
     {

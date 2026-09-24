@@ -19,7 +19,8 @@ public sealed partial class PlaybackEngine : IDisposable
     private readonly ITransitionStore _store;
     private readonly IEngineSink _sink;
     private readonly TransitionResolver _resolver;
-    private readonly PlayerSettings _settings;
+    private readonly SettingsStore? _settingsStore;
+    private PlayerSettings _settings;
     private readonly Random _rng;
     private readonly object _sync = new();
     private readonly TransitionMixer _mixer;
@@ -75,13 +76,14 @@ public sealed partial class PlaybackEngine : IDisposable
         IAudioOutput output,
         ITransitionStore store,
         IEngineSink sink,
-        PlayerSettings? settings = null,
+        SettingsStore? settings = null,
         Random? rng = null)
     {
         _output = output;
         _store = store;
         _sink = sink;
-        _settings = settings ?? new PlayerSettings();
+        _settingsStore = settings;
+        _settings = settings?.Settings ?? new PlayerSettings();
         _resolver = new TransitionResolver(_settings);
         _rng = rng ?? new Random();
         _rate = output.SampleRate;
@@ -92,6 +94,12 @@ public sealed partial class PlaybackEngine : IDisposable
         _mixer.VoiceEnded += OnVoiceEnded;
         _output.Stopped += OnOutputStopped;
         _output.Initialise(new EngineFrameSource(this));
+
+        // Nothing holds the lock yet, so the store's trouble opening is told straight away.
+        if (settings?.LoadNotice is { } notice)
+        {
+            _sink.Notice(notice);
+        }
     }
 
     /// <summary>The player at this instant. Discrete state is whatever was last published; the
@@ -305,7 +313,7 @@ public sealed partial class PlaybackEngine : IDisposable
         return new Snapshot(
             _version, _queueVersion, TransportNow, _queue.Entries.ToImmutableArray(),
             _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null, _finishAt is not null,
-            _shuffle, _repeat, Adding, _rate, _unreadable.ToImmutableHashSet());
+            _shuffle, _repeat, Adding, _rate, _unreadable.ToImmutableHashSet(), _settings);
     }
 
     /// <summary>One voice frozen for the view: its row, its reference history and its length.
@@ -351,7 +359,8 @@ public sealed partial class PlaybackEngine : IDisposable
         RepeatMode Repeat,
         AddProgress? Adding,
         int Rate,
-        ImmutableHashSet<RowId> Unreadable)
+        ImmutableHashSet<RowId> Unreadable,
+        PlayerSettings Settings)
     {
         public PlayerView At(long emitted)
         {
@@ -372,7 +381,10 @@ public sealed partial class PlaybackEngine : IDisposable
                 attended?.At(emitted, true, Rate, Unreadable),
                 incoming?.At(emitted, false, Rate, Unreadable),
                 Shuffle, Repeat, Adding, next,
-                CanTransitionNow: Transport == Transport.Playing && heardAlone && next is not null);
+                CanTransitionNow: Transport == Transport.Playing && heardAlone && next is not null)
+            {
+                Settings = Settings,
+            };
         }
 
         private Adjacency? NextAdjacencyFrom(RowId? row)

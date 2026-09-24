@@ -1,13 +1,16 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Faderio.Core.Persistence;
 
 namespace Faderio.Core.Settings;
 
 /// <summary>
-/// Loads and persists player settings as JSON per design.md D4. Missing keys fall back to
-/// built-in defaults; a corrupt file produces a visible warning and a reset to defaults —
-/// never silently swallowed. Writes are atomic (temp file + rename).
+/// settings.json, loaded once when opened, as the transition store is (wayfinder ticket 10).
+/// Missing keys fall back to built-in defaults. A corrupt file is moved aside to
+/// <c>settings.json.corrupt</c>, so the old settings stay recoverable; a file from a newer
+/// schema is left alone. Either way defaults load and <see cref="LoadNotice"/> says so: the
+/// engine, which owns this store, raises it. Writes are atomic (temp file + rename).
 /// </summary>
 public sealed class SettingsStore
 {
@@ -15,20 +18,41 @@ public sealed class SettingsStore
     {
         WriteIndented = true,
 
-        // Settings files are user-editable; accept any casing of the keys.
+        // Settings files are user-editable: keys in any casing, choices by name. Integer values
+        // still deserialise.
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() },
     };
+
+    private const string LeftAsItIs = "Defaults are used, and the file is left as it is until a setting is changed.";
 
     private readonly string _path;
 
-    public SettingsStore(string path) => _path = path;
+    public SettingsStore(string path)
+    {
+        _path = path;
+        (Settings, LoadNotice) = Load();
+    }
 
-    public SettingsLoadResult Load()
+    /// <summary>The settings loaded, or last saved.</summary>
+    public PlayerSettings Settings { get; private set; }
+
+    /// <summary>What went wrong opening the file, worded for the user; null when nothing did.</summary>
+    public string? LoadNotice { get; }
+
+    /// <summary>Writes the settings, and keeps them only once they are on disk.</summary>
+    public void Save(PlayerSettings settings)
+    {
+        AtomicJson.Write(_path, settings, JsonOptions);
+        Settings = settings;
+    }
+
+    private (PlayerSettings, string?) Load()
     {
         if (!File.Exists(_path))
         {
-            return new SettingsLoadResult(new PlayerSettings(), null);
+            return (new PlayerSettings(), null);
         }
 
         string json;
@@ -36,34 +60,61 @@ public sealed class SettingsStore
         {
             json = File.ReadAllText(_path);
         }
-        catch (IOException e)
+        catch (Exception e) when (IsFileFailure(e))
         {
-            return new SettingsLoadResult(new PlayerSettings(),
-                $"Could not read settings file: {e.Message}. Defaults restored.");
+            return (new PlayerSettings(), $"The settings file could not be read ({e.Message}). Defaults are used.");
         }
 
+        PlayerSettings? loaded;
         try
         {
-            var loaded = JsonSerializer.Deserialize<PlayerSettings>(json, JsonOptions);
-            var settings = loaded is null ? new PlayerSettings() : loaded;
-            string? warning = null;
-            if (settings.SchemaVersion > PlayerSettings.CurrentSchemaVersion)
+            // The schema first, on its own: a newer version may hold values this one cannot
+            // parse, and its file must not be taken for a corrupt one.
+            if (SchemaVersionOf(json) is > PlayerSettings.CurrentSchemaVersion and var newer)
             {
-                warning = $"Settings were written by a newer faderio version (schema {settings.SchemaVersion}). Defaults restored.";
-                settings = new PlayerSettings();
+                return (new PlayerSettings(),
+                    $"The settings file was written by a newer faderio (schema {newer}). {LeftAsItIs}");
             }
-            return new SettingsLoadResult(settings, warning);
+            loaded = JsonSerializer.Deserialize<PlayerSettings>(json, JsonOptions);
         }
         catch (JsonException e)
         {
-            // Corrupt settings file: warn visibly, reset to defaults, app still launches.
-            return new SettingsLoadResult(new PlayerSettings(),
-                $"Settings file is corrupt ({e.Message}). Defaults restored.");
+            return (new PlayerSettings(), MoveAside(e.Message));
         }
+        return (loaded?.Normalised() ?? new PlayerSettings(), null);
     }
 
-    public void Save(PlayerSettings settings)
+    /// <summary>The file's schemaVersion, in any casing, or null when it has none.</summary>
+    private static int? SchemaVersionOf(string json)
     {
-        AtomicJson.Write(_path, settings, JsonOptions);
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+        foreach (var property in document.RootElement.EnumerateObject())
+        {
+            if (string.Equals(property.Name, "schemaVersion", StringComparison.OrdinalIgnoreCase))
+            {
+                return property.Value.TryGetInt32(out var version) ? version : null;
+            }
+        }
+        return null;
     }
+
+    private string MoveAside(string problem)
+    {
+        var name = Path.GetFileName(_path);
+        try
+        {
+            File.Move(_path, _path + ".corrupt", overwrite: true);
+        }
+        catch (Exception e) when (IsFileFailure(e))
+        {
+            return $"The settings file is corrupt ({problem}) and could not be moved aside ({e.Message}). {LeftAsItIs}";
+        }
+        return $"The settings file is corrupt ({problem}). It was moved aside to {name}.corrupt and defaults are used.";
+    }
+
+    private static bool IsFileFailure(Exception e) => e is IOException or UnauthorizedAccessException;
 }

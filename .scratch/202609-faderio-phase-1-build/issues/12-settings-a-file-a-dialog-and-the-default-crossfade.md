@@ -1,6 +1,6 @@
 # 12: Settings: a file, a dialog and the default crossfade
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 09
 
 Decided in [Which settings exist, and where do they live?](../../202609-faderio-phase-1-restage/issues/10-which-settings-exist-and-where-do-they-live.md).
@@ -34,13 +34,13 @@ except ReplayGain, which is issue 13.
 
 ## Acceptance
 
-- [ ] Settings survive a restart.
-- [ ] A corrupt file is moved aside with a notice, and defaults load.
-- [ ] Changing N does not alter an authored transition with a blank duration.
-- [ ] Switching to *Crossfade for N s* makes the next unauthored boundary crossfade, if its
+- [x] Settings survive a restart.
+- [x] A corrupt file is moved aside with a notice, and defaults load.
+- [x] Changing N does not alter an authored transition with a blank duration.
+- [x] Switching to *Crossfade for N s* makes the next unauthored boundary crossfade, if its
       transition has not started. One in flight plays out.
-- [ ] A new output mode applies at the next launch; the dialog says so.
-- [ ] `--output=` is gone, and `docs/smoke.md` no longer uses it.
+- [x] A new output mode applies at the next launch; the dialog says so.
+- [x] `--output=` is gone, and `docs/smoke.md` no longer uses it.
 
 ## Tests
 

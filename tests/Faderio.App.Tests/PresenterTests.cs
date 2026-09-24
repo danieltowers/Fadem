@@ -111,13 +111,12 @@ public sealed class PresenterTests
     }
 
     [Theory]
-    [InlineData("", AudioOutputMode.WasapiShared)]
-    [InlineData("--output=wasapi-shared", AudioOutputMode.WasapiShared)]
-    [InlineData("--output=wasapi-exclusive", AudioOutputMode.WasapiExclusive)]
-    [InlineData("--output=WaveOut", AudioOutputMode.WaveOut)]
-    [InlineData("--output=nonsense", AudioOutputMode.WasapiShared)]
-    public void ParseOutputMode_ReadsTheArgument(string arg, AudioOutputMode expected) =>
-        Assert.Equal(expected, Presenter.ParseOutputMode(arg.Length == 0 ? Array.Empty<string>() : new[] { arg }));
+    [InlineData(AudioOutputMode.WasapiShared, AudioOutputMode.WasapiShared, "")]
+    [InlineData(AudioOutputMode.WasapiExclusive, AudioOutputMode.WasapiShared, "In use now: WASAPI shared")]
+    [InlineData(AudioOutputMode.WasapiShared, null, "In use now: no audio output")]
+    public void FmtModeInUse_NamesTheModeInUse_OnlyWhenItIsNotTheOneChosen(
+        AudioOutputMode chosen, AudioOutputMode? inUse, string expected) =>
+        Assert.Equal(expected, Presenter.FmtModeInUse(chosen, inUse));
 
     [Theory]
     [InlineData(AudioOutputMode.WasapiExclusive, new[] { AudioOutputMode.WasapiExclusive, AudioOutputMode.WasapiShared, AudioOutputMode.WaveOut })]

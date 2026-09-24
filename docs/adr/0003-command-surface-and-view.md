@@ -127,3 +127,16 @@ The shell keeps a `NoticeLog` of what the sink has delivered this session: a rep
 its first entry with a count. It holds delivered messages, not engine state, so it passes the
 placement rule. The presenter gains the strip's wording (`FmtNotice`, `FmtNoticeCount`). The
 store open path reports its warnings as startup notices instead of a message box.
+
+## Addendum: settings are one command, and the view carries them (2026-09-24)
+
+The engine owns `settings.json` through `SettingsStore`, as it owns the transition store
+([issue 12](../../.scratch/202609-faderio-phase-1-build/issues/12-settings-a-file-a-dialog-and-the-default-crossfade.md)).
+`ChangeSettings(settings)` is the one command: it saves the file, applies each value and
+reports the outcome as a notice, as authoring does. A file that cannot be written changes
+nothing. `View.Settings` carries the settings in force, so the dialog opens on the view and
+holds nothing between calls. The output mode in the view is the one chosen for the next launch
+(ADR 0008). The mode in use belongs to the output adapter, not the engine, so the composition
+root hands the form a read of it, as it already did for the title. `Presenter.FmtModeInUse`
+words the difference. The store's trouble at launch (a corrupt file moved aside, a newer
+schema) reaches the sink from the engine's constructor, before any lock is taken.

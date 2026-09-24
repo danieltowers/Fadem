@@ -124,8 +124,8 @@ public sealed class TransitionNowTests
     {
         using var tc = TestEngine.Create(new PlayerSettings
         {
-            DefaultAdjacencyBehaviour = DefaultAdjacencyBehaviour.GlobalDefaultCrossfade,
-            DefaultCrossfadeDuration = TimeSpan.FromSeconds(1),
+            UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade,
+            DefaultCrossfadeSeconds = 1,
         });
         var a = TestAudio.WriteDcWav("a.wav", 6, 0.4);
         var b = TestAudio.WriteDcWav("b.wav", 6, 0.2);

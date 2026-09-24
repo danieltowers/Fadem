@@ -18,8 +18,8 @@ internal sealed record SecondsField(Point? Point, string? Error)
 
 /// <summary>
 /// The shell's remaining logic, with no WinForms in it (ADR 0002, S4). Ticket 06's list, amended
-/// by build issues 01, 07 and 09: format and parse seconds, row → adjacency with its bounds
-/// check, the add's progress, the store open/recovery path, the launch-time output mode, the
+/// by build issues 01, 07, 09 and 12: format and parse seconds, row → adjacency with its bounds
+/// check, the add's progress, the store open/recovery path, the output modes' names, the
 /// repeat button's cycle, the notice strip's wording and the render's file name. The add's
 /// outcome is an engine notice since build issue 01, so its summary moved to
 /// <see cref="AddReport"/>. Everything here formats engine values, parses text, or picks the next
@@ -144,6 +144,12 @@ internal static class Presenter
         _ => "WASAPI shared",
     };
 
+    /// <summary>The settings dialog's note beside the chosen output mode: the mode in use, when it
+    /// is not the one chosen (a fallback at launch, or a choice waiting for the next launch).
+    /// Blank otherwise.</summary>
+    public static string FmtModeInUse(AudioOutputMode chosen, AudioOutputMode? inUse) =>
+        inUse == chosen ? "" : $"In use now: {(inUse is { } mode ? FmtOutputMode(mode) : "no audio output")}";
+
     /// <summary>The window title names the mode actually in use, not the one asked for.</summary>
     public static string Title(AudioOutputMode? inUse, int sampleRate) =>
         inUse is { } mode ? $"faderio — {FmtOutputMode(mode)} at {sampleRate} Hz" : "faderio — no audio output";
@@ -161,21 +167,6 @@ internal static class Presenter
             }
         }
         return modes;
-    }
-
-    /// <summary>"--output=wasapi-shared|wasapi-exclusive|waveout"; shared by default (ticket 05:
-    /// selectable by argument, no settings dialog).</summary>
-    public static AudioOutputMode ParseOutputMode(IEnumerable<string> args)
-    {
-        foreach (var arg in args)
-        {
-            if (!arg.StartsWith("--output=", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-            return ParseMode(arg["--output=".Length..]);
-        }
-        return AudioOutputMode.WasapiShared;
     }
 
     private static AudioOutputMode ParseMode(string name) => name.Trim().ToLowerInvariant() switch
