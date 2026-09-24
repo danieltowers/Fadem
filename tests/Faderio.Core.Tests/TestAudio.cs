@@ -109,6 +109,27 @@ public static class TestAudio
         return samples;
     }
 
+    /// <summary>Reads a source to its end in 4096-frame pulls and disposes it; returns the left
+    /// channel.</summary>
+    internal static float[] LeftChannel(Faderio.Core.Playback.ITrackSource source)
+    {
+        using (source)
+        {
+            var channels = source.WaveFormat.Channels;
+            var buffer = new float[4096 * channels];
+            var left = new List<float>();
+            int n;
+            while ((n = source.Read(buffer, 0, 4096)) > 0)
+            {
+                for (var f = 0; f < n; f++)
+                {
+                    left.Add(buffer[f * channels]);
+                }
+            }
+            return left.ToArray();
+        }
+    }
+
     /// <summary>Where <paramref name="block"/> occurs in <paramref name="reference"/>: the offset
     /// with the highest cosine similarity over every possible alignment, and that similarity
     /// (1.0 is an exact match, noise-level is about 0.1). Ticket 02's cross-correlation, made

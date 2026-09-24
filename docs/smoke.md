@@ -181,6 +181,8 @@ sharp percussive transient; the realism check is the authored boundary from the 
 - [ ] Author an overlap of two loud masters, or play a boosted track: the clip light comes on
       as you hear the clip, not before, and names what you heard. Stop and Clear queue
       leave it on; clicking it clears it.
+- [ ] Two consecutive tracks of a continuous MP3 album (a live or segued one, whose files
+      carry a LAME tag), with no transition authored, hard-cut with no audible gap.
 - [ ] With another app holding the device exclusively, launch in exclusive mode; faderio falls
       back to shared and says so.
 - [ ] Play a whole real album on WASAPI exclusive, through several queue advances and a track

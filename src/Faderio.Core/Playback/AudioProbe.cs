@@ -93,10 +93,10 @@ public static class SupportedAudio
 
 /// <summary>
 /// Reads a file's header — never its audio — to decide promised or rejected and to issue its
-/// length (ADR 0010). WAV: the fmt and data chunks. FLAC: STREAMINFO. MP3: the first frame
-/// header plus the Xing/Info frame count, or the file size over the frame size for a bare
-/// constant-bitrate file. The real-input matrix asserts on every promised cell that the length
-/// issued here equals what the decoder delivers.
+/// length (ADR 0010). WAV: the fmt and data chunks. FLAC: STREAMINFO. MP3: <see cref="Mp3Header"/>,
+/// whole frames less the encoder's delay and padding when a valid LAME tag gives them. The
+/// real-input matrix asserts on every promised cell that the length issued here equals what the
+/// decoder delivers.
 /// </summary>
 internal static class AudioProbe
 {
@@ -234,121 +234,10 @@ internal static class AudioProbe
 
     // ── MP3 ──────────────────────────────────────────────────────────────────────────────
 
-    private static readonly int[][] BitrateTable =
-    {
-        // MPEG-1 Layer III, kbit/s, index 1..14
-        new[] { 0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0 },
-        // MPEG-2 / 2.5 Layer III
-        new[] { 0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0 },
-    };
-
-    private static readonly int[][] RateTable =
-    {
-        new[] { 44100, 48000, 32000, 0 }, // MPEG-1
-        new[] { 22050, 24000, 16000, 0 }, // MPEG-2
-        new[] { 11025, 12000, 8000, 0 },  // MPEG-2.5
-    };
-
-    private sealed record Mp3Frame(int Version, int SampleRate, int Channels, int Bitrate, int Length, int SamplesPerFrame, bool Mono);
-
     private static ProbeResult ProbeMp3(FileStream stream)
     {
-        var fileLength = stream.Length;
-        long audioStart = 0;
-        Span<byte> id3 = stackalloc byte[10];
-        if (stream.Read(id3) == 10 && id3[..3].SequenceEqual("ID3"u8))
-        {
-            var size = (id3[6] << 21) | (id3[7] << 14) | (id3[8] << 7) | id3[9];
-            audioStart = 10 + size + ((id3[5] & 0x10) != 0 ? 10 : 0);
-        }
-        long audioEnd = fileLength;
-        if (fileLength >= 128)
-        {
-            stream.Seek(fileLength - 128, SeekOrigin.Begin);
-            Span<byte> tag = stackalloc byte[3];
-            if (stream.Read(tag) == 3 && tag.SequenceEqual("TAG"u8))
-            {
-                audioEnd -= 128;
-            }
-        }
-
-        // Find the first frame header that is followed by another valid header.
-        stream.Seek(audioStart, SeekOrigin.Begin);
-        var window = new byte[Math.Min(64 * 1024, Math.Max(0, audioEnd - audioStart))];
-        var got = stream.Read(window, 0, window.Length);
-        for (var i = 0; i + 4 <= got; i++)
-        {
-            var frame = ParseFrame(window.AsSpan(i));
-            if (frame is null)
-            {
-                continue;
-            }
-            var nextAt = i + frame.Length;
-            if (nextAt + 4 <= got && ParseFrame(window.AsSpan(nextAt)) is null)
-            {
-                continue; // a false sync
-            }
-            var firstFrameOffset = audioStart + i;
-            var shape = new AudioShape(AudioFormat.Mp3, frame.SampleRate, null, frame.Channels);
-            var frames = XingFrames(window.AsSpan(i, Math.Min(frame.Length, got - i)), frame) is { } counted
-                ? counted
-                : (long)Math.Round((audioEnd - firstFrameOffset) / AverageFrameBytes(frame));
-            return new ProbeResult(shape, frames * frame.SamplesPerFrame);
-        }
-        throw new InvalidDataException("No MP3 frame header found.");
-    }
-
-    private static Mp3Frame? ParseFrame(ReadOnlySpan<byte> b)
-    {
-        if (b.Length < 4 || b[0] != 0xFF || (b[1] & 0xE0) != 0xE0)
-        {
-            return null;
-        }
-        var versionBits = (b[1] >> 3) & 0x3; // 0: 2.5, 1: reserved, 2: MPEG-2, 3: MPEG-1
-        var layerBits = (b[1] >> 1) & 0x3;   // 1: layer III
-        if (versionBits == 1 || layerBits != 1)
-        {
-            return null;
-        }
-        var bitrateIndex = b[2] >> 4;
-        var rateIndex = (b[2] >> 2) & 0x3;
-        var padding = (b[2] >> 1) & 0x1;
-        var channelMode = b[3] >> 6;
-        if (bitrateIndex is 0 or 15 || rateIndex == 3)
-        {
-            return null;
-        }
-        var version = versionBits == 3 ? 0 : versionBits == 2 ? 1 : 2;
-        var bitrate = BitrateTable[version == 0 ? 0 : 1][bitrateIndex] * 1000;
-        var rate = RateTable[version][rateIndex];
-        var samplesPerFrame = version == 0 ? 1152 : 576;
-        var length = samplesPerFrame / 8 * bitrate / rate + padding;
-        return new Mp3Frame(version, rate, channelMode == 3 ? 1 : 2, bitrate, length, samplesPerFrame, channelMode == 3);
-    }
-
-    private static double AverageFrameBytes(Mp3Frame frame) =>
-        frame.SamplesPerFrame / 8.0 * frame.Bitrate / frame.SampleRate;
-
-    /// <summary>The frame count from a Xing or Info header when the first frame carries one.</summary>
-    private static long? XingFrames(ReadOnlySpan<byte> frame, Mp3Frame info)
-    {
-        var sideInfo = info.Version == 0 ? (info.Mono ? 17 : 32) : (info.Mono ? 9 : 17);
-        var at = 4 + sideInfo;
-        if (frame.Length < at + 8)
-        {
-            return null;
-        }
-        var tag = frame.Slice(at, 4);
-        if (!tag.SequenceEqual("Xing"u8) && !tag.SequenceEqual("Info"u8))
-        {
-            return null;
-        }
-        var flags = BinaryPrimitives.ReadInt32BigEndian(frame.Slice(at + 4));
-        if ((flags & 1) == 0 || frame.Length < at + 12)
-        {
-            return null;
-        }
-        return BinaryPrimitives.ReadUInt32BigEndian(frame.Slice(at + 8));
+        var header = Mp3Header.Read(stream);
+        return new ProbeResult(header.Shape, header.Frames);
     }
 
     private static void ReadExactly(Stream stream, Span<byte> buffer)

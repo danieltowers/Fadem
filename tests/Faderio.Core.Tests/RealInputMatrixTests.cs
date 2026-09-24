@@ -7,11 +7,12 @@ namespace Faderio.Core.Tests;
 /// promised row of <c>docs/supported-audio.md</c>. The fixture name carries it.</summary>
 public enum Mp3Variant
 {
-    /// <summary>Constant bitrate with LAME's Info tag: the frame count is in the tag.</summary>
+    /// <summary>Constant bitrate with LAME's Info tag: the frame count, less the encoder's delay
+    /// and padding, is in the tag.</summary>
     CbrInfo,
-    /// <summary>Constant bitrate, no Xing/Info tag: audio bytes over the frame size.</summary>
+    /// <summary>Constant bitrate, no Xing/Info tag: audio bytes over the frame size, whole frames.</summary>
     CbrBare,
-    /// <summary>Variable bitrate with a Xing tag: the frame count is in the tag.</summary>
+    /// <summary>Variable bitrate with a Xing tag: as <see cref="CbrInfo"/>.</summary>
     Vbr,
 }
 
@@ -66,6 +67,12 @@ public class RealInputMatrixTests
         from rate in new[] { 44100, 48000 }
         from channels in new[] { 1, 2 }
         select new object[] { variant, rate, channels };
+
+    /// <summary>The variants whose LAME tag the probe trims by (issue 18).</summary>
+    public static IEnumerable<object[]> TaggedMp3Cells() =>
+        from cell in Mp3Cells()
+        where (Mp3Variant)cell[0] != Mp3Variant.CbrBare
+        select cell;
 
     private static string FixturePath(string name)
     {
@@ -149,6 +156,41 @@ public class RealInputMatrixTests
         Assert.True(rejection is null, $"probe rejected the cell: {rejection}");
         using var decoded = TrackSources.Open(path);
         Assert.Equal(decoded.TotalFrames, probed!.Frames);
+    }
+
+    /// <summary>The 2 s the generator encoded, in the file's own frames.</summary>
+    private static long SourceFrames(int rate) => (long)(Seconds * rate);
+
+    /// <summary>What LAME pads 2 s out to in whole 1152-sample frames: 78 at 44.1 kHz, 85 at 48.</summary>
+    private static long WholeFrames(int rate) => rate == 44100 ? 78 * 1152 : 85 * 1152;
+
+    /// <summary>The decoder, in the file's own frames, reports and delivers exactly
+    /// <paramref name="expected"/>.</summary>
+    private static void AssertDecodedFrames(string path, long expected)
+    {
+        using var decoded = TrackSources.Open(path);
+        Assert.Equal(expected, decoded.TotalFrames);
+        Assert.Equal(expected, TestAudio.LeftChannel(TrackSources.Open(path)).Length);
+    }
+
+    /// <summary>The decode, in the file's own frames, is the generator's source PCM sample for
+    /// sample: its first block sits at offset 0 of the source and its last at the source's end.
+    /// The source is the lossless FLAC fixture of the same pink noise (Fixtures/generate.sh).</summary>
+    private static void AssertIsTheSource(string mp3, int rate, int channels)
+    {
+        var source = TestAudio.LeftChannel(TrackSources.Open(FlacFixture("noise", rate, 24, channels)));
+        var decoded = TestAudio.LeftChannel(TrackSources.Open(mp3));
+        const int block = 4096;
+
+        var (first, firstSimilarity) = TestAudio.Locate(source, decoded.AsSpan(0, block), 0, 2000);
+        var (last, lastSimilarity) = TestAudio.Locate(source, decoded.AsSpan(decoded.Length - block),
+            source.Length - block - 2000, source.Length - block);
+
+        Assert.True(firstSimilarity > 0.95 && first == 0,
+            $"the decode's first block is the source's at {first} (similarity {firstSimilarity:F3}), not 0");
+        Assert.True(lastSimilarity > 0.95 && last == source.Length - block,
+            $"the decode's last block is the source's at {last} (similarity {lastSimilarity:F3}), " +
+            $"not {source.Length - block}");
     }
 
     /// <summary>Where a seek to <paramref name="target"/> landed, in engine frames, by ticket
@@ -321,8 +363,86 @@ public class RealInputMatrixTests
     public void Mp3_HeaderLengthEqualsDecoded(Mp3Variant variant, int rate, int channels)
     {
         // This is where the three variants earn their rows (ticket 10): the Xing/Info frame
-        // count for CbrInfo and Vbr, the audio bytes over the frame size for CbrBare.
-        AssertHeaderLengthEqualsDecoded(Mp3Fixture("tone", variant, rate, channels));
+        // count less the LAME tag's delay and padding for CbrInfo and Vbr, which is the source's
+        // own sample count (issue 18); the audio bytes over the frame size for CbrBare, whole
+        // frames, since a bare file says nothing about its padding.
+        var path = Mp3Fixture("tone", variant, rate, channels);
+        AssertHeaderLengthEqualsDecoded(path);
+        AssertDecodedFrames(path, variant == Mp3Variant.CbrBare ? WholeFrames(rate) : SourceFrames(rate));
+    }
+
+    [Theory, MemberData(nameof(TaggedMp3Cells))]
+    public void Mp3_TaggedDecode_IsTheSourceFromItsFirstSample(Mp3Variant variant, int rate, int channels)
+    {
+        // 0:00 is the first encoded sample: the trimming reader skips the encoder's delay and
+        // the ACM decoder's own (Mp3DecoderOffsetTests), and ends where the source ended.
+        AssertIsTheSource(Mp3Fixture("noise", variant, rate, channels), rate, channels);
+    }
+
+    [Theory, MemberData(nameof(TaggedMp3Cells))]
+    public void Mp3_LameEncoderString_IsTrimmedLikeFfmpegsLavc(Mp3Variant variant, int rate, int channels)
+    {
+        // Library files say LAME3.9x where ffmpeg's fixtures say Lavc62.23. lame.exe is not
+        // available to the generator, so the tag is crafted (CraftedMp3); there is no encoder
+        // allowlist, so it must trim the same.
+        var tone = CraftedMp3.WithEncoder(Mp3Fixture("tone", variant, rate, channels), "LAME3.99r");
+        var noise = CraftedMp3.WithEncoder(Mp3Fixture("noise", variant, rate, channels), "LAME3.99r");
+
+        AssertHeaderLengthEqualsDecoded(tone);
+        AssertDecodedFrames(tone, SourceFrames(rate));
+        AssertIsTheSource(noise, rate, channels);
+    }
+
+    [Fact]
+    public void Mp3_TagPaddingShorterThanTheDecodersDelay_EndsInSilenceAtItsLength()
+    {
+        // 61 of the library's tagged MP3s (60 by an old ffmpeg, Lavc57) record padding 0. The decoder's delay (D,
+        // 529) then carries the source's last samples past the last frame, where no decoder
+        // reaches, so the trimming reader ends in that much silence and the length stays the
+        // one the probe issued: 78 x 1152 - 576 - 0, of which the last 529 are silence.
+        var path = CraftedMp3.WithDelayAndPadding(Mp3Fixture("tone", Mp3Variant.CbrInfo, 44100, 2), 576, 0);
+        const long length = 78 * 1152 - 576;
+
+        AssertHeaderLengthEqualsDecoded(path);
+        AssertDecodedFrames(path, length);
+        using var decoded = TrackSources.Open(path);
+        decoded.Position = length - 2000; // inside the tone, which ends 1080 frames before the end
+        var tail = new float[2000 * 2];
+        Assert.Equal(2000, decoded.Read(tail, 0, 2000));
+        Assert.Contains(tail[..(900 * 2)], s => Math.Abs(s) > 0.1);          // the tone
+        Assert.Contains(tail[(1000 * 2)..(1471 * 2)], s => s != 0f);         // the encoder's padding, decoded
+        Assert.All(tail[(1471 * 2)..], s => Assert.Equal(0f, s));            // then D of silence
+        Assert.Equal(length, decoded.Position);
+    }
+
+    [Fact]
+    public void Mp3_CutAfterEncoding_WithinTheMusicLengthAllowance_EndsWhereItsAudioEnds()
+    {
+        // A cut of under 10 KiB still passes the MusicLength check, so the file is trimmed by its
+        // tag and the probe issues the source count; the decoder then stops short. The reader
+        // does not pad that with silence: the track ends where the audio ends, which is the
+        // engine's one notice (ADR 0010).
+        var fixture = Mp3Fixture("tone", Mp3Variant.CbrInfo, 44100, 2);
+        var bytes = File.ReadAllBytes(fixture);
+        var path = Path.Combine(TestAudio.Dir, $"cut-{Guid.NewGuid():N}.mp3");
+        Directory.CreateDirectory(TestAudio.Dir);
+        File.WriteAllBytes(path, bytes[..^(8 * 1024)]);
+
+        Assert.Null(AudioProbe.Probe(path, out var probed));
+        Assert.Equal(88200, probed!.Frames);
+        var frames = TestAudio.LeftChannel(TrackSources.Open(path)).Length;
+        Assert.InRange(frames, 88200 - 8 * 1024 / 1044 * 1152 - 2 * 1152, 88200 - 1152);
+    }
+
+    [Theory, MemberData(nameof(TaggedMp3Cells))]
+    public void Mp3_TagFailingValidation_KeepsWholeFrames(Mp3Variant variant, int rate, int channels)
+    {
+        // A tag whose CRC fails is not trusted: whole frames, as for a bare file, and silently.
+        var path = CraftedMp3.WithBrokenTagCrc(Mp3Fixture("tone", variant, rate, channels));
+
+        AssertHeaderLengthEqualsDecoded(path);
+        AssertDecodedFrames(path, WholeFrames(rate));
+        AssertPure(path);
     }
 
     [Theory, MemberData(nameof(Mp3Cells))]

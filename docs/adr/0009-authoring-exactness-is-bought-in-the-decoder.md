@@ -54,3 +54,12 @@ M4A and WMA, measured at 15 ms and 71 ms, have no way back to the promised table
 decoder that seeks them exactly.
 
 Every decoder left in the chain is open source and readable when a matrix cell goes red.
+
+## Addendum: the MP3 decoder is not open source (2026-09-24)
+
+"Every decoder left in the chain is open source" holds for WAV and FLAC. MP3 decodes through
+NAudio's open wrapper over Windows' closed ACM codec, as it did when this was written. Since
+[build issue 18](../../.scratch/202609-faderio-phase-1-build/issues/18-trim-tagged-mp3s.md)
+faderio takes one number from that codec, its decoder delay (529), and
+`Mp3DecoderOffsetTests` pins it; see the addendum to
+[ADR 0010](0010-one-length-issued-from-the-header.md).

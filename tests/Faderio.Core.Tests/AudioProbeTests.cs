@@ -48,9 +48,96 @@ public sealed class AudioProbeTests
 
         Assert.Null(rejection);
         Assert.Equal(new AudioShape(AudioFormat.Mp3, 44100, null, 2), result!.Shape);
-        // 2 s at 44.1 kHz is 76.5 frames of 1152; LAME pads to 78 whole frames, and the matrix
-        // proves this equals Mp3FileReader.Length on every MP3 cell (Mp3_HeaderLengthEqualsDecoded).
-        Assert.Equal(78 * 1152, result.Frames);
+        // 78 frames of 1152, less the encoder's delay (576) and padding (1080) from its valid
+        // LAME tag, is the 88200 samples that were encoded (issue 18). The matrix proves the
+        // trimming reader decodes exactly that (Mp3_HeaderLengthEqualsDecoded).
+        Assert.Equal(88200, result.Frames);
+    }
+
+    [Theory]
+    [InlineData("tone-cbrinfo-48000-1.mp3", 96000)]
+    [InlineData("tone-vbr-44100-2.mp3", 88200)]
+    [InlineData("tone-vbr-48000-1.mp3", 96000)]
+    public void Mp3WithAValidLameTag_IssuesTheEncodedSampleCount(string fixture, long encoded)
+    {
+        Assert.Null(Probe(FixturePath(fixture), out var result));
+        Assert.Equal(encoded, result!.Frames);
+    }
+
+    [Fact]
+    public void Mp3WithALameEncoderString_IsTrimmedLikeFfmpegs()
+    {
+        // No encoder allowlist: a passing CRC already proves LAME's layout.
+        var path = CraftedMp3.WithEncoder(FixturePath("tone-cbrinfo-44100-2.mp3"), "LAME3.99r");
+
+        Assert.Null(Probe(path, out var result));
+        Assert.Equal(88200, result!.Frames);
+    }
+
+    [Fact]
+    public void BareMp3_KeepsWholeFrames()
+    {
+        Assert.Null(Probe(FixturePath("tone-cbrbare-44100-2.mp3"), out var result));
+        Assert.Equal(78 * 1152, result!.Frames);
+    }
+
+    [Fact]
+    public void Mp3TagFailingItsCrc_KeepsWholeFrames_Silently()
+    {
+        var path = CraftedMp3.WithBrokenTagCrc(FixturePath("tone-cbrinfo-44100-2.mp3"));
+
+        Assert.Null(Probe(path, out var result)); // still promised: no rejection, no notice
+        Assert.Equal(78 * 1152, result!.Frames);
+    }
+
+    [Theory]
+    [InlineData(-20 * 1024, false)] // cut after encoding: more than 10 KiB (and 5%) short
+    [InlineData(+20 * 1024, false)]
+    [InlineData(-10 * 1024, true)]  // within 10 KiB, the larger allowance for a small file
+    [InlineData(+10 * 1024, true)]
+    public void Mp3TagMusicLength_TrimsOnlyWithinTheAllowance(int by, bool trimmed)
+    {
+        var fixture = FixturePath("tone-cbrinfo-44100-2.mp3");
+        var path = CraftedMp3.WithMusicLength(fixture, (uint)(CraftedMp3.MusicLength(fixture) + by));
+
+        Assert.Null(Probe(path, out var result));
+        Assert.Equal(trimmed ? 88200 : 78 * 1152, result!.Frames);
+    }
+
+    [Theory]
+    [InlineData(2881, 1080, 78 * 1152)]               // delay beyond 2880: whole frames
+    [InlineData(576, 2305, 78 * 1152)]                // padding beyond 2304: whole frames
+    [InlineData(2880, 2304, 78 * 1152 - 2880 - 2304)] // the ceilings themselves trim
+    public void Mp3TagValues_TrimOnlyWithinTheirCeilings(int delay, int padding, long issued)
+    {
+        var path = CraftedMp3.WithDelayAndPadding(FixturePath("tone-cbrinfo-44100-2.mp3"), delay, padding);
+
+        Assert.Null(Probe(path, out var result));
+        Assert.Equal(issued, result!.Frames);
+    }
+
+    [Fact]
+    public void Mp3TagClaimingMoreTrimThanTheFileHolds_KeepsWholeFrames()
+    {
+        // delay + padding must be less than frames x 1152. Each value here is at its ceiling and
+        // in range, the tag is re-signed, and 4 frames (4608) cannot hold 2880 + 2304.
+        var fourFrames = CraftedMp3.WithFrameCount(FixturePath("tone-cbrinfo-44100-2.mp3"), 4);
+        var path = CraftedMp3.WithDelayAndPadding(fourFrames, 2880, 2304);
+
+        Assert.Null(Probe(path, out var result));
+        Assert.Equal(4 * 1152, result!.Frames);
+    }
+
+    [Fact]
+    public void CraftingATagWithItsOwnValues_ChangesNoByte()
+    {
+        // Guards CraftedMp3: its CRC is the one ffmpeg wrote, so a re-signed tag that passes is
+        // a real pass, not a shared mistake between the helper and the probe.
+        var fixture = FixturePath("tone-cbrinfo-44100-2.mp3");
+
+        var path = CraftedMp3.WithDelayAndPadding(fixture, 576, 1080);
+
+        Assert.Equal(File.ReadAllBytes(fixture), File.ReadAllBytes(path));
     }
 
     [Fact]

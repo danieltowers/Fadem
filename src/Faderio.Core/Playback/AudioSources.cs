@@ -37,7 +37,8 @@ internal static class TrackSources
             WaveStream reader = extension switch
             {
                 ".wav" => new WaveFileReader(file),
-                ".mp3" => new Mp3FileReader(file),
+                // Trimmed to the encoded source when a valid LAME tag says how (issue 18).
+                ".mp3" => Mp3TrackReader.Open(file),
                 // The managed decoder (FlacTrackReader) lands seeks on the exact sample. Media
                 // Foundation landed on the next block boundary, +67 ms on the ramp fixture, and
                 // is out of the chain (ADR 0009).

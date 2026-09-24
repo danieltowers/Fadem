@@ -42,15 +42,42 @@ cell, and a missing fixture is a red cell.
 |---|---|---|---|---|---|
 | WAV (PCM) | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | the five `Wav_*` theories over `WavCells()` | proven, 12 cells ([ticket 14](../.scratch/202609-faderio-v3/issues/14-fill-the-real-input-matrix.md)) |
 | FLAC | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | the five `Flac_*` theories over `FlacCells()` | proven, 12 cells (ticket 14; the first landing in [ticket 15](../.scratch/202609-faderio-v3/issues/15-make-flac-seek-exact.md)) |
-| MP3, constant bitrate with a Xing/Info header | 44.1, 48 kHz | n/a (decodes to PCM) | mono, stereo | the five `Mp3_*` theories over `Mp3Cells()`, variant `CbrInfo`: the length is the tag's frame count | proven, 4 cells (ticket 14) |
-| MP3, constant bitrate with no Xing/Info/VBRI header | 44.1, 48 kHz | n/a | mono, stereo | same theories, variant `CbrBare`: the length is the audio bytes over the frame size, no frame scan | proven, 4 cells (ticket 14) |
-| MP3, variable bitrate with a Xing header | 44.1, 48 kHz | n/a | mono, stereo | same theories, variant `Vbr`: the length is the tag's frame count | proven, 4 cells (ticket 14) |
+| MP3, constant bitrate with a Xing/Info header | 44.1, 48 kHz | n/a (decodes to PCM) | mono, stereo | the five `Mp3_*` theories over `Mp3Cells()`, variant `CbrInfo`, and over `TaggedMp3Cells()` `Mp3_TaggedDecode_IsTheSourceFromItsFirstSample`, `Mp3_LameEncoderString_IsTrimmedLikeFfmpegsLavc` and `Mp3_TagFailingValidation_KeepsWholeFrames`: with a valid LAME tag the length is the source count (the tag's frame count less its delay and padding); otherwise the tag's frame count, whole frames | proven, 4 cells, 8 theories each (ticket 14; trimmed in [issue 18](../.scratch/202609-faderio-phase-1-build/issues/18-trim-tagged-mp3s.md)) |
+| MP3, constant bitrate with no Xing/Info/VBRI header | 44.1, 48 kHz | n/a | mono, stereo | the five `Mp3_*` theories, variant `CbrBare`: the length is the audio bytes over the frame size, whole frames, no frame scan | proven, 4 cells (ticket 14) |
+| MP3, variable bitrate with a Xing header | 44.1, 48 kHz | n/a | mono, stereo | the same eight theories as `CbrInfo`, variant `Vbr`: as `CbrInfo` | proven, 4 cells, 8 theories each (ticket 14; trimmed in issue 18) |
 
-Every promised cell seeks to 1 ms; no cell is pinned. An MP3's decoded length is whole
-1152-frame blocks, so it is a little longer than the audio that was encoded (the encoder's
-delay and padding); the length the probe issues is that decoded length, which is what the
-completeness and length cells assert. A variable-bitrate MP3 without a Xing header is not a
-row: the probe would have to scan every frame, and no library file is one (ticket 08 survey).
+Every promised cell seeks to 1 ms; no cell is pinned. A variable-bitrate MP3 without a Xing
+header is not a row: the probe would have to scan every frame, and no library file is one
+(ticket 08 survey).
+
+**MP3 length has two rules** ([ADR 0010](adr/0010-one-length-issued-from-the-header.md),
+addendum):
+
+- **With a valid LAME tag** (`CbrInfo` and `Vbr`), the length is the encoded source's own
+  sample count: whole frames less the encoder's delay and padding, and 0:00 is the first
+  encoded sample. A tag is valid when its CRC matches, its MusicLength matches the audio bytes
+  on disk within 10 KiB or 5%, and delay ≤ 2880, padding ≤ 2304 and delay + padding is less
+  than the whole frames. No encoder string is required. `Mp3TrackReader` trims the decode to
+  it by the encoder's delay plus the ACM decoder's own, 529, pinned by
+  `Mp3DecoderOffsetTests`. `Mp3_HeaderLengthEqualsDecoded` asserts the source count (88200 at
+  44.1 kHz, 96000 at 48), `Mp3_TaggedDecode_IsTheSourceFromItsFirstSample` that the decode is
+  the generator's source PCM from sample 0, and `Mp3_LameEncoderString_IsTrimmedLikeFfmpegsLavc`
+  the same for a `LAME` encoder string beside ffmpeg's `Lavc`. A hard cut between two such files
+  has no gap.
+- **Otherwise** (`CbrBare`, or a tag that fails a check), the length is whole 1152-frame
+  blocks, a little longer than the audio that was encoded: the encoder's delay (25 ms at
+  44.1 kHz) and padding stay inside it, silently. `Mp3_TagFailingValidation_KeepsWholeFrames`
+  and the `CbrBare` cells assert it.
+
+Two facts pin the trimming reader's edges on one crafted file each:
+`Mp3_TagPaddingShorterThanTheDecodersDelay_EndsInSilenceAtItsLength` (a tag whose padding is
+under 529, as 61 library files record, ends in that much silence at its length) and
+`Mp3_CutAfterEncoding_WithinTheMusicLengthAllowance_EndsWhereItsAudioEnds` (a file cut by less
+than the allowance is trimmed by its tag but not padded: it ends where its audio ends, with the
+engine's notice).
+
+The `LAME`-string and failing-tag files are crafted at test time from the checked-in fixtures
+(`CraftedMp3`), because `lame.exe` is not available to the generator.
 
 **Sample rate policy.** The engine runs at the output device's rate, fixed at launch
 ([ADR 0008](adr/0008-engine-runs-at-the-device-rate.md)). A file at any other promised rate
@@ -58,12 +85,15 @@ is resampled once, on the way in. Authoring exactness is the same at every promi
 the seek-landing assertion runs per rate with one tolerance, and the engine compensates the
 resampler's known latency if it has to.
 
-**Decoders.** WAV through NAudio's `WaveFileReader`, MP3 through `Mp3FileReader`, FLAC through
+**Decoders.** WAV through NAudio's `WaveFileReader`, MP3 through `Mp3FileReader` (behind
+`Mp3TrackReader` when the file is trimmed), FLAC through
 `BunLabs.NAudio.Flac` 2.0.1 behind `FlacTrackReader`, which repairs two defects in the package
 (a position counter that stops short at end of stream, and a seek into the last block that did
 nothing) and leaves the decode and the exact seek to the package. Windows Media Foundation is
 not in the production chain: its FLAC decoder is undocumented and landed seeks on the next block
-boundary. Every decoder that remains is open source, so a red cell can be read to its cause.
+boundary. Every decoder that remains is open source, so a red cell can be read to its cause,
+except the Windows ACM codec behind NAudio's MP3 wrapper; the one number faderio takes from it,
+its decoder delay, is pinned by `Mp3DecoderOffsetTests`.
 
 **Length.** Length is a property of a file, not a format, so it is not a column. The matrix
 fixtures are two seconds long; long-file playback is not proven by the suite. The library's

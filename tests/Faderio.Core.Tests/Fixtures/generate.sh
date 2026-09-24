@@ -21,6 +21,14 @@
 #   cbrbare   320 kbps CBR with no Xing/Info tag ("-write_xing 0"): the probe divides the audio
 #             bytes by the frame size.
 #   vbr       LAME V2 ("-q:a 2"), Xing tag: the frame count from the tag.
+# The Info and Xing tags carry ffmpeg's LAME extension (encoder "Lavc", delay 576), which the
+# probe trims by (issue 18): their length is the source's 88200 or 96000 samples, not whole
+# frames. Two more kinds of tag are crafted from these at test time by CraftedMp3, because
+# lame.exe is not available here: a "LAME" encoder string, and tags that fail each check.
+#
+# The FLAC noise fixtures double as the MP3s' source PCM: the same lavfi expression and seed,
+# encoded losslessly. Mp3DecoderOffsetTests and the tagged cells correlate against them, so the
+# two must keep coming from one noise() below.
 #
 # A sine, not a full-scale one: lavfi's "sine" source is full scale, which a lossy encoder
 # overshoots into clipping. The pink noise is what the seek landing correlates against; a tone
