@@ -142,6 +142,9 @@ sharp percussive transient; the realism check is the authored boundary from the 
       and press Play; it resumes where it paused.
 - [ ] With *Crossfade for 8 s* on in **Settings…**, two tracks with no authored transition
       crossfade over 8 s. Switched on mid-track, the very next boundary crossfades.
+- [ ] On a track with a ReplayGain tag (the library has two; tag one with rsgain or foobar2000
+      if needed), toggling ReplayGain in **Settings…** mid-track changes the level at once,
+      with no click. An untagged track does not change.
 - [ ] With another app holding the device exclusively, launch in exclusive mode; faderio falls
       back to shared and says so.
 - [ ] Play a whole real album on WASAPI exclusive, through several queue advances and a track

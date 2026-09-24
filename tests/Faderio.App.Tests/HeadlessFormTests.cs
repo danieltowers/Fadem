@@ -937,6 +937,22 @@ public sealed class HeadlessFormTests
     });
 
     [Fact]
+    public void TheReplayGainCheckbox_IsOnByDefault_AndReachesChangeSettings() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Form.ShowSettings = dialog =>
+        {
+            Assert.True(dialog._replayGain.Checked);
+            dialog._replayGain.Checked = false;
+            return true;
+        };
+
+        Click(h.Form._settings);
+
+        Assert.Equal(new PlayerSettings { ReplayGainEnabled = false }, h.Engine.View.Settings);
+    });
+
+    [Fact]
     public void ChoosingHardCut_GreysOutN_AndIsWhatOKSends() => RunSta(() =>
     {
         using var h = new Harness();

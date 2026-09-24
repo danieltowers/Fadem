@@ -7,6 +7,14 @@ namespace Faderio.Core.Playback;
 /// (ADR 0003); the shell sees a <see cref="VoiceView"/>.</summary>
 internal sealed class MixerVoice
 {
+    /// <summary>The base gain (ReplayGain) ramps linearly from <see cref="_gainFrom"/> to
+    /// <see cref="_gainTo"/> over <see cref="_rampFrames"/> from the timeline frame
+    /// <see cref="_rampStart"/>; before and after, it holds.</summary>
+    private double _gainFrom;
+    private double _gainTo;
+    private long _rampStart;
+    private long _rampFrames;
+
     internal MixerVoice(
         ITrackSource source, long timelineStart, long sourceStart,
         double baseGain, long fadeInFrames, FadeCurveKind fadeInCurve)
@@ -14,7 +22,8 @@ internal sealed class MixerVoice
         Source = source;
         TimelineStart = timelineStart;
         SourceStart = sourceStart;
-        BaseGain = baseGain;
+        _gainFrom = baseGain;
+        _gainTo = baseGain;
         FadeInFrames = fadeInFrames;
         FadeInCurve = fadeInCurve;
         References.Add((timelineStart, sourceStart));
@@ -23,7 +32,6 @@ internal sealed class MixerVoice
     internal ITrackSource Source { get; }
     internal long TimelineStart { get; }
     internal long SourceStart { get; }
-    internal double BaseGain { get; set; } = 1.0;
     internal long FadeInFrames { get; set; }
     internal FadeCurveKind FadeInCurve { get; set; } = FadeCurveKind.EqualPower;
     internal long? FadeOutStart { get; set; }
@@ -58,6 +66,28 @@ internal sealed class MixerVoice
         {
             References.Add((timeline, source));
         }
+    }
+
+    /// <summary>The base gain the voice renders at the timeline frame.</summary>
+    internal double BaseGainAt(long timeline)
+    {
+        var into = timeline - _rampStart;
+        if (into >= _rampFrames)
+        {
+            return _gainTo;
+        }
+        return into <= 0 ? _gainFrom : _gainFrom + (_gainTo - _gainFrom) * (into / (double)_rampFrames);
+    }
+
+    /// <summary>Moves the base gain to <paramref name="target"/> over <paramref name="frames"/>
+    /// from <paramref name="timeline"/>, starting where it is then, so a change mid-ramp never
+    /// jumps (build issue 13).</summary>
+    internal void RampBaseGain(double target, long timeline, long frames)
+    {
+        _gainFrom = BaseGainAt(timeline);
+        _gainTo = target;
+        _rampStart = timeline;
+        _rampFrames = Math.Max(frames, 0);
     }
 
     internal void CancelFadeIn() => FadeInFrames = 0;
@@ -240,7 +270,7 @@ internal sealed class TransitionMixer : ISampleProvider
                 for (var f = 0; f < read; f++)
                 {
                     var timeline = start + runStart + f;
-                    var gain = voice.BaseGain * Envelope(voice, timeline);
+                    var gain = voice.BaseGainAt(timeline) * Envelope(voice, timeline);
                     var target = offset + (runStart + f) * Channels;
                     var source0 = f * Channels;
                     for (var c = 0; c < Channels; c++)

@@ -62,3 +62,10 @@ and the correction in [What does queue management add?](../../202609-faderio-pha
   - preview a draft, capture a better fade-in point while it plays, and preview again: the new
     point is heard.
   - the queue stays paused afterwards.
+
+## Comments
+
+- From issue 13: a ReplayGain toggle ramps every mixer voice that has an entry in the engine's
+  voice-to-row map (`RampLiveVoicesToTheirGain`, `PlaybackEngineSettings.cs`). Preview voices
+  must be reached too: give them their track's base gain when created, and make sure that
+  loop covers them.

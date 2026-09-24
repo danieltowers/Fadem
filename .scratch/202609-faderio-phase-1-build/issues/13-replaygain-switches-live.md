@@ -1,6 +1,6 @@
 # 13: ReplayGain switches live
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 12
 
 Decided in [When does ReplayGain switch, and is it on by default?](../../202609-faderio-phase-1-restage/issues/06-when-does-replaygain-switch-and-is-it-on-by-default.md).
@@ -23,10 +23,10 @@ Carries v2 0012's intent. Closes the ReplayGain part of audit finding 14.
 
 ## Acceptance
 
-- [ ] Toggling mid-track changes the playing track's gain within one device buffer, with no
+- [x] Toggling mid-track changes the playing track's gain within one device buffer, with no
       discontinuity in the rendered samples.
-- [ ] Mid-crossfade, each voice moves to its own tag's gain.
-- [ ] An untagged track is unaffected by the toggle.
+- [x] Mid-crossfade, each voice moves to its own tag's gain.
+- [x] An untagged track is unaffected by the toggle.
 
 ## Tests
 
