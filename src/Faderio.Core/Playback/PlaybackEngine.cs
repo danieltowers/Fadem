@@ -41,6 +41,10 @@ public sealed partial class PlaybackEngine : IDisposable
 
     private BoundarySchedule? _pendingBoundary;
     private bool _finished;
+
+    /// <summary>The timeline frame after the last voice's last frame, while the device has yet
+    /// to emit it: playback finishes when it has.</summary>
+    private long? _finishAt;
     private bool _disposed;
     private long _nextRowId = 1;
     private long _version;
@@ -225,14 +229,19 @@ public sealed partial class PlaybackEngine : IDisposable
         }
     }
 
-    /// <summary>Completes a pending audible handover once the device has emitted past it.
-    /// Called at the start of every locked section, so the published state is never behind
-    /// what the listener hears by more than one call.</summary>
+    /// <summary>Completes a pending audible handover, or finishes playback, once the device has
+    /// emitted past it. Called at the start of every locked section, so the published state is
+    /// never behind what the listener hears by more than one call.</summary>
     private void ObserveClock()
     {
-        if (_handoverAt is { } handover && _output.FramesEmitted.Count >= handover)
+        var emitted = _output.FramesEmitted.Count;
+        if (_handoverAt is { } handover && emitted >= handover)
         {
             CompleteHandover();
+        }
+        if (_finishAt is { } end && emitted >= end)
+        {
+            FinishPlayback();
         }
     }
 
@@ -353,7 +362,21 @@ public sealed partial class PlaybackEngine : IDisposable
                 Version, QueueVersion, Transport, rows,
                 attended?.At(emitted, true, Rate),
                 incoming?.At(emitted, false, Rate),
-                Shuffle, Repeat, Adding);
+                Shuffle, Repeat, Adding, NextAdjacencyFrom(currentRow));
+        }
+
+        private Adjacency? NextAdjacencyFrom(RowId? row)
+        {
+            for (var i = 0; i < Entries.Length; i++)
+            {
+                if (Entries[i].Id == row)
+                {
+                    return PlaybackQueue.IndexSkippedTo(i, Entries.Length, Repeat) is { } next
+                        ? new Adjacency(Entries[i].Track, Entries[next].Track)
+                        : null;
+                }
+            }
+            return null;
         }
     }
 

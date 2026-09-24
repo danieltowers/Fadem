@@ -102,27 +102,46 @@ internal sealed class PlaybackQueue
         }
     }
 
-    /// <summary>The index of the track after <paramref name="index"/>, honouring repeat mode.
-    /// The repeat-all wrap is a real adjacency: last → first. Null when playback would end.</summary>
-    public int? IndexAfter(int index, RepeatMode repeat)
+    /// <summary>The index that follows <paramref name="index"/> at the track's natural end.
+    /// Repeat-one plays the same row again; otherwise it is <see cref="IndexSkippedTo(int, RepeatMode)"/>.
+    /// Null when playback would end.</summary>
+    public int? IndexAfter(int index, RepeatMode repeat) =>
+        repeat == RepeatMode.One && index >= 0 && index < _entries.Count ? index : IndexSkippedTo(index, repeat);
+
+    /// <summary>The index ⏭ reaches from <paramref name="index"/>.</summary>
+    public int? IndexSkippedTo(int index, RepeatMode repeat) => IndexSkippedTo(index, _entries.Count, repeat);
+
+    /// <summary>The index ⏭ reaches from <paramref name="index"/> in a queue of
+    /// <paramref name="count"/> rows: the next row, or under repeat-all the wrap to the first, a
+    /// real adjacency. Repeat-one governs only a track's natural end, so a skip under it moves on
+    /// too. Null past the last row with repeat off.</summary>
+    public static int? IndexSkippedTo(int index, int count, RepeatMode repeat)
     {
-        if (index < 0 || index >= _entries.Count)
+        if (index < 0 || index >= count)
         {
             return null;
         }
-        if (repeat == RepeatMode.One)
-        {
-            return index;
-        }
-        if (index + 1 < _entries.Count)
+        if (index + 1 < count)
         {
             return index + 1;
         }
         return repeat == RepeatMode.All ? 0 : null;
     }
 
-    /// <summary>The previous track index, or null when at the start of the queue.</summary>
-    public int? PreviousIndex() => CurrentIndex > 0 ? CurrentIndex - 1 : null;
+    /// <summary>The index ⏮ reaches from <paramref name="index"/>: the row before it, or at the
+    /// head under repeat-all the last row. Null at the head otherwise.</summary>
+    public int? IndexBefore(int index, RepeatMode repeat)
+    {
+        if (index < 0 || index >= _entries.Count)
+        {
+            return null;
+        }
+        if (index > 0)
+        {
+            return index - 1;
+        }
+        return repeat == RepeatMode.All ? _entries.Count - 1 : null;
+    }
 
     public void SetCurrent(int index)
     {

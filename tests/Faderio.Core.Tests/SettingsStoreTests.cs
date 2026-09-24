@@ -27,7 +27,6 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.False(result.HasWarning);
         Assert.Equal(AudioOutputMode.WasapiShared, result.Settings.OutputMode);
         Assert.Equal(DefaultAdjacencyBehaviour.HardCut, result.Settings.DefaultAdjacencyBehaviour);
-        Assert.Equal(SkipBehaviour.AbandonTransition, result.Settings.SkipBehaviour);
         Assert.Equal(5, result.Settings.PreviewPreRollSeconds);
     }
 
@@ -40,7 +39,6 @@ public sealed class SettingsStoreTests : IDisposable
             OutputMode = AudioOutputMode.WasapiExclusive,
             DefaultAdjacencyBehaviour = DefaultAdjacencyBehaviour.GlobalDefaultCrossfade,
             DefaultCrossfadeDuration = TimeSpan.FromSeconds(8),
-            SkipBehaviour = SkipBehaviour.LetOutgoingFadeFinish,
             ReplayGainEnabled = false,
             PreviewPreRollSeconds = 10,
             VisualiserVisible = false,

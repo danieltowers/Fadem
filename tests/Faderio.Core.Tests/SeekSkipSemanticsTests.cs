@@ -1,5 +1,4 @@
 using Faderio.Core.Domain;
-using Faderio.Core.Settings;
 
 namespace Faderio.Core.Tests;
 
@@ -98,31 +97,5 @@ public sealed class SeekSkipSemanticsTests
         // authored 1 s: at +15000 frames the gain is sin(π/4)·0.4 ≈ 0.2.
         tc.Output.Advance(44100 * 4);
         Assert.InRange(tc.Rendered.ToneAmplitude(3000, 220500 + 15000), 0.15, 0.25);
-    }
-
-    [Fact]
-    public void SkipWithLetFinishSetting_LetsTheOutgoingFadeComplete()
-    {
-        var settings = new PlayerSettings { SkipBehaviour = SkipBehaviour.LetOutgoingFadeFinish };
-        using var tc = TestEngine.Create(settings);
-        var a = TestAudio.WriteToneWav("a.wav", 4, FA);
-        var b = TestAudio.WriteToneWav("b.wav", 4, FB);
-        tc.Add(a, b);
-        tc.Store.Upsert(a, b, CrossfadeAt1s(1.0));
-
-        tc.Engine.Play();
-        tc.Output.Advance(44100 + 11025); // 1.25 s, mid-crossfade
-        tc.Engine.Next();
-
-        // The outgoing fade continues: at 1.75 s (frame 77175) its gain is
-        // cos(π/2 · 0.75) ≈ 0.38 → amplitude ≈ 0.15.
-        tc.Output.Advance(22050);
-        Assert.InRange(tc.Rendered.ToneAmplitude(FA, 77175), 0.12, 0.19);
-        Assert.True(tc.Rendered.ToneAmplitude(FB, 77175) / 0.4 > 0.9);
-
-        // After the fade completes at 2.0 s the outgoing voice is gone.
-        tc.Output.Advance(22050);
-        Assert.True(tc.Rendered.ToneAmplitude(FA, 88200) < 0.05);
-        Assert.Equal(0.4, tc.Rendered.ToneAmplitude(FB, 88200), 2);
     }
 }

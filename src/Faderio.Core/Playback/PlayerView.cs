@@ -29,6 +29,9 @@ public sealed record VoiceView(QueueRow Row, Playhead Playhead, Length Length)
 /// <see cref="Attended"/> is the voice the listener attends to — the outgoing voice until it
 /// falls silent — and is null exactly when stopped; <see cref="Incoming"/> is non-null only
 /// while two voices overlap. <see cref="Adding"/> is non-null exactly while an add is running.
+/// <see cref="NextAdjacency"/> is the adjacency ⏭ would reach from the current row: into the
+/// next row, or under repeat-all from the last row into the first. Repeat-one does not make it
+/// the row into itself. Null on the last row with repeat off, and when the queue is empty.
 /// </summary>
 public sealed record PlayerView(
     long Version,
@@ -39,7 +42,8 @@ public sealed record PlayerView(
     VoiceView? Incoming,
     bool Shuffle,
     RepeatMode Repeat,
-    AddProgress? Adding = null);
+    AddProgress? Adding = null,
+    Adjacency? NextAdjacency = null);
 
 /// <summary>How far the running add has got: files resolved (queued or rejected) out of every
 /// file given to it, including those of an add waiting behind the first.</summary>

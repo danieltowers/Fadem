@@ -15,11 +15,6 @@ public interface ITransitionStore
 
     bool Remove(string outgoingPath, string incomingPath);
 
-    /// <summary>Any authored transition whose outgoing track is <paramref name="outgoingPath"/>.
-    /// Used to honour an authored fade-out at the end of the queue, where there is no
-    /// incoming track (spec story 19).</summary>
-    TransitionSpec? FindForOutgoing(string outgoingPath);
-
     TransitionSpec? GetOverride(string playlistName, string outgoingPath, string incomingPath);
 
     void UpsertOverride(string playlistName, string outgoingPath, string incomingPath, TransitionSpec partial);

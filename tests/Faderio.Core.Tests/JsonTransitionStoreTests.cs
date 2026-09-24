@@ -106,15 +106,6 @@ public sealed class JsonTransitionStoreTests : IDisposable
     }
 
     [Fact]
-    public void FindForOutgoing_FindsAnyTransitionWithThatOutgoingTrack()
-    {
-        var store = new JsonTransitionStore(_path);
-        store.Upsert(@"C:\a.wav", @"C:\b.wav", FullSpec());
-        Assert.NotNull(store.FindForOutgoing(@"C:\a.wav"));
-        Assert.Null(store.FindForOutgoing(@"C:\zzz.wav"));
-    }
-
-    [Fact]
     public void Remove_DeletesTheTransition()
     {
         var store = new JsonTransitionStore(_path);

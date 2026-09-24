@@ -190,48 +190,4 @@ public sealed class MoveRowsTests
         Assert.Single(tc.Notices);
         Assert.Contains("no longer in the queue", tc.Notices[0]);
     }
-
-    [Fact]
-    public void GivingTheLastRowANextRow_BeforeItsEndFadeStarts_DropsTheEndFade()
-    {
-        using var tc = TestEngine.Create();
-        var a = TestAudio.WriteToneWav("a.wav", 3, FA);
-        var b = TestAudio.WriteToneWav("b.wav", 3, FB);
-        var c = TestAudio.WriteToneWav("c.wav", 3, FC);
-        tc.Add(a, b, c);
-        tc.Store.Upsert(a, b, CrossfadeAt1s(1.0)); // A's authored fade-out, honoured at the end
-        tc.Engine.Play();
-        tc.Output.Advance(Second / 4);
-        tc.Engine.Move(new[] { tc.RowOf(a) }, before: null); // B C A: A is last and will fade at 1 s
-
-        tc.Engine.Move(new[] { tc.RowOf(c) }, before: null); // B A C: A → C is a hard cut
-
-        tc.Output.Advance(Second + Second / 4); // 1.5 s
-        Assert.Equal(0.4, tc.Rendered.ToneAmplitude(FA, Second + Second / 2), 2);
-        tc.Output.Advance(Second + Second / 2); // 3.0 s: A has played out; C follows
-        Assert.Equal(c, tc.View.Attended!.Row.Track.FilePath);
-    }
-
-    [Fact]
-    public void GivingTheLastRowANextRow_AfterItsEndFadeStarted_LetsTheFadePlayOut()
-    {
-        using var tc = TestEngine.Create();
-        var a = TestAudio.WriteToneWav("a.wav", 3, FA);
-        var b = TestAudio.WriteToneWav("b.wav", 3, FB);
-        var c = TestAudio.WriteToneWav("c.wav", 3, FC);
-        tc.Add(a, b, c);
-        tc.Store.Upsert(a, b, CrossfadeAt1s(1.0));
-        tc.Engine.Play();
-        tc.Output.Advance(Second / 4);
-        tc.Engine.Move(new[] { tc.RowOf(a) }, before: null); // B C A
-        tc.Output.Advance(Second); // 1.25 s: A's end fade is under way
-
-        tc.Engine.Move(new[] { tc.RowOf(c) }, before: null); // B A C
-
-        tc.Output.Advance(Second / 4); // 1.5 s: halfway through the fade
-        var level = tc.Rendered.ToneAmplitude(FA, Second + Second / 2);
-        Assert.InRange(level, 0.05, 0.35);
-        tc.Output.Advance(Second); // 2.5 s: the fade ended A, and C followed
-        Assert.Equal(c, tc.View.Attended!.Row.Track.FilePath);
-    }
 }

@@ -13,7 +13,7 @@ public sealed partial class PlaybackEngine
     {
         public required MixerVoice OutgoingVoice { get; init; }
         public required int OutgoingIndex { get; init; }
-        public required int IncomingIndex { get; init; } // -1 → end of sequence (fade-out only)
+        public required int IncomingIndex { get; init; }
         public long FadeOutTrigger { get; init; }
         public long FadeOutFrames { get; init; }
         public List<ScheduledEventHandle> Handles { get; } = new();
@@ -23,7 +23,6 @@ public sealed partial class PlaybackEngine
         /// scheduled trigger event and directly when the outgoing voice ends exactly at the
         /// trigger (the non-overlapping shape).</summary>
         public Action? SpawnAction { get; set; }
-        public bool EndOfSequence => IncomingIndex < 0;
     }
 
     // ── Starting voices ──────────────────────────────────────────────────────────────────
@@ -109,38 +108,15 @@ public sealed partial class PlaybackEngine
 
         long TimelineOf(long sourceFrame) => referenceTimeline + (sourceFrame - referencePosition);
 
+        _pendingBoundary = null;
         if (nextIndex is null)
         {
-            // End of sequence: an authored fade-out is honoured with no incoming track.
-            var spec = _store.FindForOutgoing(outTrack.FilePath);
-            var effective = _resolver.Resolve(spec, null, TimeSpanOf(total), TimeSpan.Zero);
-            _pendingBoundary = null;
-            if (effective.IsHardCut)
-            {
-                return;
-            }
-            if (!TryComputeFade(referencePosition, total, effective, TimelineOf, out var trigger, out var fadeFrames))
-            {
-                return;
-            }
-            voice.FadeOutStart = trigger;
-            voice.FadeOutFrames = fadeFrames;
-            voice.FadeOutCurve = effective.Curve;
-            _pendingBoundary = new BoundarySchedule
-            {
-                OutgoingVoice = voice,
-                OutgoingIndex = index,
-                IncomingIndex = -1,
-                FadeOutTrigger = trigger,
-                FadeOutFrames = fadeFrames,
-            };
-            return;
+            return; // the end of the queue: the track plays to its length, with no fade
         }
 
         var inTrack = _queue.Entries[nextIndex.Value].Track;
         var global = _store.Get(outTrack.FilePath, inTrack.FilePath);
         var transition = _resolver.Resolve(global, null, TimeSpanOf(total), inTrack.Length.TimeSpan);
-        _pendingBoundary = null;
         if (transition.IsHardCut)
         {
             return; // hard cut: the incoming track starts when the outgoing one runs out
@@ -257,22 +233,33 @@ public sealed partial class PlaybackEngine
         {
             CancelBoundary(boundary);
             _pendingBoundary = null;
-            if (boundary.IncomingIndex >= 0)
-            {
-                boundary.SpawnAction?.Invoke();
-                _outgoingVoice = null; // the outgoing voice just ended; it was not cut mid-fade
-                _handoverAt = endTimeline;
-                return;
-            }
+            boundary.SpawnAction?.Invoke();
+            _outgoingVoice = null; // the outgoing voice just ended; it was not cut mid-fade
+            _handoverAt = endTimeline;
+            return;
         }
 
         var next = _queue.IndexAfter(_queue.CurrentIndex, _repeat);
         if (next is null)
         {
-            FinishPlayback();
+            FinishOnceHeard(voice, entry, endTimeline);
             return;
         }
         StartTrack(next.Value, endTimeline, null, null);
+    }
+
+    /// <summary>The last voice has rendered its last frame, but the device still holds it.
+    /// Playback finishes once the listener has heard that frame (ADR 0001): the final buffer is
+    /// not cut, and <see cref="Transport.Stopped"/> follows the playhead. Until then the voice
+    /// stays current and in the view, its playhead running on to its length.</summary>
+    private void FinishOnceHeard(MixerVoice voice, QueueEntry? entry, long endTimeline)
+    {
+        _currentVoice = voice;
+        if (entry is not null)
+        {
+            _voiceEntry[voice] = entry;
+        }
+        _finishAt = endTimeline;
     }
 
     /// <summary>Audio that ends before the issued length says it should (a truncated file, a
@@ -302,24 +289,38 @@ public sealed partial class PlaybackEngine
         }
         _currentVoice = null;
         _outgoingVoice = null;
+        _finishAt = null;
     }
 
+    /// <summary>⏭ outside a transition: a hard cut to the row a skip reaches, from 0:00.</summary>
     private void CutCurrentAndAdvance()
     {
         var current = _queue.CurrentIndex;
         CutAllVoices();
-        var next = _queue.IndexAfter(current, _repeat);
+        var next = _queue.IndexSkippedTo(current, _repeat);
         if (next is null)
         {
             FinishPlayback();
             return;
         }
         StartTrack(next.Value, _mixer.Timeline, null, null);
+        LandWhilePaused();
     }
 
-    /// <summary>Default skip mid-transition: the in-flight transition is abandoned right away
-    /// — the outgoing voice is removed, the incoming voice snaps to full volume — and the
-    /// next adjacency (already scheduled from the incoming voice's own start) takes over.</summary>
+    /// <summary>A paused device emits nothing, so after a hard cut the audible handover would
+    /// wait for Play and the view would sit on the row that was cut. Nothing is heard until then,
+    /// so the listener is on the new row now.</summary>
+    private void LandWhilePaused()
+    {
+        if (_output.State == Transport.Paused && _handoverAt is not null)
+        {
+            CompleteHandover();
+        }
+    }
+
+    /// <summary>⏭ mid-transition: the in-flight transition is abandoned right away — the
+    /// outgoing voice is removed, the incoming voice snaps to full volume — and the next
+    /// adjacency (already scheduled from the incoming voice's own start) takes over.</summary>
     private void AbandonInFlightTransition()
     {
         if (_outgoingVoice is { } outgoing)
@@ -358,24 +359,6 @@ public sealed partial class PlaybackEngine
         }
     }
 
-    /// <summary>Let-finish skip: the outgoing fade completes before advancing.</summary>
-    private void ScheduleLetFinishAdvance()
-    {
-        if (_outgoingVoice is not { } outgoing)
-        {
-            return;
-        }
-        var fadeEnd = outgoing.FadeOutStart is { } start ? start + outgoing.FadeOutFrames : _mixer.Timeline;
-        _mixer.Schedule(Math.Max(fadeEnd, _mixer.Timeline), () =>
-        {
-            if (_outgoingVoice == outgoing && _mixer.Voices.Contains(outgoing))
-            {
-                _outgoingVoice = null;
-                _mixer.RemoveVoice(outgoing);
-            }
-        });
-    }
-
     private void CancelPendingBoundaryFor(MixerVoice voice)
     {
         if (_pendingBoundary is { } boundary && boundary.OutgoingVoice == voice && !boundary.Triggered)
@@ -401,6 +384,7 @@ public sealed partial class PlaybackEngine
             return;
         }
         _finished = true;
+        _finishAt = null;
         _currentVoice = null;
         _outgoingVoice = null;
         _attendedVoice = null;
@@ -430,5 +414,6 @@ public sealed partial class PlaybackEngine
         _handoverAt = null;
         _pendingBoundary = null;
         _finished = false;
+        _finishAt = null;
     }
 }

@@ -97,6 +97,7 @@ sharp percussive transient; the realism check is the authored boundary from the 
 - [ ] Delete the playing row; the next one starts cleanly from its beginning.
 - [ ] Mid-song, drag a different track into the next place; it is the one that plays next.
       Dragging the playing row elsewhere does not interrupt it.
-- [ ] Reaching the end of the second track stops playback cleanly with no error.
+- [ ] The last track's tail plays to its very end before playback stops: no clipped final
+      note, and no error.
 - [ ] Add the whole `MUSIC` library (**Add folder…** on the `MUSIC` folder) while a track plays;
       the track plays on without a dropout, and adding never starts or stops playback.

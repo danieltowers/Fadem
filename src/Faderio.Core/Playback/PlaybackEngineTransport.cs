@@ -1,5 +1,4 @@
 using Faderio.Core.Domain;
-using Faderio.Core.Settings;
 
 namespace Faderio.Core.Playback;
 
@@ -112,9 +111,12 @@ public sealed partial class PlaybackEngine
         });
     }
 
-    /// <summary>Skips to the next track. A skip ends any in-flight transition right away (or,
-    /// with the let-finish setting, after the outgoing fade completes), and the next adjacency
-    /// begins with its own transition.</summary>
+    /// <summary>Skips to the next adjacency (build issue 06). Mid-transition it lands on the
+    /// incoming track at full volume and the outgoing one drops out; it never passes over the
+    /// incoming track. Otherwise it hard-cuts, from 0:00, to the row after the current one (under
+    /// repeat-all the wrap to the first; under repeat-one still the next row), the adjacency
+    /// <see cref="PlayerView.NextAdjacency"/> publishes, and stops on the last row with repeat
+    /// off. Paused stays paused.</summary>
     public void Next()
     {
         ThrowIfDisposed();
@@ -127,15 +129,7 @@ public sealed partial class PlaybackEngine
             }
             if (_outgoingVoice is not null)
             {
-                // A transition is in flight between the outgoing voice and the current voice.
-                if (_settings.SkipBehaviour == SkipBehaviour.LetOutgoingFadeFinish)
-                {
-                    ScheduleLetFinishAdvance();
-                }
-                else
-                {
-                    AbandonInFlightTransition();
-                }
+                AbandonInFlightTransition(); // a transition is in flight
                 Publish();
                 return;
             }
@@ -144,30 +138,32 @@ public sealed partial class PlaybackEngine
         });
     }
 
+    /// <summary>Acts on the attended voice (build issue 06). Past 3 s it restarts the track; so
+    /// it does at the head of the queue, unless repeat-all wraps it to the last row. Otherwise it
+    /// hard-cuts to the previous row from 0:00, never through a reverse adjacency. Restarting the
+    /// outgoing voice mid-transition cancels the transition, as a seek does.</summary>
     public void Previous()
     {
         ThrowIfDisposed();
         Run(() =>
         {
             ObserveClock();
-            if (_attendedVoice is null || _currentVoice is null)
+            if (_attendedVoice is not { } attended || _currentVoice is null)
             {
                 return;
             }
+            var index = IndexOf(attended);
             var playhead = View.Attended?.Playhead ?? Playhead.Zero;
-            if (playhead.TotalSeconds > 3)
+            var previous = playhead.TotalSeconds > 3 ? null : _queue.IndexBefore(index, _repeat);
+            if (previous is null && !attended.IsFinished)
             {
                 Seek(Playhead.Zero);
                 return;
             }
-            var previous = _queue.PreviousIndex();
-            if (previous is null)
-            {
-                Seek(Playhead.Zero);
-                return;
-            }
+            // The previous row, or the last track's tail, which has no source left to seek.
             CutAllVoices();
-            StartTrack(previous.Value, _mixer.Timeline, null, null);
+            StartTrack(previous ?? index, _mixer.Timeline, null, null);
+            LandWhilePaused();
             Publish();
         });
     }

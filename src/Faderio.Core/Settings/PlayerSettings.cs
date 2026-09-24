@@ -22,16 +22,6 @@ public enum DefaultAdjacencyBehaviour
     GlobalDefaultCrossfade,
 }
 
-/// <summary>What skipping mid-transition does (see CONTEXT.md "Skip").</summary>
-public enum SkipBehaviour
-{
-    /// <summary>The in-flight transition is abandoned right away.</summary>
-    AbandonTransition,
-
-    /// <summary>The outgoing fade completes before advancing.</summary>
-    LetOutgoingFadeFinish,
-}
-
 /// <summary>
 /// Player settings per design.md D4. Persisted as JSON at %APPDATA%\faderio\settings.json;
 /// missing keys fall back to these built-in defaults.
@@ -47,8 +37,6 @@ public sealed record PlayerSettings
     /// <summary>The N-second duration used by the global default crossfade and as the fallback
     /// duration for individually optional authored fade durations.</summary>
     public TimeSpan DefaultCrossfadeDuration { get; init; } = TimeSpan.FromSeconds(5);
-
-    public SkipBehaviour SkipBehaviour { get; init; } = SkipBehaviour.AbandonTransition;
 
     /// <summary>ReplayGain track gain applied with symmetric clamping. On by default.</summary>
     public bool ReplayGainEnabled { get; init; } = true;

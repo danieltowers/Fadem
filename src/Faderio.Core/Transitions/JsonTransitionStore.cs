@@ -55,18 +55,6 @@ public sealed class JsonTransitionStore : ITransitionStore
         return removed;
     }
 
-    public TransitionSpec? FindForOutgoing(string outgoingPath)
-    {
-        foreach (var (key, spec) in _model.Transitions)
-        {
-            if (OutgoingOfKey(key) == Normalize(outgoingPath))
-            {
-                return spec;
-            }
-        }
-        return null;
-    }
-
     public TransitionSpec? GetOverride(string playlistName, string outgoingPath, string incomingPath)
     {
         if (!_model.PlaylistOverrides.TryGetValue(playlistName, out var byPair))
@@ -105,8 +93,6 @@ public sealed class JsonTransitionStore : ITransitionStore
         Normalize(outgoingPath) + "|" + Normalize(incomingPath);
 
     internal static string Normalize(string path) => Path.GetFullPath(path);
-
-    private static string OutgoingOfKey(string key) => key.Split('|')[0];
 
     private void Load()
     {

@@ -49,13 +49,24 @@ public sealed class PlaybackQueueTests
     }
 
     [Fact]
-    public void PreviousIndex_StopsAtTheStart()
+    public void ASkipUnderRepeatOne_MovesToTheNextRow()
     {
         var queue = new PlaybackQueue();
         queue.SetEntries(new[] { E("a"), E("b") });
-        Assert.Null(queue.PreviousIndex());
-        queue.SetCurrent(1);
-        Assert.Equal(0, queue.PreviousIndex());
+        Assert.Equal(1, queue.IndexSkippedTo(0, RepeatMode.One));
+        Assert.Null(queue.IndexSkippedTo(1, RepeatMode.One));
+        Assert.Equal(0, queue.IndexSkippedTo(1, RepeatMode.All));
+    }
+
+    [Fact]
+    public void IndexBefore_StopsAtTheHead_UnlessRepeatAllWrapsToTheLastRow()
+    {
+        var queue = new PlaybackQueue();
+        queue.SetEntries(new[] { E("a"), E("b"), E("c") });
+        Assert.Equal(1, queue.IndexBefore(2, RepeatMode.Off));
+        Assert.Null(queue.IndexBefore(0, RepeatMode.Off));
+        Assert.Null(queue.IndexBefore(0, RepeatMode.One));
+        Assert.Equal(2, queue.IndexBefore(0, RepeatMode.All));
     }
 
     [Fact]

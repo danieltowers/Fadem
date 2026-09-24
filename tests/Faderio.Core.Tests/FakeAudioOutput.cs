@@ -26,6 +26,10 @@ public sealed class FakeAudioOutput : IAudioOutput
     public int Latency { get; init; }
 
     public List<float[]> Blocks { get; } = new();
+
+    /// <summary><see cref="FramesEmitted"/> at each <see cref="Stop"/>, before it resets: how much
+    /// the listener had heard when the device was stopped.</summary>
+    public List<long> EmittedAtStop { get; } = new();
     public long FramesRendered { get; private set; }
     public int ReadCallCount { get; private set; }
 
@@ -45,6 +49,7 @@ public sealed class FakeAudioOutput : IAudioOutput
     /// call, so the two clocks share one origin.</summary>
     public void Stop()
     {
+        EmittedAtStop.Add(FramesEmitted.Count);
         State = Transport.Stopped;
         FramesRendered = 0;
     }

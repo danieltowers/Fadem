@@ -128,12 +128,7 @@ public sealed partial class PlaybackEngine
             else if (replacement is not null)
             {
                 StartTrack(_queue.IndexOf(replacement.Id), _mixer.Timeline, null, null);
-                if (_output.State == Transport.Paused && _handoverAt is not null)
-                {
-                    // A paused device emits nothing, so the audible handover would wait for
-                    // Play: the view would sit on a row that is gone. Nothing is heard now.
-                    CompleteHandover();
-                }
+                LandWhilePaused(); // or the view would sit on a row that is gone
             }
             else
             {
@@ -296,22 +291,17 @@ public sealed partial class PlaybackEngine
     /// incoming track: cancel it and schedule again from the current voice's position.</summary>
     private void RescheduleCurrentBoundary()
     {
-        if (_currentVoice is not { } voice)
+        if (_currentVoice is not { } voice || voice.IsFinished)
         {
-            return;
+            return; // nothing playing, or the last track's tail: it has no boundary to move
         }
         if (_pendingBoundary is { } boundary)
         {
-            var endFadeStarted = boundary.EndOfSequence && boundary.FadeOutTrigger <= _mixer.Timeline;
-            if (boundary.Triggered || endFadeStarted || boundary.OutgoingVoice != voice)
+            if (boundary.Triggered || boundary.OutgoingVoice != voice)
             {
                 return; // in flight, or not this voice's: nothing to move
             }
             CancelBoundary(boundary);
-            if (boundary.EndOfSequence)
-            {
-                voice.CancelFadeOut(); // an end fade is written on the voice, not scheduled
-            }
             _pendingBoundary = null;
         }
         var index = IndexOf(voice);
