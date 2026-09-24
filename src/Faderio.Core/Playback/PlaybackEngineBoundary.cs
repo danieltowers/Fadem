@@ -334,6 +334,30 @@ public sealed partial class PlaybackEngine
         _currentVoice?.CancelFadeIn();
     }
 
+    /// <summary>Cancels the in-flight transition back to its outgoing voice: the incoming voice
+    /// goes, and the outgoing one is attended and current again, at full volume, with no
+    /// boundary until the caller schedules one.</summary>
+    private void ReturnToOutgoing()
+    {
+        if (_outgoingVoice is not { } outgoing || _currentVoice is not { } incoming || incoming == outgoing)
+        {
+            return;
+        }
+        CancelPendingBoundaryFor(incoming);
+        _voiceEntry.Remove(incoming);
+        _mixer.RemoveVoice(incoming);
+        _outgoingVoice = null;
+        _currentVoice = outgoing;
+        _attendedVoice = outgoing;
+        _handoverAt = null;
+        outgoing.CancelFadeOut();
+        var index = IndexOf(outgoing);
+        if (index >= 0)
+        {
+            _queue.SetCurrent(index);
+        }
+    }
+
     /// <summary>Let-finish skip: the outgoing fade completes before advancing.</summary>
     private void ScheduleLetFinishAdvance()
     {

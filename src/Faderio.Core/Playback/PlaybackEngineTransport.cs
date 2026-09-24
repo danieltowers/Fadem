@@ -188,20 +188,9 @@ public sealed partial class PlaybackEngine
                 return;
             }
 
-            if (_outgoingVoice == voice && _currentVoice is { } incoming && incoming != voice)
+            if (_outgoingVoice == voice)
             {
-                // Cancel the transition: the incoming voice goes, the outgoing one is current again.
-                CancelPendingBoundaryFor(incoming);
-                _voiceEntry.Remove(incoming);
-                _mixer.RemoveVoice(incoming);
-                _outgoingVoice = null;
-                _currentVoice = voice;
-                _handoverAt = null;
-                var index = IndexOf(voice);
-                if (index >= 0)
-                {
-                    _queue.SetCurrent(index);
-                }
+                ReturnToOutgoing();
             }
 
             var total = voice.Source.TotalFrames;

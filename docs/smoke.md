@@ -58,6 +58,11 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
 - [ ] **Save as playlist…** then **Open playlist…** on the file just saved doubles the queue
       in the same order, and the status strip names the file saved. Save it in a folder whose
       name has `†` or `⭐️`.
+- [ ] Ctrl-click or Shift-click selects several rows. **Delete** removes them all at once and
+      the numbering closes up. The context menu's **Remove** does the same, and is disabled
+      when nothing is selected.
+- [ ] **Clear queue** in the context menu, with more than one row, shows a confirmation.
+      Cancel leaves the queue as it was; OK empties it and playback stops.
 - [ ] Adding a rejected file (an `.m4a`, an `.ogg`, or a file with more than two channels)
       leaves the list unchanged and shows one notice naming the property that failed and
       pointing at `docs/supported-audio.md`. Nothing is queued, nothing plays.
@@ -83,6 +88,7 @@ sharp percussive transient; the realism check is the authored boundary from the 
       app.
 - [ ] Run the same capture-and-listen on WASAPI shared, WASAPI exclusive and WaveOut; the
       fade lands in the same place on all three.
+- [ ] Delete the playing row; the next one starts cleanly from its beginning.
 - [ ] Reaching the end of the second track stops playback cleanly with no error.
 - [ ] Add the whole `MUSIC` library (**Add folder…** on the `MUSIC` folder) while a track plays;
       the track plays on without a dropout, and adding never starts or stops playback.

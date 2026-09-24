@@ -6,9 +6,10 @@ namespace Faderio.App;
 
 /// <summary>
 /// The WinForms shell for the slice (ticket 05): add files or a folder, or drop either on the
-/// list (build issue 02), open a playlist or save the queue as one (build issue 03), a plain
-/// list, a context menu for "Edit transition (this → next)", transport, a seek bar in
-/// milliseconds, and the transition editor. It renders <see cref="PlayerView"/>s and issues commands; it holds no engine state
+/// list (build issue 02), open a playlist or save the queue as one (build issue 03), a
+/// multi-select list, a context menu for "Edit transition (this → next)", Remove and Clear queue
+/// (build issue 04; Delete removes too), transport, a seek bar in milliseconds, and the
+/// transition editor. It renders <see cref="PlayerView"/>s and issues commands; it holds no engine state
 /// between calls (the placement rule in CLAUDE.md). The seek bar's Maximum is the track length
 /// in milliseconds, so no scaling exists to get wrong (ticket 06).
 /// </summary>
@@ -32,6 +33,8 @@ internal sealed class MainForm : Form
     internal readonly ToolStripButton _cancelAdd;
     internal readonly TransitionEditorPanel _editor;
     internal readonly ToolStripMenuItem _editTransition;
+    internal readonly ToolStripMenuItem _removeRows;
+    internal readonly ToolStripMenuItem _clearQueue;
     private readonly System.Windows.Forms.Timer _timer;
 
     private long _shownQueue = -1;
@@ -44,6 +47,7 @@ internal sealed class MainForm : Form
         ChooseFolders = ShowFolderDialog;
         ChoosePlaylists = ShowPlaylistDialog;
         ChoosePlaylistSavePath = ShowSavePlaylistDialog;
+        ConfirmClear = ShowClearDialog;
 
         Text = "faderio";
         MinimumSize = new Size(760, 480);
@@ -104,7 +108,7 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Fill,
             View = View.Details,
             FullRowSelect = true,
-            MultiSelect = false,
+            MultiSelect = true,
             HideSelection = false,
             AllowDrop = true,
         };
@@ -114,9 +118,29 @@ internal sealed class MainForm : Form
         _queueList.Columns.Add("Length", 70, HorizontalAlignment.Right);
 
         _editTransition = new ToolStripMenuItem("Edit transition (this → next)");
-        var menu = new ContextMenuStrip { Items = { _editTransition } };
-        menu.Opening += (_, _) => _editTransition.Enabled = SelectedAdjacency() is not null;
+        _removeRows = new ToolStripMenuItem("Remove") { ShortcutKeyDisplayString = "Del" };
+        _clearQueue = new ToolStripMenuItem("Clear queue");
+        var menu = new ContextMenuStrip
+        {
+            Items = { _editTransition, new ToolStripSeparator(), _removeRows, _clearQueue },
+        };
+        menu.Opening += (_, _) =>
+        {
+            _editTransition.Enabled = SelectedAdjacency() is not null;
+            _removeRows.Enabled = _queueList.SelectedItems.Count > 0;
+            _clearQueue.Enabled = _queueList.Items.Count > 0;
+        };
         _editTransition.Click += (_, _) => EditSelectedTransition();
+        _removeRows.Click += (_, _) => RemoveSelected();
+        _clearQueue.Click += (_, _) => ClearQueue();
+        _queueList.KeyDown += (_, e) =>
+        {
+            if (e.KeyCode == Keys.Delete && e.Modifiers == Keys.None)
+            {
+                RemoveSelected();
+                e.Handled = true;
+            }
+        };
         _queueList.ContextMenuStrip = menu;
         _queueList.DoubleClick += (_, _) => PlaySelected();
         _queueList.DragEnter += (_, e) =>
@@ -262,6 +286,10 @@ internal sealed class MainForm : Form
     /// <summary>The path picked in the Save as playlist dialog, or null.</summary>
     internal Func<string?> ChoosePlaylistSavePath { get; set; }
 
+    /// <summary>Whether the user confirms clearing a queue of this many rows. A test replaces
+    /// it, since a headless form cannot show a dialog.</summary>
+    internal Func<int, bool> ConfirmClear { get; set; }
+
     private void AddChosen(Func<IReadOnlyList<string>> choose)
     {
         var paths = choose();
@@ -329,6 +357,30 @@ internal sealed class MainForm : Form
     internal Task AddPaths(IEnumerable<string> paths) => _engine.Add(paths);
 
     internal static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
+
+    /// <summary>The selected rows go in one call; what that does to playback is the engine's.</summary>
+    private void RemoveSelected() =>
+        _engine.Remove(_queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToList());
+
+    /// <summary>There is no undo, so a queue of more than one row asks first.</summary>
+    private void ClearQueue()
+    {
+        var count = _engine.View.Queue.Count;
+        if (count > 1 && !ConfirmClear(count))
+        {
+            return;
+        }
+        _engine.Clear();
+    }
+
+    private bool ShowClearDialog(int count) =>
+        MessageBox.Show(
+            this,
+            $"Remove all {count} rows from the queue? This cannot be undone.",
+            "Clear queue",
+            MessageBoxButtons.OKCancel,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2) == DialogResult.OK;
 
     private void PlaySelected()
     {

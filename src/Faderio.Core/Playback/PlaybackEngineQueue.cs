@@ -74,42 +74,111 @@ public sealed partial class PlaybackEngine
         Run(() => RaiseNotice(notice));
     }
 
-    public void Remove(RowId row)
+    /// <summary>Removes the given rows in one call (build issue 04). Removing what plays means
+    /// "not this one", not "stop". When every sounding voice's row goes, playback continues on
+    /// the first surviving row after them (under repeat-all, the wrap), from 0:00, as a hard cut,
+    /// and paused stays paused; with no such row, playback finishes. Mid-transition, a removed
+    /// voice is cut and the other plays on at full volume, as a skip lands. Rows already gone are
+    /// one notice, and the rest are still removed.</summary>
+    public void Remove(IEnumerable<RowId> rows)
     {
         ThrowIfDisposed();
+        var ids = rows.Distinct().ToList();
         Run(() =>
         {
             ObserveClock();
-            var index = _queue.IndexOf(row);
-            if (index < 0)
+            var removing = new HashSet<QueueEntry>();
+            var gone = new List<RowId>();
+            foreach (var id in ids)
             {
-                RaiseNotice($"That row is no longer in the queue ({row}).");
-                return;
-            }
-            var entry = _queue.Entries[index];
-            var wasSounding = _voiceEntry.ContainsValue(entry);
-            _queue.RemoveAt(index);
-            _originalOrder.Remove(entry);
-            if (wasSounding)
-            {
-                var playing = _output.State != Transport.Stopped;
-                CutAllVoices();
-                if (playing && _queue.Count > 0)
+                var index = _queue.IndexOf(id);
+                if (index < 0)
                 {
-                    StartTrack(Math.Min(index, _queue.Count - 1), _mixer.Timeline, null, null);
+                    gone.Add(id);
                 }
                 else
                 {
-                    FinishPlayback();
+                    removing.Add(_queue.Entries[index]);
+                }
+            }
+            if (gone.Count > 0)
+            {
+                RaiseNotice(gone.Count == 1
+                    ? $"That row is no longer in the queue ({gone[0]})."
+                    : $"{gone.Count} of those rows are no longer in the queue.");
+            }
+            if (removing.Count == 0)
+            {
+                return;
+            }
+
+            bool IsRemoved(MixerVoice? voice) =>
+                voice is not null && _voiceEntry.TryGetValue(voice, out var entry) && removing.Contains(entry);
+            var cutCurrent = IsRemoved(_currentVoice);
+            var cutOutgoing = IsRemoved(_outgoingVoice);
+            var allCut = cutCurrent && (_outgoingVoice is null || cutOutgoing);
+            QueueEntry? replacement = null;
+            if (allCut)
+            {
+                replacement = ReplacementFor(_voiceEntry[_currentVoice!], removing);
+                CutAllVoices();
+            }
+            else if (cutOutgoing)
+            {
+                AbandonInFlightTransition();
+            }
+            else if (cutCurrent)
+            {
+                ReturnToOutgoing();
+            }
+
+            foreach (var entry in removing)
+            {
+                _queue.RemoveAt(_queue.IndexOf(entry.Id));
+                _originalOrder.Remove(entry);
+            }
+
+            if (!allCut)
+            {
+                if (_currentVoice is { } voice && IndexOf(voice) is var index and >= 0)
+                {
+                    _queue.SetCurrent(index);
+                }
+                RescheduleCurrentBoundary();
+            }
+            else if (replacement is not null)
+            {
+                StartTrack(_queue.IndexOf(replacement.Id), _mixer.Timeline, null, null);
+                if (_output.State == Transport.Paused && _handoverAt is not null)
+                {
+                    // A paused device emits nothing, so the audible handover would wait for
+                    // Play: the view would sit on a row that is gone. Nothing is heard now.
+                    CompleteHandover();
                 }
             }
             else
             {
-                RescheduleCurrentBoundary();
+                FinishPlayback();
             }
             _queueVersion++;
             Publish();
         });
+    }
+
+    /// <summary>The row that takes the place of <paramref name="playing"/> when it and
+    /// <paramref name="removing"/> go: the first surviving row after it, or under repeat-all
+    /// the first surviving row of all. Null when playback would end.</summary>
+    private QueueEntry? ReplacementFor(QueueEntry playing, HashSet<QueueEntry> removing)
+    {
+        var entries = _queue.Entries;
+        for (var i = _queue.IndexOf(playing.Id) + 1; i < entries.Count; i++)
+        {
+            if (!removing.Contains(entries[i]))
+            {
+                return entries[i];
+            }
+        }
+        return _repeat == RepeatMode.All ? entries.FirstOrDefault(e => !removing.Contains(e)) : null;
     }
 
     public void Clear()

@@ -33,3 +33,24 @@ timer and UI Automation are not.
 - A test: the fake output cannot show this, since it has no second thread joining. A test
   against `NAudioAudioOutput` is out of scope for phase 1 (spec), so this may stay a smoke item:
   press ⏹ repeatedly while playing and confirm the window keeps rendering.
+
+## Comments
+
+- 2026-09-24, during the Looks smoke run for [issue 04](04-remove-rows-and-clear-the-queue.md).
+  The suspected cause is confirmed by `dotnet-stack` on a frozen window. **Clear queue → OK**
+  while playing froze it:
+  - The UI thread was in `MainForm.ClearQueue` → `PlaybackEngine.Clear` → `Run` (holding the
+    lock) → `NAudioAudioOutput.Stop` → `WasapiOut.Stop` → `Thread.Join`.
+  - The WASAPI `PlayThread` was in `WasapiOut.FillBuffer` → `CountingSource.Read` →
+    `EngineFrameSource.Read` → `PlaybackEngine.Run`, waiting on the same lock.
+  - As before, `WM_NULL` was answered in 0 ms and UI Automation timed out.
+- There are now more ways in. Every `_output.Stop()` runs under the lock: `Stop`, `Clear`, and
+  `FinishPlayback`, which is reached by removing the last playing row or the only one, and at
+  the natural end of the queue.
+- Trials on WASAPI shared, one 12 s tone playing for 2 s, then the action, then 1.5 s to check
+  the stacks:
+  - **Delete on the only playing row:** froze 1 in 4.
+  - **⏹:** froze 0 in 4.
+  - **Clear → OK while playing:** froze 1 in 2.
+  The race is real and not rare.
+

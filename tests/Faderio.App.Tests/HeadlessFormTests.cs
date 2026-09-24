@@ -398,4 +398,132 @@ public sealed class HeadlessFormTests
         var saved = h.Store.Get(a, b)!.FadeOutPoint!.Position;
         Assert.Equal(12345, Ticks.FramesOf(saved, 44100));
     });
+
+    /// <summary>Fires the list's context menu Opening, which sets what is enabled.</summary>
+    private static void OpenMenu(ListView list)
+    {
+        var menu = list.ContextMenuStrip!;
+        typeof(ToolStripDropDown).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(menu, new object[] { new System.ComponentModel.CancelEventArgs() });
+    }
+
+    private static void PressKey(Control control, Keys key)
+    {
+        typeof(Control).GetMethod("OnKeyDown", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(control, new object[] { new KeyEventArgs(key) });
+    }
+
+    /// <summary>Selects rows as a user would. A list without a handle keeps no selection, so it
+    /// gets one here; the form is still never shown.</summary>
+    private static void SelectRows(ListView list, params int[] indices)
+    {
+        _ = list.Handle;
+        foreach (var index in indices)
+        {
+            list.Items[index].Selected = true;
+        }
+    }
+
+    private static string[] Titles(ListView list) =>
+        list.Items.Cast<ListViewItem>().Select(i => i.SubItems[1].Text).ToArray();
+
+    [Fact]
+    public void Delete_RemovesEverySelectedRow_InOneGo() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var paths = new[] { "one", "two", "three", "four" }.Select(n => TestAudio.WriteDcWav(n + ".wav", 1, 0.2)).ToArray();
+        h.Form.AddPaths(paths);
+        Assert.True(h.Form._queueList.MultiSelect);
+        SelectRows(h.Form._queueList, 0, 2);
+
+        PressKey(h.Form._queueList, Keys.Delete);
+
+        Assert.Equal(new[] { paths[1], paths[3] }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
+        Assert.Equal(new[] { Path.GetFileNameWithoutExtension(paths[1]), Path.GetFileNameWithoutExtension(paths[3]) },
+            Titles(h.Form._queueList));
+        Assert.Equal(new[] { "1", "2" }, h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
+    });
+
+    [Fact]
+    public void TheMenusRemove_RemovesTheSelectedRows_AndIsOfferedOnlyWithASelection() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 1, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 1, 0.2);
+        h.Form.AddPaths(new[] { a, b });
+
+        OpenMenu(h.Form._queueList);
+        Assert.False(h.Form._removeRows.Enabled);
+        Assert.True(h.Form._clearQueue.Enabled);
+
+        SelectRows(h.Form._queueList, 1);
+        OpenMenu(h.Form._queueList);
+        Assert.True(h.Form._removeRows.Enabled);
+        h.Form._removeRows.PerformClick();
+
+        Assert.Equal(new[] { a }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
+        Assert.Single(h.Form._queueList.Items);
+    });
+
+    [Fact]
+    public void DeletingThePlayingRow_PlaysTheRowThatTookItsPlace() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 5, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 5, 0.2);
+        h.Form.AddPaths(new[] { a, b });
+        h.Form.PlayRowAt(0);
+        h.Output.Advance(44100 * 2);
+        SelectRows(h.Form._queueList, 0);
+
+        PressKey(h.Form._queueList, Keys.Delete);
+        h.Form.Render();
+
+        Assert.Equal(b, h.Engine.View.Attended!.Row.Track.FilePath);
+        Assert.Equal("0:00 / -0:05", h.Form._time.Text);
+        Assert.Equal(SystemColors.Info, h.Form._queueList.Items[0].BackColor);
+    });
+
+    [Fact]
+    public void ClearQueue_BeyondOneRow_AsksFirst_AndDoesNothingIfDeclined() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Form.AddPaths(new[] { TestAudio.WriteDcWav("alpha.wav", 5, 0.4), TestAudio.WriteDcWav("beta.wav", 5, 0.2) });
+        h.Form.PlayRowAt(0);
+        var asked = new List<int>();
+        h.Form.ConfirmClear = count =>
+        {
+            asked.Add(count);
+            return false;
+        };
+
+        h.Form._clearQueue.PerformClick();
+
+        Assert.Equal(new[] { 2 }, asked);
+        Assert.Equal(2, h.Form._queueList.Items.Count);
+        Assert.Equal(Transport.Playing, h.Engine.View.Transport);
+
+        h.Form.ConfirmClear = _ => true;
+        h.Form._clearQueue.PerformClick();
+
+        Assert.Empty(h.Engine.View.Queue);
+        Assert.Empty(h.Form._queueList.Items);
+        Assert.Equal(Transport.Stopped, h.Engine.View.Transport);
+        Assert.Equal("0:00 / -0:00", h.Form._time.Text);
+    });
+
+    [Fact]
+    public void ClearQueue_OfOneRow_ClearsWithoutAsking_AndIsNotOfferedWhenEmpty() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Form.AddPaths(new[] { TestAudio.WriteDcWav("alpha.wav", 1, 0.4) });
+        h.Form.ConfirmClear = _ => throw new InvalidOperationException("one row must not ask");
+
+        h.Form._clearQueue.PerformClick();
+
+        Assert.Empty(h.Form._queueList.Items);
+        OpenMenu(h.Form._queueList);
+        Assert.False(h.Form._clearQueue.Enabled);
+        Assert.False(h.Form._removeRows.Enabled);
+    });
 }
