@@ -307,6 +307,35 @@ public sealed class HeadlessFormTests
     });
 
     [Fact]
+    public void AnUnreadableRow_IsMarked_UntilItsFileOpensAgain() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 5, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 5, 0.2);
+        var c = TestAudio.WriteDcWav("gamma.wav", 5, 0.3);
+        h.Form.AddPaths(new[] { a, b, c });
+        File.Move(b, b + ".away");
+
+        h.Form.PlayRowAt(0); // A's boundary opens B, and passes over it
+        h.Form.Render();
+
+        var marked = h.Form._queueList.Items[1];
+        Assert.Equal("⚠ 2", marked.Text);
+        Assert.Equal(SystemColors.GrayText, marked.ForeColor);
+        Assert.Contains("Unreadable", marked.ToolTipText);
+        Assert.Equal("1", h.Form._queueList.Items[0].Text);
+        Assert.Equal(SystemColors.WindowText, h.Form._queueList.Items[0].ForeColor);
+
+        File.Move(b + ".away", b);
+        h.Form.PlayRowAt(1); // a double-click tries it
+        h.Form.Render();
+
+        Assert.Equal("2", marked.Text);
+        Assert.Equal(SystemColors.WindowText, marked.ForeColor);
+        Assert.Equal("", marked.ToolTipText);
+    });
+
+    [Fact]
     public void Capture_WritesThePlayheadIntoTheField_AndKeepsTheExactPoint() => RunSta(() =>
     {
         using var h = new Harness(latency: 4410);

@@ -105,6 +105,14 @@ internal static class Presenter
         _ => $"{entries} notices",
     };
 
+    /// <summary>A queue row's number, marked ⚠ while its file is unreadable (build issue 10).</summary>
+    public static string RowLabel(int number, bool unreadable) => unreadable ? $"⚠ {number}" : number.ToString();
+
+    /// <summary>A queue row's tooltip: why it is marked, and what a double-click does. Blank
+    /// otherwise.</summary>
+    public static string RowTip(bool unreadable) =>
+        unreadable ? "Unreadable: its file could not be opened, so it is passed over. Double-click to try it again." : "";
+
     public static string PlayPauseGlyph(Transport transport) => transport == Transport.Playing ? "⏸" : "▶";
 
     /// <summary>The mode a press of the repeat button asks for: off → all → one → off. A display

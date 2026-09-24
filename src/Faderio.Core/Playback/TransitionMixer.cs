@@ -43,6 +43,10 @@ internal sealed class MixerVoice
     /// trigger the engine's advance logic.</summary>
     internal bool EndSuppressed { get; set; }
 
+    /// <summary>The decode error that ended the voice, if one did: the track ends where the
+    /// error happened, as audio that ends early does (ADR 0010).</summary>
+    internal Exception? DecodeError { get; set; }
+
     internal void NoteSeek(long timeline, long source)
     {
         // A second seek within the same rendered frame replaces the first.
@@ -217,7 +221,21 @@ internal sealed class TransitionMixer : ISampleProvider
                 }
 
                 var framesToRender = (int)(count - runStart);
-                var read = voice.Source.Read(_scratch, 0, framesToRender);
+                int read;
+                try
+                {
+                    read = voice.Source.Read(_scratch, 0, framesToRender);
+                }
+                catch (Exception e)
+                {
+                    // A decode error: the voice ends where it happened, and only this voice. The
+                    // read that failed delivered nothing, so "where" is the start of that read.
+                    voice.DecodeError = e;
+                    processed.Add(voice);
+                    progressed = true;
+                    End(voice, start + runStart);
+                    continue;
+                }
 
                 for (var f = 0; f < read; f++)
                 {

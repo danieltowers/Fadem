@@ -115,6 +115,7 @@ public sealed partial class PlaybackEngine
             {
                 _queue.RemoveAt(_queue.IndexOf(entry.Id));
                 _originalOrder.Remove(entry);
+                _unreadable.Remove(entry.Id);
             }
 
             if (!allCut)
@@ -125,9 +126,10 @@ public sealed partial class PlaybackEngine
                 }
                 RescheduleCurrentBoundary();
             }
-            else if (replacement is not null)
+            else if (replacement is not null
+                && OpenFirstReadable(_queue.IndexOf(replacement.Id), RowAfter, retryMarked: false) is { } next)
             {
-                StartTrack(_queue.IndexOf(replacement.Id), _mixer.Timeline, null, null);
+                StartTrack(next, _mixer.Timeline, null);
                 LandWhilePaused(); // or the view would sit on a row that is gone
             }
             else
@@ -234,6 +236,7 @@ public sealed partial class PlaybackEngine
             StopOutput();
             _queue.Clear();
             _originalOrder.Clear();
+            _unreadable.Clear();
             _queueVersion++;
             Publish();
         });
@@ -307,7 +310,7 @@ public sealed partial class PlaybackEngine
         var index = IndexOf(voice);
         if (index >= 0)
         {
-            ScheduleBoundary(index, voice, _mixer.Timeline, voice.Source.Position);
+            ScheduleBoundary(index, voice, _mixer.Timeline, voice.Source.Position, retryMarked: false);
         }
     }
 }

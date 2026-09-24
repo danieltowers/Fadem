@@ -11,8 +11,10 @@ public readonly record struct RowId(long Value)
 }
 
 /// <summary>One row of the queue as the shell sees it. <see cref="IsCurrent"/> follows the
-/// attended voice: it flips at the audible handover, not when the incoming voice is spawned.</summary>
-public sealed record QueueRow(RowId Id, Track Track, bool IsCurrent);
+/// attended voice: it flips at the audible handover, not when the incoming voice is spawned.
+/// <see cref="IsUnreadable"/> is set when the row's file could not be opened the last time the
+/// queue reached it, and clears the next time it opens (build issue 10).</summary>
+public sealed record QueueRow(RowId Id, Track Track, bool IsCurrent, bool IsUnreadable = false);
 
 /// <summary>One voice as the shell sees it: which row, where the listener is within it, and how
 /// long it is. <see cref="Playhead"/> is audible time, derived from the frames the device has
@@ -30,8 +32,9 @@ public sealed record VoiceView(QueueRow Row, Playhead Playhead, Length Length)
 /// falls silent — and is null exactly when stopped; <see cref="Incoming"/> is non-null only
 /// while two voices overlap. <see cref="Adding"/> is non-null exactly while an add is running.
 /// <see cref="NextAdjacency"/> is the adjacency ⏭ would reach from the current row: into the
-/// next row, or under repeat-all from the last row into the first. Repeat-one does not make it
-/// the row into itself. Null on the last row with repeat off, and when the queue is empty.
+/// next row, or under repeat-all from the last row into the first, passing over rows marked
+/// unreadable. Repeat-one does not make it the row into itself. Null on the last row with repeat
+/// off, when every row after is marked, and when the queue is empty.
 /// <see cref="CanTransitionNow"/> is whether <c>TransitionNow</c> would act: playing, one voice
 /// heard alone with no handover or finish still in the device, and a next adjacency.
 /// </summary>

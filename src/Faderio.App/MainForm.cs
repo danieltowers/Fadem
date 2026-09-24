@@ -151,8 +151,9 @@ internal sealed class MainForm : Form
             MultiSelect = true,
             HideSelection = false,
             AllowDrop = true,
+            ShowItemToolTips = true,
         };
-        _queueList.Columns.Add("#", 36);
+        _queueList.Columns.Add("#", 48);
         _queueList.Columns.Add("Title", 320);
         _queueList.Columns.Add("Artist", 200);
         _queueList.Columns.Add("Length", 70, HorizontalAlignment.Right);
@@ -286,8 +287,22 @@ internal sealed class MainForm : Form
         }
         for (var i = 0; i < _queueList.Items.Count && i < view.Queue.Count; i++)
         {
-            var current = view.Queue[i].IsCurrent && view.Transport != Transport.Stopped;
-            _queueList.Items[i].BackColor = current ? SystemColors.Info : SystemColors.Window;
+            var row = view.Queue[i];
+            var item = _queueList.Items[i];
+            var current = row.IsCurrent && view.Transport != Transport.Stopped;
+            item.BackColor = current ? SystemColors.Info : SystemColors.Window;
+            // Render runs on every tick: the mark is set only when it changes (build issue 20).
+            var fore = row.IsUnreadable ? SystemColors.GrayText : SystemColors.WindowText;
+            if (item.ForeColor != fore)
+            {
+                item.ForeColor = fore;
+            }
+            var label = Presenter.RowLabel(i + 1, row.IsUnreadable);
+            if (item.Text != label)
+            {
+                item.Text = label;
+                item.ToolTipText = Presenter.RowTip(row.IsUnreadable);
+            }
         }
 
         var attended = view.Attended;

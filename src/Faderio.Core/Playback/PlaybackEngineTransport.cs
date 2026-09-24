@@ -34,7 +34,13 @@ public sealed partial class PlaybackEngine
                 {
                     _queue.SetCurrent(0); // replay from the top
                 }
-                StartTrack(Math.Max(_queue.CurrentIndex, 0), 0, null, null);
+                var first = OpenFirstReadable(Math.Max(_queue.CurrentIndex, 0), RowAfter, retryMarked: true);
+                if (first is null)
+                {
+                    Publish(); // nothing readable: playback stays stopped
+                    return;
+                }
+                StartTrack(first.Value, 0, null);
             }
             _output.Play();
             Publish();
@@ -82,7 +88,9 @@ public sealed partial class PlaybackEngine
     }
 
     /// <summary>Plays the given row from its start — the one call that replaces v2's hand-rolled
-    /// stop → set-current → play. A row that is gone is a notice.</summary>
+    /// stop → set-current → play. A row that is gone is a notice. The row is tried once, marked
+    /// or not: if it cannot be read, it is marked with a notice and what was playing carries on
+    /// (build issue 10). An explicit choice never jumps to a row you did not pick.</summary>
     public void PlayRow(RowId row)
     {
         ThrowIfDisposed();
@@ -95,6 +103,11 @@ public sealed partial class PlaybackEngine
                 RaiseNotice($"That row is no longer in the queue ({row}).");
                 return;
             }
+            if (TryOpen(index, out var error) is not { } source)
+            {
+                RaiseNotice($"Could not play \"{Path.GetFileName(_queue.Entries[index].Track.FilePath)}\": {error}");
+                return;
+            }
             if (_output.State == Transport.Stopped)
             {
                 ResetForRestart();
@@ -105,7 +118,7 @@ public sealed partial class PlaybackEngine
                 _finished = false;
             }
             _queue.SetCurrent(index);
-            StartTrack(index, _mixer.Timeline, null, null);
+            StartTrack(new OpenedTrack(index, source), _mixer.Timeline, null);
             _output.Play();
             Publish();
         });
@@ -163,8 +176,9 @@ public sealed partial class PlaybackEngine
 
     /// <summary>Acts on the attended voice (build issue 06). Past 3 s it restarts the track; so
     /// it does at the head of the queue, unless repeat-all wraps it to the last row. Otherwise it
-    /// hard-cuts to the previous row from 0:00, never through a reverse adjacency. Restarting the
-    /// outgoing voice mid-transition cancels the transition, as a seek does.</summary>
+    /// hard-cuts to the previous readable row from 0:00, never through a reverse adjacency, passing
+    /// over rows marked unreadable; with none, it restarts the track. Restarting the outgoing
+    /// voice mid-transition cancels the transition, as a seek does.</summary>
     public void Previous()
     {
         ThrowIfDisposed();
@@ -177,15 +191,22 @@ public sealed partial class PlaybackEngine
             }
             var index = IndexOf(attended);
             var playhead = View.Attended?.Playhead ?? Playhead.Zero;
-            var previous = playhead.TotalSeconds > 3 ? null : _queue.IndexBefore(index, _repeat);
+            int? Back(int i) => _queue.IndexBefore(i, _repeat);
+            var previous = playhead.TotalSeconds > 3 ? null : OpenFirstReadable(Back(index), Back, retryMarked: false);
             if (previous is null && !attended.IsFinished)
             {
                 Seek(Playhead.Zero);
                 return;
             }
             // The previous row, or the last track's tail, which has no source left to seek.
+            var target = previous ?? OpenFirstReadable(index, _ => null, retryMarked: true);
             CutAllVoices();
-            StartTrack(previous ?? index, _mixer.Timeline, null, null);
+            if (target is null)
+            {
+                FinishPlayback();
+                return;
+            }
+            StartTrack(target.Value, _mixer.Timeline, null);
             LandWhilePaused();
             Publish();
         });
@@ -229,7 +250,7 @@ public sealed partial class PlaybackEngine
             var voiceIndex = IndexOf(voice);
             if (voiceIndex >= 0)
             {
-                ScheduleBoundary(voiceIndex, voice, _mixer.Timeline, voice.Source.Position);
+                ScheduleBoundary(voiceIndex, voice, _mixer.Timeline, voice.Source.Position, retryMarked: false);
             }
             Publish();
         });

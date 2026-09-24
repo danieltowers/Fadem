@@ -40,6 +40,13 @@ public sealed partial class PlaybackEngine : IDisposable
     private long? _handoverAt;
 
     private BoundarySchedule? _pendingBoundary;
+
+    /// <summary>The pending boundary's incoming track, opened when the boundary was scheduled
+    /// and taken when it starts (build issue 10).</summary>
+    private (QueueEntry Entry, ITrackSource Source)? _prepared;
+
+    /// <summary>Rows whose file could not be opened the last time the queue reached them.</summary>
+    private readonly HashSet<RowId> _unreadable = new();
     private bool _finished;
 
     /// <summary>The timeline frame after the last voice's last frame, while the device has yet
@@ -301,7 +308,7 @@ public sealed partial class PlaybackEngine : IDisposable
         return new Snapshot(
             _version, _queueVersion, _output.State, _queue.Entries.ToImmutableArray(),
             _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null, _finishAt is not null,
-            _shuffle, _repeat, Adding, _rate);
+            _shuffle, _repeat, Adding, _rate, _unreadable.ToImmutableHashSet());
     }
 
     /// <summary>One voice frozen for the view: its row, its reference history and its length.
@@ -326,8 +333,8 @@ public sealed partial class PlaybackEngine : IDisposable
             return Math.Clamp(position, 0, Math.Max(LengthFrames, 0));
         }
 
-        public VoiceView At(long emitted, bool isCurrent, int rate) =>
-            new(new QueueRow(Entry.Id, Entry.Track, isCurrent),
+        public VoiceView At(long emitted, bool isCurrent, int rate, ImmutableHashSet<RowId> unreadable) =>
+            new(new QueueRow(Entry.Id, Entry.Track, isCurrent, unreadable.Contains(Entry.Id)),
                 Playhead.FromFrames(PlayheadFrames(emitted), rate),
                 Entry.Track.Length);
     }
@@ -346,7 +353,8 @@ public sealed partial class PlaybackEngine : IDisposable
         bool Shuffle,
         RepeatMode Repeat,
         AddProgress? Adding,
-        int Rate)
+        int Rate,
+        ImmutableHashSet<RowId> Unreadable)
     {
         public PlayerView At(long emitted)
         {
@@ -360,12 +368,12 @@ public sealed partial class PlaybackEngine : IDisposable
                 heardAlone = handedOver && !Overlap && !Finishing;
             }
             var currentRow = attended?.Entry.Id ?? CurrentRow;
-            var rows = Entries.Select(e => new QueueRow(e.Id, e.Track, e.Id == currentRow)).ToList();
+            var rows = Entries.Select(e => new QueueRow(e.Id, e.Track, e.Id == currentRow, Unreadable.Contains(e.Id))).ToList();
             var next = NextAdjacencyFrom(currentRow);
             return new PlayerView(
                 Version, QueueVersion, Transport, rows,
-                attended?.At(emitted, true, Rate),
-                incoming?.At(emitted, false, Rate),
+                attended?.At(emitted, true, Rate, Unreadable),
+                incoming?.At(emitted, false, Rate, Unreadable),
                 Shuffle, Repeat, Adding, next,
                 CanTransitionNow: Transport == Transport.Playing && heardAlone && next is not null);
         }
@@ -376,9 +384,16 @@ public sealed partial class PlaybackEngine : IDisposable
             {
                 if (Entries[i].Id == row)
                 {
-                    return PlaybackQueue.IndexSkippedTo(i, Entries.Length, Repeat) is { } next
-                        ? new Adjacency(Entries[i].Track, Entries[next].Track)
-                        : null;
+                    // A skip passes over the rows marked unreadable, and so does this.
+                    int? After(int n) => PlaybackQueue.IndexSkippedTo(n, Entries.Length, Repeat);
+                    foreach (var next in PlaybackQueue.Walk(After(i), After))
+                    {
+                        if (!Unreadable.Contains(Entries[next].Id))
+                        {
+                            return new Adjacency(Entries[i].Track, Entries[next].Track);
+                        }
+                    }
+                    return null;
                 }
             }
             return null;
@@ -388,8 +403,10 @@ public sealed partial class PlaybackEngine : IDisposable
     // ── The output seam ──────────────────────────────────────────────────────────────────
 
     /// <summary>What the output pulls. Rendering and control calls share one lock, except that a
-    /// render still waiting while the device is being stopped reads nothing; errors are surfaced as a notice,
-    /// never swallowed, and a block that failed renders as silence.</summary>
+    /// render still waiting while the device is being stopped reads nothing. A decode error never
+    /// reaches here: it ends only its own voice, where it happened, with one notice (build issue
+    /// 10). What still can is an engine fault, surfaced as a notice, never swallowed, and never
+    /// thrown into the device's thread; its block renders as silence.</summary>
     private sealed class EngineFrameSource : IFrameSource
     {
         private readonly PlaybackEngine _engine;

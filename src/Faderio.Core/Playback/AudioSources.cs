@@ -17,7 +17,7 @@ internal interface ITrackSource : ISampleProvider, IDisposable
 /// <summary>
 /// Opens audio files through the production decoders. Decoders are not a port (ADR 0003): one
 /// adapter would be a hypothetical seam, and the real-input matrix uses real files. Errors are
-/// thrown to the caller, which surfaces them as a notice and skips the track.
+/// thrown to the caller, which marks the row unreadable and passes over it with a notice.
 /// </summary>
 internal static class TrackSources
 {
@@ -29,18 +29,30 @@ internal static class TrackSources
         }
 
         var extension = Path.GetExtension(path).ToLowerInvariant();
-        return extension switch
+        // Shared for delete: a track held open, the playing one or the next one opened when its
+        // boundary was scheduled, never stops the user renaming or deleting its file.
+        var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        try
         {
-            ".wav" => WaveStreamTrackSource.Create(new WaveFileReader(path)),
-            ".mp3" => WaveStreamTrackSource.Create(new Mp3FileReader(path)),
-            // The managed decoder (FlacTrackReader) lands seeks on the exact sample. Media
-            // Foundation landed on the next block boundary, +67 ms on the ramp fixture, and is
-            // out of the chain (ADR 0009).
-            ".flac" => WaveStreamTrackSource.Create(FlacTrackReader.Open(path)),
-            // The add-time probe rejects everything else before it gets here (ADR 0007).
-            _ => throw new NotSupportedException(
-                $"Unsupported audio format '{extension}': not in docs/supported-audio.md."),
-        };
+            WaveStream reader = extension switch
+            {
+                ".wav" => new WaveFileReader(file),
+                ".mp3" => new Mp3FileReader(file),
+                // The managed decoder (FlacTrackReader) lands seeks on the exact sample. Media
+                // Foundation landed on the next block boundary, +67 ms on the ramp fixture, and
+                // is out of the chain (ADR 0009).
+                ".flac" => FlacTrackReader.Open(file),
+                // The add-time probe rejects everything else before it gets here (ADR 0007).
+                _ => throw new NotSupportedException(
+                    $"Unsupported audio format '{extension}': not in docs/supported-audio.md."),
+            };
+            return WaveStreamTrackSource.Create(reader, file);
+        }
+        catch
+        {
+            file.Dispose();
+            throw;
+        }
     }
 }
 
@@ -51,12 +63,19 @@ internal static class TrackSources
 internal sealed class WaveStreamTrackSource : ITrackSource
 {
     private readonly WaveStream _stream;
+    private readonly Stream _file;
     private byte[] _sourceBytes = new byte[0];
     private bool _disposed;
 
-    private WaveStreamTrackSource(WaveStream stream) => _stream = stream;
+    private WaveStreamTrackSource(WaveStream stream, Stream file)
+    {
+        _stream = stream;
+        _file = file;
+    }
 
-    public static WaveStreamTrackSource Create(WaveStream stream) => new(stream);
+    /// <summary>Owns both the reader and the file under it: NAudio's readers given a stream
+    /// leave it open.</summary>
+    public static WaveStreamTrackSource Create(WaveStream stream, Stream file) => new(stream, file);
 
     public WaveFormat WaveFormat => _stream.WaveFormat;
 
@@ -166,6 +185,7 @@ internal sealed class WaveStreamTrackSource : ITrackSource
         }
         _disposed = true;
         _stream.Dispose();
+        _file.Dispose();
     }
 }
 

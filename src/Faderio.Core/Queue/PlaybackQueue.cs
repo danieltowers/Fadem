@@ -128,6 +128,17 @@ internal sealed class PlaybackQueue
         return repeat == RepeatMode.All ? 0 : null;
     }
 
+    /// <summary>Each index from <paramref name="first"/>, then <paramref name="step"/> from it, once
+    /// each: the walk ends when a step gives null or comes back round under repeat-all.</summary>
+    public static IEnumerable<int> Walk(int? first, Func<int, int?> step)
+    {
+        var seen = new HashSet<int>();
+        for (var index = first; index is { } i && seen.Add(i); index = step(i))
+        {
+            yield return i;
+        }
+    }
+
     /// <summary>The index ⏮ reaches from <paramref name="index"/>: the row before it, or at the
     /// head under repeat-all the last row. Null at the head otherwise.</summary>
     public int? IndexBefore(int index, RepeatMode repeat)

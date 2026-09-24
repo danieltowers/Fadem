@@ -83,6 +83,10 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
       it, and clicking the strip again brings back the same list.
 - [ ] Launching with a corrupt `%APPDATA%\faderio\transitions.json` (back it up first) shows
       no dialog: the strip says the file was moved aside to `transitions.json.corrupt`.
+- [ ] A queued file renamed before the track ahead of it starts is marked when that track starts:
+      "⚠" before its row number, the row greyed, and a tooltip saying it is unreadable. The
+      strip says it was passed over, once, and the queue plays on past it. (The file is opened
+      as the track before it starts, so renaming it later still plays it.)
 - [ ] Adding a rejected file (an `.m4a`, an `.ogg`, or a file with more than two channels)
       leaves the list unchanged and shows one notice naming the property that failed and
       pointing at `docs/supported-audio.md`. Nothing is queued, nothing plays.
@@ -117,5 +121,7 @@ sharp percussive transient; the realism check is the authored boundary from the 
       any other boundary does.
 - [ ] Transition now mid-song fades into the next track as authored, starting from where you
       pressed.
+- [ ] Rename a queued file before the track ahead of it starts; the queue plays on past it
+      without a gap or a fade into silence.
 - [ ] Add the whole `MUSIC` library (**Add folder…** on the `MUSIC` folder) while a track plays;
       the track plays on without a dropout, and adding never starts or stops playback.

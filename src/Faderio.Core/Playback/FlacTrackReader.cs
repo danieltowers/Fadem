@@ -26,20 +26,8 @@ internal sealed class FlacTrackReader : FlacReader
     private readonly ReadOnlyCollection<FlacFrameInformation> _frames;
     private long _positionBytes;
 
-    public static FlacTrackReader Open(string path)
-    {
-        var scan = new ScanCapture();
-        var stream = File.OpenRead(path);
-        try
-        {
-            return new FlacTrackReader(stream, scan);
-        }
-        catch
-        {
-            stream.Dispose();
-            throw;
-        }
-    }
+    /// <summary>Reads the FLAC stream in <paramref name="stream"/>, which the caller owns.</summary>
+    public static FlacTrackReader Open(Stream stream) => new(stream, new ScanCapture());
 
     private FlacTrackReader(Stream stream, ScanCapture scan)
         : base(stream, FlacPreScanMode.Sync, scan.Capture)

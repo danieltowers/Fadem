@@ -34,10 +34,10 @@ public sealed class PlaybackEngineRobustnessTests
     }
 
     [Fact]
-    public void FileThatFailsAfterPassingTheProbe_IsSkipped_WithOneNotice()
+    public void FileThatFailsAfterPassingTheProbe_IsPassedOver_WithOneNotice()
     {
         // The probe passed; the file vanished before play. Play-time failures are one notice
-        // and a skip, never a notice per block (ADR 0007).
+        // and the row is passed over, never a notice per block (ADR 0007, build issue 10).
         using var tc = TestEngine.Create();
         var a = TestAudio.WriteDcWav("a.wav", 1, 0.4);
         var b = TestAudio.WriteDcWav("b.wav", 2, 0.2);
