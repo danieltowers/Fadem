@@ -1,5 +1,6 @@
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;
+using Faderio.Core.Queue;
 using Faderio.Core.Transitions;
 
 namespace Faderio.App;
@@ -9,7 +10,8 @@ namespace Faderio.App;
 /// list (build issue 02), open a playlist or save the queue as one (build issue 03), a
 /// multi-select list whose rows drag to a new place (build issue 05), a context menu for "Edit
 /// transition (this → next)", Remove and Clear queue (build issue 04; Delete removes too),
-/// transport, a seek bar in milliseconds, and the transition editor. It renders
+/// transport with a shuffle toggle and a repeat button (build issue 07), a seek bar in
+/// milliseconds, and the transition editor. It renders
 /// <see cref="PlayerView"/>s and issues commands; it holds no engine state between calls (the
 /// placement rule in CLAUDE.md). The seek bar's Maximum is the track length
 /// in milliseconds, so no scaling exists to get wrong (ticket 06).
@@ -29,6 +31,9 @@ internal sealed class MainForm : Form
     internal readonly Button _playPause;
     internal readonly Button _stop;
     internal readonly Button _next;
+    internal readonly CheckBox _shuffle;
+    internal readonly CheckBox _repeat;
+    private readonly ToolTip _tips;
     internal readonly ToolStripStatusLabel _status;
     internal readonly ToolStripStatusLabel _addProgress;
     internal readonly ToolStripButton _cancelAdd;
@@ -78,6 +83,11 @@ internal sealed class MainForm : Form
         _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _stop = new Button { Text = "⏹", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _next = new Button { Text = "⏭", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
+        // Push buttons that stay pressed in while on. They never check themselves: what they
+        // show is always the view's, set in Render.
+        _shuffle = new CheckBox { Text = "🔀", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 44, Height = 28, Margin = new Padding(10, 8, 2, 4) };
+        _repeat = new CheckBox { Text = "🔁", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 44, Height = 28, Margin = new Padding(2, 8, 2, 4) };
+        _tips = new ToolTip();
         _seek = new TrackBar
         {
             Dock = DockStyle.Fill,
@@ -96,8 +106,8 @@ internal sealed class MainForm : Form
         };
         // A table, not anchors: the seek bar takes whatever width is left between the buttons
         // and the readout, at any window size.
-        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 6, RowCount = 1 };
-        foreach (var _ in Enumerable.Range(0, 4))
+        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 8, RowCount = 1 };
+        foreach (var _ in Enumerable.Range(0, 6))
         {
             transport.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         }
@@ -107,8 +117,10 @@ internal sealed class MainForm : Form
         transport.Controls.Add(_playPause, 1, 0);
         transport.Controls.Add(_stop, 2, 0);
         transport.Controls.Add(_next, 3, 0);
-        transport.Controls.Add(_seek, 4, 0);
-        transport.Controls.Add(_time, 5, 0);
+        transport.Controls.Add(_shuffle, 4, 0);
+        transport.Controls.Add(_repeat, 5, 0);
+        transport.Controls.Add(_seek, 6, 0);
+        transport.Controls.Add(_time, 7, 0);
 
         _queueList = new ListView
         {
@@ -198,6 +210,9 @@ internal sealed class MainForm : Form
         _prev.Click += (_, _) => _engine.Previous();
         _stop.Click += (_, _) => _engine.Stop();
         _next.Click += (_, _) => _engine.Next();
+        // The press asks for the state after the one the view holds now, not the one last shown.
+        _shuffle.Click += (_, _) => _engine.SetShuffle(!_engine.View.Shuffle);
+        _repeat.Click += (_, _) => _engine.SetRepeat(Presenter.NextRepeat(_engine.View.Repeat));
         _seek.MouseDown += (_, _) => _seekDragging = true;
         _seek.MouseUp += (_, _) =>
         {
@@ -215,6 +230,7 @@ internal sealed class MainForm : Form
         FormClosing += (_, _) =>
         {
             _timer.Stop();
+            _tips.Dispose();
             _engine.Dispose();
         };
 
@@ -232,6 +248,11 @@ internal sealed class MainForm : Form
             return;
         }
         _playPause.Text = Presenter.PlayPauseGlyph(view.Transport);
+        _shuffle.Checked = view.Shuffle;
+        _repeat.Checked = view.Repeat != RepeatMode.Off;
+        _repeat.Text = Presenter.RepeatGlyph(view.Repeat);
+        ShowTip(_shuffle, Presenter.ShuffleTip(view.Shuffle));
+        ShowTip(_repeat, Presenter.RepeatTip(view.Repeat));
 
         if (view.QueueVersion != _shownQueue)
         {
@@ -259,6 +280,15 @@ internal sealed class MainForm : Form
         _cancelAdd.Available = view.Adding is not null;
 
         _editor.Refresh(view);
+    }
+
+    /// <summary>Render runs on every tick, and resetting a tip that is showing would close it.</summary>
+    private void ShowTip(Control control, string tip)
+    {
+        if (_tips.GetToolTip(control) != tip)
+        {
+            _tips.SetToolTip(control, tip);
+        }
     }
 
     /// <summary>A background add publishes once per file, so rows the list already shows in

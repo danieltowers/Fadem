@@ -1,6 +1,6 @@
 # 07: Shuffle and repeat controls
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 06
 
 Decided in [What does queue management add?](../../202609-faderio-phase-1-restage/issues/12-what-does-queue-management-add.md) (Shuffle
@@ -26,9 +26,9 @@ work.
 
 ## Acceptance
 
-- [ ] The toggle and button show the view's state after every publication, including changes
+- [x] The toggle and button show the view's state after every publication, including changes
       made elsewhere.
-- [ ] Each press is exactly one engine call.
+- [x] Each press is exactly one engine call.
 
 ## Tests
 
@@ -38,3 +38,24 @@ work.
 
 - **Looks:** the shuffle and repeat controls read clearly in all states, including repeat-one.
 - **Sounds:** repeat-all wraps from the last track to the first through their adjacency.
+
+## Comments
+
+- Built 2026-09-24. Both controls are `CheckBox`es with `Appearance.Button` and
+  `AutoCheck = false`: pressed in while on, plain while off. They never check themselves;
+  `Render` sets them from the view, so a change made elsewhere shows on the next publication.
+- **A press reads the view, not the button.** Shuffle sends `SetShuffle(!View.Shuffle)`. Repeat
+  sends `SetRepeat(Presenter.NextRepeat(View.Repeat))`, both read at the moment of the press. A
+  stale button therefore cannot undo a change made elsewhere. ADR 0003 has an addendum adding
+  the cycle to the presenter's list.
+- **Repeat-one shows "🔁1", not 🔂.** In the Looks screenshot the "1" inside 🔂 could not be
+  read at 9 pt, so repeat-one looked like repeat-all. Off and all share 🔁 and differ by being
+  pressed in. The two buttons are 44 px wide to fit "🔁1".
+- **Tooltips** name each state ("Shuffle: on", "Repeat: one"). They are set only when the text
+  changes, because `Render` runs every 100 ms and re-setting a tip closes it.
+- **Tests:** four form tests: the state follows the view, including changes made through the
+  engine directly; each shuffle press and each repeat press is one publication with the right
+  state; and a press cycles from the view, not from what the button last showed. Presenter
+  tests cover the cycle, the glyphs and the tips.
+- **Smoke:** `docs/smoke.md` gains a Looks item for the two controls and a Sounds item for
+  repeat-all wrapping.

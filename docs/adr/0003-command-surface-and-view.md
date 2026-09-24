@@ -93,3 +93,12 @@ adding it, so it appends; there is no "replace the queue". `SaveAsPlaylist(path)
 visible order, taking the rows under the lock and writing the file off it, and reports how it
 went as a notice. **Open playlist…** and **Save as playlist…** are two file dialogs; the shell
 never reads a playlist or reads `View.Queue` to write one.
+
+## Addendum: the presenter picks the repeat button's next mode (2026-09-24)
+
+The shuffle toggle and the repeat button ([issue 07](../../.scratch/202609-faderio-phase-1-build/issues/07-shuffle-and-repeat-controls.md))
+are one command each, `SetShuffle(!View.Shuffle)` and `SetRepeat(next)`. The cycle *off → all →
+one* is a display choice over the enum, not engine arithmetic, so `Presenter.NextRepeat` picks
+the next mode from the one the view holds when the button is pressed. It joins the presenter's
+list, with the glyph and tooltip for each state. The buttons read the view when pressed, not
+the state they last showed, so a change made elsewhere is never undone by a stale button.

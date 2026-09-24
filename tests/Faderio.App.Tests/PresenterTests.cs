@@ -84,6 +84,31 @@ public sealed class PresenterTests
     }
 
     [Theory]
+    [InlineData(RepeatMode.Off, RepeatMode.All)]
+    [InlineData(RepeatMode.All, RepeatMode.One)]
+    [InlineData(RepeatMode.One, RepeatMode.Off)]
+    public void NextRepeat_CyclesOffAllOne(RepeatMode shown, RepeatMode next) =>
+        Assert.Equal(next, Presenter.NextRepeat(shown));
+
+    [Fact]
+    public void RepeatOne_HasItsOwnGlyph_AndEachModeIsNamed()
+    {
+        Assert.Equal("🔁", Presenter.RepeatGlyph(RepeatMode.Off));
+        Assert.Equal("🔁", Presenter.RepeatGlyph(RepeatMode.All));
+        Assert.Equal("🔁1", Presenter.RepeatGlyph(RepeatMode.One));
+        Assert.Equal("Repeat: off", Presenter.RepeatTip(RepeatMode.Off));
+        Assert.Equal("Repeat: all", Presenter.RepeatTip(RepeatMode.All));
+        Assert.Equal("Repeat: one", Presenter.RepeatTip(RepeatMode.One));
+    }
+
+    [Fact]
+    public void ShuffleTip_NamesTheState()
+    {
+        Assert.Equal("Shuffle: on", Presenter.ShuffleTip(true));
+        Assert.Equal("Shuffle: off", Presenter.ShuffleTip(false));
+    }
+
+    [Theory]
     [InlineData("", AudioOutputMode.WasapiShared)]
     [InlineData("--output=wasapi-shared", AudioOutputMode.WasapiShared)]
     [InlineData("--output=wasapi-exclusive", AudioOutputMode.WasapiExclusive)]

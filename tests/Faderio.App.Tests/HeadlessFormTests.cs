@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 using Faderio.App;
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;
+using Faderio.Core.Queue;
 using Faderio.Core.Tests;
 using Faderio.Core.Transitions;
 
@@ -65,7 +66,7 @@ public sealed class HeadlessFormTests
 
     /// <summary>Fires the control's own click handler. <c>PerformClick</c> refuses on a form that
     /// was never shown, and showing one is the thing a headless test must not do.</summary>
-    private static void Click(Button button)
+    private static void Click(ButtonBase button)
     {
         Assert.True(button.Enabled, $"{button.Text} is disabled");
         var onClick = typeof(Control).GetMethod("OnClick", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -619,5 +620,74 @@ public sealed class HeadlessFormTests
         DropAt(list, DragSelectedRows(h.Form), new System.Drawing.Point(right, UpperHalfOf(list, 1).Y));
 
         Assert.Equal(new[] { paths[0], paths[2], paths[1] }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
+    });
+
+    [Fact]
+    public void ShuffleAndRepeat_ShowTheViewsState_IncludingChangesMadeElsewhere() => RunSta(() =>
+    {
+        using var h = new Harness();
+        Assert.False(h.Form._shuffle.Checked);
+        Assert.False(h.Form._repeat.Checked);
+        Assert.Equal("🔁", h.Form._repeat.Text);
+
+        // Not through the form: the published view is what the controls follow.
+        h.Engine.SetShuffle(true);
+        h.Engine.SetRepeat(RepeatMode.One);
+
+        Assert.True(h.Form._shuffle.Checked);
+        Assert.True(h.Form._repeat.Checked);
+        Assert.Equal("🔁1", h.Form._repeat.Text);
+
+        h.Engine.SetRepeat(RepeatMode.All);
+        Assert.True(h.Form._repeat.Checked);
+        Assert.Equal("🔁", h.Form._repeat.Text);
+
+        h.Engine.SetShuffle(false);
+        h.Engine.SetRepeat(RepeatMode.Off);
+        Assert.False(h.Form._shuffle.Checked);
+        Assert.False(h.Form._repeat.Checked);
+    });
+
+    [Fact]
+    public void EachShufflePress_IsOneCall_ThatFlipsIt() => RunSta(() =>
+    {
+        using var h = new Harness();
+
+        foreach (var expected in new[] { true, false, true })
+        {
+            var before = h.Engine.View.Version;
+            Click(h.Form._shuffle);
+            Assert.Equal(expected, h.Engine.View.Shuffle);
+            Assert.Equal(before + 1, h.Engine.View.Version); // one publication: one call
+            Assert.Equal(expected, h.Form._shuffle.Checked);
+        }
+    });
+
+    [Fact]
+    public void EachRepeatPress_IsOneCall_CyclingOffAllOne() => RunSta(() =>
+    {
+        using var h = new Harness();
+
+        foreach (var expected in new[] { RepeatMode.All, RepeatMode.One, RepeatMode.Off, RepeatMode.All })
+        {
+            var before = h.Engine.View.Version;
+            Click(h.Form._repeat);
+            Assert.Equal(expected, h.Engine.View.Repeat);
+            Assert.Equal(before + 1, h.Engine.View.Version);
+            Assert.Equal(Presenter.RepeatGlyph(expected), h.Form._repeat.Text);
+            Assert.Equal(expected != RepeatMode.Off, h.Form._repeat.Checked);
+        }
+    });
+
+    [Fact]
+    public void ARepeatPress_CyclesFromWhatTheViewSays_NotFromWhatTheButtonLastShowed() => RunSta(() =>
+    {
+        using var h = new Harness();
+        Click(h.Form._repeat);             // off → all
+        h.Engine.SetRepeat(RepeatMode.One); // changed elsewhere
+
+        Click(h.Form._repeat);
+
+        Assert.Equal(RepeatMode.Off, h.Engine.View.Repeat);
     });
 }

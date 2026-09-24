@@ -1,6 +1,7 @@
 using System.Globalization;
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;
+using Faderio.Core.Queue;
 using Faderio.Core.Settings;
 using Faderio.Core.Transitions;
 
@@ -17,11 +18,11 @@ internal sealed record SecondsField(Point? Point, string? Error)
 
 /// <summary>
 /// The shell's remaining logic, with no WinForms in it (ADR 0002, S4). Ticket 06's list, amended
-/// by build issue 01:
-/// format and parse seconds, row → adjacency with its bounds check, the add's progress, the
-/// store open/recovery path, and the launch-time output mode. The add's outcome is an engine
-/// notice since build issue 01, so its summary moved to <see cref="AddReport"/>. Everything here formats engine
-/// values or parses text; nothing computes a position.
+/// by build issues 01 and 07: format and parse seconds, row → adjacency with its bounds check,
+/// the add's progress, the store open/recovery path, the launch-time output mode, and the repeat
+/// button's cycle. The add's outcome is an engine notice since build issue 01, so its summary
+/// moved to <see cref="AddReport"/>. Everything here formats engine values, parses text, or picks
+/// the next state of a display control (ADR 0003's addendum); nothing computes a position.
 /// </summary>
 internal static class Presenter
 {
@@ -86,6 +87,28 @@ internal static class Presenter
         adding is null ? "" : $"Adding {adding.Resolved} of {adding.Total}…";
 
     public static string PlayPauseGlyph(Transport transport) => transport == Transport.Playing ? "⏸" : "▶";
+
+    /// <summary>The mode a press of the repeat button asks for: off → all → one → off. A display
+    /// choice over the enum (build issue 07), so it lives here, not in the engine.</summary>
+    public static RepeatMode NextRepeat(RepeatMode shown) => shown switch
+    {
+        RepeatMode.Off => RepeatMode.All,
+        RepeatMode.All => RepeatMode.One,
+        _ => RepeatMode.Off,
+    };
+
+    /// <summary>Off and all share a glyph and differ by the button being pressed in. Repeat-one
+    /// adds a plain "1": the "1" inside 🔂 cannot be read at button size.</summary>
+    public static string RepeatGlyph(RepeatMode mode) => mode == RepeatMode.One ? "🔁1" : "🔁";
+
+    public static string RepeatTip(RepeatMode mode) => mode switch
+    {
+        RepeatMode.All => "Repeat: all",
+        RepeatMode.One => "Repeat: one",
+        _ => "Repeat: off",
+    };
+
+    public static string ShuffleTip(bool shuffle) => shuffle ? "Shuffle: on" : "Shuffle: off";
 
     /// <summary>"--output=wasapi-shared|wasapi-exclusive|waveout"; shared by default (ticket 05:
     /// selectable by argument, no settings dialog).</summary>
