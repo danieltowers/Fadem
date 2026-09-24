@@ -237,11 +237,14 @@ public sealed class NAudioAudioOutput : IAudioOutput
             {
                 return;
             }
+            // A clean stop is always one this output asked for, and Stop already set the state.
+            // It is posted to the UI thread, so it can arrive after a Play that followed the Stop
+            // in the same command (a preview starting, build issue 16): it must not stop that.
             if (args.Exception is not null)
             {
                 _heardAtFailure = MeasureHeard().Count;
+                _state = Transport.Stopped;
             }
-            _state = Transport.Stopped;
             Stopped?.Invoke(args.Exception);
         };
         _latencyMs = latencyMs;

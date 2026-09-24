@@ -20,7 +20,15 @@ public sealed partial class PlaybackEngine
                 return;
             }
             _outputLost = true;
-            LandAfterOutputLoss();
+            if (_preview is not null)
+            {
+                EndPreview(); // the held queue stays paused where it was held
+                RaiseNotice(TransportNow == Transport.Paused
+                    ? $"Audio output lost ({error.Message}). The preview ended; the queue stays paused where it was held."
+                    : $"Audio output lost ({error.Message}). The preview ended.");
+                return;
+            }
+            ParkWhereHeard();
             RaiseNotice(TransportNow == Transport.Paused
                 ? $"Audio output lost ({error.Message}). Playback is paused; press Play to resume."
                 : $"Audio output lost ({error.Message}). Press Play to try again.");
@@ -33,25 +41,26 @@ public sealed partial class PlaybackEngine
     /// playhead, so a hard cut or a last track's tail still in the device buffer is not lost.
     /// Mid-transition it is the incoming track, as a skip would land. A track that cannot be
     /// opened again is passed over to the next readable row, from its start.</summary>
-    private void LandAfterOutputLoss()
+    private void ParkWhereHeard()
     {
         ObserveClock(); // a handover or an end the listener already heard
         var view = View;
         var heard = view.Incoming ?? view.Attended;
         var index = heard is null ? -1 : _queue.IndexOf(heard.Row.Id);
         ResetForRestart();
-        StopLostOutput();
+        StopOutputOrNotice();
         if (index < 0 || OpenFirstReadable(index, RowAfter, retryMarked: true) is not { } landing)
         {
             return; // nothing was playing, or nothing is readable: stopped
         }
         StartTrack(landing, 0, null, from: landing.Index == index ? heard!.Playhead.Frames(_rate) : 0);
+        _parked = true;
     }
 
-    /// <summary>Stops the failed device, so its emitted count returns to the timeline's zero.
-    /// Stopping a device that has gone can fail too; that is a notice, never an exception out of
-    /// the device's event.</summary>
-    private void StopLostOutput()
+    /// <summary>Stops the device, so its emitted count returns to the timeline's zero. Stopping a
+    /// device that has gone can fail too; that is a notice, never an exception out of the
+    /// device's event or a render.</summary>
+    private void StopOutputOrNotice()
     {
         try
         {
@@ -68,6 +77,16 @@ public sealed partial class PlaybackEngine
     /// and the engine keeps its rate (ADR 0008): the notice suggests a restart.</summary>
     private void PlayOutput()
     {
+        if (StartDevice())
+        {
+            _parked = false;
+        }
+    }
+
+    /// <summary>Starts the device for the queue or a preview, reopening a lost one first. False,
+    /// with a notice, when there is no device.</summary>
+    private bool StartDevice()
+    {
         if (_outputLost)
         {
             var deviceRate = 0;
@@ -78,7 +97,7 @@ public sealed partial class PlaybackEngine
             catch (Exception e)
             {
                 RaiseNotice($"No audio output device to play on ({e.Message}). Playback stays paused.");
-                return;
+                return false;
             }
             _outputLost = false;
             if (deviceRate != _rate)
@@ -89,5 +108,6 @@ public sealed partial class PlaybackEngine
             }
         }
         _output.Play();
+        return true;
     }
 }

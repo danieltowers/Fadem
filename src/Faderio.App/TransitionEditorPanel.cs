@@ -22,7 +22,8 @@ internal enum UnsavedEdits
 /// its source of truth: v2 formatted the capture with "0.###" before saving it and quantised
 /// every point to a millisecond (ticket 06). The fields are a draft; the engine converts,
 /// captures and validates, and each value it refuses is shown beside its field. Leaving a draft
-/// that differs from what is stored asks Save / Discard / Cancel (build issue 15).
+/// that differs from what is stored asks Save / Discard / Cancel (build issue 15). Preview plays
+/// the draft on its own voices while the queue is held, and shows where it is (build issue 16).
 /// </summary>
 internal sealed class TransitionEditorPanel : Panel
 {
@@ -45,6 +46,9 @@ internal sealed class TransitionEditorPanel : Panel
     internal readonly Button _revert;
     internal readonly Button _remove;
     internal readonly Button _render;
+    internal readonly Button _preview;
+    internal readonly Button _stopPreview;
+    internal readonly Label _previewStatus;
     private readonly Dictionary<TransitionField, Label> _reasons = new();
 
     private Adjacency? _adjacency;
@@ -117,6 +121,14 @@ internal sealed class TransitionEditorPanel : Panel
         _revert = new Button { Text = "Revert", Width = 72, Height = 32, Enabled = false };
         _remove = new Button { Text = "Remove transition", Width = 124, Height = 32, Enabled = false };
         _render = new Button { Text = "Render this boundary", Width = 160, Height = 32, Enabled = false };
+        _preview = new Button { Text = "Preview", Width = 110, Height = 32, Enabled = false };
+        _stopPreview = new Button { Text = "Stop preview", Width = 110, Height = 32, Enabled = false };
+        ButtonRow(layout, ref row, _preview, _stopPreview);
+        _previewStatus = new Label { AutoSize = true, MaximumSize = new Size(300, 0), Margin = new Padding(3, 0, 3, 8) };
+        layout.Controls.Add(_previewStatus, 0, row);
+        layout.SetColumnSpan(_previewStatus, 2);
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        row++;
         ButtonRow(layout, ref row, _save, _revert, _remove);
         ButtonRow(layout, ref row, _render);
 
@@ -126,6 +138,8 @@ internal sealed class TransitionEditorPanel : Panel
         _revert.Click += (_, _) => Revert();
         _remove.Click += (_, _) => Remove();
         _render.Click += (_, _) => Render();
+        _preview.Click += (_, _) => Preview();
+        _stopPreview.Click += (_, _) => _engine.StopPreview();
         _fadeOutFromEnd.CheckedChanged += (_, _) => { if (!_loading) MeasureFadeOutFromOtherEnd(); };
         _fadeOutPoint.TextChanged += (_, _) => { if (_fadeOutPoint.Text != Presenter.FmtSeconds(_fadeOut)) _fadeOut = null; };
         _fadeInPoint.TextChanged += (_, _) => { if (_fadeInPoint.Text != Presenter.FmtSeconds(_fadeIn)) _fadeIn = null; };
@@ -188,12 +202,16 @@ internal sealed class TransitionEditorPanel : Panel
 
     /// <summary>Opens the editor on an adjacency, loading what is authored for it, once any
     /// unsaved edits to the one open now are saved or discarded. Reopening the adjacency already
-    /// open keeps its draft.</summary>
+    /// open keeps its draft. Opening another one ends a running preview.</summary>
     public void Open(Adjacency adjacency)
     {
         if ((adjacency == _adjacency && HasUnsavedEdits) || !ConfirmLeave())
         {
             return;
+        }
+        if (adjacency != _adjacency)
+        {
+            _engine.StopPreview();
         }
         Load(adjacency);
     }
@@ -252,26 +270,54 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeOutDuration.Text = Presenter.FmtSeconds(spec?.FadeOutDuration);
         _fadeInDuration.Text = Presenter.FmtSeconds(spec?.FadeInDuration);
         ShowReasons([]);
-        foreach (var control in new Control[] { _fadeOutFromEnd, _curve, _save, _revert, _remove, _render })
+        foreach (var control in new Control[] { _fadeOutFromEnd, _curve, _save, _revert, _remove, _render, _preview })
         {
             control.Enabled = true;
         }
     }
 
-    /// <summary>Called on every render: the capture buttons live only while a voice is attended.</summary>
+    /// <summary>Called on every render: the capture buttons live only while a voice is attended
+    /// or a preview runs, and the preview's buttons and line follow the preview.</summary>
     public void Refresh(PlayerView view)
     {
-        var canCapture = _adjacency is not null && view.Attended is not null;
+        var canCapture = _adjacency is not null && (view.Attended is not null || view.Preview is not null);
         _captureOut.Enabled = canCapture;
         _captureIn.Enabled = canCapture;
+        _preview.Text = view.Preview is null ? "Preview" : "Preview again";
+        _stopPreview.Enabled = view.Preview is not null;
+        _previewStatus.Text = Presenter.FmtPreview(view.Preview);
     }
 
-    internal void CaptureFadeOut() => ShowFadeOut(_engine.Capture(fromEnd: _fadeOutFromEnd.Checked));
+    /// <summary>A capture that captured nothing leaves the field as it was; the engine says why.</summary>
+    internal void CaptureFadeOut()
+    {
+        if (_engine.Capture(CaptureSide.FadeOut, fromEnd: _fadeOutFromEnd.Checked) is { } point)
+        {
+            ShowFadeOut(point);
+        }
+    }
 
     internal void CaptureFadeIn()
     {
-        _fadeIn = _engine.Capture();
-        _fadeInPoint.Text = Presenter.FmtSeconds(_fadeIn);
+        if (_engine.Capture(CaptureSide.FadeIn) is { } point)
+        {
+            _fadeIn = point;
+            _fadeInPoint.Text = Presenter.FmtSeconds(point);
+        }
+    }
+
+    /// <summary>Previews the draft as it stands, or restarts a running preview with it. Text that
+    /// is not a number previews nothing, as it saves nothing.</summary>
+    internal void Preview()
+    {
+        if (_adjacency is null)
+        {
+            return;
+        }
+        if (ParsedDraft("Not previewed") is { } spec)
+        {
+            ShowReasons(_engine.Preview(_adjacency, spec));
+        }
     }
 
     /// <summary>From-end ticked or unticked: the same moment, measured from the other end. The
@@ -298,14 +344,24 @@ internal sealed class TransitionEditorPanel : Panel
         {
             return;
         }
+        if (ParsedDraft("Not saved") is { } spec)
+        {
+            ShowReasons(_engine.Author(_adjacency, spec)); // saved or not, the engine says which
+        }
+    }
+
+    /// <summary>The draft, or null when a field is not a number: then its reason is shown beside
+    /// it, and the strip says the <paramref name="outcome"/> and why.</summary>
+    private TransitionSpec? ParsedDraft(string outcome)
+    {
         var (spec, unparsed) = Draft();
         ShowReasons(unparsed);
         if (unparsed.Count > 0)
         {
-            _notice("Not saved: " + string.Join(" ", unparsed.Select(r => r.Reason)));
-            return;
+            _notice($"{outcome}: " + string.Join(" ", unparsed.Select(r => r.Reason)));
+            return null;
         }
-        ShowReasons(_engine.Author(_adjacency, spec)); // saved or not, the engine says which
+        return spec;
     }
 
     /// <summary>The fields as the spec Save would author, and the fields whose text is not a

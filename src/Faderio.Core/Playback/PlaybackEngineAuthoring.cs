@@ -6,23 +6,47 @@ public sealed partial class PlaybackEngine
 {
     // ── Authoring ────────────────────────────────────────────────────────────────────────
 
-    /// <summary>The attended voice's playhead as a point: the only sound→point path. Returns the
-    /// same value <c>View.Attended.Playhead</c> would have at this instant, unquantised. With
-    /// <paramref name="fromEnd"/>, the point is measured from the end of the attended track:
-    /// <c>Length − playhead</c>, for a from-end fade-out point (build issue 14). Null when
-    /// nothing is playing.</summary>
-    public Point? Capture(bool fromEnd = false)
+    /// <summary>A playhead as a point for <paramref name="side"/>: the only sound→point path.
+    /// Returns the same value the view's playhead would have at this instant, unquantised: the
+    /// attended voice's, or during a preview the preview's own voice for that side, the outgoing
+    /// one for a fade-out point and the incoming one for a fade-in point (build issue 16). With
+    /// <paramref name="fromEnd"/>, the point is measured from the end of that voice's track:
+    /// <c>Length − playhead</c>, for a from-end fade-out point (build issue 14). Null when nothing
+    /// is playing; during a preview, null with a notice saying why when that side's voice is not
+    /// heard.</summary>
+    public Point? Capture(CaptureSide side, bool fromEnd = false)
     {
         ThrowIfDisposed();
         return Run(() =>
         {
             ObserveClock();
-            if (View.Attended is not { } attended)
+            var view = View;
+            Playhead playhead;
+            Track track;
+            if (view.Preview is { } preview)
             {
-                return (Point?)null;
+                var outgoing = side == CaptureSide.FadeOut;
+                if ((outgoing ? preview.Outgoing : preview.Incoming) is not { } heard)
+                {
+                    RaiseNotice(outgoing
+                        ? "Nothing captured: the preview's outgoing track has fallen silent."
+                        : _preview?.IncomingEndedAt is null
+                            ? "Nothing captured: the preview's incoming track has not started yet."
+                            : "Nothing captured: the preview's incoming track has ended.");
+                    return (Point?)null;
+                }
+                (playhead, track) = (heard, outgoing ? preview.Adjacency.Outgoing : preview.Adjacency.Incoming);
             }
-            var point = Point.FromTimeSpan(attended.Playhead.TimeSpan);
-            return fromEnd ? MeasuredFromOtherEnd(attended.Row.Track, point) : point;
+            else if (view.Attended is { } attended)
+            {
+                (playhead, track) = (attended.Playhead, attended.Row.Track);
+            }
+            else
+            {
+                return null;
+            }
+            var point = Point.FromTimeSpan(playhead.TimeSpan);
+            return fromEnd ? MeasuredFromOtherEnd(track, point) : point;
         });
     }
 

@@ -1548,4 +1548,130 @@ public sealed class HeadlessFormTests
             File.SetAttributes(path, FileAttributes.Normal);
         }
     });
+
+    // ── Build issue 16: preview ─────────────────────────────────────────────────────────
+
+    /// <summary>Three DC tracks queued, 5 s each, with the editor open on alpha → beta and a
+    /// draft that fades out at 3 s.</summary>
+    private static (string A, string B, string C) EditingADraft(Harness h)
+    {
+        var rows = ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+        Fill(h.Form._editor, "3", "1", "0", "1");
+        h.Form.Render();
+        return rows;
+    }
+
+    [Fact]
+    public void Preview_PreviewAgain_AndStopPreview_AreTheEditorsButtons_WithThePreviewShownBesideThem() => RunSta(() =>
+    {
+        using var h = new Harness();
+        EditingADraft(h);
+        var editor = h.Form._editor;
+        Assert.Equal("Preview", editor._preview.Text);
+        Assert.False(editor._stopPreview.Enabled);
+        Assert.Equal("", editor._previewStatus.Text);
+
+        Click(editor._preview);
+        h.Output.Advance(44100);
+        h.Form.Render();
+
+        Assert.Equal("Preview again", editor._preview.Text);
+        Assert.True(editor._stopPreview.Enabled);
+        Assert.Equal("Pre-roll · outgoing 0:01", editor._previewStatus.Text);
+
+        h.Output.Advance(2 * 44100 + 22050); // half a second into the fade at 3 s
+        h.Form.Render();
+        Assert.Equal("Transition · outgoing 0:03 · incoming 0:00", editor._previewStatus.Text);
+
+        Click(editor._stopPreview);
+        h.Form.Render();
+
+        Assert.Null(h.Engine.View.Preview);
+        Assert.Equal("Preview", editor._preview.Text);
+        Assert.False(editor._stopPreview.Enabled);
+        Assert.Equal("", editor._previewStatus.Text);
+    });
+
+    [Fact]
+    public void Preview_IsDisabledWithNoAdjacencyOpen() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Form.Render();
+
+        Assert.False(h.Form._editor._preview.Enabled);
+        Assert.False(h.Form._editor._stopPreview.Enabled);
+    });
+
+    [Fact]
+    public void TheMainWindow_ShowsTheQueueHeld_WhileAPreviewRuns() => RunSta(() =>
+    {
+        using var h = new Harness();
+        EditingADraft(h);
+        h.Form.PlayRowAt(0);
+        h.Output.Advance(44100);
+        h.Form.Render();
+        Assert.Equal("0:01 / -0:04", h.Form._time.Text);
+
+        Click(h.Form._editor._preview);
+        h.Output.Advance(2 * 44100);
+        h.Form.Render();
+
+        Assert.Equal("Held 0:01 / -0:04", h.Form._time.Text);
+        Assert.Equal("▶", h.Form._playPause.Text);
+
+        Click(h.Form._editor._stopPreview);
+        h.Form.Render();
+
+        Assert.Equal("0:01 / -0:04", h.Form._time.Text); // paused where it was held
+        Assert.Equal("▶", h.Form._playPause.Text);
+    });
+
+    [Fact]
+    public void Preview_WithTextThatIsNotANumber_PreviewsNothing_AndSaysWhy() => RunSta(() =>
+    {
+        using var h = new Harness();
+        EditingADraft(h);
+        h.Form._editor._fadeOutDuration.Text = "soon";
+
+        Click(h.Form._editor._preview);
+
+        Assert.Null(h.Engine.View.Preview);
+        Assert.StartsWith("Not previewed", h.Form._status.Text);
+        Assert.True(IsSetVisible(h.Form._editor.ReasonFor(TransitionField.FadeOutDuration)));
+    });
+
+    [Fact]
+    public void CaptureFadeIn_BeforeThePreviewsIncomingTrackStarts_LeavesTheField_AndSaysWhy() => RunSta(() =>
+    {
+        using var h = new Harness();
+        EditingADraft(h);
+        h.Form._editor._fadeInPoint.Text = "0.5";
+        Click(h.Form._editor._preview);
+        h.Output.Advance(44100);
+        h.Form.Render();
+
+        Click(h.Form._editor._captureIn);
+
+        Assert.Equal("0.5", h.Form._editor._fadeInPoint.Text);
+        Assert.Contains("has not started yet", h.Form._status.Text);
+    });
+
+    [Fact]
+    public void OpeningAnotherAdjacency_EndsThePreview_OnceTheUnsavedEditsAreSettled() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (_, b, c) = EditingADraft(h);
+        Click(h.Form._editor._preview);
+        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Cancel;
+
+        h.Form.EditTransitionAt(1);
+        Assert.NotNull(h.Engine.View.Preview); // cancelled: still on alpha → beta, still previewing
+
+        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Discard;
+        h.Form.EditTransitionAt(1);
+
+        Assert.Equal((b, c), Opened(h));
+        Assert.Null(h.Engine.View.Preview);
+    });
 }

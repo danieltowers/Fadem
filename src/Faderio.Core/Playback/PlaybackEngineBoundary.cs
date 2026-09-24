@@ -42,27 +42,39 @@ public sealed partial class PlaybackEngine
             _prepared = null;
             source = prepared.Source;
         }
+        else if (OpenTrackFile(entry.Track, out error) is { } opened)
+        {
+            source = opened;
+        }
         else
         {
-            try
-            {
-                source = NormalizedTrackSource.Wrap(TrackSources.Open(entry.Track.FilePath), _rate);
-            }
-            catch (Exception e)
-            {
-                error = e.Message;
-                SetUnreadable(entry, true);
-                return null;
-            }
-            if (source.TotalFrames <= 0)
-            {
-                source.Dispose();
-                error = "the file contains no audio.";
-                SetUnreadable(entry, true);
-                return null;
-            }
+            SetUnreadable(entry, true);
+            return null;
         }
         SetUnreadable(entry, false);
+        return source;
+    }
+
+    /// <summary>The track's file opened at the engine rate, or null with why it cannot be read.</summary>
+    private ITrackSource? OpenTrackFile(Track track, out string error)
+    {
+        error = "";
+        ITrackSource source;
+        try
+        {
+            source = NormalizedTrackSource.Wrap(TrackSources.Open(track.FilePath), _rate);
+        }
+        catch (Exception e)
+        {
+            error = e.Message;
+            return null;
+        }
+        if (source.TotalFrames <= 0)
+        {
+            source.Dispose();
+            error = "the file contains no audio.";
+            return null;
+        }
         return source;
     }
 
@@ -125,20 +137,30 @@ public sealed partial class PlaybackEngine
     {
         var (index, source) = opened;
         var entry = _queue.Entries[index];
-        var track = entry.Track;
-        var sourceStart = Math.Clamp(
-            from ?? (spawn is null ? 0 : Frames(spawn.FadeInPoint)), 0, Math.Max(source.TotalFrames - 1, 0));
-        var fadeInFrames = spawn is null ? 0 : Math.Max(0, Frames(spawn.FadeInDuration));
-
-        var voice = _mixer.AddVoice(
-            source, timelineStart, sourceStart, BaseGain(track),
-            fadeInFrames, spawn?.Curve ?? FadeCurveKind.EqualPower);
-        voice.LengthFrames = track.Length.Frames(_rate) > 0 ? track.Length.Frames(_rate) : source.TotalFrames;
+        var voice = AddTrackVoice(_mixer, source, entry.Track, timelineStart, spawn, from);
         _voiceEntry[voice] = entry;
         _queue.SetCurrent(index);
         BecomeCurrent(voice, audibleAt ?? timelineStart);
-        ScheduleBoundary(index, voice, timelineStart, sourceStart, retryMarked: true);
+        ScheduleBoundary(index, voice, timelineStart, voice.SourceStart, retryMarked: true);
         Publish();
+    }
+
+    /// <summary>A track's voice on <paramref name="mixer"/>, as every boundary starts one: from its
+    /// fade-in point with the authored fade-in, or from <paramref name="from"/> at full volume, at
+    /// its ReplayGain, its playhead bounded by its length. The queue's voices and a preview's
+    /// (build issue 16) both start here.</summary>
+    private MixerVoice AddTrackVoice(
+        TransitionMixer mixer, ITrackSource source, Track track, long timelineStart, TransitionSpawn? spawn,
+        long? from = null)
+    {
+        var sourceStart = Math.Clamp(
+            from ?? (spawn is null ? 0 : Frames(spawn.FadeInPoint)), 0, Math.Max(source.TotalFrames - 1, 0));
+        var fadeInFrames = spawn is null ? 0 : Math.Max(0, Frames(spawn.FadeInDuration));
+        var voice = mixer.AddVoice(
+            source, timelineStart, sourceStart, BaseGain(track),
+            fadeInFrames, spawn?.Curve ?? FadeCurveKind.EqualPower);
+        voice.LengthFrames = track.Length.Frames(_rate) > 0 ? track.Length.Frames(_rate) : source.TotalFrames;
+        return voice;
     }
 
     private double BaseGain(Track track)
@@ -247,9 +269,7 @@ public sealed partial class PlaybackEngine
     private void Crossfade(
         MixerVoice outgoing, long start, long fadeFrames, FadeCurveKind curve, OpenedTrack incoming, TransitionSpawn spawn)
     {
-        outgoing.FadeOutStart = start;
-        outgoing.FadeOutFrames = fadeFrames;
-        outgoing.FadeOutCurve = curve;
+        outgoing.BeginFadeOut(start, fadeFrames, curve);
         _outgoingVoice = outgoing;
         // The listener attends to the outgoing voice until it falls silent (ADR 0001).
         StartTrack(incoming, start, spawn, audibleAt: start + fadeFrames);
@@ -345,7 +365,7 @@ public sealed partial class PlaybackEngine
         }
         if (entry is not null)
         {
-            NoticeEarlyEnd(delivered, entry, voice.DecodeError);
+            NoticeEarlyEnd(delivered, entry.Track, voice.DecodeError);
         }
         if (voice == _outgoingVoice)
         {
@@ -400,21 +420,21 @@ public sealed partial class PlaybackEngine
     /// <summary>Audio that ends before the issued length says it should (a truncated file, a
     /// lying header) is one notice; the track ends where the audio ends (ADR 0010). A decode
     /// error mid-track is the same: one notice, and the track ends where it happened.</summary>
-    private void NoticeEarlyEnd(long delivered, QueueEntry entry, Exception? decodeError)
+    private void NoticeEarlyEnd(long delivered, Track track, Exception? decodeError)
     {
         if (decodeError is not null)
         {
             RaiseNotice(
-                $"\"{Path.GetFileName(entry.Track.FilePath)}\" could not be read past {TimeSpanOf(delivered).TotalSeconds:F1} s, so it ends there: {decodeError.Message}");
+                $"\"{Path.GetFileName(track.FilePath)}\" could not be read past {TimeSpanOf(delivered).TotalSeconds:F1} s, so it ends there: {decodeError.Message}");
             return;
         }
-        var claimed = entry.Track.Length.Frames(_rate);
+        var claimed = track.Length.Frames(_rate);
         var tolerance = Math.Max(1, _rate / 1000); // one millisecond
         if (claimed - delivered > tolerance)
         {
             var shortfall = TimeSpanOf(claimed - delivered);
             RaiseNotice(
-                $"\"{Path.GetFileName(entry.Track.FilePath)}\" ends {shortfall.TotalSeconds:F1} s before its header claims.");
+                $"\"{Path.GetFileName(track.FilePath)}\" ends {shortfall.TotalSeconds:F1} s before its header claims.");
         }
     }
 
@@ -539,13 +559,9 @@ public sealed partial class PlaybackEngine
         _outgoingVoice = null;
         _attendedVoice = null;
         _handoverAt = null;
-        try
+        if (_preview is null) // a preview's device plays on: rows removed do not stop it
         {
-            StopOutput();
-        }
-        catch (Exception e)
-        {
-            RaiseNotice($"Audio output error: {e.Message}");
+            StopOutputOrNotice();
         }
         Publish();
     }
@@ -566,5 +582,7 @@ public sealed partial class PlaybackEngine
         _pendingBoundary = null;
         _finished = false;
         _finishAt = null;
+        _parked = false;
+        _queueBase = 0;
     }
 }

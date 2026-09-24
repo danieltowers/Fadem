@@ -174,3 +174,26 @@ and a save the store could not write still counts as unsaved. The engine owns th
 decide it: a blank draft stores nothing, and a missing curve is equal-power. So that an
 untouched draft compares equal, the editor loads a stored point exactly through
 `FadePointSpec.Point`, not through seconds, which can lose a tick.
+
+## Addendum: preview is two commands and one field, and capture names its side (2026-09-24)
+
+`Preview(adjacency, draft)` starts a preview, or restarts a running one, and `StopPreview()`
+ends it ([issue 16](../../.scratch/202609-faderio-phase-1-build/issues/16-preview.md)). Each is
+one user intent. The draft is resolved as the engine resolves a stored transition and played
+with the queue's boundary pieces (resolution, fade computation, voices and fades) on a second
+pair of voices, on the one output; a test holds its samples equal to a render. The queue is
+held exactly where it was, by no longer reading its mixer, so a transition in flight is held
+too. `Preview` refuses impossible values as `Author` does and returns them. `PlayerView.Preview` is null
+unless a preview runs; it carries the adjacency, the phase and each preview voice's playhead.
+`Attended`, `Incoming` and `Transport` stay the queue's, so the main window shows the held
+queue, paused, and marks it held because `Preview` is set. The shell keeps no preview state:
+Preview again, the phase line and the held marker are all read from the view. The presenter
+gains `TimeReadout`, the main window's readout with its "Held" mark, and `FmtPreview`, the
+editor's line naming the phase and each voice's playhead.
+
+`Capture(side, fromEnd)` takes a `CaptureSide`. Outside a preview both sides read the attended
+voice, as before. During one, the fade-out point reads the preview's outgoing voice and the
+fade-in point its incoming voice. When that voice is not heard, the capture returns nothing and
+the engine says why in a notice, so the editor leaves the field as it was. That is the one
+no-op here without a view flag, by the issue's own wording ("does nothing and says why"): the
+capture buttons stay live through a preview, so a capture a moment early is told, not hidden.

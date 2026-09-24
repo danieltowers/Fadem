@@ -131,7 +131,7 @@ internal sealed class MainForm : Form
         _time = new Label
         {
             Text = "0:00 / -0:00",
-            Width = 130,
+            Width = 170,
             TextAlign = ContentAlignment.MiddleLeft,
             AutoSize = false,
             Dock = DockStyle.Fill,
@@ -144,7 +144,7 @@ internal sealed class MainForm : Form
             transport.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         }
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        transport.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+        transport.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
         transport.Controls.Add(_prev, 0, 0);
         transport.Controls.Add(_playPause, 1, 0);
         transport.Controls.Add(_stop, 2, 0);
@@ -337,9 +337,7 @@ internal sealed class MainForm : Form
         {
             _seek.Value = Math.Clamp(attended?.Playhead.Milliseconds ?? 0, _seek.Minimum, _seek.Maximum);
         }
-        _time.Text = attended is null
-            ? "0:00 / -0:00"
-            : $"{Presenter.Fmt(attended.Playhead)} / -{Presenter.FmtRemaining(attended.Remaining)}";
+        _time.Text = Presenter.TimeReadout(attended, held: view.Preview is not null);
 
         _addProgress.Text = Presenter.FmtAdding(view.Adding);
         _addProgress.Available = view.Adding is not null;

@@ -108,6 +108,33 @@ internal static class Presenter
 
     public static string PlayPauseGlyph(Transport transport) => transport == Transport.Playing ? "⏸" : "▶";
 
+    /// <summary>The main window's time readout for the attended voice, marked "Held" while a
+    /// preview holds the queue (build issue 16).</summary>
+    public static string TimeReadout(VoiceView? attended, bool held) =>
+        attended is null
+            ? "0:00 / -0:00"
+            : $"{(held ? "Held " : "")}{Fmt(attended.Playhead)} / -{FmtRemaining(attended.Remaining)}";
+
+    /// <summary>The editor's line for a running preview: its phase, and the playhead of each voice
+    /// heard. Blank with no preview.</summary>
+    public static string FmtPreview(PreviewView? preview)
+    {
+        if (preview is null)
+        {
+            return "";
+        }
+        var phase = preview.Phase switch
+        {
+            PreviewPhase.PreRoll => "Pre-roll",
+            PreviewPhase.Transition => "Transition",
+            _ => "Tail",
+        };
+        var voices = new[] { ("outgoing", preview.Outgoing), ("incoming", preview.Incoming) }
+            .Where(v => v.Item2 is not null)
+            .Select(v => $"{v.Item1} {Fmt(v.Item2!.Value)}");
+        return string.Join(" · ", voices.Prepend(phase));
+    }
+
     /// <summary>The mode a press of the repeat button asks for: off → all → one → off. A display
     /// choice over the enum (build issue 07), so it lives here, not in the engine.</summary>
     public static RepeatMode NextRepeat(RepeatMode shown) => shown switch

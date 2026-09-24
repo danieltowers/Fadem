@@ -24,6 +24,10 @@ public sealed partial class PlaybackEngine : IDisposable
     private readonly Random _rng;
     private readonly object _sync = new();
     private readonly TransitionMixer _mixer;
+
+    /// <summary>The preview's own voices (build issue 16), on the same output: the device reads
+    /// this mixer instead of the queue's while a preview runs, so the queue's stands still.</summary>
+    private readonly TransitionMixer _previewMixer;
     private readonly int _rate;
     private readonly PlaybackQueue _queue;
     private readonly List<QueueEntry> _originalOrder = new();
@@ -53,6 +57,15 @@ public sealed partial class PlaybackEngine : IDisposable
     /// <summary>The output failed on its own and has not been reopened: the next start reopens
     /// it (build issue 11).</summary>
     private bool _outputLost;
+
+    /// <summary>The queue is paused with a track to resume while the device is stopped: after
+    /// device loss, or after a preview held it (build issues 11 and 16).</summary>
+    private bool _parked;
+
+    /// <summary>The queue timeline frame the device's count starts from. Zero, as ADR 0001 has it,
+    /// except after a preview: the device stopped and its count returned to zero, but the queue
+    /// resumes from where it was held (build issue 16). Reset with the timeline.</summary>
+    private long _queueBase;
 
     /// <summary>The timeline frame after the last voice's last frame, while the device has yet
     /// to emit it: playback finishes when it has.</summary>
@@ -88,10 +101,12 @@ public sealed partial class PlaybackEngine : IDisposable
         _rng = rng ?? new Random();
         _rate = output.SampleRate;
         _mixer = new TransitionMixer(_rate);
+        _previewMixer = new TransitionMixer(_rate);
         _queue = new PlaybackQueue(_rng);
         _snapshot = BuildSnapshot();
 
         _mixer.VoiceEnded += OnVoiceEnded;
+        _previewMixer.VoiceEnded += OnPreviewVoiceEnded;
         _output.Stopped += OnOutputStopped;
         _output.Initialise(new EngineFrameSource(this));
 
@@ -121,6 +136,7 @@ public sealed partial class PlaybackEngine : IDisposable
             }
             _disposed = true;
             unanswered = EndAddRun(cancelled: true, notify: false);
+            ReleasePreview();
             ResetForRestart();
             _output.Stopped -= OnOutputStopped;
             HaltOutput(_output.Dispose);
@@ -253,7 +269,12 @@ public sealed partial class PlaybackEngine : IDisposable
     /// never behind what the listener hears by more than one call.</summary>
     private void ObserveClock()
     {
-        var emitted = _output.FramesEmitted.Count;
+        if (_preview is not null)
+        {
+            ObservePreview(); // the queue is held: its clock stands still
+            return;
+        }
+        var emitted = _output.FramesEmitted.Count + _queueBase;
         if (_handoverAt is { } handover && emitted >= handover)
         {
             CompleteHandover();
@@ -293,10 +314,13 @@ public sealed partial class PlaybackEngine : IDisposable
         }
     }
 
-    /// <summary>The engine's transport: the device's, except that a lost device with a track to
-    /// resume is paused, never half-stopped (build issue 11).</summary>
+    /// <summary>The queue's transport: the device's, except that a parked queue with a track to
+    /// resume is paused, never half-stopped, while the device is stopped (build issue 11) or
+    /// plays a preview (build issue 16).</summary>
     private Transport TransportNow =>
-        _outputLost && _currentVoice is not null && _output.State == Transport.Stopped ? Transport.Paused : _output.State;
+        _preview is not null ? (_currentVoice is null ? Transport.Stopped : Transport.Paused)
+        : _parked && _currentVoice is not null && _output.State == Transport.Stopped ? Transport.Paused
+        : _output.State;
 
     private long Frames(TimeSpan t) => EngineTime.Frames(t, _rate);
 
@@ -313,16 +337,16 @@ public sealed partial class PlaybackEngine : IDisposable
         return new Snapshot(
             _version, _queueVersion, TransportNow, _queue.Entries.ToImmutableArray(),
             _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null, _finishAt is not null,
-            _shuffle, _repeat, Adding, _rate, _unreadable.ToImmutableHashSet(), _settings);
+            _shuffle, _repeat, Adding, _rate, _unreadable.ToImmutableHashSet(), _settings,
+            _queueBase, _preview is null ? null : _mixer.Timeline, _previewOrigin, _preview?.Snap());
     }
 
-    /// <summary>One voice frozen for the view: its row, its reference history and its length.
-    /// The playhead is a pure function of the frames emitted, so the view can be recomputed
-    /// lock-free at any instant.</summary>
-    private sealed record VoiceSnap(QueueEntry Entry, ImmutableArray<(long Timeline, long Source)> Refs, long LengthFrames)
+    /// <summary>One voice's clock frozen for the view: its reference history and its length. The
+    /// playhead is a pure function of the frames emitted, so the view can be recomputed lock-free
+    /// at any instant.</summary>
+    private sealed record VoiceClock(ImmutableArray<(long Timeline, long Source)> Refs, long LengthFrames)
     {
-        public static VoiceSnap Of(MixerVoice voice, QueueEntry entry) =>
-            new(entry, voice.References.ToImmutableArray(), voice.LengthFrames);
+        public static VoiceClock Of(MixerVoice voice) => new(voice.References.ToImmutableArray(), voice.LengthFrames);
 
         public long PlayheadFrames(long emitted)
         {
@@ -337,10 +361,16 @@ public sealed partial class PlaybackEngine : IDisposable
             }
             return Math.Clamp(position, 0, Math.Max(LengthFrames, 0));
         }
+    }
+
+    /// <summary>One queue voice frozen for the view: its row and its clock.</summary>
+    private sealed record VoiceSnap(QueueEntry Entry, VoiceClock Clock)
+    {
+        public static VoiceSnap Of(MixerVoice voice, QueueEntry entry) => new(entry, VoiceClock.Of(voice));
 
         public VoiceView At(long emitted, bool isCurrent, int rate, ImmutableHashSet<RowId> unreadable) =>
             new(new QueueRow(Entry.Id, Entry.Track, isCurrent, unreadable.Contains(Entry.Id)),
-                Playhead.FromFrames(PlayheadFrames(emitted), rate),
+                Playhead.FromFrames(Clock.PlayheadFrames(emitted), rate),
                 Entry.Track.Length);
     }
 
@@ -360,10 +390,20 @@ public sealed partial class PlaybackEngine : IDisposable
         AddProgress? Adding,
         int Rate,
         ImmutableHashSet<RowId> Unreadable,
-        PlayerSettings Settings)
+        PlayerSettings Settings,
+        long QueueBase,
+        long? QueueHeldAt,
+        long PreviewOrigin,
+        PreviewSnap? Preview)
     {
+        /// <param name="emitted">The device's count. The queue's clock is that from
+        /// <see cref="QueueBase"/>; while a preview holds the queue, it stops where the queue's
+        /// mixer stopped, once the device has played out what it had of the queue. The preview's
+        /// clock starts at <see cref="PreviewOrigin"/>, where the device began playing it.</param>
         public PlayerView At(long emitted)
         {
+            var preview = Preview?.At(emitted - PreviewOrigin, Rate);
+            emitted = QueueHeldAt is { } held ? Math.Min(emitted + QueueBase, held) : emitted + QueueBase;
             VoiceSnap? attended = null, incoming = null;
             var heardAlone = false;
             if (Transport != Transport.Stopped)
@@ -384,6 +424,7 @@ public sealed partial class PlaybackEngine : IDisposable
                 CanTransitionNow: Transport == Transport.Playing && heardAlone && next is not null)
             {
                 Settings = Settings,
+                Preview = preview,
             };
         }
 
@@ -469,9 +510,16 @@ public sealed partial class PlaybackEngine : IDisposable
             return _engine.RunWithLockHeld(() =>
             {
                 _engine.ObserveClock();
+                if (_engine._output.State == Transport.Stopped)
+                {
+                    // Observing the clock stopped the device (playback finished, or a preview
+                    // ended): nothing more is heard, and no mixer moves on.
+                    return Playback.Frames.Zero;
+                }
                 try
                 {
-                    _engine._mixer.Read(interleaved, offset, count);
+                    // A preview's voices play instead of the queue's, which stands still.
+                    (_engine._preview is null ? _engine._mixer : _engine._previewMixer).Read(interleaved, offset, count);
                 }
                 catch (Exception e)
                 {

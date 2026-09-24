@@ -92,6 +92,18 @@ internal sealed class MixerVoice
 
     internal void CancelFadeIn() => FadeInFrames = 0;
 
+    /// <summary>Fades the voice out over <paramref name="frames"/> from the timeline frame
+    /// <paramref name="start"/>; the mixer ends it once the fade completes.</summary>
+    internal void BeginFadeOut(long start, long frames, FadeCurveKind curve)
+    {
+        FadeOutStart = start;
+        FadeOutFrames = frames;
+        FadeOutCurve = curve;
+    }
+
+    /// <summary>The voice falls silent at the timeline frame, exactly, and ends there.</summary>
+    internal void SilenceFrom(long timeline) => BeginFadeOut(timeline, 0, FadeCurveKind.Linear);
+
     internal void CancelFadeOut() => FadeOutStart = null;
 }
 

@@ -55,6 +55,34 @@ public sealed record PlayerView(
     bool CanTransitionNow = false)
 {
     public PlayerSettings Settings { get; init; } = new();
+
+    /// <summary>The preview running in the editor, or null (build issue 16). While it runs the
+    /// queue is held: <see cref="Attended"/>, <see cref="Incoming"/> and <see cref="Transport"/>
+    /// stay the queue's, paused where it was held, or stopped.</summary>
+    public PreviewView? Preview { get; init; }
+}
+
+/// <summary>Where a preview is: the outgoing track before its transition begins, the transition
+/// until its later fade completes, then the tail after it.</summary>
+public enum PreviewPhase
+{
+    PreRoll,
+    Transition,
+    Tail,
+}
+
+/// <summary>A running preview as the editor shows it (build issue 16): the adjacency, its phase,
+/// and the playhead of each preview voice the listener hears, in audible time. The outgoing
+/// playhead is null once its voice has fallen silent, and the incoming one until its voice is
+/// heard and after it ends.</summary>
+public sealed record PreviewView(Adjacency Adjacency, PreviewPhase Phase, Playhead? Outgoing, Playhead? Incoming);
+
+/// <summary>Which point a capture is for: a fade-out point, or a fade-in point. During a preview
+/// each reads its own voice (build issue 16).</summary>
+public enum CaptureSide
+{
+    FadeOut,
+    FadeIn,
 }
 
 /// <summary>The adjacencies the editor can open from one row, each as the queue would reach it

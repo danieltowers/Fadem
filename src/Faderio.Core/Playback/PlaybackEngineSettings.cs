@@ -1,3 +1,4 @@
+using Faderio.Core.Domain;
 using Faderio.Core.Settings;
 
 namespace Faderio.Core.Playback;
@@ -61,11 +62,21 @@ public sealed partial class PlaybackEngine
     /// An untagged track's gain is 1 either way, so it does not move.</summary>
     private void RampLiveVoicesToTheirGain()
     {
+        void Ramp(MixerVoice voice, Track track, TransitionMixer mixer) =>
+            voice.RampBaseGain(BaseGain(track), mixer.Timeline, Frames(GainRampDuration));
+
         foreach (var voice in _mixer.Voices)
         {
             if (_voiceEntry.TryGetValue(voice, out var entry))
             {
-                voice.RampBaseGain(BaseGain(entry.Track), _mixer.Timeline, Frames(GainRampDuration));
+                Ramp(voice, entry.Track, _mixer);
+            }
+        }
+        if (_preview is { } run)
+        {
+            foreach (var voice in run.Voices.Where(v => !v.IsFinished))
+            {
+                Ramp(voice, run.TrackOf(voice), _previewMixer); // a preview's voices too (build issue 16)
             }
         }
     }

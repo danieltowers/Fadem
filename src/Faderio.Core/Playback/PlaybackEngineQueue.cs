@@ -233,7 +233,10 @@ public sealed partial class PlaybackEngine
         Run(() =>
         {
             ResetForRestart();
-            StopOutput();
+            if (_preview is null) // a preview's device plays on: rows removed do not stop it
+            {
+                StopOutput();
+            }
             _queue.Clear();
             _originalOrder.Clear();
             _unreadable.Clear();

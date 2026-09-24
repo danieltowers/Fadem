@@ -12,6 +12,7 @@ public sealed partial class PlaybackEngine
         Run(() =>
         {
             ObserveClock();
+            EndPreviewFirst();
             if (TransportNow == Transport.Paused)
             {
                 PlayOutput();
@@ -53,6 +54,7 @@ public sealed partial class PlaybackEngine
         Run(() =>
         {
             ObserveClock();
+            EndPreviewFirst();
             if (_output.State == Transport.Playing)
             {
                 _output.Pause();
@@ -64,7 +66,8 @@ public sealed partial class PlaybackEngine
     public void TogglePlayPause()
     {
         ThrowIfDisposed();
-        if (_output.State == Transport.Playing)
+        // The queue's transport: during a preview it is held, and Play ends the preview, then plays.
+        if (View.Transport == Transport.Playing)
         {
             Pause();
         }
@@ -81,6 +84,7 @@ public sealed partial class PlaybackEngine
         ThrowIfDisposed();
         Run(() =>
         {
+            ReleasePreview();
             ResetForRestart();
             StopOutput();
             Publish();
@@ -97,6 +101,7 @@ public sealed partial class PlaybackEngine
         Run(() =>
         {
             ObserveClock();
+            EndPreviewFirst();
             var index = _queue.IndexOf(row);
             if (index < 0)
             {
@@ -136,6 +141,7 @@ public sealed partial class PlaybackEngine
         Run(() =>
         {
             ObserveClock();
+            EndPreviewFirst();
             if (_currentVoice is null)
             {
                 return;
@@ -165,6 +171,7 @@ public sealed partial class PlaybackEngine
         Run(() =>
         {
             ObserveClock();
+            EndPreviewFirst();
             // The guard is the view's own flag, so the button and the command cannot disagree.
             if (!View.CanTransitionNow || _currentVoice is not { } voice)
             {
@@ -185,6 +192,7 @@ public sealed partial class PlaybackEngine
         Run(() =>
         {
             ObserveClock();
+            EndPreviewFirst();
             if (_attendedVoice is not { } attended || _currentVoice is null)
             {
                 return;
@@ -222,6 +230,7 @@ public sealed partial class PlaybackEngine
         Run(() =>
         {
             ObserveClock();
+            EndPreviewFirst();
             var voice = _attendedVoice;
             if (voice is null || voice.IsFinished)
             {

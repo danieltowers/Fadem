@@ -354,7 +354,7 @@ public sealed class UnreadableTracksTests
     /// <paramref name="failsAt"/> is how many frames it delivers first, read in the fake output's
     /// block size, measured by decoding it here. (A FLAC cut short instead crashes the decoder
     /// package's process; build issue 21.)</summary>
-    private static string CorruptFlac(out long failsAt)
+    internal static string CorruptFlac(out long failsAt)
     {
         var fixture = Path.Combine(AppContext.BaseDirectory, "Fixtures", "noise-44100-16-2.flac");
         Directory.CreateDirectory(TestAudio.Dir);

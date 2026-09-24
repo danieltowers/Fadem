@@ -63,6 +63,12 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
 - [ ] Pressing capture writes a number into the field, and it is the number the time readout
       showed at that moment.
 - [ ] After Save, the status strip shows a confirmation and nothing else changed.
+- [ ] **Preview** and **Stop preview** sit together in the editor, Stop preview greyed out
+      until a preview runs. While one runs, Preview reads **Preview again**, and the line under
+      them shows the phase and each voice's position ("Pre-roll · outgoing 2:25", then
+      "Transition · outgoing 2:31 · incoming 0:12", then "Tail · incoming 0:20"), moving as it
+      plays. The main window's readout reads "Held 1:10 / -2:50" and stands still, and the play
+      button shows ▶. When the preview ends, the line clears and the readout loses "Held".
 - [ ] Resizing the window narrower does not hide the transport or the editor's buttons.
 - [ ] While adding a folder's worth of files (fifty or more, through **Add files…**, **Add
       folder…** or as arguments), the window stays responsive — it moves and repaints — and
@@ -142,6 +148,11 @@ sharp percussive transient; the realism check is the authored boundary from the 
       alone.
 - [ ] Render this boundary; open the file; the fade starts at the same place it did in the
       app.
+- [ ] Mid-song, preview a draft: the song stops, the outgoing track plays from 5 s before its
+      fade-out point, through the transition and 5 s on, then silence. Capture a better fade-in
+      point while the incoming track plays and press **Preview again**: the new point is heard.
+      The queue stays paused where it was; Play resumes it there.
+- [ ] Preview on WASAPI exclusive plays: there is no second output to fail.
 - [ ] Run the same capture-and-listen on WASAPI shared, WASAPI exclusive and WaveOut; the
       fade lands in the same place on all three.
 - [ ] Delete the playing row; the next one starts cleanly from its beginning.
