@@ -25,6 +25,9 @@ public static class ChildProcess
             case "play":
                 Play(args[1]);
                 return 0;
+            case "window":
+                Window(args[1], long.Parse(args[2], CultureInfo.InvariantCulture), int.Parse(args[3], CultureInfo.InvariantCulture));
+                return 0;
             default:
                 Console.Error.WriteLine($"Unknown child command: {string.Join(' ', args)}");
                 return 2;
@@ -55,6 +58,36 @@ public static class ChildProcess
         }
         Console.WriteLine($"read={TestAudio.ReadToEnd(source)}");
         Console.WriteLine($"position={source.Position}");
+    }
+
+    /// <summary>Opens <paramref name="path"/>, seeks to <paramref name="seekTo"/> and prints
+    /// where it landed and the next <paramref name="frames"/> frames read (<see cref="Format"/>),
+    /// for a seek that could decode a frame that is not there.</summary>
+    private static void Window(string path, long seekTo, int frames)
+    {
+        using var source = TrackSources.Open(path);
+        source.Position = seekTo;
+        Console.WriteLine($"landed={source.Position}");
+        var buffer = new float[frames * source.WaveFormat.Channels];
+        var read = 0;
+        int n;
+        while (read < frames && (n = source.Read(buffer, read * source.WaveFormat.Channels, frames - read)) > 0)
+        {
+            read += n;
+        }
+        Console.WriteLine($"window={Format(buffer.AsSpan(0, read * source.WaveFormat.Channels))}");
+    }
+
+    /// <summary>Samples as one line of text that round-trips exactly, for a parent to compare
+    /// with what it decoded itself.</summary>
+    public static string Format(ReadOnlySpan<float> samples)
+    {
+        var text = new string[samples.Length];
+        for (var i = 0; i < samples.Length; i++)
+        {
+            text[i] = samples[i].ToString("R", CultureInfo.InvariantCulture);
+        }
+        return string.Join(',', text);
     }
 
     /// <summary>Queues <paramref name="path"/> and then a 3 s 0.2 DC WAV on a test engine and

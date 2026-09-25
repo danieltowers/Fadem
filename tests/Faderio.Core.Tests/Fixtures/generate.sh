@@ -30,6 +30,20 @@
 # encoded losslessly. Mp3DecoderOffsetTests and the tagged cells correlate against them, so the
 # two must keep coming from one noise() below.
 #
+# Two FLACs outside the grid, for the frame table the decoder package's pre-scan builds (build
+# issue 22). Each is shaped like files in the author's music folder:
+#   silent-tail-44100-16-2.flac   1.5 s of pink noise padded with digital silence to 20 whole
+#                 4608-sample blocks (92160 samples, 2.09 s). The silent frames are 14 bytes
+#                 (constant subframes), and the package never finds the last one: it sits in
+#                 the file's last 16 bytes. 110 of 245 FLACs in the music folder end this way.
+#   false-header-44100-16-1.flac  2 s of full-scale white noise, which the encoder stores
+#                 verbatim, so bytes written into the PCM appear in the file unchanged. Six
+#                 bytes at sample 70120 (in frame 15 of 20) are a valid frame header of the
+#                 same format: FF F8 89 08 09 2C, fixed-blocksize frame 9 of 256 samples, 44.1
+#                 kHz, mono, 16-bit, and its CRC-8. The package's pre-scan takes it for a frame,
+#                 as it did in 5 of those 245 files. The bytes are written swapped in pairs:
+#                 the raw PCM is s16le, a verbatim subframe is big-endian.
+#
 # A sine, not a full-scale one: lavfi's "sine" source is full scale, which a lossy encoder
 # overshoots into clipping. The pink noise is what the seek landing correlates against; a tone
 # is periodic and would match every cycle.
@@ -44,7 +58,7 @@ cd "$(dirname "$0")"
 tone()  { echo "aevalsrc='0.5*sin(2*PI*1000*t)':s=$1:d=2"; }
 noise() { echo "anoisesrc=color=pink:sample_rate=$1:duration=2:seed=42:amplitude=0.5"; }
 
-rm -f tone-*.flac noise-*.flac tone-*.mp3 noise-*.mp3
+rm -f tone-*.flac noise-*.flac tone-*.mp3 noise-*.mp3 silent-tail-*.flac false-header-*.flac
 
 for rate in 44100 48000 96000; do
   for bits in 16 24; do
@@ -66,5 +80,15 @@ for rate in 44100 48000; do
     ffmpeg -y -loglevel error -f lavfi -i "$(noise $rate)" -ac $ch -c:a libmp3lame -q:a 2 "noise-vbr-$rate-$ch.mp3"
   done
 done
+
+ffmpeg -y -loglevel error -f lavfi -i "anoisesrc=color=pink:sample_rate=44100:duration=1.5:seed=42:amplitude=0.5" \
+  -af apad=whole_len=92160 -ac 2 -sample_fmt s16 silent-tail-44100-16-2.flac
+
+raw=$(mktemp)
+ffmpeg -y -loglevel error -f lavfi -i "anoisesrc=color=white:sample_rate=44100:duration=2:seed=42:amplitude=1" \
+  -ac 1 -f s16le "$raw"
+printf '\xF8\xFF\x08\x89\x2C\x09' | dd of="$raw" bs=1 seek=$((70120 * 2)) conv=notrunc status=none
+ffmpeg -y -loglevel error -f s16le -ar 44100 -ac 1 -i "$raw" false-header-44100-16-1.flac
+rm -f "$raw"
 
 ls -l *.flac *.mp3

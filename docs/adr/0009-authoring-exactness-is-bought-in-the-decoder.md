@@ -82,3 +82,23 @@ Still open: the unsafe decode trusts the frame's contents. A frame damaged in pl
 cut, with a run of zeros longer than the rest of the decoder's 128 KB frame buffer, could still
 read past it. The noise-damaged file of
 issue 10 throws a managed exception instead, and no such file has been seen.
+
+## Addendum: the pre-scan's frame table is checked, not trusted (2026-09-24)
+
+Seeks are exact only if the package's frame table is, and in the author's music folder it was
+wrong in 112 of 245 FLACs ([build issue 22](../../.scratch/202609-faderio-phase-1-build/issues/22-flacs-ending-in-a-tiny-frame-raise-a-false-notice.md)).
+In 110 it lacked a final frame under 16 bytes, a CD rip's block of digital silence: the
+pre-scan never looks for a header in a stream's last 16 bytes, and the decoder reads 16 bytes for
+every header, so the frame was neither counted nor played and ADR 0010's notice fired at every
+play. In 5 (3 of them among those 110) it held a frame that is not there: bytes inside a real
+frame that parse as a header, CRC-8 and all. That frame's block was added to the length, every
+seek after it landed late by that block (256 to 4096 samples), and a seek just after it decoded
+it.
+
+The decision stands, and the package is still not vendored. `FlacTrackReader` hands the package
+a stream that reads 16 bytes of zeros past its end, which a frame's body never reaches, so both
+the pre-scan and the header read find a short final frame. It drops a scanned frame whose number
+is out of step with the frames around it, keeps its own table of the frames that are really
+there for the length and for its sums, and asks the package's seek for the frame before the
+target by the offset the package's own table gives it, which is never a phantom. A phantom whose
+number happens to be in step would still be taken for a frame.

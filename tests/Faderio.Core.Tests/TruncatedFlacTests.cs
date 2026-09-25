@@ -65,14 +65,29 @@ public sealed class TruncatedFlacTests
     }
 
     [Fact]
-    public void ACutInsideAFrameHeader_AlsoDropsTheWholeFrameBefore()
+    public void ACutJustAfterAFrameHeader_DropsOnlyThatFrame()
     {
-        // The pre-scan never looks for a header in a file's last 16 bytes, so the stray start of
-        // frame k counts as the tail of frame k - 1, whose CRC then fails at the file's end. One
-        // whole frame is lost; the file was short anyway, and the notice is the same.
+        // The fixture's headers are 6 bytes. The reader's stream reads zeros past the file's end,
+        // so the pre-scan finds a whole header in its last 16 bytes (build issue 22).
         var frames = FrameTable(Noise);
         var k = frames.Count / 2;
         var path = Cut(Noise, frames[k].StreamOffset + 8);
+
+        var child = ChildProcess.Run("decode", path);
+
+        AssertLived(child);
+        Assert.Equal(frames[k].SampleOffset, child["read"]);
+    }
+
+    [Fact]
+    public void ACutInsideAFrameHeader_AlsoDropsTheWholeFrameBefore()
+    {
+        // A header cut short does not parse, so the stray start of frame k counts as the tail of
+        // frame k - 1, whose CRC then fails at the file's end. One whole frame is lost; the file
+        // was short anyway, and the notice is the same.
+        var frames = FrameTable(Noise);
+        var k = frames.Count / 2;
+        var path = Cut(Noise, frames[k].StreamOffset + 3);
 
         var child = ChildProcess.Run("decode", path);
 
@@ -180,15 +195,17 @@ public sealed class TruncatedFlacTests
         Assert.Equal(frames[^1].SampleOffset, TestAudio.ReadToEnd(source));
     }
 
-    /// <summary>Opt-in, as it reads every file twice: set <c>FADERIO_MUSIC_FOLDER</c> to a
-    /// folder of music. Every promised FLAC under it opens to exactly the length the package's own pre-scan
-    /// finds, so the whole-frame check takes no frame from a whole file (trailing bytes other than
-    /// an ID3v1 tag would make it). Not the header's length: the package loses a final frame
-    /// shorter than 16 bytes, which 110 of the 245 files in the author's music folder end with (build
-    /// issue 22). Opening only pre-scans; nothing is decoded, so it runs in process. Without the
-    /// variable it passes without looking.</summary>
+    /// <summary>Opt-in, as it decodes every file: set <c>FADERIO_MUSIC_FOLDER</c> to a folder of
+    /// music. Every promised FLAC under it opens to exactly its header's length and decodes to
+    /// it, so the whole-frame check takes no frame from a whole file (trailing bytes other than
+    /// the tags it knows would make it), and a seek 1.5 s before the end lands on the sample a
+    /// sequential decode has there. The header, not the package's own pre-scan: that loses a
+    /// final frame under 16 bytes and invents frames, as 110 and 5 of the 245 files in the
+    /// author's music folder showed (build issue 22). Whole files, so it runs in process. It
+    /// decodes every file in full, so point it at a sample: 50 files took 3.5 minutes, and all
+    /// 245 had not finished after hours. Without the variable it passes without looking.</summary>
     [Fact]
-    public void EveryFlacInAMusicFolder_OpensToThePackagesOwnLength()
+    public void EveryFlacInAMusicFolder_DecodesToItsHeadersLength_AndSeeksExactlyNearItsEnd()
     {
         var folder = Environment.GetEnvironmentVariable("FADERIO_MUSIC_FOLDER");
         if (string.IsNullOrEmpty(folder))
@@ -196,25 +213,66 @@ public sealed class TruncatedFlacTests
             return;
         }
         var opened = 0;
-        var shortened = new List<string>();
+        var wrong = new List<string>();
         foreach (var path in Directory.EnumerateFiles(folder, "*.flac", SearchOption.AllDirectories))
         {
-            if (AudioProbe.Probe(path, out _) is not null)
+            if (AudioProbe.Probe(path, out var probe) is not null)
             {
                 continue;
             }
-            using var source = TrackSources.Open(path);
             opened++;
-            var scanned = FrameTable(path);
-            var scannedTotal = scanned[^1].SampleOffset + scanned[^1].Header.BlockSize;
-            if (source.TotalFrames != scannedTotal)
+            using var source = TrackSources.Open(path);
+            var channels = source.WaveFormat.Channels;
+            var tail = source.WaveFormat.SampleRate * 3 / 2;
+            var window = 1024;
+            if (source.TotalFrames != probe!.Frames)
             {
-                shortened.Add($"{path}: pre-scan {scannedTotal}, opens to {source.TotalFrames}");
+                wrong.Add($"{path}: header {probe.Frames}, opens to {source.TotalFrames}");
+                continue;
+            }
+            var last = LastFrames(source, tail);
+            if (source.Position != probe.Frames)
+            {
+                wrong.Add($"{path}: header {probe.Frames}, decodes to {source.Position}");
+                continue;
+            }
+            source.Position = probe.Frames - tail;
+            var landed = new float[window * channels];
+            var read = 0;
+            int n;
+            while (read < window && (n = source.Read(landed, read * channels, window - read)) > 0)
+            {
+                read += n;
+            }
+            if (!landed.AsSpan().SequenceEqual(last.AsSpan(0, window * channels)))
+            {
+                wrong.Add($"{path}: a seek to {probe.Frames - tail} lands elsewhere");
             }
         }
         Assert.True(opened > 0, $"No promised FLAC under {folder}.");
-        Assert.True(shortened.Count == 0,
-            $"{shortened.Count} of {opened}:" + Environment.NewLine + string.Join(Environment.NewLine, shortened));
+        Assert.True(wrong.Count == 0,
+            $"{wrong.Count} of {opened}:" + Environment.NewLine + string.Join(Environment.NewLine, wrong));
+    }
+
+    /// <summary>Reads <paramref name="source"/> to its end and returns its last
+    /// <paramref name="frames"/> frames.</summary>
+    private static float[] LastFrames(ITrackSource source, int frames)
+    {
+        var channels = source.WaveFormat.Channels;
+        var ring = new float[frames * channels];
+        var buffer = new float[4410 * channels];
+        long total = 0;
+        int n;
+        while ((n = source.Read(buffer, 0, 4410)) > 0)
+        {
+            for (var i = 0; i < n * channels; i++)
+            {
+                ring[(total * channels + i) % ring.Length] = buffer[i];
+            }
+            total += n;
+        }
+        var start = (int)(total * channels % ring.Length);
+        return [.. ring.AsSpan(start), .. ring.AsSpan(0, start)];
     }
 
     // ── Through the engine ───────────────────────────────────────────────────────────────

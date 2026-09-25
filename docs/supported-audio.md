@@ -87,10 +87,13 @@ resampler's known latency if it has to.
 
 **Decoders.** WAV through NAudio's `WaveFileReader`, MP3 through `Mp3FileReader` (behind
 `Mp3TrackReader` when the file is trimmed), FLAC through
-`BunLabs.NAudio.Flac` 2.0.1 behind `FlacTrackReader`, which repairs three defects in the package
+`BunLabs.NAudio.Flac` 2.0.1 behind `FlacTrackReader`, which repairs five defects in the package
 (a position counter that stops short at end of stream, a seek into the last block that did
-nothing, and a frame cut short that crashed the process, so the decoder now stops after the last
-whole frame; [build issue 21](../.scratch/202609-faderio-phase-1-build/issues/21-a-truncated-flac-crashes-the-app.md))
+nothing, a frame cut short that crashed the process, so the decoder now stops after the last
+whole frame, [build issue 21](../.scratch/202609-faderio-phase-1-build/issues/21-a-truncated-flac-crashes-the-app.md);
+a final frame under 16 bytes that was never decoded, and a frame header found by chance inside a
+frame that made every later seek land late,
+[build issue 22](../.scratch/202609-faderio-phase-1-build/issues/22-flacs-ending-in-a-tiny-frame-raise-a-false-notice.md))
 and leaves the decode and the exact seek to the package. Windows Media Foundation is
 not in the production chain: its FLAC decoder is undocumented and landed seeks on the next block
 boundary. Every decoder that remains is open source, so a red cell can be read to its cause,
