@@ -971,6 +971,35 @@ public sealed class HeadlessFormTests
     });
 
     [Fact]
+    public void TheMarker_RestsDimmedWhenStopped_AndIsFullWhilePlayingOrPaused() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 1, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 1, 0.2);
+        h.Form.AddPaths(new[] { a, b });
+        h.Form.Render();
+        Color[] Backs() => h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.BackColor).ToArray();
+
+        Assert.NotEqual(SystemColors.Window, MainForm.RestingMarker);
+        Assert.NotEqual(SystemColors.Info, MainForm.RestingMarker);
+        Assert.Equal(new[] { MainForm.RestingMarker, SystemColors.Window }, Backs()); // at launch
+
+        h.Form.PlayRowAt(1);
+        h.Form.Render();
+        Assert.Equal(new[] { SystemColors.Window, SystemColors.Info }, Backs());
+
+        Click(h.Form._playPause); // pause
+        h.Form.Render();
+        Assert.Equal(new[] { SystemColors.Window, SystemColors.Info }, Backs());
+
+        Click(h.Form._playPause);
+        h.Output.Advance(44100 * 2); // the queue runs out
+        h.Form.Render();
+        Assert.Equal(Transport.Stopped, h.Engine.View.Transport);
+        Assert.Equal(new[] { MainForm.RestingMarker, SystemColors.Window }, Backs());
+    });
+
+    [Fact]
     public void TransitionNow_IsEnabledOnlyWhilePlaying_WithANextAdjacency_AndNoTransitionInFlight() => RunSta(() =>
     {
         using var h = new Harness();

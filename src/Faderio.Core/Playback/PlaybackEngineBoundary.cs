@@ -559,6 +559,10 @@ public sealed partial class PlaybackEngine
         _outgoingVoice = null;
         _attendedVoice = null;
         _handoverAt = null;
+        if (_queue.Count > 0)
+        {
+            _queue.SetCurrent(0); // the mark goes where Play starts: the top (interim transport 03)
+        }
         if (_preview is null) // a preview's device plays on: rows removed do not stop it
         {
             StopOutputOrNotice();

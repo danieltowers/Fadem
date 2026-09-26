@@ -36,15 +36,11 @@ public sealed partial class PlaybackEngine
             }
             if (_currentVoice is null || _finished)
             {
-                var restartFromTop = _finished;
+                // The marked row: the end of the queue already put the mark back at the top.
                 ResetForRestart();
                 if (_queue.Count == 0)
                 {
                     return;
-                }
-                if (restartFromTop)
-                {
-                    _queue.SetCurrent(0); // replay from the top
                 }
                 var first = OpenFirstReadable(Math.Max(_queue.CurrentIndex, 0), RowAfter, retryMarked: true);
                 if (first is null)

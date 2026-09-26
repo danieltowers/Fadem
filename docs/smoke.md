@@ -40,6 +40,9 @@ from a capture.
 - [ ] The window opens without an error dialog.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
 - [ ] The transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, then the seek bar and the time; no ⏹.
+- [ ] At launch the first row carries the marker, dimmed (a greyer yellow than while playing).
+      Playing or paused, the marker is the full pale yellow. When the queue runs out it goes
+      back to the first row, dimmed, and ▶ plays that row.
 - [ ] Pause, click a different row, press ▶: that row plays from 0:00 and carries the marker.
       With the playing row, no row or several rows selected, ▶ resumes where it paused.
 - [ ] The seek bar has visible travel across the width of the transport area, not a stub.

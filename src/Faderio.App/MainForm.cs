@@ -317,7 +317,9 @@ internal sealed class MainForm : Form
             var row = view.Queue[i];
             var item = _queueList.Items[i];
             // Render runs on every tick: each row's look is set only when it changes (build issue 20).
-            var back = row.IsCurrent && view.Transport != Transport.Stopped ? SystemColors.Info : SystemColors.Window;
+            var back = !row.IsCurrent ? SystemColors.Window
+                : view.Transport == Transport.Stopped ? RestingMarker
+                : SystemColors.Info;
             if (item.BackColor != back)
             {
                 item.BackColor = back;
@@ -554,6 +556,13 @@ internal sealed class MainForm : Form
     /// <summary>Returns at once; rows, progress and the closing notice arrive through the sink.
     /// The task is for the launch arguments, which must wait for the rows before --play.</summary>
     internal Task AddPaths(IEnumerable<string> paths) => _engine.Add(paths);
+
+    /// <summary>The attended row's mark while nothing sounds (interim transport 03): the sounding
+    /// mark's hue, halfway to the window's grey, so it reads as the same mark, at rest.</summary>
+    internal static readonly Color RestingMarker = Color.FromArgb(
+        (SystemColors.Info.R + SystemColors.Control.R) / 2,
+        (SystemColors.Info.G + SystemColors.Control.G) / 2,
+        (SystemColors.Info.B + SystemColors.Control.B) / 2);
 
     internal static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
 

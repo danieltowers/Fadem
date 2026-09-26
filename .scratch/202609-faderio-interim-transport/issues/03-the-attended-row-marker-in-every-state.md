@@ -1,6 +1,6 @@
 # 03: The attended-row marker in every state
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01
 
 Decided in [D5](../../202609-faderio-interim-improvements/decisions.md). Glossary: **Attended
@@ -33,10 +33,10 @@ after the queue ends there is no marker, though the engine knows what ▶ would 
 
 ## Acceptance
 
-- [ ] Launch with rows queued: row 0 carries the resting marker before anything is pressed.
-- [ ] Play, pause: sounding marker. Let the queue run out: resting marker on the row `Play()`
+- [x] Launch with rows queued: row 0 carries the resting marker before anything is pressed.
+- [x] Play, pause: sounding marker. Let the queue run out: resting marker on the row `Play()`
       would restart.
-- [ ] ▶ from resting always plays the marked row when nothing else is selected (issue 02).
+- [x] ▶ from resting always plays the marked row when nothing else is selected (issue 02).
 
 ## Tests
 
@@ -48,3 +48,18 @@ after the queue ends there is no marker, though the engine knows what ▶ would 
 - **Looks:** at launch, the first row is marked (dim); after ▶ it is marked (full).
 
 ## Comments
+
+- Built 2026-09-26. **Resting look:** `MainForm.RestingMarker`, the sounding mark's
+  `SystemColors.Info` blended halfway to `SystemColors.Control` — (247,247,232) against the
+  sounding (255,255,225) on this machine. Chosen over a left-edge bar, which would need an
+  owner-drawn `ListView`.
+- **Engine fix, decided by the user during the build:** at the end of the queue the engine left
+  its current row on the last row played while a plain Play restarted from row 0, so the mark
+  and ▶ disagreed (and Q24 of the grilling had said "last row played"). The user chose: the mark
+  goes back to row 0 and ▶ plays it. `FinishPlayback` now sets the current row to 0, and Play's
+  own restart-from-top branch is gone: Play starts the marked row. Without that second half,
+  dragging the marked row after the end would have split them again
+  (`AfterTheQueueEnds_MovingTheMarkedRow_PlayStillStartsTheMarkedRow`).
+- At launch the queue's current row was already row 0; only the shell hid the mark.
+- Tests: `AttendedRowMarkerTests` (4, engine: launch, end, end then move, end under shuffle) and
+  one form test through launch → playing → paused → ended.

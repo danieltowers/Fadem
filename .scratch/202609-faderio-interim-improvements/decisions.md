@@ -21,7 +21,9 @@ spec and this file disagree, this file wins.** Glossary terms settled here are a
   a row regardless. *Refined while building transport 02:* while stopped, a selected row always
   plays, even the marked one; "resume" applies only while paused.
 - **D5** The attended-row marker shows in every transport state, dimmed when nothing sounds. It
-  means "what Play would do", never "sounding now".
+  means "what Play would do", never "sounding now". *Decided while building transport 03,
+  replacing Q24's "last row played":* when the queue ends the mark returns to row 0 and ▶ plays
+  it.
 - **D6** The seek bar becomes a custom bar: a click anywhere jumps there; a drag seeks on
   release, not live.
 - **D7** ±5 s buttons, fixed, both directions, on the attended voice. The engine gets a
