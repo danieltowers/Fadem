@@ -6,13 +6,24 @@ public sealed partial class PlaybackEngine
 {
     // ── Transport ────────────────────────────────────────────────────────────────────────
 
-    public void Play()
+    /// <summary>The ▶ intent (interim transport issue 02). <paramref name="selected"/> is the row
+    /// the user has singled out, if any. While stopped it plays from its start, as
+    /// <see cref="PlayRow"/> does; so does any row other than the attended one. The attended row,
+    /// no row, or a row no longer in the queue (a stale selection, not a mistake: no notice)
+    /// resumes when paused, and otherwise starts the queue's current row.</summary>
+    public void Play(RowId? selected = null)
     {
         ThrowIfDisposed();
         Run(() =>
         {
             ObserveClock();
             EndPreviewFirst();
+            if (selected is { } row && _queue.IndexOf(row) >= 0
+                && (TransportNow == Transport.Stopped || row != AttendedRow()))
+            {
+                PlayRowNow(row);
+                return;
+            }
             if (TransportNow == Transport.Paused)
             {
                 PlayOutput();
@@ -63,7 +74,8 @@ public sealed partial class PlaybackEngine
         });
     }
 
-    public void TogglePlayPause()
+    /// <summary>Pauses while playing; otherwise <see cref="Play"/> with the selected row.</summary>
+    public void TogglePlayPause(RowId? selected = null)
     {
         ThrowIfDisposed();
         // The queue's transport: during a preview it is held, and Play ends the preview, then plays.
@@ -73,9 +85,17 @@ public sealed partial class PlaybackEngine
         }
         else
         {
-            Play();
+            Play(selected);
         }
     }
+
+    /// <summary>While paused or playing, the row the view marks as current, read after
+    /// <see cref="ObserveClock"/> so it is the one the listener hears: the attended voice's until
+    /// its handover, then the incoming one's.</summary>
+    private RowId? AttendedRow() =>
+        (_attendedVoice ?? _currentVoice) is { } voice && _voiceEntry.TryGetValue(voice, out var entry)
+            ? entry.Id
+            : _queue.Current?.Id;
 
     /// <summary>Stops and resets: the mixer timeline and the device's emitted count return to a
     /// shared zero, so the next Play starts both clocks from one origin (ADR 0001).</summary>
@@ -102,31 +122,36 @@ public sealed partial class PlaybackEngine
         {
             ObserveClock();
             EndPreviewFirst();
-            var index = _queue.IndexOf(row);
-            if (index < 0)
-            {
-                RaiseNotice($"That row is no longer in the queue ({row}).");
-                return;
-            }
-            if (TryOpen(index, out var error) is not { } source)
-            {
-                RaiseNotice($"Could not play \"{Path.GetFileName(_queue.Entries[index].Track.FilePath)}\": {error}");
-                return;
-            }
-            if (_output.State == Transport.Stopped)
-            {
-                ResetForRestart();
-            }
-            else
-            {
-                CutAllVoices();
-                _finished = false;
-            }
-            _queue.SetCurrent(index);
-            StartTrack(new OpenedTrack(index, source), _mixer.Timeline, null);
-            PlayOutput();
-            Publish();
+            PlayRowNow(row);
         });
+    }
+
+    private void PlayRowNow(RowId row)
+    {
+        var index = _queue.IndexOf(row);
+        if (index < 0)
+        {
+            RaiseNotice($"That row is no longer in the queue ({row}).");
+            return;
+        }
+        if (TryOpen(index, out var error) is not { } source)
+        {
+            RaiseNotice($"Could not play \"{Path.GetFileName(_queue.Entries[index].Track.FilePath)}\": {error}");
+            return;
+        }
+        if (_output.State == Transport.Stopped)
+        {
+            ResetForRestart();
+        }
+        else
+        {
+            CutAllVoices();
+            _finished = false;
+        }
+        _queue.SetCurrent(index);
+        StartTrack(new OpenedTrack(index, source), _mixer.Timeline, null);
+        PlayOutput();
+        Publish();
     }
 
     /// <summary>Skips to the next adjacency (build issue 06). Mid-transition it lands on the

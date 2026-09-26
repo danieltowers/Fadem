@@ -40,6 +40,8 @@ from a capture.
 - [ ] The window opens without an error dialog.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
 - [ ] The transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, then the seek bar and the time; no ⏹.
+- [ ] Pause, click a different row, press ▶: that row plays from 0:00 and carries the marker.
+      With the playing row, no row or several rows selected, ▶ resumes where it paused.
 - [ ] The seek bar has visible travel across the width of the transport area, not a stub.
 - [ ] While playing, the seek thumb moves smoothly — not in visible steps.
 - [ ] The time readout shows elapsed and remaining, and remaining never reads `0:00` mid-track.

@@ -1,6 +1,6 @@
 # 02: Play plays the selected row
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 
 Decided in [D4](../../202609-faderio-interim-improvements/decisions.md).
@@ -34,11 +34,11 @@ click row B, press ▶ → A resumes. Only a double-click (`PlayRow`) plays B.
 
 ## Acceptance
 
-- [ ] Paused on A, select B, ▶ → B plays from its start.
-- [ ] Paused on A, A still selected (or nothing selected), ▶ → A resumes where it was.
-- [ ] Paused on A, two rows selected, ▶ → A resumes.
-- [ ] At launch with rows queued, select row 3, ▶ → row 3 plays.
-- [ ] Mid-crossfade A→B, select D, ▶ (via pause first) → D plays; the crossfade is abandoned.
+- [x] Paused on A, select B, ▶ → B plays from its start.
+- [x] Paused on A, A still selected (or nothing selected), ▶ → A resumes where it was.
+- [x] Paused on A, two rows selected, ▶ → A resumes.
+- [x] At launch with rows queued, select row 3, ▶ → row 3 plays.
+- [x] Mid-crossfade A→B, select D, ▶ (via pause first) → D plays; the crossfade is abandoned.
 
 ## Tests
 
@@ -51,3 +51,20 @@ click row B, press ▶ → A resumes. Only a double-click (`PlayRow`) plays B.
   time readout restarts from 0:00.
 
 ## Comments
+
+- Built 2026-09-26. `Play(RowId? selected = null)` and `TogglePlayPause(RowId? selected = null)`:
+  optional, so `Program`'s `--play` and every existing caller are unchanged. `PlayRow`'s body is
+  now `PlayRowNow`, shared by both commands, so a selected row plays exactly as a double-click
+  does (unreadable → notice, what was playing carries on).
+- **Refinement of D4, found by the tests:** while *stopped*, a selected row always plays from its
+  start, even the marked one. After the queue ends the marker sits on the last row played but a
+  plain Play restarts from row 0; "same as the attended row → resume" would have sent a user who
+  selected the marked row to the top. Resuming only means something while paused, so the
+  attended-row comparison applies only then (and while playing, where it is a no-op).
+- The attended row is read from engine state after `ObserveClock`, not from the published
+  snapshot, so mid-crossfade it is the voice the listener attends (outgoing until handover).
+- Tests: `PlaySelectedRowTests` (7, engine) and two form tests (one row selected → that row;
+  none or two → resume).
+- Smoke driver note (not in the repo): UIA `SelectionItemPattern` on this `ListView` does not
+  clear an existing selection, so a probe that selects one row after another ends up with two.
+  A posted `WM_LBUTTONDOWN/UP` on the row selects the way a user does.

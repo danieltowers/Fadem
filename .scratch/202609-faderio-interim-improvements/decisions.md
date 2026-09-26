@@ -18,7 +18,8 @@ spec and this file disagree, this file wins.** Glossary terms settled here are a
   row from 0:00, as today.
 - **D4** Play with a row selected that is not the attended row plays that row from its start;
   otherwise Play resumes. Applies paused, at launch and after the queue ends. Double-click plays
-  a row regardless.
+  a row regardless. *Refined while building transport 02:* while stopped, a selected row always
+  plays, even the marked one; "resume" applies only while paused.
 - **D5** The attended-row marker shows in every transport state, dimmed when nothing sounds. It
   means "what Play would do", never "sounding now".
 - **D6** The seek bar becomes a custom bar: a click anywhere jumps there; a drag seeks on

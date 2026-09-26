@@ -252,7 +252,7 @@ internal sealed class MainForm : Form
         _status.Click += (_, _) => OpenNotices();
         _noticeCount.Click += (_, _) => OpenNotices();
         _clip.Click += (_, _) => _engine.ClearClip();
-        _playPause.Click += (_, _) => _engine.TogglePlayPause();
+        _playPause.Click += (_, _) => _engine.TogglePlayPause(SingleSelectedRow());
         _prev.Click += (_, _) => _engine.Previous();
         _next.Click += (_, _) => _engine.Next();
         _transitionNow.Click += (_, _) => _engine.TransitionNow();
@@ -556,6 +556,10 @@ internal sealed class MainForm : Form
     internal Task AddPaths(IEnumerable<string> paths) => _engine.Add(paths);
 
     internal static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
+
+    /// <summary>The row ▶ hands the engine: the selected one when exactly one is, else none.</summary>
+    private RowId? SingleSelectedRow() =>
+        _queueList.SelectedItems.Count == 1 ? RowOf(_queueList.SelectedItems[0]) : null;
 
     /// <summary>The selected rows go in one call; what that does to playback is the engine's.</summary>
     private void RemoveSelected() =>

@@ -929,6 +929,48 @@ public sealed class HeadlessFormTests
     });
 
     [Fact]
+    public void Play_WithOneOtherRowSelected_PlaysThatRow() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 5, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 5, 0.2);
+        h.Form.AddPaths(new[] { a, b });
+        h.Form.PlayRowAt(0);
+        h.Output.Advance(44100 * 2);
+        Click(h.Form._playPause); // pause
+        SelectRows(h.Form._queueList, 1);
+
+        Click(h.Form._playPause);
+        h.Form.Render();
+
+        Assert.Equal(b, h.Engine.View.Attended!.Row.Track.FilePath);
+        Assert.Equal("0:00 / -0:05", h.Form._time.Text);
+    });
+
+    [Fact]
+    public void Play_WithNoneOrSeveralRowsSelected_Resumes() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 5, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 5, 0.2);
+        var c = TestAudio.WriteDcWav("gamma.wav", 5, 0.1);
+        h.Form.AddPaths(new[] { a, b, c });
+        h.Form.PlayRowAt(0);
+        h.Output.Advance(44100 * 2);
+        Click(h.Form._playPause); // pause
+
+        Click(h.Form._playPause); // nothing selected
+        Assert.Equal(a, h.Engine.View.Attended!.Row.Track.FilePath);
+        Assert.Equal(2.0, h.Engine.View.Attended!.Playhead.TimeSpan.TotalSeconds, 2);
+
+        Click(h.Form._playPause); // pause
+        SelectRows(h.Form._queueList, 1, 2);
+        Click(h.Form._playPause); // two selected
+        Assert.Equal(a, h.Engine.View.Attended!.Row.Track.FilePath);
+        Assert.Equal(2.0, h.Engine.View.Attended!.Playhead.TimeSpan.TotalSeconds, 2);
+    });
+
+    [Fact]
     public void TransitionNow_IsEnabledOnlyWhilePlaying_WithANextAdjacency_AndNoTransitionInFlight() => RunSta(() =>
     {
         using var h = new Harness();
