@@ -40,7 +40,7 @@ the thumb in a capture (the highlight colour), and click it with posted mouse me
 
 - [ ] The window opens without an error dialog.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
-- [ ] The transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, then the seek bar and the time; no ⏹.
+- [ ] The transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, then −5 s, the seek bar, +5 s and the time; no ⏹.
 - [ ] At launch the first row carries the marker, dimmed (a greyer yellow than while playing).
       Playing or paused, the marker is the full pale yellow. When the queue runs out it goes
       back to the first row, dimmed, and ▶ plays that row.
@@ -52,6 +52,8 @@ the thumb in a capture (the highlight colour), and click it with posted mouse me
       three-quarters of the length, playing or paused. Dragging the thumb moves it without
       moving the sound; letting go seeks there. At launch the bar is a plain grey groove with no
       thumb, and clicking it does nothing.
+- [ ] **+5 s** twice moves the readout on ten seconds and **−5 s** back five, playing or paused;
+      near the start −5 s stops at 0:00. Both are greyed out at launch, with the seek bar.
 - [ ] The time readout shows elapsed and remaining, and remaining never reads `0:00` mid-track.
 - [ ] Right-clicking a row shows "Edit transition: this → next" and "Edit transition: previous
       → this", and, only while repeat is on one, "Edit transition: this → this". All read

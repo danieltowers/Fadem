@@ -55,6 +55,10 @@ public readonly record struct Playhead
     /// <summary>The seek bar's value, straight through: no scaling, ever.</summary>
     public static Playhead FromMilliseconds(int milliseconds) => new(TimeSpan.FromMilliseconds(milliseconds));
 
+    /// <summary>A playhead moved by an offset, for <c>PlaybackEngine.SeekBy</c>; below zero is
+    /// zero.</summary>
+    internal Playhead Plus(TimeSpan offset) => new(TimeSpan + offset);
+
     /// <summary>Explicit only: audition an authored point by seeking to it.</summary>
     public static Playhead At(Point point) => new(point.TimeSpan);
 

@@ -252,37 +252,60 @@ public sealed partial class PlaybackEngine
         {
             ObserveClock();
             EndPreviewFirst();
-            var voice = _attendedVoice;
-            if (voice is null || voice.IsFinished)
-            {
-                return;
-            }
-
-            if (_outgoingVoice == voice)
-            {
-                ReturnToOutgoing();
-            }
-
-            var total = voice.Source.TotalFrames;
-            var frames = Math.Clamp(target.Frames(_rate), 0, Math.Max(total - 1, 0));
-            voice.Source.Position = frames;
-            voice.NoteSeek(_mixer.Timeline, voice.Source.Position);
-
-            // The seeked track snaps to full volume: its fades are cancelled.
-            voice.CancelFadeIn();
-            voice.CancelFadeOut();
-
-            if (_pendingBoundary is { } boundary && boundary.OutgoingVoice == voice && !boundary.Triggered)
-            {
-                CancelBoundary(boundary);
-                _pendingBoundary = null;
-            }
-            var voiceIndex = IndexOf(voice);
-            if (voiceIndex >= 0)
-            {
-                ScheduleBoundary(voiceIndex, voice, _mixer.Timeline, voice.Source.Position, retryMarked: false);
-            }
-            Publish();
+            SeekNow(target);
         });
+    }
+
+    /// <summary>Moves the attended voice by <paramref name="offset"/> from the playhead the
+    /// listener hears (interim transport issue 05): the ±5 s buttons. Clamped to the track, and
+    /// otherwise any seek: landing past a fade-out point does not force the transition. With
+    /// nothing attended (stopped) it does nothing and says nothing.</summary>
+    public void SeekBy(TimeSpan offset)
+    {
+        ThrowIfDisposed();
+        Run(() =>
+        {
+            ObserveClock();
+            EndPreviewFirst();
+            if (View.Attended is { } attended)
+            {
+                SeekNow(attended.Playhead.Plus(offset));
+            }
+        });
+    }
+
+    private void SeekNow(Playhead target)
+    {
+        var voice = _attendedVoice;
+        if (voice is null || voice.IsFinished)
+        {
+            return;
+        }
+
+        if (_outgoingVoice == voice)
+        {
+            ReturnToOutgoing();
+        }
+
+        var total = voice.Source.TotalFrames;
+        var frames = Math.Clamp(target.Frames(_rate), 0, Math.Max(total - 1, 0));
+        voice.Source.Position = frames;
+        voice.NoteSeek(_mixer.Timeline, voice.Source.Position);
+
+        // The seeked track snaps to full volume: its fades are cancelled.
+        voice.CancelFadeIn();
+        voice.CancelFadeOut();
+
+        if (_pendingBoundary is { } boundary && boundary.OutgoingVoice == voice && !boundary.Triggered)
+        {
+            CancelBoundary(boundary);
+            _pendingBoundary = null;
+        }
+        var voiceIndex = IndexOf(voice);
+        if (voiceIndex >= 0)
+        {
+            ScheduleBoundary(voiceIndex, voice, _mixer.Timeline, voice.Source.Position, retryMarked: false);
+        }
+        Publish();
     }
 }

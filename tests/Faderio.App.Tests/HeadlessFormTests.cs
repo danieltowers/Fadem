@@ -920,12 +920,12 @@ public sealed class HeadlessFormTests
     public void TheTransportRow_HasNoStopButton() => RunSta(() =>
     {
         using var h = new Harness();
-        var transport = h.Form._playPause.Parent!;
+        var transport = (TableLayoutPanel)h.Form._playPause.Parent!;
         // Ordinal: UI text comparison folds ⏹ and ⏸ together.
         Assert.DoesNotContain(transport.Controls.Cast<Control>(), c => string.Equals(c.Text, "⏹", StringComparison.Ordinal));
         Assert.Equal(
-            new[] { "⏮", "▶", "⏭", "⤳", "🔀", "🔁" },
-            transport.Controls.OfType<ButtonBase>().Select(c => c.Text).ToArray());
+            new[] { "⏮", "▶", "⏭", "⤳", "🔀", "🔁", "−5 s", "+5 s" },
+            transport.Controls.OfType<ButtonBase>().OrderBy(transport.GetColumn).Select(c => c.Text).ToArray());
     });
 
     [Fact]
@@ -1028,6 +1028,44 @@ public sealed class HeadlessFormTests
 
         Assert.InRange(h.Engine.View.Attended!.Playhead.Milliseconds, 3980, 4020);
         Assert.Equal("0:04 / -0:04", h.Form._time.Text);
+    });
+
+    [Fact]
+    public void TheJumpButtons_MoveFiveSecondsEachWay_AndFollowTheSeekBarsEnabledState() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 12, 0.4);
+        h.Form.AddPaths(new[] { a });
+        h.Form.Render();
+        Assert.False(h.Form._back5.Enabled); // stopped at launch
+        Assert.False(h.Form._forward5.Enabled);
+
+        h.Form.PlayRowAt(0);
+        h.Output.Advance(44100);
+        h.Form.Render();
+        Assert.True(h.Form._back5.Enabled);
+        Assert.True(h.Form._forward5.Enabled);
+
+        Click(h.Form._forward5);
+        Click(h.Form._forward5);
+        h.Form.Render();
+        Assert.Equal(11.0, h.Engine.View.Attended!.Playhead.TotalSeconds, 2);
+        Assert.Equal("0:11 / -0:01", h.Form._time.Text);
+
+        Click(h.Form._back5);
+        h.Form.Render();
+        Assert.Equal(6.0, h.Engine.View.Attended!.Playhead.TotalSeconds, 2);
+    });
+
+    [Fact]
+    public void TheTransportRow_PutsTheJumpButtonsEitherSideOfTheSeekBar() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var row = (TableLayoutPanel)h.Form._seek.Parent!;
+        var seek = row.GetColumn(h.Form._seek);
+        Assert.Equal(seek - 1, row.GetColumn(h.Form._back5));
+        Assert.Equal(seek + 1, row.GetColumn(h.Form._forward5));
+        Assert.Equal(seek + 2, row.GetColumn(h.Form._time));
     });
 
     [Fact]

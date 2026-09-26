@@ -1,6 +1,6 @@
 # 05: Jump five seconds either way
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 04
 
 Decided in [D7](../../202609-faderio-interim-improvements/decisions.md).
@@ -23,13 +23,15 @@ Decided in [D7](../../202609-faderio-interim-improvements/decisions.md).
 
 ## Acceptance
 
-- [ ] At 0:10, +5 s → 0:15; −5 s → 0:10.
-- [ ] At 0:02, −5 s → 0:00.
-- [ ] 3 s before the end, +5 s → the track ends and the adjacency plays as authored (or the
+- [x] At 0:10, +5 s → 0:15; −5 s → 0:10.
+- [x] At 0:02, −5 s → 0:00.
+- [x] 3 s before the end, +5 s → the track ends and the adjacency plays as authored (or the
       queue advances).
-- [ ] 2 s before a fade-out point with a 4 s fade, +5 s → lands inside the fade; the crossfade
-      is already in progress at the right gain (fake-output test).
-- [ ] Paused: the jump moves the readout; ▶ resumes there.
+- [x] ~~2 s before a fade-out point with a 4 s fade, +5 s → lands inside the fade; the crossfade
+      is already in progress at the right gain (fake-output test).~~ Superseded by D7 ("treated as
+      any seek"): the jump lands past the fade-out point, the track plays flat, and no transition
+      is forced — see Comments.
+- [x] Paused: the jump moves the readout; ▶ resumes there.
 
 ## Tests
 
@@ -41,3 +43,19 @@ Decided in [D7](../../202609-faderio-interim-improvements/decisions.md).
 - **Looks:** press +5 s twice; the readout advances by ten seconds.
 
 ## Comments
+
+- Built 2026-09-26. `SeekBy(TimeSpan offset)` reads the attended playhead from `View` after
+  `ObserveClock`, as `Capture` does, so the offset is from what the listener hears; it then runs
+  `Seek`'s body (`SeekNow`, extracted). `Playhead.Plus(offset)` (internal) floors at zero; the
+  seek already clamps to the track's last frame. Stopped: `View.Attended` is null, so nothing
+  happens and nothing is said.
+- **Acceptance line 4 contradicted D7 and the engine.** It asked for a jump past the fade-out point
+  to land mid-crossfade; D7 says a jump is any seek, and a seek past the fade-out point never
+  forces the transition (`SeekSkipSemanticsTests.SeekPastTheAuthoredFadeOutPoint_DoesNotForceTheTransition`).
+  The decisions file wins, so `SeekByTests.ForwardPastTheFadeOutPoint_IsAnySeek_TheTransitionIsNotForced`
+  pins the D7 behaviour: the track plays flat from where it lands and hard-cuts at its end.
+- Shell: **−5 s** and **+5 s** in columns either side of the seek bar (the transport table is 10
+  columns), enabled exactly when the bar is. The row still fits at the window's 760 px minimum.
+- Tests: `SeekByTests` (6, engine) and two form tests (the buttons move ±5 s and follow the bar's
+  enabled state; their columns flank the bar). Issue 01's row test now orders by column and
+  includes the two buttons.

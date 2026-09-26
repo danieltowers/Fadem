@@ -27,6 +27,8 @@ internal sealed class MainForm : Form
 
     internal readonly ListView _queueList;
     internal readonly SeekBar _seek;
+    internal readonly Button _back5;
+    internal readonly Button _forward5;
     internal readonly Label _time;
     internal readonly Button _addFiles;
     internal readonly Button _addFolder;
@@ -121,6 +123,11 @@ internal sealed class MainForm : Form
         _repeat = new CheckBox { Text = "🔁", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 44, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _tips = new ToolTip();
         _tips.SetToolTip(_transitionNow, "Transition now");
+        // Either side of the seek bar (interim transport issue 05): fixed five-second jumps.
+        _back5 = new Button { Text = "−5 s", Width = 48, Height = 28, Margin = new Padding(8, 8, 0, 4), Enabled = false };
+        _forward5 = new Button { Text = "+5 s", Width = 48, Height = 28, Margin = new Padding(0, 8, 2, 4), Enabled = false };
+        _tips.SetToolTip(_back5, "Back 5 seconds");
+        _tips.SetToolTip(_forward5, "Forward 5 seconds");
         _seek = new SeekBar
         {
             Dock = DockStyle.Fill,
@@ -136,12 +143,13 @@ internal sealed class MainForm : Form
         };
         // A table, not anchors: the seek bar takes whatever width is left between the buttons
         // and the readout, at any window size.
-        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 8, RowCount = 1 };
-        foreach (var _ in Enumerable.Range(0, 6))
+        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 10, RowCount = 1 };
+        foreach (var _ in Enumerable.Range(0, 7))
         {
             transport.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         }
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        transport.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
         transport.Controls.Add(_prev, 0, 0);
         transport.Controls.Add(_playPause, 1, 0);
@@ -149,8 +157,10 @@ internal sealed class MainForm : Form
         transport.Controls.Add(_transitionNow, 3, 0);
         transport.Controls.Add(_shuffle, 4, 0);
         transport.Controls.Add(_repeat, 5, 0);
-        transport.Controls.Add(_seek, 6, 0);
-        transport.Controls.Add(_time, 7, 0);
+        transport.Controls.Add(_back5, 6, 0);
+        transport.Controls.Add(_seek, 7, 0);
+        transport.Controls.Add(_forward5, 8, 0);
+        transport.Controls.Add(_time, 9, 0);
 
         _queueList = new ListView
         {
@@ -256,6 +266,8 @@ internal sealed class MainForm : Form
         _shuffle.Click += (_, _) => _engine.SetShuffle(!_engine.View.Shuffle);
         _repeat.Click += (_, _) => _engine.SetRepeat(Presenter.NextRepeat(_engine.View.Repeat));
         _seek.SeekRequested += playhead => _engine.Seek(playhead);
+        _back5.Click += (_, _) => _engine.SeekBy(TimeSpan.FromSeconds(-5));
+        _forward5.Click += (_, _) => _engine.SeekBy(TimeSpan.FromSeconds(5));
 
         sink.Changed += Render;
         sink.Noticed += ShowNotice;
@@ -330,6 +342,7 @@ internal sealed class MainForm : Form
 
         var attended = view.Attended;
         _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length);
+        _back5.Enabled = _forward5.Enabled = _seek.Enabled;
         _time.Text = Presenter.TimeReadout(attended, held: view.Preview is not null);
 
         _addProgress.Text = Presenter.FmtAdding(view.Adding);
