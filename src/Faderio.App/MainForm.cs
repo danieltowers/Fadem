@@ -35,7 +35,6 @@ internal sealed class MainForm : Form
     internal readonly Button _settings;
     internal readonly Button _prev;
     internal readonly Button _playPause;
-    internal readonly Button _stop;
     internal readonly Button _next;
     internal readonly Button _transitionNow;
     internal readonly CheckBox _shuffle;
@@ -114,7 +113,6 @@ internal sealed class MainForm : Form
         var symbols = new Font("Segoe UI Symbol", 9f);
         _prev = new Button { Text = "⏮", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
-        _stop = new Button { Text = "⏹", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _next = new Button { Text = "⏭", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         // Arrows draw small in this font; at 13 pt the wave arrow reads as clearly as ⏭.
         _transitionNow = new Button { Text = "⤳", Font = new Font("Segoe UI Symbol", 13f), Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
@@ -142,8 +140,8 @@ internal sealed class MainForm : Form
         };
         // A table, not anchors: the seek bar takes whatever width is left between the buttons
         // and the readout, at any window size.
-        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 9, RowCount = 1 };
-        foreach (var _ in Enumerable.Range(0, 7))
+        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 8, RowCount = 1 };
+        foreach (var _ in Enumerable.Range(0, 6))
         {
             transport.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         }
@@ -151,13 +149,12 @@ internal sealed class MainForm : Form
         transport.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
         transport.Controls.Add(_prev, 0, 0);
         transport.Controls.Add(_playPause, 1, 0);
-        transport.Controls.Add(_stop, 2, 0);
-        transport.Controls.Add(_next, 3, 0);
-        transport.Controls.Add(_transitionNow, 4, 0);
-        transport.Controls.Add(_shuffle, 5, 0);
-        transport.Controls.Add(_repeat, 6, 0);
-        transport.Controls.Add(_seek, 7, 0);
-        transport.Controls.Add(_time, 8, 0);
+        transport.Controls.Add(_next, 2, 0);
+        transport.Controls.Add(_transitionNow, 3, 0);
+        transport.Controls.Add(_shuffle, 4, 0);
+        transport.Controls.Add(_repeat, 5, 0);
+        transport.Controls.Add(_seek, 6, 0);
+        transport.Controls.Add(_time, 7, 0);
 
         _queueList = new ListView
         {
@@ -257,7 +254,6 @@ internal sealed class MainForm : Form
         _clip.Click += (_, _) => _engine.ClearClip();
         _playPause.Click += (_, _) => _engine.TogglePlayPause();
         _prev.Click += (_, _) => _engine.Previous();
-        _stop.Click += (_, _) => _engine.Stop();
         _next.Click += (_, _) => _engine.Next();
         _transitionNow.Click += (_, _) => _engine.TransitionNow();
         // The press asks for the state after the one the view holds now, not the one last shown.

@@ -917,6 +917,18 @@ public sealed class HeadlessFormTests
     });
 
     [Fact]
+    public void TheTransportRow_HasNoStopButton() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var transport = h.Form._playPause.Parent!;
+        // Ordinal: UI text comparison folds ⏹ and ⏸ together.
+        Assert.DoesNotContain(transport.Controls.Cast<Control>(), c => string.Equals(c.Text, "⏹", StringComparison.Ordinal));
+        Assert.Equal(
+            new[] { "⏮", "▶", "⏭", "⤳", "🔀", "🔁" },
+            transport.Controls.OfType<ButtonBase>().Select(c => c.Text).ToArray());
+    });
+
+    [Fact]
     public void TransitionNow_IsEnabledOnlyWhilePlaying_WithANextAdjacency_AndNoTransitionInFlight() => RunSta(() =>
     {
         using var h = new Harness();

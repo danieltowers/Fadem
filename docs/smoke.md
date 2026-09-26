@@ -32,12 +32,14 @@ half; the Sounds half uses the two tracks of a boundary already in the store
 (`%APPDATA%\faderio\transitions.json` lists them by full path).
 
 Capture the window with `PrintWindow` rather than a screen grab, so it need not be in front.
-UI Automation matches ⏹ and ⏸ as the same name, so find a transport button by comparing names
-ordinally, not with a name condition. The status strip's items are not exposed to it; read them
+There is no ⏹ button (the engine still stops at launch and when the queue ends). UI Automation
+folds some symbol glyphs together, so find a transport button by comparing names ordinally, not
+with a name condition. The status strip's items are not exposed to it; read them
 from a capture.
 
 - [ ] The window opens without an error dialog.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
+- [ ] The transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, then the seek bar and the time; no ⏹.
 - [ ] The seek bar has visible travel across the width of the transport area, not a stub.
 - [ ] While playing, the seek thumb moves smoothly — not in visible steps.
 - [ ] The time readout shows elapsed and remaining, and remaining never reads `0:00` mid-track.
@@ -94,8 +96,8 @@ from a capture.
 - [ ] Dragging selected rows shows a line where they will land, and dropping moves them there,
       still selected and in their order. In a queue longer than the list, a drag held at the
       bottom edge scrolls it.
-- [ ] While playing on WASAPI shared, pressing ⏹, **Delete** on the only row and **Clear
-      queue** each stop playback, and the window keeps rendering afterwards: the play button
+- [ ] While playing on WASAPI shared, **Delete** on the only row and **Clear queue** each
+      stop playback, and the window keeps rendering afterwards: the play button
       shows ▶ and the readout resets. Repeat each a few times; the freeze was a race.
 - [ ] Beside ⏭, the shuffle toggle (🔀) and the repeat button read clearly in every state:
       each shows pressed in while on and plain while off. Repeat cycles off (🔁, plain) → all
@@ -183,8 +185,8 @@ sharp percussive transient; the realism check is the authored boundary from the 
       if needed), toggling ReplayGain in **Settings…** mid-track changes the level at once,
       with no click. An untagged track does not change.
 - [ ] Author an overlap of two loud masters, or play a boosted track: the clip light comes on
-      as you hear the clip, not before, and names what you heard. Stop and Clear queue
-      leave it on; clicking it clears it.
+      as you hear the clip, not before, and names what you heard. Clear queue leaves it
+      on; clicking it clears it.
 - [ ] Two consecutive tracks of a continuous MP3 album (a live or segued one, whose files
       carry a LAME tag), with no transition authored, hard-cut with no audible gap.
 - [ ] With another app holding the device exclusively, launch in exclusive mode; faderio falls

@@ -1,6 +1,6 @@
 # 01: Hide the stop button
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 
 Decided in [D3](../../202609-faderio-interim-improvements/decisions.md).
@@ -19,9 +19,9 @@ Decided in [D3](../../202609-faderio-interim-improvements/decisions.md).
 
 ## Acceptance
 
-- [ ] No ⏹ anywhere in the window.
-- [ ] `Stop()` and its tests are unchanged in the diff.
-- [ ] The Looks half of `docs/smoke.md` no longer names ⏹; its note that "UI Automation
+- [x] No ⏹ anywhere in the window.
+- [x] `Stop()` and its tests are unchanged in the diff.
+- [x] The Looks half of `docs/smoke.md` no longer names ⏹; its note that "UI Automation
       matches ⏹ and ⏸ as the same name" is updated to say only ⏸ exists.
 
 ## Tests
@@ -33,3 +33,12 @@ Decided in [D3](../../202609-faderio-interim-improvements/decisions.md).
 - **Looks:** the transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, seek bar, time.
 
 ## Comments
+
+- Built 2026-09-26. `_stop` is gone from `MainForm`: field, construction, click handler and its
+  grid cell; the transport table is 8 columns (6 auto-sized buttons, the seek bar, the time).
+  `PlaybackEngine.Stop()` and its tests are untouched; `Clear`, `Remove` of the last row and the
+  end of the queue still reach it.
+- Form test `TheTransportRow_HasNoStopButton` asserts the row's buttons, in order, are
+  ⏮ ▶ ⏭ ⤳ 🔀 🔁. It failed before the change for the right reason.
+- `docs/smoke.md`: the UI Automation note no longer names ⏹; the Delete / Clear queue freeze item
+  and the clip-light Sounds item no longer press it; a Looks item for the row's order is added.
