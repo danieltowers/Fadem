@@ -1,6 +1,6 @@
 # Spec — faderio v3: the rest of Phase 1
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem
 
