@@ -145,9 +145,10 @@ file later becomes unreadable, that is not a rejection.
 _Avoid_: Unsupported, failed, skipped
 
 **Unreadable**:
-A queued track whose file can no longer be read when the player comes to play it: deleted,
-moved, truncated or on a drive that has gone. The player passes over it with a notice and keeps
-its row, trying it again next time.
+A queued track whose file cannot be opened when the player comes to play it: deleted, moved,
+on a drive that has gone, or damaged so that none of it plays. The player passes over it with a
+notice and keeps its row, trying it again next time. A file that plays but ends before its
+length, such as one cut short, is not unreadable: it ends where its audio ends, with a notice.
 _Avoid_: Broken, missing, rejected, skipped (a skip is the user's action)
 
 **Probe**:

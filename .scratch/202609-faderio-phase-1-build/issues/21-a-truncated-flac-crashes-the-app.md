@@ -94,6 +94,10 @@ last frame the pre-scan found is incomplete.
   a truncated file with whole frames plays short with a notice, as ADR 0010 says and as a
   truncated WAV already did; only a file with nothing whole is passed over. The glossary is
   unchanged: a gap for `/domain-modeling`, not decided here.
+- Glossary gap closed 2026-09-26 (`/domain-modeling`): **Unreadable** now means a file that
+  cannot be opened, down to one damaged so that none of it plays. A file cut short that still
+  plays is not Unreadable: it ends where its audio ends, with ADR 0010's notice. The code
+  already did this; only `CONTEXT.md` changed.
 - Code review (standards and spec, in parallel): no hard violations. Fixed from it: the size
   bound (was STREAMINFO's maximum frame size, applied to a run that can hold more than one
   frame), APEv2 tags, a child-process timeout that could not fire (stdout was read to the end
