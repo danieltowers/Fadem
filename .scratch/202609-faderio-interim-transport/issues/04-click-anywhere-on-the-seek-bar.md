@@ -1,6 +1,6 @@
 # 04: Click anywhere on the seek bar
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 
 Decided in [D6](../../202609-faderio-interim-improvements/decisions.md).
@@ -31,12 +31,12 @@ the only way to move far is to drag the thumb.
 
 ## Acceptance
 
-- [ ] Click at 50 % of the bar during playback → the playhead lands within 0.5 s of half the
+- [x] Click at 50 % of the bar during playback → the playhead lands within 0.5 s of half the
       length and the readout follows.
-- [ ] Drag: the audio does not move until release.
-- [ ] Click while paused → seeks; ▶ resumes there.
-- [ ] Click at launch (stopped) → nothing happens.
-- [ ] During a crossfade the bar scrubs the attended (outgoing) voice, as today.
+- [x] Drag: the audio does not move until release.
+- [x] Click while paused → seeks; ▶ resumes there.
+- [x] Click at launch (stopped) → nothing happens.
+- [x] During a crossfade the bar scrubs the attended (outgoing) voice, as today.
 
 ## Tests
 
@@ -50,3 +50,20 @@ the only way to move far is to drag the thumb.
   time near three-quarters of the length.
 
 ## Comments
+
+- Built 2026-09-26. `SeekBar` (`src/Faderio.App/SeekBar.cs`), a user-painted `Control`:
+  `Show(Playhead, Length?)` on every render, one `SeekRequested(Playhead)` event per click, drag or
+  run of arrow keys, which `MainForm` passes straight to `engine.Seek`. `_seekDragging` is gone
+  from the form: the bar ignores the view's playhead itself while it is held. Travel runs between
+  a 6 px inset at each end so the thumb is whole at both ends; `PlayheadAt(x)` is the only
+  pixel → playhead mapping. Disabled, with no thumb, when `Length` is null (nothing attended).
+- An arrow-key run that loses focus before key-up still seeks, so the thumb never strands where
+  the sound is not.
+- Crossfade: the engine's `Seek` is unchanged, and
+  `SeekSkipSemanticsTests.SeekDuringACrossfade_CancelsTheTransition_AndScrubsTheAttendedVoice`
+  already covers it; the bar is fed the attended voice as the TrackBar was.
+- Tests: `SeekBarTests` (5: mapping, click, drag, keys, disabled) and one form test (a click while
+  paused seeks the attended voice to half of 8 s; at launch it does nothing). The existing playhead
+  test reads `_seek.Playhead` instead of `_seek.Value`.
+- UI Automation sees the bar as a pane named "Seek" (its window text; `AccessibleName` alone
+  did not reach UIA). `docs/smoke.md` says so and how to find the thumb.

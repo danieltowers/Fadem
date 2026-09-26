@@ -35,7 +35,8 @@ Capture the window with `PrintWindow` rather than a screen grab, so it need not 
 There is no ⏹ button (the engine still stops at launch and when the queue ends). UI Automation
 folds some symbol glyphs together, so find a transport button by comparing names ordinally, not
 with a name condition. The status strip's items are not exposed to it; read them
-from a capture.
+from a capture. The seek bar is a pane named "Seek" whose thumb is not an element of its own: find
+the thumb in a capture (the highlight colour), and click it with posted mouse messages.
 
 - [ ] The window opens without an error dialog.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
@@ -47,6 +48,10 @@ from a capture.
       With the playing row, no row or several rows selected, ▶ resumes where it paused.
 - [ ] The seek bar has visible travel across the width of the transport area, not a stub.
 - [ ] While playing, the seek thumb moves smoothly — not in visible steps.
+- [ ] Clicking three-quarters along the seek bar jumps the thumb there and the readout to about
+      three-quarters of the length, playing or paused. Dragging the thumb moves it without
+      moving the sound; letting go seeks there. At launch the bar is a plain grey groove with no
+      thumb, and clicking it does nothing.
 - [ ] The time readout shows elapsed and remaining, and remaining never reads `0:00` mid-track.
 - [ ] Right-clicking a row shows "Edit transition: this → next" and "Edit transition: previous
       → this", and, only while repeat is on one, "Edit transition: this → this". All read

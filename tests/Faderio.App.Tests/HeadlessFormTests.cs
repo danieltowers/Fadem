@@ -303,8 +303,8 @@ public sealed class HeadlessFormTests
         h.Output.Advance(44100 * 3);
         h.Form.Render(); // the display timer's tick
 
-        Assert.Equal(5000, h.Form._seek.Maximum);           // milliseconds, no scaling
-        Assert.Equal(3000, h.Form._seek.Value);
+        Assert.True(h.Form._seek.Enabled);
+        Assert.Equal(3000, h.Form._seek.Playhead.Milliseconds);
         Assert.Equal("0:03 / -0:02", h.Form._time.Text);
         Assert.Equal(SystemColors.Info, h.Form._queueList.Items[1].BackColor);
         Assert.Equal(SystemColors.Window, h.Form._queueList.Items[0].BackColor);
@@ -997,6 +997,37 @@ public sealed class HeadlessFormTests
         h.Form.Render();
         Assert.Equal(Transport.Stopped, h.Engine.View.Transport);
         Assert.Equal(new[] { MainForm.RestingMarker, SystemColors.Window }, Backs());
+    });
+
+    [Fact]
+    public void AClickOnTheSeekBar_SeeksTheAttendedVoiceThere_AndOnlyWhileSomethingIsAttended() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 8, 0.4);
+        h.Form.AddPaths(new[] { a });
+        h.Form.Render();
+        var onMouseDown = typeof(Control).GetMethod("OnMouseDown", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var onMouseUp = typeof(Control).GetMethod("OnMouseUp", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        void ClickAt(int x)
+        {
+            var at = new MouseEventArgs(MouseButtons.Left, 1, x, 10, 0);
+            onMouseDown.Invoke(h.Form._seek, new object[] { at });
+            onMouseUp.Invoke(h.Form._seek, new object[] { at });
+        }
+
+        Assert.False(h.Form._seek.Enabled); // stopped at launch: nothing attended
+        ClickAt(300);
+        Assert.Equal(Transport.Stopped, h.Engine.View.Transport);
+
+        h.Form.PlayRowAt(0);
+        h.Output.Advance(44100);
+        Click(h.Form._playPause); // pause
+        h.Form.Render();
+        ClickAt(SeekBar.Inset + (h.Form._seek.Width - 2 * SeekBar.Inset) / 2); // halfway along the travel
+        h.Form.Render();
+
+        Assert.InRange(h.Engine.View.Attended!.Playhead.Milliseconds, 3980, 4020);
+        Assert.Equal("0:04 / -0:04", h.Form._time.Text);
     });
 
     [Fact]

@@ -26,7 +26,7 @@ internal sealed class MainForm : Form
     private readonly Func<AudioOutputMode?> _outputModeInUse;
 
     internal readonly ListView _queueList;
-    internal readonly TrackBar _seek;
+    internal readonly SeekBar _seek;
     internal readonly Label _time;
     internal readonly Button _addFiles;
     internal readonly Button _addFolder;
@@ -64,7 +64,6 @@ internal sealed class MainForm : Form
     internal NoticeListForm? _noticeList;
 
     private long _shownQueue = -1;
-    private bool _seekDragging;
 
     /// <param name="outputModeInUse">The mode the output opened in, or null when none could be:
     /// the output adapter's, for the settings dialog.</param>
@@ -122,13 +121,10 @@ internal sealed class MainForm : Form
         _repeat = new CheckBox { Text = "🔁", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 44, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _tips = new ToolTip();
         _tips.SetToolTip(_transitionNow, "Transition now");
-        _seek = new TrackBar
+        _seek = new SeekBar
         {
             Dock = DockStyle.Fill,
-            Minimum = 0,
-            Maximum = 0,
-            TickStyle = TickStyle.None,
-            Margin = new Padding(8, 6, 8, 0),
+            Margin = new Padding(8, 6, 8, 4),
         };
         _time = new Label
         {
@@ -259,12 +255,7 @@ internal sealed class MainForm : Form
         // The press asks for the state after the one the view holds now, not the one last shown.
         _shuffle.Click += (_, _) => _engine.SetShuffle(!_engine.View.Shuffle);
         _repeat.Click += (_, _) => _engine.SetRepeat(Presenter.NextRepeat(_engine.View.Repeat));
-        _seek.MouseDown += (_, _) => _seekDragging = true;
-        _seek.MouseUp += (_, _) =>
-        {
-            _seekDragging = false;
-            _engine.Seek(Playhead.FromMilliseconds(_seek.Value)); // straight through, no scaling
-        };
+        _seek.SeekRequested += playhead => _engine.Seek(playhead);
 
         sink.Changed += Render;
         sink.Noticed += ShowNotice;
@@ -338,11 +329,7 @@ internal sealed class MainForm : Form
         }
 
         var attended = view.Attended;
-        _seek.Maximum = attended?.Length.Milliseconds ?? 0;
-        if (!_seekDragging)
-        {
-            _seek.Value = Math.Clamp(attended?.Playhead.Milliseconds ?? 0, _seek.Minimum, _seek.Maximum);
-        }
+        _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length);
         _time.Text = Presenter.TimeReadout(attended, held: view.Preview is not null);
 
         _addProgress.Text = Presenter.FmtAdding(view.Adding);
