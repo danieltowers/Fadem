@@ -36,8 +36,9 @@ Decided in [D3](../../202609-faderio-interim-improvements/decisions.md).
 
 - Built 2026-09-26. `_stop` is gone from `MainForm`: field, construction, click handler and its
   grid cell; the transport table is 8 columns (6 auto-sized buttons, the seek bar, the time).
-  `PlaybackEngine.Stop()` and its tests are untouched; `Clear`, `Remove` of the last row and the
-  end of the queue still reach it.
+  `PlaybackEngine.Stop()` and its tests are untouched. Its only production caller is now
+  `Renderer`; `Clear` and removing the last row stop through the same internals
+  (`ResetForRestart` + `StopOutput`), not through `Stop()`.
 - Form test `TheTransportRow_HasNoStopButton` asserts the row's buttons, in order, are
   ⏮ ▶ ⏭ ⤳ 🔀 🔁. It failed before the change for the right reason.
 - `docs/smoke.md`: the UI Automation note no longer names ⏹; the Delete / Clear queue freeze item
