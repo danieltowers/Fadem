@@ -13,16 +13,22 @@ A single audio file known to the player. The unit of metadata and playback; it n
 transition by itself.
 
 **Library**:
-The collection of all tracks known to the player, from which playlists are built.
+A folder the user chooses that is one self-contained faderio instance: its playlists, its
+transitions and its listening settings live inside it, and its tracks may live anywhere on
+disk. Opening a different library is opening a different world; nothing carries across.
+_Avoid_: Workspace, collection, instance, profile
 
 **Playlist**:
-A named, saved, ordered sequence of tracks.
+A named, ordered sequence of tracks belonging to a library. Its name is how the user refers
+to it and how its overrides are found. Exactly one playlist is **open** at a time; edits to
+the open playlist are kept without the user asking.
 _Avoid_: Album, set
 
 **Queue**:
-The runtime playback sequence — what the player will play next. Playlists are loaded into the
-queue; the queue itself is never saved, though its order can be saved as a new playlist.
-_Avoid_: Up next, playback list
+The runtime playback sequence — what the player will play next. The queue mirrors the open
+playlist: opening a playlist replaces the queue, and every change to the queue is a change to
+that playlist. There is no queue apart from an open playlist.
+_Avoid_: Up next, playback list, scratch queue
 
 **Row**:
 One place in the queue, holding one track. The same track can fill several rows. A row keeps
@@ -122,6 +128,12 @@ _Avoid_: Set from here, mark, grab
 **Attended voice**:
 The voice whose playhead the shell displays and the seek bar scrubs. During a crossfade it
 remains the outgoing voice until that voice falls silent.
+
+**Attended row**:
+The row Play would resume or start: the attended voice's row while anything sounds, otherwise
+the row the queue rests on. Marked in the queue in every transport state, so the marker
+never means "sounding now".
+_Avoid_: Playing row, current row, now playing
 
 **Length**:
 How long a track is, as the engine issues it: the span the playhead lives within, the value a
