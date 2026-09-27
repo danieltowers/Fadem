@@ -374,6 +374,48 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
+    public void AboveTheTransport_TheAttendedTrackIsNamed_PausedToo_AndBlankWhenStopped() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 5, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 5, 0.2);
+        h.Form.AddPaths(new[] { a, b });
+        Assert.Equal("", h.Form._attendedTrack.Text);
+
+        h.Form.PlayRowAt(0);
+        h.Output.Advance(44100 * 3);
+        h.Form.Render();
+        // Untagged: the title is the file's name.
+        Assert.Equal(Path.GetFileNameWithoutExtension(a), h.Form._attendedTrack.Text);
+
+        h.Output.Advance(44100 * 3); // alpha ends; the hard cut hands over to beta
+        h.Form.Render();
+        Assert.Equal(Path.GetFileNameWithoutExtension(b), h.Form._attendedTrack.Text);
+
+        h.Form._queueList.SelectedIndices.Clear();
+        Click(h.Form._playPause);
+        Assert.Equal(Transport.Paused, h.Engine.View.Transport);
+        Assert.Equal(Path.GetFileNameWithoutExtension(b), h.Form._attendedTrack.Text);
+
+        h.Form.ConfirmClear = _ => true;
+        h.Form._clearQueue.PerformClick();
+        Assert.Equal(Transport.Stopped, h.Engine.View.Transport);
+        Assert.Equal("", h.Form._attendedTrack.Text);
+    });
+
+    [Fact]
+    public void TheAttendedTrack_SitsBetweenTheButtonsAndTheTransport() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Form.ClientSize = new Size(900, 600);
+        h.Form.PerformLayout();
+        var transport = h.Form._seek.Parent!;
+        var track = h.Form._attendedTrack;
+        Assert.Equal(transport.Top, track.Bottom);
+        Assert.Equal(h.Form._addFiles.Parent!.Bottom, track.Top);
+    });
+
+    [Fact]
     public void AnUnreadableRow_IsMarked_UntilItsFileOpensAgain() => RunSta(() =>
     {
         using var h = new Harness();

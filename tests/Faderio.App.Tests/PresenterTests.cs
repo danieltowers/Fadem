@@ -233,6 +233,16 @@ public sealed class PresenterTests
     }
 
     [Fact]
+    public void FmtAttendedTrack_NamesTheAttendedVoicesTrack_AndIsBlankWhenStopped()
+    {
+        var track = TrackNamed(@"C:\m\morning.flac", "Morning", "Example Band");
+        var voice = new VoiceView(new QueueRow(new RowId(1), track, IsCurrent: true), Playhead.Zero, new Length(TimeSpan.FromSeconds(5)));
+
+        Assert.Equal("Morning — Example Band", Presenter.FmtAttendedTrack(voice));
+        Assert.Equal("", Presenter.FmtAttendedTrack(null));
+    }
+
+    [Fact]
     public void ManagerRow_PairsEachParameterGlobalThenOverride_WithADashForTheLayerThatSetsNone()
     {
         var a = TrackNamed(@"C:\m\a.wav", "A");

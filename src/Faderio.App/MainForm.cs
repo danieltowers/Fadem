@@ -21,7 +21,8 @@ namespace Faderio.App;
 /// playlist sidebar on the left (playlists issue 02), the open playlist named above the queue
 /// and in the title (playlists issue 03), and Transitions…, which opens the transition manager,
 /// as the queue's menu does on a row's track (playlists issue 05), and the queue's columns, chosen
-/// from the header's menu, dragged into order and sized, kept per library (playlists issue 06). It
+/// from the header's menu, dragged into order and sized, kept per library (playlists issue 06), and
+/// the attended track named above the transport. It
 /// renders <see cref="PlayerView"/>s and issues commands; it holds no engine state between calls
 /// (the placement rule in CLAUDE.md). The seek bar's Maximum is the track length in milliseconds,
 /// so no scaling exists to get wrong (ticket 06).
@@ -37,6 +38,7 @@ internal sealed class MainForm : Form
     internal readonly Button _back5;
     internal readonly Button _forward5;
     internal readonly Label _time;
+    internal readonly Label _attendedTrack;
     internal readonly Button _addFiles;
     internal readonly Button _addFolder;
     internal readonly Button _importPlaylist;
@@ -172,6 +174,18 @@ internal sealed class MainForm : Form
             TextAlign = ContentAlignment.MiddleLeft,
             AutoSize = false,
             Dock = DockStyle.Fill,
+        };
+        // The attended track's name, on its own line above the transport. It keeps its height
+        // while stopped, so the transport does not jump when playback starts.
+        _attendedTrack = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = 26,
+            Font = new Font(Font.FontFamily, 11f),
+            Padding = new Padding(6, 4, 6, 0),
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoEllipsis = true, // and the whole name as its tooltip when cut short
+            UseMnemonic = false,
         };
         // A table, not anchors: the seek bar takes whatever width is left between the buttons
         // and the readout, at any window size.
@@ -408,6 +422,7 @@ internal sealed class MainForm : Form
         Controls.Add(_editor);
         Controls.Add(statusStrip);
         Controls.Add(transport);
+        Controls.Add(_attendedTrack);
         Controls.Add(queueBar);
 
         _addFiles.Click += (_, _) => AddChosen(ChooseFiles);
@@ -565,6 +580,11 @@ internal sealed class MainForm : Form
         _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length);
         _back5.Enabled = _forward5.Enabled = _seek.Enabled;
         _time.Text = Presenter.TimeReadout(attended, held: view.Preview is not null);
+        var attendedTrack = Presenter.FmtAttendedTrack(attended);
+        if (_attendedTrack.Text != attendedTrack)
+        {
+            _attendedTrack.Text = attendedTrack;
+        }
 
         _addProgress.Text = Presenter.FmtAdding(view.Adding);
         _addProgress.Available = view.Adding is not null;

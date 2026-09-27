@@ -261,6 +261,12 @@ internal static class Presenter
             ? "0:00 / -0:00"
             : $"{(held ? "Held " : "")}{Fmt(attended.Playhead)} / -{FmtRemaining(attended.Remaining)}";
 
+    /// <summary>The line above the transport: the attended voice's track, named as
+    /// <see cref="FmtTrack"/> names it, so it is the track the readout and the seek bar are about.
+    /// Paused, it still names it; blank only when stopped, as nothing is attended then.</summary>
+    public static string FmtAttendedTrack(VoiceView? attended) =>
+        attended is null ? "" : FmtTrack(attended.Row.Track);
+
     /// <summary>The editor's line for a running preview: its phase, and the playhead of each voice
     /// heard. Blank with no preview.</summary>
     public static string FmtPreview(PreviewView? preview)

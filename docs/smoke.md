@@ -60,6 +60,11 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       "Not renamed: …" in the strip, and the old name stays.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
 - [ ] The transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, then −5 s, the seek bar, +5 s and the time; no ⏹.
+- [ ] Between the buttons and the transport row, a line names the playing track in a larger
+      font: its title and artist ("Title — Artist"), or its filename when untagged. It is blank
+      at launch, keeps naming the track while paused, and goes blank when the queue is cleared or
+      runs out. The transport does not move when it fills or empties. A name too long for the
+      window ends in "…" and shows whole in its tooltip.
 - [ ] At launch the first row carries the marker, dimmed (a greyer yellow than while playing).
       Playing or paused, the marker is the full pale yellow. When the queue runs out it goes
       back to the first row, dimmed, and ▶ plays that row.
