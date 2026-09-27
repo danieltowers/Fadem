@@ -48,5 +48,5 @@ auto playlists, and folders of playlists.
 ## Comments
 
 - Resolved 2026-09-27: issues 01–06 built, each recorded in its own file. Three loose ends found
-  in issues 05 and 06 went to [phase 2](../202609-faderio-phase-2/spec.md): ✎ out of view with
+  in issues 05 and 06 went to [phase 3](../202609-faderio-phase-3/spec.md): ✎ out of view with
   extra columns, a gone track opened from the manager, and the flaky add-time budget test.

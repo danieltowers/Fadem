@@ -1,4 +1,4 @@
-# Spec — faderio v3 phase 2: the playlists build's loose ends
+# Spec — faderio v3 phase 3: the playlists build's loose ends
 
 Status: ready-for-agent
 Blocked by: [playlists](../202609-faderio-playlists/spec.md)
@@ -18,7 +18,7 @@ was found but not fixed:
 
 ## Solution
 
-Three independent issues, in any order. Phase 2's larger work (a library manager, a playlist
+Three independent issues, in any order. Phase 3's larger work (a library manager, a playlist
 manager beyond the sidebar; see the v3 map's out-of-scope list) is not specified yet. It joins
 this folder as its own issues once it has been grilled.
 
