@@ -2276,7 +2276,7 @@ public sealed class HeadlessFormTests
     {
         var file = TempWindowFile();
         var area = Screen.PrimaryScreen!.WorkingArea;
-        var placed = new Rectangle(area.X + 40, area.Y + 30, 900, 560);
+        var placed = new Rectangle(area.X + 40, area.Y + 30, 1000, 560);
         using (var first = new Harness(windowFile: file))
         {
             Assert.Equal(FormStartPosition.CenterScreen, first.Form.StartPosition); // nothing saved yet
@@ -2313,7 +2313,7 @@ public sealed class HeadlessFormTests
         using var h = new Harness(windowFile: file);
 
         Assert.Equal(FormStartPosition.CenterScreen, h.Form.StartPosition);
-        Assert.Equal(new Size(1040, 600), h.Form.Size);
+        Assert.Equal(new Size(1240, 600), h.Form.Size);
     });
 
     [Fact]
@@ -2335,5 +2335,279 @@ public sealed class HeadlessFormTests
         using var h = new Harness();
         CloseWindow(h);
         Assert.False(File.Exists(Path.Combine(h.TempDir + "-machine", "window.json")));
+    });
+
+    // ── Playlists issue 02: the playlist sidebar ────────────────────────────────────────
+
+    private static string[] Names(PlaylistSidebar sidebar) =>
+        sidebar._list.Items.Cast<ListViewItem>().Select(i => i.Text).ToArray();
+
+    /// <summary>The name the sidebar highlights: bold, on the marker's yellow.</summary>
+    private static string Highlighted(PlaylistSidebar sidebar)
+    {
+        var open = sidebar._list.Items.Cast<ListViewItem>().Where(i => i.Font.Bold).ToList();
+        Assert.Single(open);
+        Assert.Equal(SystemColors.Info, open[0].BackColor);
+        return open[0].Text;
+    }
+
+    private static int IndexOf(PlaylistSidebar sidebar, string name) => Array.IndexOf(Names(sidebar), name);
+
+    /// <summary>Two playlists: "Evening" with three rows, and "Untitled", with two, open. Returns
+    /// each one's files.</summary>
+    private static (string[] Evening, string[] Untitled) TwoPlaylists(Harness h)
+    {
+        var (a, b, c) = ThreeQueued(h);
+        h.Engine.RenamePlaylist("Untitled", "Evening");
+        h.Form._playlists._new.PerformClick();
+        var untitled = new[] { TestAudio.WriteDcWav("delta.wav", 5, 0.2), TestAudio.WriteDcWav("epsilon.wav", 5, 0.2) };
+        h.Form.AddPaths(untitled);
+        return (new[] { a, b, c }, untitled);
+    }
+
+    private static string[] Queued(Harness h) => h.Engine.View.Queue.Select(r => r.Track.FilePath).ToArray();
+
+    private static LabelEditEventArgs EndLabelEdit(PlaylistSidebar sidebar, int index, string? label)
+    {
+        var args = label is null ? new LabelEditEventArgs(index) : new LabelEditEventArgs(index, label);
+        typeof(ListView).GetMethod("OnAfterLabelEdit", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(sidebar._list, new object[] { args });
+        return args;
+    }
+
+    [Fact]
+    public void AtLaunch_TheSidebarShowsUntitled_Highlighted() => RunSta(() =>
+    {
+        using var h = new Harness();
+
+        Assert.Equal(new[] { "Untitled" }, Names(h.Form._playlists));
+        Assert.Equal("Untitled", Highlighted(h.Form._playlists));
+    });
+
+    [Fact]
+    public void NewPlaylist_AddsUntitled2_AndHighlightsIt() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+
+        h.Form._playlists._new.PerformClick();
+
+        Assert.Equal(new[] { "Untitled", "Untitled 2" }, Names(h.Form._playlists));
+        Assert.Equal("Untitled 2", Highlighted(h.Form._playlists));
+        Assert.Empty(h.Form._queueList.Items);
+    });
+
+    [Fact]
+    public void AClick_OpensThatPlaylist_AndTheHighlightFollows() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (evening, _) = TwoPlaylists(h);
+
+        h.Form._playlists.OpenAt(IndexOf(h.Form._playlists, "Evening"));
+
+        Assert.Equal("Evening", h.Engine.View.OpenPlaylist);
+        Assert.Equal("Evening", Highlighted(h.Form._playlists));
+        Assert.Equal(evening, Queued(h));
+        Assert.Equal(3, h.Form._queueList.Items.Count);
+    });
+
+    [Fact]
+    public void AClick_WithUnsavedEdits_Asks_AndCancelStays() => RunSta(() =>
+    {
+        using var h = new Harness();
+        TwoPlaylists(h);
+        h.Form.EditTransitionAt(0);
+        h.Form._editor._fadeOutPoint.Text = "2";
+        var asked = 0;
+        h.Form.AskUnsavedEdits = _ =>
+        {
+            asked++;
+            return UnsavedEdits.Cancel;
+        };
+
+        h.Form._playlists.OpenAt(IndexOf(h.Form._playlists, "Evening"));
+
+        Assert.Equal(1, asked);
+        Assert.Equal("Untitled", h.Engine.View.OpenPlaylist);
+        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
+    });
+
+    [Fact]
+    public void AClick_WithUnsavedEdits_Discarded_OpensIt_AndEmptiesTheEditor() => RunSta(() =>
+    {
+        using var h = new Harness();
+        TwoPlaylists(h);
+        h.Form.EditTransitionAt(0);
+        h.Form._editor._fadeOutPoint.Text = "2";
+        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Discard;
+
+        h.Form._playlists.OpenAt(IndexOf(h.Form._playlists, "Evening"));
+
+        Assert.Equal("Evening", h.Engine.View.OpenPlaylist);
+        Assert.Null(h.Form._editor.Adjacency); // what it had open was the queue left
+        Assert.Equal("", h.Form._editor._fadeOutPoint.Text);
+    });
+
+    [Fact]
+    public void AClickOnTheOpenPlaylist_ChangesNothing_AndAsksNothing() => RunSta(() =>
+    {
+        using var h = new Harness();
+        TwoPlaylists(h);
+        h.Form.EditTransitionAt(0);
+        h.Form._editor._fadeOutPoint.Text = "2";
+        h.Form.AskUnsavedEdits = _ => throw new InvalidOperationException("the open playlist is no change");
+
+        h.Form._playlists.OpenAt(IndexOf(h.Form._playlists, "Untitled"));
+
+        Assert.Equal("Untitled", h.Engine.View.OpenPlaylist);
+        Assert.NotNull(h.Form._editor.Adjacency);
+    });
+
+    [Fact]
+    public void Enter_CommitsARename_WithTheOldNameAndTheNew() => RunSta(() =>
+    {
+        using var h = new Harness();
+        TwoPlaylists(h);
+
+        var args = EndLabelEdit(h.Form._playlists, IndexOf(h.Form._playlists, "Evening"), "Morning");
+
+        Assert.True(args.CancelEdit); // the label is the view's: the new name comes back from it
+        Assert.Equal(new[] { "Morning", "Untitled" }, h.Engine.View.Playlists);
+        Assert.Equal(new[] { "Morning", "Untitled" }, Names(h.Form._playlists));
+        Assert.True(File.Exists(Path.Combine(h.Library.PlaylistsFolder, "Morning.m3u8")));
+        Assert.Equal("Untitled", Highlighted(h.Form._playlists));
+    });
+
+    [Fact]
+    public void Esc_EndsARename_WithoutACall() => RunSta(() =>
+    {
+        using var h = new Harness();
+        TwoPlaylists(h);
+
+        EndLabelEdit(h.Form._playlists, IndexOf(h.Form._playlists, "Evening"), label: null);
+
+        Assert.Equal(new[] { "Evening", "Untitled" }, h.Engine.View.Playlists);
+        Assert.Equal(new[] { "Evening", "Untitled" }, Names(h.Form._playlists));
+        Assert.Equal("Ready.", h.Form._status.Text);
+    });
+
+    [Fact]
+    public void ARefusedRename_ShowsTheEnginesNotice_AndTheLabelKeepsTheOldName() => RunSta(() =>
+    {
+        using var h = new Harness();
+        TwoPlaylists(h);
+
+        var args = EndLabelEdit(h.Form._playlists, IndexOf(h.Form._playlists, "Untitled"), "evening");
+
+        Assert.True(args.CancelEdit);
+        Assert.Equal(new[] { "Evening", "Untitled" }, Names(h.Form._playlists));
+        Assert.StartsWith("Not renamed: Untitled.", h.Form._status.Text);
+    });
+
+    [Fact]
+    public void ARenameTheUserDidNotAskFor_IsRefused() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var args = new LabelEditEventArgs(0);
+
+        // The list's own slow click on a selected item starts an edit; only F2, a double-click
+        // and the menu's Rename may.
+        typeof(ListView).GetMethod("OnBeforeLabelEdit", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(h.Form._playlists._list, new object[] { args });
+
+        Assert.True(args.CancelEdit);
+    });
+
+    [Fact]
+    public void TheMenu_OffersRenameAndDelete_OnlyOnASelectedPlaylist() => RunSta(() =>
+    {
+        using var h = new Harness();
+        TwoPlaylists(h);
+
+        OpenMenu(h.Form._playlists._list);
+        Assert.True(h.Form._playlists._new.Enabled);
+        Assert.False(h.Form._playlists._rename.Enabled);
+        Assert.False(h.Form._playlists._delete.Enabled);
+
+        SelectRows(h.Form._playlists._list, 0);
+        OpenMenu(h.Form._playlists._list);
+        Assert.True(h.Form._playlists._rename.Enabled);
+        Assert.True(h.Form._playlists._delete.Enabled);
+    });
+
+    [Fact]
+    public void Delete_AsksOnce_AndNoKeepsThePlaylist() => RunSta(() =>
+    {
+        using var h = new Harness();
+        TwoPlaylists(h);
+        var asked = new List<string>();
+        h.Form._playlists.ConfirmDelete = name =>
+        {
+            asked.Add(name);
+            return false;
+        };
+        SelectRows(h.Form._playlists._list, IndexOf(h.Form._playlists, "Evening"));
+
+        h.Form._playlists._delete.PerformClick();
+
+        Assert.Equal(new[] { "Evening" }, asked);
+        Assert.Equal(new[] { "Evening", "Untitled" }, h.Engine.View.Playlists);
+    });
+
+    [Fact]
+    public void Delete_Confirmed_DeletesThePlaylistsFile() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (_, untitled) = TwoPlaylists(h);
+        h.Form._playlists.ConfirmDelete = _ => true;
+        SelectRows(h.Form._playlists._list, IndexOf(h.Form._playlists, "Evening"));
+
+        h.Form._playlists._delete.PerformClick();
+
+        Assert.Equal(new[] { "Untitled" }, Names(h.Form._playlists));
+        Assert.False(File.Exists(Path.Combine(h.Library.PlaylistsFolder, "Evening.m3u8")));
+        Assert.Equal(untitled, Queued(h)); // the open one was not touched
+    });
+
+    [Fact]
+    public void DeletingTheOpenPlaylist_OpensTheFirstRemaining() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (evening, _) = TwoPlaylists(h);
+        h.Form._playlists.ConfirmDelete = _ => true;
+        SelectRows(h.Form._playlists._list, IndexOf(h.Form._playlists, "Untitled"));
+
+        h.Form._playlists._delete.PerformClick();
+
+        Assert.Equal(new[] { "Evening" }, Names(h.Form._playlists));
+        Assert.Equal("Evening", Highlighted(h.Form._playlists));
+        Assert.Equal(evening, Queued(h));
+    });
+
+    [Fact]
+    public void DeletingTheOpenPlaylist_WithUnsavedEdits_AsksAfterTheConfirm_AndCancelKeepsIt() => RunSta(() =>
+    {
+        using var h = new Harness();
+        TwoPlaylists(h);
+        h.Form.EditTransitionAt(0);
+        h.Form._editor._fadeOutPoint.Text = "2";
+        var asks = new List<string>();
+        h.Form._playlists.ConfirmDelete = _ =>
+        {
+            asks.Add("delete");
+            return true;
+        };
+        h.Form.AskUnsavedEdits = _ =>
+        {
+            asks.Add("unsaved");
+            return UnsavedEdits.Cancel;
+        };
+        SelectRows(h.Form._playlists._list, IndexOf(h.Form._playlists, "Untitled"));
+
+        h.Form._playlists._delete.PerformClick();
+
+        Assert.Equal(new[] { "delete", "unsaved" }, asks);
+        Assert.Equal(new[] { "Evening", "Untitled" }, h.Engine.View.Playlists);
+        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
     });
 }

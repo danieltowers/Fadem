@@ -78,7 +78,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       next has a saved transition, plain and grey where it has none. The last row has none, even
       under repeat-all. Clicking it opens the editor on this → next, as the menu does: the
       heading changes to that adjacency. Saving or removing the transition flips its row's ✎.
-      At the 760 px minimum width it is still in view, with no sideways scroll bar.
+      At the 960 px minimum width it is still in view, with no sideways scroll bar.
 - [ ] With unsaved edits (a field, **From end** or the curve changed, or **Remove transition**
       pressed), opening another adjacency asks **Save / Discard / Cancel**, and so does closing
       the window. Cancel keeps the edits and stays; Discard drops them; Save saves and moves on,
@@ -175,6 +175,20 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] Crossfade for 12 s in one library, then **Open library…** on a fresh folder: **Settings…**
       shows *Hard cut* there, and the output mode chosen before. Back to the first library:
       12 s again.
+- [ ] Down the left, between the transport row and the status strip, a ~200 px **Playlists**
+      panel lists the library's playlists, the open one bold on the marker's yellow. In a fresh
+      temp library launched with two files it shows "Untitled", highlighted. Right-click on empty
+      space offers **New playlist** (Rename and Delete greyed out); it adds "Untitled 2",
+      highlighted, and empties the queue and the editor.
+- [ ] Clicking a playlist opens it: its rows replace the queue and the highlight moves. With
+      unsaved edits in the editor it asks Save / Discard / Cancel first; Cancel stays.
+- [ ] F2, a double-click or the menu's **Rename** edits the name in place; Enter renames the file,
+      Esc leaves it. A name another playlist has is refused: the strip says "Not renamed: …"
+      and the label shows the old name. A slow second click on a selected name starts nothing.
+- [ ] **Delete** asks once, Yes/No with No the default, naming the playlist. No keeps it. Yes on
+      the open playlist removes its file and opens the first remaining one.
+- [ ] A playlist file copied into `<library>\.faderio\playlists\` from outside appears at the
+      next playlist command (open, new, rename, delete) or library open, not on its own.
 - [ ] Resize and move the window, close it, relaunch with the same `--machine=`: it opens in
       the same place at the same size. Closed maximised, it opens maximised.
 - [ ] Launching with a corrupt `<library>\.faderio\settings.json` shows no

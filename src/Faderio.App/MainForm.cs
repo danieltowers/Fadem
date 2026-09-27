@@ -16,10 +16,10 @@ namespace Faderio.App;
 /// transition editor, a status strip showing the latest notice and a count that opens this
 /// session's notice list (build issue 09), a Settings… dialog (build issue 12), and the clip
 /// light, which a click clears (build issue 17), Open library… with the library named in the
-/// title (library issue 02), and the window opening where it was closed (library issue 03). It
-/// renders <see cref="PlayerView"/>s and issues
-/// commands; it holds no engine state between calls (the placement rule in CLAUDE.md). The seek
-/// bar's Maximum is the track length in milliseconds, so no scaling exists to get wrong
+/// title (library issue 02), the window opening where it was closed (library issue 03), and the
+/// playlist sidebar on the left (playlists issue 02). It renders <see cref="PlayerView"/>s and
+/// issues commands; it holds no engine state between calls (the placement rule in CLAUDE.md). The
+/// seek bar's Maximum is the track length in milliseconds, so no scaling exists to get wrong
 /// (ticket 06).
 /// </summary>
 internal sealed class MainForm : Form
@@ -52,6 +52,7 @@ internal sealed class MainForm : Form
     internal readonly ToolStripButton _cancelAdd;
     internal readonly ToolStripStatusLabel _clip;
     internal readonly TransitionEditorPanel _editor;
+    internal readonly PlaylistSidebar _playlists;
     internal readonly ToolStripMenuItem _editNext;
     internal readonly ToolStripMenuItem _editPrevious;
     internal readonly ToolStripMenuItem _editSelf;
@@ -99,8 +100,10 @@ internal sealed class MainForm : Form
         };
 
         Text = "faderio";
-        MinimumSize = new Size(760, 480);
-        Size = new Size(1040, 600);
+        // The sidebar's 200 px on top of what the queue and the editor need: at the least width the
+        // queue still shows every column, the row buttons in view.
+        MinimumSize = new Size(960, 480);
+        Size = new Size(1240, 600);
         StartPosition = FormStartPosition.CenterScreen;
 
         _status = new SpringLabel("Ready.") { TextAlign = ContentAlignment.MiddleLeft };
@@ -305,9 +308,11 @@ internal sealed class MainForm : Form
         };
 
         _editor = new TransitionEditorPanel(engine, ShowNotice, ChooseRenderPath, a => AskUnsavedEdits(a));
+        _playlists = new PlaylistSidebar(engine, LeaveEditor);
 
-        // Docking order: right-docked editor and bottom strip first, the fill-docked list last.
+        // Docking order: the side panels and bottom strip first, the fill-docked list last.
         Controls.Add(_queueList);
+        Controls.Add(_playlists);
         Controls.Add(_editor);
         Controls.Add(statusStrip);
         Controls.Add(transport);
@@ -461,6 +466,7 @@ internal sealed class MainForm : Form
         ShowClip(view.Clip);
 
         _editor.Refresh(view);
+        _playlists.Render(view);
     }
 
     /// <summary>The clip light: dark, or lit red with the count and the latest cause. Set only when
@@ -606,6 +612,19 @@ internal sealed class MainForm : Form
         }
         _editor.Close();
         _engine.OpenLibrary(folder);
+    }
+
+    /// <summary>Before the open playlist changes (playlists issue 02): unsaved edits are settled,
+    /// then the editor empties, as what it had open was the queue left. False when the user
+    /// cancels.</summary>
+    private bool LeaveEditor()
+    {
+        if (!_editor.ConfirmLeave())
+        {
+            return false;
+        }
+        _editor.Close();
+        return true;
     }
 
     /// <summary>Asks for a library folder, starting in Music (D12): at the first launch, before
