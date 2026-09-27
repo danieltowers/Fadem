@@ -1,6 +1,6 @@
 # Spec — faderio v3: the library
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: [interim-transport](../202609-faderio-interim-transport/spec.md)
 
 ## Problem
