@@ -1,6 +1,6 @@
 # 01: ✎ stays in view with extra columns
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 
 Found in [playlists 06](../../202609-faderio-phase-2-playlists/issues/06-configurable-columns.md)'s smoke.
@@ -39,13 +39,13 @@ Shell only: `FitColumns` and the floors beside it. `ColumnLayout` is unchanged.
 
 ## Acceptance
 
-- [ ] With all eight columns shown at the default window size, ✎ is in view with no sideways
+- [x] With all eight columns shown at the default window size, ✎ is in view with no sideways
       scroll bar, and Path, Album and Artist are narrower than their layout widths.
-- [ ] Widening the window gives Artist, then Album, then Path their own widths back, and
+- [x] Widening the window gives Artist, then Album, then Path their own widths back, and
       `columns.json` is unchanged throughout.
-- [ ] Squeezed past every floor (all eight columns at the 960 px minimum), the list scrolls
+- [x] Squeezed past every floor (all eight columns at the 960 px minimum), the list scrolls
       sideways rather than cutting a column below its floor.
-- [ ] The default four behave exactly as today.
+- [x] The default four behave exactly as today.
 
 ## Tests
 
@@ -61,3 +61,27 @@ Shell only: `FitColumns` and the floors beside it. `ColumnLayout` is unchanged.
   columns their widths back.
 
 ## Comments
+
+- Built 2026-09-27, with the give-way order as proposed. **Shell only:** `MainForm.GiveWay` lists
+  Path (80), Album (60) and Artist (60). `FitColumns` works out how far the title's 100 px floor
+  plus every shown giver's own width overshoots the room, and takes that from the givers in order,
+  each down to its floor. Because the widths come from the layout's widths and the list's width
+  alone, they are given back in the reverse order as room returns. A giver the user dragged
+  narrower than its floor keeps that width. It is never widened to the floor. Every fitted width
+  goes through `_widthsSet`, so none is recorded as the user's.
+- **Changed here:** a width the user drags on any column except Title now fits the rest again,
+  Artist included. Artist used to be left out only because the fit set its width. A `_fitting`
+  flag now covers that for every width the fit sets. The upshot: widening Artist by hand makes
+  the title give up room at once, as Album and Path already did. Before, the list scrolled until
+  the next resize.
+- **Tests:** five in `HeadlessFormTests.Columns.cs`: all eight at 1240 px fit, with the three
+  givers between their floors and their layout widths and the fixed four at theirs; widening in
+  20 px steps to 2000 px keeps the order and leaves `columns.json` byte-identical; at the 960 px
+  minimum the floors hold and the sum exceeds the list; the default four fill as before, with
+  Artist alone giving way at 960 px; a Path dragged to 50 px stays at 50.
+- **Looks smoke** (fresh temp library and machine folder, widths read with `LVM_GETCOLUMNWIDTH`,
+  the sideways bar from `WS_HSCROLL`): all eight ticked through the header menu at 1240 px:
+  48,100,83,60,70,110,84,80,28 plus the scroll bar = the list's 680 px, ✎ in view, no sideways bar.
+  Widening: Artist 200 by 1400 px, Album 200 by 1500, Path 360 by 1800, then the title grows.
+  `columns.json` unchanged. At 960 px: every giver at its floor, sum 640 in a 400 px list, sideways
+  bar shown. The default four at 960 px: Artist 137, ✎ in view, no sideways bar.

@@ -89,8 +89,10 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       Length, Format, Replay gain and Path, with # ticked and greyed out. Ticking Path adds a Path
       column showing each row's full path; ticking Album, Format and Replay gain shows, for a
       tagged FLAC, its album, "44.1 kHz / 16-bit" and "−7.2 dB" (blank where untagged). ✎ stays
-      the rightmost column; with more columns than the list's width, the list scrolls sideways
-      to it. Dragging a header moves it (never before # or after ✎), and a dragged width holds.
+      the rightmost column. With Album, Format, Replay gain and Path ticked at the default size,
+      ✎ is still in view with no sideways scroll bar: Path, Album and Artist give way, in that
+      order. Widening the window gives Artist, then Album, then Path their widths back. Only at
+      the 960 px minimum with all eight ticked does the list scroll sideways to ✎. Dragging a header moves it (never before # or after ✎), and a dragged width holds.
       A right-click on a row still shows the row's menu. Relaunched, or after **Open library…** elsewhere and back, the
       layout is as it was left; the other library shows its own. The file is
       `<library>\.faderio\columns.json`.

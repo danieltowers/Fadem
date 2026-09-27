@@ -160,4 +160,125 @@ public sealed partial class HeadlessFormTests
 
         Assert.Equal(["#", "Title", "Artist", "Length", ""], Headings(h.Form));
     });
+
+    // ── Columns that give way (phase 3 issue 01) ──────────────────────────────────────────
+
+    private static readonly (QueueColumn Column, int Floor)[] GiveWayOrder =
+        [(QueueColumn.Path, 80), (QueueColumn.Album, 60), (QueueColumn.Artist, 60)];
+
+    private static int WidthOf(MainForm form, QueueColumn column) =>
+        form._queueList.Columns.Cast<ColumnHeader>().First(c => Equals(c.Tag, column)).Width;
+
+    /// <summary>Every column shown: Album, Format, Replay gain and Path ticked beside the default four.</summary>
+    private static void ShowAllEight(Harness h)
+    {
+        _ = h.Form._queueList.Handle;
+        foreach (var heading in new[] { "Album", "Format", "Replay gain", "Path" })
+        {
+            OpenColumnMenu(h.Form)[heading].PerformClick();
+        }
+    }
+
+    /// <summary>Resizes the window and lets the list fit its columns, which it does once it has
+    /// finished sizing.</summary>
+    private static void SizeWindow(MainForm form, int width)
+    {
+        form.Width = width;
+        Application.DoEvents();
+    }
+
+    private static int ColumnsAndScrollBar(MainForm form) =>
+        form._queueList.Columns.Cast<ColumnHeader>().Sum(c => c.Width) + SystemInformation.VerticalScrollBarWidth;
+
+    [Fact]
+    public void AllEightShown_AtTheDefaultSize_FitTheList_WithPathAlbumAndArtistGivingWay() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ShowAllEight(h);
+        SizeWindow(h.Form, 1240);
+
+        Assert.True(ColumnsAndScrollBar(h.Form) <= h.Form._queueList.ClientSize.Width, "the row button must be in view");
+        foreach (var (column, floor) in GiveWayOrder)
+        {
+            Assert.InRange(WidthOf(h.Form, column), floor, ColumnLayout.Default[column].Width - 1);
+        }
+        Assert.True(WidthOf(h.Form, QueueColumn.Title) >= 100);
+        foreach (var column in new[] { QueueColumn.Number, QueueColumn.Length, QueueColumn.Format, QueueColumn.ReplayGain })
+        {
+            Assert.Equal(ColumnLayout.Default[column].Width, WidthOf(h.Form, column)); // never shrinks
+        }
+    });
+
+    [Fact]
+    public void WideningTheWindow_GivesArtistThenAlbumThenPathTheirWidthsBack_AndNeverWritesThem() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ShowAllEight(h);
+        SizeWindow(h.Form, 1240);
+        var written = File.ReadAllText(ColumnsFile(h));
+
+        for (var width = 1240; width <= 2000; width += 20)
+        {
+            SizeWindow(h.Form, width);
+            Assert.True(ColumnsAndScrollBar(h.Form) <= h.Form._queueList.ClientSize.Width, $"fits at {width}");
+            // A column takes width back only once every column after it in the order has all its own.
+            for (var i = 1; i < GiveWayOrder.Length; i++)
+            {
+                if (WidthOf(h.Form, GiveWayOrder[i].Column) < ColumnLayout.Default[GiveWayOrder[i].Column].Width)
+                {
+                    Assert.Equal(GiveWayOrder[i - 1].Floor, WidthOf(h.Form, GiveWayOrder[i - 1].Column));
+                }
+            }
+        }
+
+        foreach (var (column, _) in GiveWayOrder)
+        {
+            Assert.Equal(ColumnLayout.Default[column].Width, WidthOf(h.Form, column));
+        }
+        Assert.Equal(written, File.ReadAllText(ColumnsFile(h)));
+    });
+
+    [Fact]
+    public void AllEightAtTheMinimumWidth_HoldTheirFloors_AndTheListScrollsSideways() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ShowAllEight(h);
+        SizeWindow(h.Form, h.Form.MinimumSize.Width);
+
+        foreach (var (column, floor) in GiveWayOrder)
+        {
+            Assert.Equal(floor, WidthOf(h.Form, column));
+        }
+        Assert.Equal(100, WidthOf(h.Form, QueueColumn.Title));
+        Assert.True(ColumnsAndScrollBar(h.Form) > h.Form._queueList.ClientSize.Width);
+    });
+
+    [Fact]
+    public void TheDefaultFour_FillTheListAsBefore_ArtistAloneGivingWayAtTheMinimum() => RunSta(() =>
+    {
+        using var h = new Harness();
+        _ = h.Form._queueList.Handle;
+
+        SizeWindow(h.Form, 1240);
+        Assert.Equal(ColumnLayout.Default[QueueColumn.Artist].Width, WidthOf(h.Form, QueueColumn.Artist));
+        Assert.Equal(h.Form._queueList.ClientSize.Width, ColumnsAndScrollBar(h.Form));
+
+        SizeWindow(h.Form, h.Form.MinimumSize.Width);
+        Assert.Equal(100, WidthOf(h.Form, QueueColumn.Title));
+        Assert.InRange(WidthOf(h.Form, QueueColumn.Artist), 60, ColumnLayout.Default[QueueColumn.Artist].Width - 1);
+        Assert.Equal(h.Form._queueList.ClientSize.Width, ColumnsAndScrollBar(h.Form));
+    });
+
+    [Fact]
+    public void APathTheUserMadeNarrowerThanItsFloor_IsNeverWidenedToIt() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ShowAllEight(h);
+        var path = h.Form._queueList.Columns.Cast<ColumnHeader>().First(c => Equals(c.Tag, QueueColumn.Path));
+
+        path.Width = 50; // dragged
+        SizeWindow(h.Form, h.Form.MinimumSize.Width);
+
+        Assert.Equal(50, WidthOf(h.Form, QueueColumn.Path));
+    });
 }

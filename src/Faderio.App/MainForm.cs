@@ -274,7 +274,8 @@ internal sealed class MainForm : Form
             {
                 return;
             }
-            // The user's width, kept; one the fit gives the title or takes from the artist is not.
+            // The user's width, kept; one the fit gives the title or takes from a column that
+            // gives way is not.
             var width = _queueList.Columns[e.ColumnIndex].Width;
             if (_widthsSet.GetValueOrDefault(column) != width && _columns[column].Width != width)
             {
@@ -285,7 +286,8 @@ internal sealed class MainForm : Form
                 _saveColumns.Stop();
                 _saveColumns.Start();
             }
-            if (column is not QueueColumn.Title and not QueueColumn.Artist)
+            // The title's width is the fit's own; any other the user sets fits the rest again.
+            if (column is not QueueColumn.Title && !_fitting)
             {
                 FitColumns();
             }
@@ -1012,12 +1014,25 @@ internal sealed class MainForm : Form
     internal int EditColumn => _queueList.Columns.Count - 1;
 
     private const int MinTitleWidth = 100;
-    private const int MinArtistWidth = 60;
+
+    /// <summary>The columns that give way when the shown ones do not fit, in the order they do
+    /// (phase 3 issue 01), each to its floor. The rest never shrink: their contents are short.</summary>
+    private static readonly (QueueColumn Column, int Floor)[] GiveWay =
+    [
+        (QueueColumn.Path, 80),
+        (QueueColumn.Album, 60),
+        (QueueColumn.Artist, 60),
+    ];
+
+    /// <summary>Set while the fit gives widths, so their changes do not fit again.</summary>
+    private bool _fitting;
 
     /// <summary>Sizes the title to the list's width less the other columns and room for a
     /// scroll bar, which appears without resizing the list. Where that would squeeze the title
-    /// below its least, the artist gives way first, and takes back up to its own width as room
-    /// returns. With the title hidden, nothing fills: the columns keep their widths.</summary>
+    /// below its least, Path, then Album, then Artist give way, each to its floor, and take back
+    /// up to their own widths as room returns, in the reverse order. Only with every one at its
+    /// floor does the list scroll sideways. With the title hidden, nothing fills: the columns
+    /// keep their widths.</summary>
     private void FitColumns()
     {
         var headers = _queueList.Columns.Cast<ColumnHeader>().ToList();
@@ -1025,24 +1040,40 @@ internal sealed class MainForm : Form
         {
             return;
         }
-        var artist = headers.Find(c => c.Tag is QueueColumn.Artist);
+        var giving = GiveWay
+            .Select(g => (Header: headers.Find(c => c.Tag is QueueColumn q && q == g.Column), g.Column, Own: _columns[g.Column].Width, g.Floor))
+            .Where(g => g.Header is not null)
+            .ToList();
         var free = _queueList.ClientSize.Width - SystemInformation.VerticalScrollBarWidth
-            - headers.Where(c => c != title && c != artist).Sum(c => c.Width);
-        if (artist is not null)
+            - headers.Where(c => c != title && !giving.Exists(g => g.Header == c)).Sum(c => c.Width);
+        // What the title's floor and every own width need beyond the room there is.
+        var lacking = MinTitleWidth + giving.Sum(g => g.Own) - free;
+        _fitting = true;
+        try
         {
-            var artistWidth = Math.Min(Math.Max(free - MinTitleWidth, MinArtistWidth), _columns[QueueColumn.Artist].Width);
-            _widthsSet[QueueColumn.Artist] = artistWidth;
-            if (artist.Width != artistWidth)
+            foreach (var g in giving)
             {
-                artist.Width = artistWidth;
+                // A column the user made narrower than its floor is never widened to it.
+                var width = g.Own - Math.Clamp(lacking, 0, Math.Max(g.Own - g.Floor, 0));
+                lacking -= g.Own - width;
+                Give(g.Header!, g.Column, width);
+                free -= width;
             }
-            free -= artistWidth;
+            Give(title, QueueColumn.Title, Math.Max(MinTitleWidth, free));
         }
-        var titleWidth = Math.Max(MinTitleWidth, free);
-        _widthsSet[QueueColumn.Title] = titleWidth;
-        if (title.Width != titleWidth)
+        finally
         {
-            title.Width = titleWidth;
+            _fitting = false;
+        }
+    }
+
+    /// <summary>Gives <paramref name="header"/> a width the fit chose, which is never the user's.</summary>
+    private void Give(ColumnHeader header, QueueColumn column, int width)
+    {
+        _widthsSet[column] = width;
+        if (header.Width != width)
+        {
+            header.Width = width;
         }
     }
 
