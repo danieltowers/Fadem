@@ -266,6 +266,22 @@ public sealed class PlaylistOverridesTests
     }
 
     [Fact]
+    public void ABlankDuration_PlaysTheGlobalsInThePlaylistLayer_AndFiveSecondsOtherwise()
+    {
+        var global = Crossfade(1) with { FadeOutDuration = Seconds(2), FadeInDuration = Seconds(3) };
+        var withDurations = new TransitionLayers(global, null, global);
+        var blankGlobal = new TransitionLayers(FadeOutAt(1.5), null, FadeOutAt(1.5));
+
+        Assert.Equal(Seconds(2), withDurations.BlankFadeOutDuration(TransitionLayer.Playlist));
+        Assert.Equal(Seconds(3), withDurations.BlankFadeInDuration(TransitionLayer.Playlist));
+        // The global layer's own blank never falls through to anything but the fixed default.
+        Assert.Equal(Seconds(5), withDurations.BlankFadeOutDuration(TransitionLayer.Global));
+        Assert.Equal(Seconds(5), withDurations.BlankFadeInDuration(TransitionLayer.Global));
+        Assert.Equal(Seconds(5), blankGlobal.BlankFadeOutDuration(TransitionLayer.Playlist));
+        Assert.Equal(Seconds(5), TransitionLayers.None.BlankFadeInDuration(TransitionLayer.Playlist));
+    }
+
+    [Fact]
     public void AnOverride_IsValidatedAgainstTheEffectiveTransition_AndARefusedOneIsNotStored()
     {
         var (tc, a, b) = InPAndQ("refused");

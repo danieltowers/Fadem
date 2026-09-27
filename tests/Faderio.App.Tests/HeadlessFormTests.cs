@@ -2799,6 +2799,40 @@ public sealed partial class HeadlessFormTests
     }
 
     [Fact]
+    public void BlankDurations_ShowWhatTheyPlayInGrey_FiveSecondsOrTheGlobals() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var editor = h.Form._editor;
+        Assert.Equal("", editor._fadeOutDuration.PlaceholderText); // nothing open
+
+        ThreeQueued(h);
+        h.Form.EditTransitionAt(0); // nothing authored
+
+        Assert.Equal("", editor._fadeOutDuration.Text);
+        Assert.Equal("5", editor._fadeOutDuration.PlaceholderText);
+        Assert.Equal("5", editor._fadeInDuration.PlaceholderText);
+        Assert.Equal("", editor._fadeOutPoint.PlaceholderText); // points have no default
+
+    });
+
+    [Fact]
+    public void AnAuthoredDurationEmptied_ShowsFiveInGrey_AndThePlaylistLayerShowsTheGlobals() => RunSta(() =>
+    {
+        using var h = new Harness();
+        EditingAlphaBeta(h);
+        var editor = h.Form._editor;
+
+        Assert.Equal("0.5", editor._fadeOutDuration.Text);
+        Assert.Equal("5", editor._fadeOutDuration.PlaceholderText); // shown once the box is emptied
+
+        editor._editPlaylist.Checked = true;
+
+        Assert.Equal("", editor._fadeOutDuration.Text);
+        Assert.Equal("0.5", editor._fadeOutDuration.PlaceholderText); // the global's
+        Assert.Equal("0.5", editor._fadeInDuration.PlaceholderText);
+    });
+
+    [Fact]
     public void PlaylistMode_ShowsTheGlobalValuesGrey_AndOnlyWhatIsTypedIsSavedAsTheOverride() => RunSta(() =>
     {
         using var h = new Harness();

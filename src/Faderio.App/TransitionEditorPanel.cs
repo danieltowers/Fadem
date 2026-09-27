@@ -468,15 +468,17 @@ internal sealed class TransitionEditorPanel : Panel
     }
 
     /// <summary>What the store holds besides the fields: the global values as placeholders in
-    /// playlist mode, and the heading line when the open playlist plays something else. Read
-    /// again after every save or removal, since either layer may have changed.</summary>
+    /// playlist mode, what a blank duration plays in either mode, and the heading line when the
+    /// open playlist plays something else. Read again after every save or removal, since either
+    /// layer may have changed.</summary>
     private void ShowLayers(TransitionLayers layers)
     {
         var global = Layer == TransitionLayer.Playlist ? layers.Global : null;
+        var open = _adjacency is not null;
         _fadeOutPoint.PlaceholderText = Presenter.FmtSeconds(global?.FadeOutPoint?.Point);
-        _fadeOutDuration.PlaceholderText = Presenter.FmtSeconds(global?.FadeOutDuration);
+        _fadeOutDuration.PlaceholderText = open ? Presenter.FmtSeconds(layers.BlankFadeOutDuration(Layer)) : "";
         _fadeInPoint.PlaceholderText = Presenter.FmtSeconds(global?.FadeInPoint?.Point);
-        _fadeInDuration.PlaceholderText = Presenter.FmtSeconds(global?.FadeInDuration);
+        _fadeInDuration.PlaceholderText = open ? Presenter.FmtSeconds(layers.BlankFadeInDuration(Layer)) : "";
         var playlist = _engine.View.OpenPlaylist;
         var differ = _adjacency is not null && playlist is not null && layers.Differ;
         _effective.Text = differ ? Presenter.FmtEffective(playlist!, layers.Effective) : "";

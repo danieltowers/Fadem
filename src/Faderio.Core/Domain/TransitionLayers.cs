@@ -1,3 +1,5 @@
+using Faderio.Core.Transitions;
+
 namespace Faderio.Core.Domain;
 
 /// <summary>Which layer of an adjacency's transition the editor writes: the global transition, or
@@ -20,4 +22,14 @@ public sealed record TransitionLayers(TransitionSpec? Global, TransitionSpec? Ov
 
     /// <summary>The open playlist plays something other than the global transition.</summary>
     public bool Differ => Effective != Global;
+
+    /// <summary>What a blank fade-out duration plays when <paramref name="layer"/> is saved: in the
+    /// playlist layer the global transition's, where it sets one; else the fixed default for a blank
+    /// authored duration (build issue 12).</summary>
+    public TimeSpan BlankFadeOutDuration(TransitionLayer layer) =>
+        (layer == TransitionLayer.Playlist ? Global?.FadeOutDuration : null) ?? TransitionResolver.BlankAuthoredDuration;
+
+    /// <summary>What a blank fade-in duration plays: as <see cref="BlankFadeOutDuration"/>.</summary>
+    public TimeSpan BlankFadeInDuration(TransitionLayer layer) =>
+        (layer == TransitionLayer.Playlist ? Global?.FadeInDuration : null) ?? TransitionResolver.BlankAuthoredDuration;
 }
