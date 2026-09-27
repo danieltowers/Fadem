@@ -457,6 +457,81 @@ public sealed class HeadlessFormTests
     });
 
     [Fact]
+    public void Nudge_MovesATypedPointATenth_ShiftASecond_AndMarksTheDraftUnsaved() => RunSta(() =>
+    {
+        using var h = new Harness();
+        EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        editor._fadeOutPoint.Text = "3.5";
+        editor._fadeInPoint.Text = "0.05";
+
+        Click(editor._fadeOutMore);
+        Assert.Equal("3.6", editor._fadeOutPoint.Text);
+        Click(editor._fadeOutLess);
+        Click(editor._fadeOutLess);
+        Assert.Equal("3.4", editor._fadeOutPoint.Text);
+        editor.NudgePoint(fadeOut: true, direction: +1, coarse: true); // Shift-click
+        Assert.Equal("4.4", editor._fadeOutPoint.Text);
+        editor.NudgePoint(fadeOut: true, direction: +1, coarse: true);
+        Assert.Equal("5", editor._fadeOutPoint.Text); // clamped at the 5 s track's end
+
+        Click(editor._fadeInLess);
+        Assert.Equal("0", editor._fadeInPoint.Text); // clamped at the start
+        Assert.True(editor.HasUnsavedEdits);
+    });
+
+    [Fact]
+    public void Nudge_FromEnd_MovesTheNumberShown_SoPlusIsEarlierInTheTrack() => RunSta(() =>
+    {
+        using var h = new Harness();
+        EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        editor._fadeOutPoint.Text = "3.5";
+        editor._fadeOutFromEnd.Checked = true;
+        Assert.Equal("1.5", editor._fadeOutPoint.Text);
+
+        Click(editor._fadeOutMore);
+        Assert.Equal("1.6", editor._fadeOutPoint.Text);
+        editor._fadeOutFromEnd.Checked = false;
+        Assert.Equal("3.4", editor._fadeOutPoint.Text); // earlier than the 3.5 it started at
+    });
+
+    [Fact]
+    public void Nudge_IsDisabled_WithNoAdjacency_ABlankField_OrTextThatIsNotANumber() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var editor = h.Form._editor;
+        Assert.False(editor._fadeOutMore.Enabled); // nothing open
+
+        EditingAlphaToBeta(h);
+        Assert.False(editor._fadeOutMore.Enabled); // blank
+        editor._fadeOutPoint.Text = "2";
+        Assert.True(editor._fadeOutMore.Enabled);
+        Assert.True(editor._fadeOutLess.Enabled);
+        editor._fadeOutPoint.Text = "two";
+        Assert.False(editor._fadeOutMore.Enabled);
+        Assert.False(editor._fadeOutLess.Enabled);
+        Assert.False(editor._fadeInMore.Enabled); // its own field is still blank
+    });
+
+    [Fact]
+    public void Nudge_OnACapturedPoint_KeepsItExact() => RunSta(() =>
+    {
+        using var h = new Harness(latency: 4410);
+        EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        h.Form.PlayRowAt(0);
+        h.Output.Advance(66150 + 4410 + 7); // audible a few frames past 1.5 s
+        h.Form.Render();
+        Click(editor._captureOut);
+        var captured = editor.CapturedFadeOut!.Value;
+
+        Click(editor._fadeOutMore);
+
+        Assert.Equal(captured.TimeSpan + TimeSpan.FromSeconds(0.1), editor.CapturedFadeOut!.Value.TimeSpan);
+    });
+
+    [Fact]
     public void CaptureWithFromEnd_StoresTheDistanceToTheEnd() => RunSta(() =>
     {
         using var h = new Harness(latency: 4410);

@@ -60,6 +60,19 @@ public sealed partial class PlaybackEngine
         return MeasuredFromOtherEnd(track, point);
     }
 
+    /// <summary><paramref name="point"/> moved by <paramref name="delta"/>, clamped to
+    /// <paramref name="track"/>: the editor's ±0.1 s buttons (interim transport issue 06). A point
+    /// from the start and a point from the end both run from zero to the track's length, so the
+    /// nudge needs no frame of reference: it moves the number the field shows, whichever end that
+    /// is measured from. Exact to the tick, so a captured point keeps its precision.</summary>
+    public Point Nudge(Track track, Point point, TimeSpan delta)
+    {
+        ThrowIfDisposed();
+        var moved = point.TimeSpan + delta;
+        var length = track.Length.TimeSpan;
+        return Point.FromTimeSpan(moved > length ? length : moved);
+    }
+
     private static Point MeasuredFromOtherEnd(Track track, Point point)
     {
         var length = track.Length.TimeSpan;

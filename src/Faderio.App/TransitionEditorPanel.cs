@@ -42,6 +42,10 @@ internal sealed class TransitionEditorPanel : Panel
     internal readonly ComboBox _curve;
     internal readonly Button _captureOut;
     internal readonly Button _captureIn;
+    internal readonly Button _fadeOutLess;
+    internal readonly Button _fadeOutMore;
+    internal readonly Button _fadeInLess;
+    internal readonly Button _fadeInMore;
     internal readonly Button _save;
     internal readonly Button _revert;
     internal readonly Button _remove;
@@ -104,8 +108,10 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeOutFromEnd = new CheckBox { Text = "From end", Dock = DockStyle.Fill, Enabled = false };
         var row = 0;
         _fadeOutPoint = Field(layout, ref row, TransitionField.FadeOutPoint, "Fade-out point (s)", _fadeOutFromEnd, out _captureOut, "Capture");
+        (_fadeOutLess, _fadeOutMore) = NudgeButtons(_fadeOutPoint);
         _fadeOutDuration = Field(layout, ref row, TransitionField.FadeOutDuration, "Fade-out duration (s)", null, out _, null);
         _fadeInPoint = Field(layout, ref row, TransitionField.FadeInPoint, "Fade-in point (s)", null, out _captureIn, "Capture");
+        (_fadeInLess, _fadeInMore) = NudgeButtons(_fadeInPoint);
         _fadeInDuration = Field(layout, ref row, TransitionField.FadeInDuration, "Fade-in duration (s)", null, out _, null);
 
         _curve = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill, Enabled = false };
@@ -141,8 +147,12 @@ internal sealed class TransitionEditorPanel : Panel
         _preview.Click += (_, _) => Preview();
         _stopPreview.Click += (_, _) => _engine.StopPreview();
         _fadeOutFromEnd.CheckedChanged += (_, _) => { if (!_loading) MeasureFadeOutFromOtherEnd(); };
-        _fadeOutPoint.TextChanged += (_, _) => { if (_fadeOutPoint.Text != Presenter.FmtSeconds(_fadeOut)) _fadeOut = null; };
-        _fadeInPoint.TextChanged += (_, _) => { if (_fadeInPoint.Text != Presenter.FmtSeconds(_fadeIn)) _fadeIn = null; };
+        _fadeOutPoint.TextChanged += (_, _) => { if (_fadeOutPoint.Text != Presenter.FmtSeconds(_fadeOut)) _fadeOut = null; ShowNudges(); };
+        _fadeInPoint.TextChanged += (_, _) => { if (_fadeInPoint.Text != Presenter.FmtSeconds(_fadeIn)) _fadeIn = null; ShowNudges(); };
+        _fadeOutLess.Click += (_, _) => NudgePoint(fadeOut: true, -1, ShiftHeld);
+        _fadeOutMore.Click += (_, _) => NudgePoint(fadeOut: true, +1, ShiftHeld);
+        _fadeInLess.Click += (_, _) => NudgePoint(fadeOut: false, -1, ShiftHeld);
+        _fadeInMore.Click += (_, _) => NudgePoint(fadeOut: false, +1, ShiftHeld);
 
         Controls.Add(scroller);
         Controls.Add(_title);
@@ -188,6 +198,65 @@ internal sealed class TransitionEditorPanel : Panel
         row++;
         _reasons[field] = reason;
         return box;
+    }
+
+    /// <summary>Puts − and + beside a point's box, in the box's own cell (interim transport issue
+    /// 06). Points only: durations have none, by decision (D8).</summary>
+    private static (Button Less, Button More) NudgeButtons(TextBox box)
+    {
+        var layout = (TableLayoutPanel)box.Parent!;
+        var cell = layout.GetPositionFromControl(box);
+        var less = new Button { Text = "−", Width = 26, Dock = DockStyle.Fill, Margin = new Padding(1, 0, 0, 0), Enabled = false };
+        var more = new Button { Text = "+", Width = 26, Dock = DockStyle.Fill, Margin = new Padding(1, 0, 0, 0), Enabled = false };
+        var strip = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = box.Margin, Padding = new Padding(0) };
+        strip.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        strip.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 27));
+        strip.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 27));
+        layout.Controls.Remove(box);
+        box.Margin = new Padding(0, 0, 0, 0);
+        strip.Controls.Add(box, 0, 0);
+        strip.Controls.Add(less, 1, 0);
+        strip.Controls.Add(more, 2, 0);
+        layout.Controls.Add(strip, cell.Column, cell.Row);
+        var tips = new ToolTip();
+        tips.SetToolTip(less, "Earlier by 0.1 s (Shift: 1 s) in the number shown");
+        tips.SetToolTip(more, "Later by 0.1 s (Shift: 1 s) in the number shown");
+        return (less, more);
+    }
+
+    private static bool ShiftHeld => (ModifierKeys & Keys.Shift) != 0;
+
+    /// <summary>Moves the point the field shows by a tenth of a second, or a second when
+    /// <paramref name="coarse"/>, in the direction given: the number shown moves, so with From end
+    /// ticked + is earlier in the track. The engine clamps it to the track; the result lands in the
+    /// field as a capture does, exact. A field that is blank or not a number is left alone.</summary>
+    internal void NudgePoint(bool fadeOut, int direction, bool coarse)
+    {
+        var (box, captured) = fadeOut ? (_fadeOutPoint, _fadeOut) : (_fadeInPoint, _fadeIn);
+        if (_adjacency is null || PointOf(box, captured).Point is not { } point)
+        {
+            return;
+        }
+        var step = TimeSpan.FromSeconds(coarse ? 1 : 0.1) * Math.Sign(direction);
+        var moved = _engine.Nudge(fadeOut ? _adjacency.Outgoing : _adjacency.Incoming, point, step);
+        if (fadeOut)
+        {
+            ShowFadeOut(moved);
+        }
+        else
+        {
+            _fadeIn = moved;
+            _fadeInPoint.Text = Presenter.FmtSeconds(moved);
+        }
+    }
+
+    /// <summary>The nudge buttons live while an adjacency is open and their field holds a point.</summary>
+    private void ShowNudges()
+    {
+        var outLive = _adjacency is not null && PointOf(_fadeOutPoint, _fadeOut).Point is not null;
+        var inLive = _adjacency is not null && PointOf(_fadeInPoint, _fadeIn).Point is not null;
+        _fadeOutLess.Enabled = _fadeOutMore.Enabled = outLive;
+        _fadeInLess.Enabled = _fadeInMore.Enabled = inLive;
     }
 
     private static void ButtonRow(TableLayoutPanel layout, ref int row, params Button[] buttons)
@@ -274,6 +343,7 @@ internal sealed class TransitionEditorPanel : Panel
         {
             control.Enabled = true;
         }
+        ShowNudges();
     }
 
     /// <summary>Called on every render: the capture buttons live only while a voice is attended

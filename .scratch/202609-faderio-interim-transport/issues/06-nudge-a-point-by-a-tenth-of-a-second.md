@@ -1,6 +1,6 @@
 # 06: Nudge a point by a tenth of a second
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 
 Decided in [D8](../../202609-faderio-interim-improvements/decisions.md).
@@ -29,10 +29,10 @@ Decided in [D8](../../202609-faderio-interim-improvements/decisions.md).
 
 ## Acceptance
 
-- [ ] Fade-out point 12.000, `+` → 12.100; Shift-`+` → 13.100; `−` → 13.000.
-- [ ] From end ticked, showing 5.000 from end, `+` → 6.000 from end (earlier in the track).
-- [ ] At 0.000, `−` stays 0.000. At `Length`, `+` stays at `Length`.
-- [ ] After a nudge the panel shows unsaved edits and Preview plays the nudged point.
+- [x] Fade-out point 12.000, `+` → 12.100; Shift-`+` → 13.100; `−` → 13.000.
+- [x] From end ticked, showing 5.000 from end, `+` → 6.000 from end (earlier in the track).
+- [x] At 0.000, `−` stays 0.000. At `Length`, `+` stays at `Length`.
+- [x] After a nudge the panel shows unsaved edits and Preview plays the nudged point.
 
 ## Tests
 
@@ -46,3 +46,18 @@ Decided in [D8](../../202609-faderio-interim-improvements/decisions.md).
   Save becomes enabled.
 
 ## Comments
+
+- Built 2026-09-27. **Engine:** `Point Nudge(Track, Point, TimeSpan delta)` needs no from-end
+  flag: a point from the start and a point from the end both run 0 → length, so adding the delta
+  to the number shown and clamping to `[0, Length]` is right in either frame. Exact to the tick.
+- **Panel:** `NudgeButtons` puts − and + inside each point box's own cell (a three-column strip),
+  so no row moves; the point boxes are 54 px narrower than the duration boxes. A nudge goes
+  through `PointOf`, so a captured point is nudged exactly and lands back in `_fadeOut`/`_fadeIn`
+  as a capture does. Shift is read from `Control.ModifierKeys` at the click; `NudgePoint(fadeOut,
+  direction, coarse)` is the seam the tests use for Shift. Enabled while an adjacency is open and
+  the box holds a point (`ShowNudges`, on every text change and on load).
+- Tests: `NudgeTests` (3, engine: steps, both clamps, tick precision) and four form tests (typed
+  point with clamps and Shift, from-end direction, disabled states, a captured point kept exact).
+- The full suite once failed `AddTimeBudgetTests.AFlacWithEightMegabytesOfCoverArt_AddsWithin150Milliseconds`
+  (216 ms) under the parallel run; it passed 3/3 alone and on the next full run. Nothing here
+  touches adding; it is a wall-clock budget that is sensitive to load.

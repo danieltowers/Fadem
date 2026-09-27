@@ -79,6 +79,10 @@ the thumb in a capture (the highlight colour), and click it with posted mouse me
       puts the transition back. **Revert** reloads what is stored.
 - [ ] Pressing capture writes a number into the field, and it is the number the time readout
       showed at that moment.
+- [ ] Beside each **point** box (not the durations) sit **−** and **+**. Each press moves the
+      number shown by 0.1, Shift-click by 1; with **From end** ticked, + makes the from-end number
+      bigger. They stop at 0 and at the track's length, and are greyed out while the box is blank
+      or not a number.
 - [ ] After Save, the status strip shows a confirmation and nothing else changed.
 - [ ] **Preview** and **Stop preview** sit together in the editor, Stop preview greyed out
       until a preview runs. While one runs, Preview reads **Preview again**, and the line under
