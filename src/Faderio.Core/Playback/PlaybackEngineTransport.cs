@@ -220,7 +220,7 @@ public sealed partial class PlaybackEngine
             }
             var index = IndexOf(attended);
             var playhead = View.Attended?.Playhead ?? Playhead.Zero;
-            int? Back(int i) => _queue.IndexBefore(i, _repeat);
+            int? Back(int i) => _queue.IndexBefore(i, _settings.Repeat);
             var previous = playhead.TotalSeconds > 3 ? null : OpenFirstReadable(Back(index), Back, retryMarked: false);
             if (previous is null && !attended.IsFinished)
             {

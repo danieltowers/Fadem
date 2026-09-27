@@ -30,7 +30,7 @@ public sealed partial class PlaybackEngine
         var entry = new QueueEntry(new RowId(_nextRowId++), track);
         _queue.Add(entry);
         _originalOrder.Add(entry);
-        if (_shuffle && _queue.Count > 1)
+        if (_settings.Shuffle && _queue.Count > 1)
         {
             // A track added while shuffling lands somewhere among the upcoming ones.
             var upcomingFrom = Math.Max(_queue.CurrentIndex + 1, 0);
@@ -172,7 +172,7 @@ public sealed partial class PlaybackEngine
                 return;
             }
             _queue.Reorder(order);
-            if (!_shuffle)
+            if (!_settings.Shuffle)
             {
                 // Unshuffled, the visible order is the original order.
                 _originalOrder.Clear();
@@ -224,7 +224,7 @@ public sealed partial class PlaybackEngine
                 return entries[i];
             }
         }
-        return _repeat == RepeatMode.All ? entries.FirstOrDefault(e => !removing.Contains(e)) : null;
+        return _settings.Repeat == RepeatMode.All ? entries.FirstOrDefault(e => !removing.Contains(e)) : null;
     }
 
     public void Clear()
@@ -252,18 +252,19 @@ public sealed partial class PlaybackEngine
     }
 
     /// <summary>Shuffle's original order is recorded in <see cref="Append"/>, the one place rows
-    /// enter, so turning shuffle off can never lose the queue.</summary>
+    /// enter, so turning shuffle off can never lose the queue. The choice is the open library's,
+    /// saved in its settings.json and in force once it is on disk (library issue 04): not saved,
+    /// or with no library open, a notice says why and nothing changes.</summary>
     public void SetShuffle(bool on)
     {
         ThrowIfDisposed();
         Run(() =>
         {
             ObserveClock();
-            if (_shuffle == on)
+            if (_settings.Shuffle == on || !KeepSettings(_settings with { Shuffle = on }, "shuffle"))
             {
                 return;
             }
-            _shuffle = on;
             if (on)
             {
                 _queue.ShuffleUpcoming();
@@ -278,17 +279,17 @@ public sealed partial class PlaybackEngine
         });
     }
 
+    /// <summary>Saved and put in force as <see cref="SetShuffle"/> is.</summary>
     public void SetRepeat(RepeatMode mode)
     {
         ThrowIfDisposed();
         Run(() =>
         {
             ObserveClock();
-            if (_repeat == mode)
+            if (_settings.Repeat == mode || !KeepSettings(_settings with { Repeat = mode }, "repeat"))
             {
                 return;
             }
-            _repeat = mode;
             RescheduleCurrentBoundary();
             Publish();
         });

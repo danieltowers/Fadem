@@ -20,36 +20,21 @@ public sealed partial class PlaybackEngine
     /// N out of range is brought into it. The outcome is a notice, as for authoring: saved, or
     /// not saved and why, and then nothing changes. With no library open there is nowhere to
     /// save them, so nothing changes. Settings the same as those in force are no change and
-    /// no notice.</summary>
+    /// no notice. Shuffle and repeat are the transport's (<see cref="SetShuffle"/>,
+    /// <see cref="SetRepeat"/>): the ones in <paramref name="settings"/> are not used.</summary>
     public void ChangeSettings(PlayerSettings settings)
     {
         ThrowIfDisposed();
         Run(() =>
         {
             ObserveClock();
-            var next = settings.Normalised();
-            if (next == _settings)
+            var next = settings.Normalised() with { Shuffle = _settings.Shuffle, Repeat = _settings.Repeat };
+            var previous = _settings;
+            if (next == previous || !KeepSettings(next, "settings"))
             {
-                return;
-            }
-            if (_store is null)
-            {
-                RaiseNotice($"Not saved: settings. {NoLibrary}");
-                return;
-            }
-            try
-            {
-                _settingsStore?.Save(next);
-            }
-            catch (Exception e) when (IsStoreWriteFailure(e))
-            {
-                RaiseNotice($"Not saved: settings. The settings file could not be written: {e.Message}");
                 return;
             }
             RaiseNotice("Saved settings.");
-            var previous = _settings;
-            _settings = next;
-            _resolver.Settings = next;
             if (previous.UnauthoredAdjacency != next.UnauthoredAdjacency ||
                 previous.DefaultCrossfadeSeconds != next.DefaultCrossfadeSeconds)
             {
@@ -61,6 +46,30 @@ public sealed partial class PlaybackEngine
             }
             Publish();
         });
+    }
+
+    /// <summary>Saves <paramref name="next"/> as the open library's settings and puts them in
+    /// force: they are in force once they are on disk. Not saved, a notice says why, naming
+    /// <paramref name="what"/>, and nothing changes. Applying each value is the caller's.</summary>
+    private bool KeepSettings(PlayerSettings next, string what)
+    {
+        if (_store is null)
+        {
+            RaiseNotice($"Not saved: {what}. {NoLibrary}");
+            return false;
+        }
+        try
+        {
+            _settingsStore?.Save(next);
+        }
+        catch (Exception e) when (IsStoreWriteFailure(e))
+        {
+            RaiseNotice($"Not saved: {what}. The settings file could not be written: {e.Message}");
+            return false;
+        }
+        _settings = next;
+        _resolver.Settings = next;
+        return true;
     }
 
     /// <summary>Saves this machine's settings (library issue 03, D11). The output mode is

@@ -298,7 +298,7 @@ public sealed partial class PlaybackEngine
             return;
         }
         var index = _queue.IndexOf(entry.Id);
-        var nextIndex = index < 0 ? null : _queue.IndexAfter(index, _repeat);
+        var nextIndex = index < 0 ? null : _queue.IndexAfter(index, _settings.Repeat);
         var incomingPath = nextIndex is { } n ? _queue.Entries[n].Track.FilePath : null;
         if (incomingPath is not null && incomingPath != adjacency.Incoming.FilePath)
         {

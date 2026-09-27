@@ -1,3 +1,5 @@
+using Faderio.Core.Queue;
+
 namespace Faderio.Core.Settings;
 
 /// <summary>What an adjacency nobody authored plays.</summary>
@@ -15,7 +17,9 @@ public enum UnauthoredAdjacency
 /// library's .faderio\settings.json (ADR 0011); missing keys fall back to these built-in
 /// defaults. Each takes effect at once. The output mode is the machine's
 /// (<see cref="MachineSettings"/>, library issue 03); a key for it left in an older file is
-/// ignored.
+/// ignored. Shuffle and repeat are the transport's toggles, remembered here per library (library
+/// issue 04): <c>SetShuffle</c> and <c>SetRepeat</c> save them, and <c>ChangeSettings</c> keeps
+/// the ones in force.
 /// </summary>
 public sealed record PlayerSettings
 {
@@ -33,6 +37,12 @@ public sealed record PlayerSettings
     /// <summary>ReplayGain track gain applied with symmetric clamping. On by default.</summary>
     public bool ReplayGainEnabled { get; init; } = true;
 
+    /// <summary>Shuffle, off by default.</summary>
+    public bool Shuffle { get; init; }
+
+    /// <summary>Repeat, off by default.</summary>
+    public RepeatMode Repeat { get; init; } = RepeatMode.Off;
+
     /// <summary>These settings as the engine keeps them: the current schema, N brought into
     /// range, and a choice no version knows replaced by its default. A hand-edited file
     /// and a caller alike get the same settings back.</summary>
@@ -41,5 +51,6 @@ public sealed record PlayerSettings
         SchemaVersion = CurrentSchemaVersion,
         UnauthoredAdjacency = Enum.IsDefined(UnauthoredAdjacency) ? UnauthoredAdjacency : UnauthoredAdjacency.HardCut,
         DefaultCrossfadeSeconds = Math.Clamp(DefaultCrossfadeSeconds, MinDefaultCrossfadeSeconds, MaxDefaultCrossfadeSeconds),
+        Repeat = Enum.IsDefined(Repeat) ? Repeat : RepeatMode.Off,
     };
 }

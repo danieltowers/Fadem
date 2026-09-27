@@ -9,7 +9,8 @@ public sealed partial class PlaybackEngine
 
     /// <summary>Switches to the library in <paramref name="folder"/> (library issue 02, D12):
     /// playback stops, a running add and a preview end, the queue empties, and the store and
-    /// settings become that library's. Nothing crosses from the one before (ADR 0011). A folder
+    /// settings become that library's, its shuffle and repeat among them, in force before anything
+    /// enters the queue (library issue 04). Nothing crosses from the one before (ADR 0011). A folder
     /// that cannot be opened leaves no library open: a notice says why, authoring is refused
     /// and playback is allowed. One that opens is remembered for the next launch.</summary>
     public void OpenLibrary(string folder)

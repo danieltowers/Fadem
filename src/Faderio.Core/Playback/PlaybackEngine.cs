@@ -87,8 +87,6 @@ public sealed partial class PlaybackEngine : IDisposable
     private long _nextRowId = 1;
     private long _version;
     private long _queueVersion;
-    private bool _shuffle;
-    private RepeatMode _repeat;
 
     private volatile bool _haltingOutput;
     private static readonly TimeSpan RenderWaitStep = TimeSpan.FromMilliseconds(1);
@@ -405,7 +403,7 @@ public sealed partial class PlaybackEngine : IDisposable
         var snapshot = new Snapshot(
             _version, _queueVersion, TransportNow, _queue.Entries.ToImmutableArray(),
             _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null, _finishAt is not null,
-            _shuffle, _repeat, Adding, _rate, _unreadable.ToImmutableHashSet(), _settings,
+            _settings.Shuffle, _settings.Repeat, Adding, _rate, _unreadable.ToImmutableHashSet(), _settings,
             _queueBase, _preview is null ? null : _mixer.Timeline, _previewOrigin, _preview?.Snap(), _clips.Snap());
         return snapshot with
         {

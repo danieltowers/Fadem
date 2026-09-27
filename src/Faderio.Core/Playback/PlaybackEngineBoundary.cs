@@ -108,7 +108,7 @@ public sealed partial class PlaybackEngine
 
     /// <summary>The row after <paramref name="index"/>, wrapping under repeat-all: the step
     /// passing over takes, whether the user skipped or the queue advanced on its own.</summary>
-    private int? RowAfter(int index) => _queue.IndexSkippedTo(index, _repeat);
+    private int? RowAfter(int index) => _queue.IndexSkippedTo(index, _settings.Repeat);
 
     private void SetUnreadable(QueueEntry entry, bool unreadable)
     {
@@ -189,7 +189,7 @@ public sealed partial class PlaybackEngine
         long TimelineOf(long sourceFrame) => referenceTimeline + (sourceFrame - referencePosition);
 
         _pendingBoundary = null;
-        var opened = OpenFirstReadable(_queue.IndexAfter(index, _repeat), RowAfter, retryMarked);
+        var opened = OpenFirstReadable(_queue.IndexAfter(index, _settings.Repeat), RowAfter, retryMarked);
         DropPrepared();
         if (opened is not { } next)
         {
