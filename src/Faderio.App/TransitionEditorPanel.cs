@@ -116,7 +116,7 @@ internal sealed class TransitionEditorPanel : Panel
         };
 
         var row = 0;
-        _editGlobal = new RadioButton { Text = "Global", AutoSize = true, Checked = true, Margin = new Padding(3, 0, 3, 0) };
+        _editGlobal = new RadioButton { Text = "Global", AutoSize = true, Checked = true, Enabled = false, Margin = new Padding(3, 0, 3, 0) };
         _editPlaylist = new RadioButton
         {
             Text = PlaylistChoice(null),
@@ -306,7 +306,7 @@ internal sealed class TransitionEditorPanel : Panel
         }
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
         row++;
-        var box = new TextBox { Dock = DockStyle.Fill };
+        var box = new TextBox { Dock = DockStyle.Fill, Enabled = false };
         layout.Controls.Add(box, 0, row);
         button = new Button { Text = buttonText ?? "", Dock = DockStyle.Fill, Enabled = false, Visible = buttonText is not null };
         layout.Controls.Add(button, 1, row);
@@ -550,8 +550,11 @@ internal sealed class TransitionEditorPanel : Panel
         _remove.Enabled = _removeOverride.Enabled = editing;
         foreach (var box in new[] { _fadeOutPoint, _fadeOutDuration, _fadeInPoint, _fadeInDuration })
         {
+            // Nothing to edit with no boundary open; a gone one's values stay readable, not greyed.
+            box.Enabled = editing;
             box.ReadOnly = editing && !changeable;
         }
+        ShowSelector(_engine.View.OpenPlaylist);
         _missing.Text = _adjacency is { } adjacency ? Presenter.FmtMissing(adjacency) : "";
         _missing.Visible = _missing.Text.Length > 0;
         ShowNudges();
@@ -566,7 +569,7 @@ internal sealed class TransitionEditorPanel : Panel
         {
             _editPlaylist.Text = choice;
         }
-        _editPlaylist.Enabled = view.OpenPlaylist is not null;
+        ShowSelector(view.OpenPlaylist);
         var canCapture = _adjacency is not null && !Gone && (view.Attended is not null || view.Preview is not null);
         _captureOut.Enabled = canCapture;
         _captureIn.Enabled = canCapture;
@@ -574,6 +577,14 @@ internal sealed class TransitionEditorPanel : Panel
         _stopPreview.Enabled = view.Preview is not null;
         _previewStatus.Text = Presenter.FmtPreview(view.Preview);
         _previewStatus.Visible = view.Preview is not null; // no room kept for it otherwise
+    }
+
+    /// <summary>The layer choice is live only with a boundary open, and This playlist only with a
+    /// playlist open. A gone boundary keeps it, since its override can still be removed.</summary>
+    private void ShowSelector(string? openPlaylist)
+    {
+        _editGlobal.Enabled = _adjacency is not null;
+        _editPlaylist.Enabled = _adjacency is not null && openPlaylist is not null;
     }
 
     /// <summary>A capture that captured nothing leaves the field as it was; the engine says why.</summary>

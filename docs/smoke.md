@@ -113,7 +113,10 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       open on an adjacency.
 - [ ] With the editor open, an empty duration box shows in grey what it plays if left blank: 5
       in Global, and in This playlist the global's duration, or 5 where the global sets none.
-      Typing over it shows the typed value in black. With no boundary open the boxes are plain.
+      Typing over it shows the typed value in black.
+- [ ] With no boundary open (at launch, and after **Open library…**), the editor reads "No
+      boundary selected" and every field, **From end**, the curve, ● Global and ○ This playlist
+      are greyed out. Opening a boundary makes them live.
 - [ ] Ticking **From end** on a fade-out point of 3.5 on a 5 s track shows 1.5; unticking shows
       3.5 again. The fade curve lists Equal-power and Linear.
 - [ ] Saving a fade-out point past the end of its track stores nothing: the strip says "Not

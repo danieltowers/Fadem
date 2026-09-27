@@ -602,6 +602,28 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
+    public void WithNoBoundaryOpen_TheFieldsAndTheLayerChoice_AreDisabled_UntilOneOpens() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var editor = h.Form._editor;
+        Control[] boxes = [editor._fadeOutPoint, editor._fadeOutDuration, editor._fadeInPoint, editor._fadeInDuration];
+        Control[] choice = [editor._editGlobal, editor._editPlaylist];
+        h.Form.Render();
+        Assert.All(boxes.Concat(choice), c => Assert.False(c.Enabled, c.Name));
+
+        EditingAlphaToBeta(h);
+        h.Form.Render();
+        Assert.All(boxes.Concat(choice), c => Assert.True(c.Enabled, c.Name));
+
+        var second = Path.Combine(h.TempDir, "Second library");
+        Directory.CreateDirectory(second);
+        h.Form.ChooseLibrary = () => second;
+        Click(h.Form._openLibrary); // empties the editor
+        h.Form.Render();
+        Assert.All(boxes.Concat(choice), c => Assert.False(c.Enabled, c.Name));
+    });
+
+    [Fact]
     public void Nudge_IsDisabled_WithNoAdjacency_ABlankField_OrTextThatIsNotANumber() => RunSta(() =>
     {
         using var h = new Harness();
