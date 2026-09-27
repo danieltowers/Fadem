@@ -1,6 +1,6 @@
 # 03: The add-time budget test holds under load
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 
 Seen in [playlists 05](../../202609-faderio-phase-2-playlists/issues/05-the-transition-manager.md) and
@@ -45,9 +45,9 @@ Tests only. No production code changes.
 
 ## Acceptance
 
-- [ ] Ten consecutive full `dotnet test` runs, with no `AddTimeBudgetTests` failure. Record the
+- [x] Ten consecutive full `dotnet test` runs, with no `AddTimeBudgetTests` failure. Record the
       fastest-of-three times seen.
-- [ ] A slowdown in every add still fails both tests: a 200 ms sleep put into
+- [x] A slowdown in every add still fails both tests: a 200 ms sleep put into
       `TrackMetadataReader.Read` makes both fail (checked, then removed).
 
 ## Tests
@@ -55,3 +55,33 @@ Tests only. No production code changes.
 This issue is a test. The mutation above is its check.
 
 ## Comments
+
+- Built 2026-09-27. `AddTimeBudgetTests` now times each add three times after the warm-up and
+  holds the fastest to the budget. The failure message lists all three times, and the times also
+  go to the test output, which `--logger "console;verbosity=detailed"` shows on a passing run. The
+  class is in the collection "Add-time budget", with `DisableParallelization = true`. The fixtures
+  add goes into the same engine each time, so the queue grows by 50 rows per run; that is well
+  inside the budget. Budgets unchanged: 1000 ms and 150 ms.
+- **Ten consecutive full runs**, 2026-09-27, all green: Core 814 passed, App 269 passed each time.
+  Built once, then `dotnet test --no-build`, with `--artifacts-path` because faderio was running
+  from `src/Faderio.App/bin`. Times are the fastest, then the three runs in order (ms):
+
+  | Run | Every fixture (budget 1000) | 8 MB cover art (budget 150) |
+  |---|---|---|
+  | 1 | 42 (49, 42, 46) | 28 (81, 28, 57) |
+  | 2 | 42 (42, 43, 44) | 33 (**285**, 33, 65) |
+  | 3 | 31 (149, 31, 45) | 43 (76, 43, 65) |
+  | 4 | 42 (76, 49, 42) | 30 (72, 30, 53) |
+  | 5 | 57 (432, 57, 253) | 52 (**438**, 66, 52) |
+  | 6 | 47 (84, 47, 49) | 81 (104, 81, 82) |
+  | 7 | 36 (94, 36, 40) | 28 (71, 28, 67) |
+  | 8 | 57 (488, 62, 57) | 34 (94, 34, 78) |
+  | 9 | 38 (405, 38, 49) | 31 (**171**, 31, 59) |
+  | 10 | 41 (94, 41, 50) | 27 (77, 27, 59) |
+
+  The first time in each run is the one the old test took. The bold ones are over 150 ms, so the
+  old test would have failed runs 2, 5 and 9, which matches the "one run in three" this issue
+  began with. The slowest fastest-of-three was 81 ms against 150, and 57 ms against 1000.
+- **Mutation:** a `Thread.Sleep(200)` at the top of `TrackMetadataReader.Read` failed both tests:
+  every fixture at best 10549 ms (10719, 10549, 10560), and cover art at best 240 ms (402, 254,
+  240). Removed; the file is unchanged.

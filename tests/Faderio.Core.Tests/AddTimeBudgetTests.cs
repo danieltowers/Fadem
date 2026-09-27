@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Diagnostics;
+using Xunit.Abstractions;
 
 namespace Faderio.Core.Tests;
 
@@ -10,9 +11,39 @@ namespace Faderio.Core.Tests;
 /// (a whole-file scan creeping into the probe), not a few milliseconds. The heaviest real case is
 /// FLAC with megabytes of embedded cover art: the probe reads STREAMINFO only, but the tag reader
 /// reads the pictures too.
+///
+/// Each test times its add three times and holds the fastest to the budget: a regression slows
+/// every run, while the load of the rest of the suite (and the App assembly's process beside it)
+/// slows only some. The collection keeps every other Core test class from running alongside.
 /// </summary>
-public sealed class AddTimeBudgetTests
+[Collection(Name)]
+public sealed class AddTimeBudgetTests(ITestOutputHelper output)
 {
+    public const string Name = "Add-time budget";
+
+    [CollectionDefinition(Name, DisableParallelization = true)]
+    public sealed class RunsAlone;
+
+    private const int Runs = 3;
+
+    /// <summary>Times <paramref name="add"/> <see cref="Runs"/> times: the fastest, and every time
+    /// for the failure message. The times are also written to the test output, which
+    /// <c>--logger "console;verbosity=detailed"</c> shows for a passing run.</summary>
+    private (long Fastest, string All) FastestOf(Action add)
+    {
+        var times = new long[Runs];
+        for (var i = 0; i < Runs; i++)
+        {
+            var sw = Stopwatch.StartNew();
+            add();
+            sw.Stop();
+            times[i] = sw.ElapsedMilliseconds;
+        }
+        var all = string.Join(", ", times.Select(t => $"{t} ms"));
+        output.WriteLine($"fastest {times.Min()} ms of {all}");
+        return (times.Min(), all);
+    }
+
     private static string FixturePath(string name) => Path.Combine(AppContext.BaseDirectory, "Fixtures", name);
 
     [Fact]
@@ -23,13 +54,10 @@ public sealed class AddTimeBudgetTests
         using var tc = TestEngine.Create();
         tc.Engine.Add([files[0]]).Wait(); // JIT and TagLib warm-up, outside the budget
 
-        var sw = Stopwatch.StartNew();
-        var report = tc.Engine.Add(files).Result;
-        sw.Stop();
+        var (fastest, all) = FastestOf(() => Assert.Empty(tc.Engine.Add(files).Result.Rejected));
 
-        Assert.Empty(report.Rejected);
-        Assert.True(sw.ElapsedMilliseconds < 1000,
-            $"adding {files.Count} fixtures took {sw.ElapsedMilliseconds} ms; the budget is 1000 ms");
+        Assert.True(fastest < 1000,
+            $"adding {files.Count} fixtures took at best {fastest} ms ({all}); the budget is 1000 ms");
     }
 
     [Fact]
@@ -41,13 +69,11 @@ public sealed class AddTimeBudgetTests
         using var tc = TestEngine.Create();
         var expected = tc.Engine.Add([plain]).Result.Added.Single().Track.Length; // also the warm-up
 
-        var sw = Stopwatch.StartNew();
-        var report = tc.Engine.Add([heavy]).Result;
-        sw.Stop();
+        var (fastest, all) = FastestOf(() =>
+            Assert.Equal(expected, tc.Engine.Add([heavy]).Result.Added.Single().Track.Length));
 
-        Assert.Equal(expected, report.Added.Single().Track.Length);
-        Assert.True(sw.ElapsedMilliseconds < 150,
-            $"adding a FLAC with 8 MB of cover art took {sw.ElapsedMilliseconds} ms; the budget is 150 ms");
+        Assert.True(fastest < 150,
+            $"adding a FLAC with 8 MB of cover art took at best {fastest} ms ({all}); the budget is 150 ms");
     }
 
     /// <summary>Inserts a PICTURE metadata block of <paramref name="imageBytes"/> straight after
