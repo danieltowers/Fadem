@@ -236,3 +236,18 @@ copies each file into the library's playlists folder, its entries made absolute,
 last one copied. The shell never copies a file. Export is still `SaveAsPlaylist(path)`, its
 dialog opening on the open playlist's name. `Add` of an `.m3u` still appends, so a playlist
 dropped on the queue is added to the open one.
+
+## Addendum: an override is authored as the global is, and `Transition` returns both layers (2026-09-27)
+
+`AuthorOverride(adjacency, partial)` and `UnauthorOverride(adjacency)` join `Author` and
+`Unauthor` ([playlists issue 04](../../.scratch/202609-faderio-playlists/issues/04-overrides-resolved-by-the-engine-authored-in-the-panel.md)).
+They write the open playlist's override, so neither takes a playlist name: the shell never
+names the playlist a command acts on. `AuthorOverride` returns refusals in the same shape,
+checked against the effective transition (the global with the override laid over it), and a
+partial that sets nothing, or only a curve with no global, removes the override. `Transition`
+now returns `TransitionLayers`: `Global`, `Override`, `Effective` and `Differ`, so the editor's
+heading line needs no comparison of its own. `IsAuthored` and `Preview` take a
+`TransitionLayer`, defaulting to the global one: a playlist-layer preview plays the drafted
+override over the stored global, and a global draft plays under the stored override, as the
+playlist would. The engine resolves every adjacency (boundary, Transition now, preview, the
+join, and the rows' ✎ marks) with the open playlist's override.

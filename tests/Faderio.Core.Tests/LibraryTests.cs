@@ -224,7 +224,7 @@ public sealed class LibraryTests : IDisposable
                 $"Not saved: settings. The library Locked could not be opened ({library.UnavailableReason}).",
             },
             sink.Notices.Skip(1));
-        Assert.Null(engine.Transition(adjacency));
+        Assert.Null(engine.Transition(adjacency).Global);
         Assert.Equal(new PlayerSettings(), engine.View.Settings);
     }
 

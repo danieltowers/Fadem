@@ -202,6 +202,7 @@ public sealed partial class PlaybackEngine
                 {
                     _pendingSave = null; // rows for a file that is gone
                     _openPlaylist = null; // so nothing is written to it again
+                    _authoredPairs.Clear();
                 }
             }
             if (RemoveOverrides(found) is { } failure)
@@ -346,6 +347,7 @@ public sealed partial class PlaybackEngine
         DeleteIfEmptyUntitled();
         KeepOnlySoundingRows();
         _openPlaylist = name;
+        _authoredPairs.Clear(); // the rows' marks follow this playlist's overrides
         if (entries.Count > 0 || !PlaylistFolder.IsUntitled(name))
         {
             RememberOpenPlaylist(launching);

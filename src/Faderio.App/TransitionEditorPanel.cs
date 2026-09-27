@@ -23,6 +23,11 @@ internal enum UnsavedEdits
 /// captures and validates, and each value it refuses is shown beside its field. Leaving a draft
 /// that differs from what is stored asks Save / Discard / Cancel (build issue 15). Preview plays
 /// the draft on its own voices while the queue is held, and shows where it is (build issue 16).
+/// <para>A selector at the top picks the layer the fields edit (D21, playlists issue 04): the
+/// global transition, or the open playlist's override of it. In playlist mode each box shows the
+/// global value as grey placeholder text, only what is typed is the override, and the curve list
+/// has "(global)". The mode is kept for the session (D23), so the row button and the menu open
+/// the editor in the last one.</para>
 /// </summary>
 internal sealed class TransitionEditorPanel : Panel
 {
@@ -32,6 +37,10 @@ internal sealed class TransitionEditorPanel : Panel
     private readonly Func<Adjacency, UnsavedEdits> _askUnsaved;
 
     internal readonly Label _title;
+    internal readonly RadioButton _editGlobal;
+    internal readonly RadioButton _editPlaylist;
+    internal readonly Label _effective;
+    internal readonly Button _removeOverride;
     internal readonly TextBox _fadeOutPoint;
     internal readonly CheckBox _fadeOutFromEnd;
     internal readonly TextBox _fadeOutDuration;
@@ -58,8 +67,11 @@ internal sealed class TransitionEditorPanel : Panel
     private Point? _fadeIn;
     private bool _loading;
 
-    /// <summary>A curve as the list shows it.</summary>
-    private sealed record CurveItem(FadeCurveKind Curve)
+    /// <summary>The layer last chosen, kept for the session (D23).</summary>
+    private TransitionLayer _layer = TransitionLayer.Global;
+
+    /// <summary>A curve as the list shows it; none is "(global)", in playlist mode only.</summary>
+    private sealed record CurveItem(FadeCurveKind? Curve)
     {
         public override string ToString() => Presenter.FmtCurve(Curve);
     }
@@ -96,14 +108,53 @@ internal sealed class TransitionEditorPanel : Panel
         {
             Text = NoAdjacency,
             Dock = DockStyle.Top,
-            Height = 44,
+            Height = 26,
             Font = new Font(Font, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft,
             AutoEllipsis = true,
         };
 
-        _fadeOutFromEnd = new CheckBox { Text = "From end", Dock = DockStyle.Fill, Enabled = false };
         var row = 0;
+        _editGlobal = new RadioButton { Text = "Global", AutoSize = true, Checked = true, Margin = new Padding(3, 0, 3, 0) };
+        _editPlaylist = new RadioButton
+        {
+            Text = PlaylistChoice(null),
+            AutoSize = true,
+            MaximumSize = new Size(290, 0),
+            Enabled = false,
+            Margin = new Padding(3, 0, 3, 0),
+        };
+        var selector = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = true,
+            MaximumSize = new Size(300, 0),
+            Margin = new Padding(0),
+        };
+        selector.Controls.Add(new Label { Text = "Editing:", AutoSize = true, Margin = new Padding(3, 3, 0, 0) });
+        selector.Controls.Add(_editGlobal);
+        selector.Controls.Add(_editPlaylist);
+        layout.Controls.Add(selector, 0, row);
+        layout.SetColumnSpan(selector, 2);
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        row++;
+        // Hidden unless the open playlist plays something other than the global transition.
+        _effective = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(290, 0),
+            ForeColor = SystemColors.GrayText,
+            Visible = false,
+            Margin = new Padding(3, 0, 3, 0),
+        };
+        layout.Controls.Add(_effective, 0, row);
+        layout.SetColumnSpan(_effective, 2);
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        row++;
+
+        _fadeOutFromEnd = new CheckBox { Text = "From end", Dock = DockStyle.Fill, Enabled = false };
         _fadeOutPoint = Field(layout, ref row, TransitionField.FadeOutPoint, "Fade-out point (s)", _fadeOutFromEnd, out _captureOut, "Capture");
         (_fadeOutLess, _fadeOutMore) = NudgeButtons(_fadeOutPoint);
         _fadeOutDuration = Field(layout, ref row, TransitionField.FadeOutDuration, "Fade-out duration (s)", null, out _, null);
@@ -112,7 +163,7 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeInDuration = Field(layout, ref row, TransitionField.FadeInDuration, "Fade-in duration (s)", null, out _, null);
 
         _curve = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill, Enabled = false };
-        _curve.Items.AddRange(Enum.GetValues<FadeCurveKind>().Select(c => (object)new CurveItem(c)).ToArray());
+        ListCurves();
         ShowCurve(FadeCurveKind.EqualPower);
         layout.Controls.Add(new Label { Text = "Fade curve", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, row);
         layout.Controls.Add(_curve, 1, row);
@@ -123,23 +174,29 @@ internal sealed class TransitionEditorPanel : Panel
         _save = new Button { Text = "Save", Width = 72, Height = 32, Enabled = false };
         _revert = new Button { Text = "Revert", Width = 72, Height = 32, Enabled = false };
         _remove = new Button { Text = "Remove transition", Width = 124, Height = 32, Enabled = false };
+        _removeOverride = new Button { Text = "Remove override", Width = 124, Height = 32, Enabled = false, Visible = false };
         _render = new Button { Text = "Render this boundary", Width = 160, Height = 32, Enabled = false };
         _preview = new Button { Text = "Preview", Width = 110, Height = 32, Enabled = false };
         _stopPreview = new Button { Text = "Stop preview", Width = 110, Height = 32, Enabled = false };
         ButtonRow(layout, ref row, _preview, _stopPreview);
-        _previewStatus = new Label { AutoSize = true, MaximumSize = new Size(300, 0), Margin = new Padding(3, 0, 3, 8) };
+        _previewStatus = new Label { AutoSize = true, MaximumSize = new Size(300, 0), Margin = new Padding(3, 0, 3, 8), Visible = false };
         layout.Controls.Add(_previewStatus, 0, row);
         layout.SetColumnSpan(_previewStatus, 2);
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         row++;
         ButtonRow(layout, ref row, _save, _revert, _remove);
-        ButtonRow(layout, ref row, _render);
+        // Remove override sits under Remove transition in playlist mode only (D21), in Render's
+        // row, so that Render stays in view at the default window size.
+        ButtonRow(layout, ref row, _render, _removeOverride);
 
         _captureOut.Click += (_, _) => CaptureFadeOut();
         _captureIn.Click += (_, _) => CaptureFadeIn();
         _save.Click += (_, _) => Save();
         _revert.Click += (_, _) => Revert();
         _remove.Click += (_, _) => Remove();
+        _removeOverride.Click += (_, _) => RemoveOverride();
+        _editGlobal.CheckedChanged += (_, _) => { if (_editGlobal.Checked) SwitchLayer(TransitionLayer.Global); };
+        _editPlaylist.CheckedChanged += (_, _) => { if (_editPlaylist.Checked) SwitchLayer(TransitionLayer.Playlist); };
         _render.Click += (_, _) => Render();
         _preview.Click += (_, _) => Preview();
         _stopPreview.Click += (_, _) => _engine.StopPreview();
@@ -156,6 +213,63 @@ internal sealed class TransitionEditorPanel : Panel
     }
 
     public Adjacency? Adjacency => _adjacency;
+
+    /// <summary>The layer the fields edit: the one chosen, while a playlist is open.</summary>
+    internal TransitionLayer Layer =>
+        _layer == TransitionLayer.Playlist && _engine.View.OpenPlaylist is not null ? TransitionLayer.Playlist : TransitionLayer.Global;
+
+    private static string PlaylistChoice(string? playlist) =>
+        playlist is null ? "This playlist" : $"This playlist ({playlist})";
+
+    /// <summary>The selector moved: unsaved edits in the layer left are settled first, as on
+    /// leaving the adjacency, and Cancel puts the selector back. The fields then load the layer
+    /// chosen.</summary>
+    internal void SwitchLayer(TransitionLayer layer)
+    {
+        if (_loading || layer == _layer)
+        {
+            return;
+        }
+        if (!ConfirmLeave())
+        {
+            ShowLayer();
+            return;
+        }
+        _layer = layer;
+        ShowLayer();
+        if (_adjacency is { } adjacency)
+        {
+            Load(adjacency);
+        }
+    }
+
+    /// <summary>The selector, the curve list and Remove override as the layer has them.</summary>
+    private void ShowLayer()
+    {
+        var wasLoading = _loading;
+        _loading = true;
+        var playlist = Layer == TransitionLayer.Playlist;
+        _editGlobal.Checked = !playlist;
+        _editPlaylist.Checked = playlist;
+        _removeOverride.Visible = playlist;
+        if (_curve.Items.Count > 0 && (_curve.Items[0] is CurveItem { Curve: null }) != playlist)
+        {
+            ListCurves();
+        }
+        _loading = wasLoading;
+    }
+
+    /// <summary>The curves the list offers: with "(global)" first in playlist mode.</summary>
+    private void ListCurves()
+    {
+        IEnumerable<FadeCurveKind?> curves = Enum.GetValues<FadeCurveKind>().Select(c => (FadeCurveKind?)c);
+        if (Layer == TransitionLayer.Playlist)
+        {
+            curves = curves.Prepend(null);
+        }
+        _curve.Items.Clear();
+        _curve.Items.AddRange(curves.Select(c => (object)new CurveItem(c)).ToArray());
+    }
 
     /// <summary>The captured fade-out point, exact, or null when the field was typed or cleared.</summary>
     internal Point? CapturedFadeOut => _fadeOut;
@@ -229,8 +343,7 @@ internal sealed class TransitionEditorPanel : Panel
     /// field as a capture does, exact. A field that is blank or not a number is left alone.</summary>
     internal void NudgePoint(bool fadeOut, int direction, bool coarse)
     {
-        var (box, captured) = fadeOut ? (_fadeOutPoint, _fadeOut) : (_fadeInPoint, _fadeIn);
-        if (_adjacency is null || PointOf(box, captured).Point is not { } point)
+        if (_adjacency is null || ShownPoint(fadeOut) is not { } point)
         {
             return;
         }
@@ -247,11 +360,33 @@ internal sealed class TransitionEditorPanel : Panel
         }
     }
 
-    /// <summary>The nudge buttons live while an adjacency is open and their field holds a point.</summary>
+    /// <summary>The point a field shows: its own, or in playlist mode, while it is empty, the
+    /// global one its placeholder shows, so a nudge or a from-end tick starts from what is heard
+    /// and writes the result into the override.</summary>
+    private Point? ShownPoint(bool fadeOut)
+    {
+        var (box, captured) = fadeOut ? (_fadeOutPoint, _fadeOut) : (_fadeInPoint, _fadeIn);
+        if (PointOf(box, captured).Point is { } point)
+        {
+            return point;
+        }
+        if (_adjacency is null || !ShowsPlaceholder(box))
+        {
+            return null;
+        }
+        var global = _engine.Transition(_adjacency).Global;
+        return (fadeOut ? global?.FadeOutPoint : global?.FadeInPoint)?.Point;
+    }
+
+    /// <summary>An empty box showing the global value, in playlist mode.</summary>
+    private static bool ShowsPlaceholder(TextBox box) => box.Text.Length == 0 && box.PlaceholderText.Length > 0;
+
+    /// <summary>The nudge buttons live while an adjacency is open and their field shows a point,
+    /// its own or the global one as a placeholder.</summary>
     private void ShowNudges()
     {
-        var outLive = _adjacency is not null && PointOf(_fadeOutPoint, _fadeOut).Point is not null;
-        var inLive = _adjacency is not null && PointOf(_fadeInPoint, _fadeIn).Point is not null;
+        var outLive = _adjacency is not null && (PointOf(_fadeOutPoint, _fadeOut).Point is not null || ShowsPlaceholder(_fadeOutPoint));
+        var inLive = _adjacency is not null && (PointOf(_fadeInPoint, _fadeIn).Point is not null || ShowsPlaceholder(_fadeInPoint));
         _fadeOutLess.Enabled = _fadeOutMore.Enabled = outLive;
         _fadeInLess.Enabled = _fadeInMore.Enabled = inLive;
     }
@@ -262,7 +397,7 @@ internal sealed class TransitionEditorPanel : Panel
         flow.Controls.AddRange(buttons);
         layout.Controls.Add(flow, 0, row);
         layout.SetColumnSpan(flow, 2);
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
         row++;
     }
 
@@ -314,17 +449,47 @@ internal sealed class TransitionEditorPanel : Panel
                 return false;
             }
             var (draft, unparsed) = Draft();
-            return unparsed.Count > 0 || !_engine.IsAuthored(_adjacency, draft);
+            return unparsed.Count > 0 || !_engine.IsAuthored(_adjacency, draft, Layer);
         }
     }
 
     /// <summary>Loads the fields from the store: opening an adjacency, and Revert. A stored
-    /// point loads exactly, so a draft nobody touched is the transition stored.</summary>
+    /// point loads exactly, so a draft nobody touched is the transition stored. In playlist mode
+    /// the fields hold the override, and the global values are their placeholders.</summary>
     private void Load(Adjacency adjacency)
     {
         _adjacency = adjacency;
         _title.Text = adjacency.Name;
-        Fill(_engine.Transition(adjacency), editing: true);
+        ShowLayer();
+        var layers = _engine.Transition(adjacency);
+        var playlist = Layer == TransitionLayer.Playlist;
+        Fill(playlist ? layers.Override : layers.Global, editing: true, playlist ? layers.Global : null);
+        ShowLayers(layers);
+    }
+
+    /// <summary>What the store holds besides the fields: the global values as placeholders in
+    /// playlist mode, and the heading line when the open playlist plays something else. Read
+    /// again after every save or removal, since either layer may have changed.</summary>
+    private void ShowLayers(TransitionLayers layers)
+    {
+        var global = Layer == TransitionLayer.Playlist ? layers.Global : null;
+        _fadeOutPoint.PlaceholderText = Presenter.FmtSeconds(global?.FadeOutPoint?.Point);
+        _fadeOutDuration.PlaceholderText = Presenter.FmtSeconds(global?.FadeOutDuration);
+        _fadeInPoint.PlaceholderText = Presenter.FmtSeconds(global?.FadeInPoint?.Point);
+        _fadeInDuration.PlaceholderText = Presenter.FmtSeconds(global?.FadeInDuration);
+        var playlist = _engine.View.OpenPlaylist;
+        var differ = _adjacency is not null && playlist is not null && layers.Differ;
+        _effective.Text = differ ? Presenter.FmtEffective(playlist!, layers.Effective) : "";
+        _effective.Visible = differ;
+        ShowNudges();
+    }
+
+    private void ShowLayers()
+    {
+        if (_adjacency is not null)
+        {
+            ShowLayers(_engine.Transition(_adjacency));
+        }
     }
 
     /// <summary>Empties the editor, as at launch: on switching library (library issue 02), where
@@ -334,16 +499,20 @@ internal sealed class TransitionEditorPanel : Panel
     {
         _adjacency = null;
         _title.Text = NoAdjacency;
-        Fill(null, editing: false);
+        Fill(null, editing: false, global: null);
+        ShowLayers(TransitionLayers.None);
     }
 
     private const string NoAdjacency = "No boundary selected";
 
-    private void Fill(TransitionSpec? spec, bool editing)
+    /// <summary>The fields from <paramref name="spec"/>. With <paramref name="global"/>, in playlist
+    /// mode, From end follows the global point while the override has none, so the placeholder
+    /// reads as the global does; and a missing curve is "(global)".</summary>
+    private void Fill(TransitionSpec? spec, bool editing, TransitionSpec? global)
     {
         _loading = true;
-        _fadeOutFromEnd.Checked = spec?.FadeOutPoint?.FromEnd ?? false;
-        ShowCurve(spec?.Curve ?? FadeCurveKind.EqualPower);
+        _fadeOutFromEnd.Checked = (spec?.FadeOutPoint ?? global?.FadeOutPoint)?.FromEnd ?? false;
+        ShowCurve(Layer == TransitionLayer.Playlist ? spec?.Curve : spec?.Curve ?? FadeCurveKind.EqualPower);
         _loading = false;
         _fadeOut = spec?.FadeOutPoint?.Point;
         _fadeIn = spec?.FadeInPoint?.Point;
@@ -352,7 +521,7 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeOutDuration.Text = Presenter.FmtSeconds(spec?.FadeOutDuration);
         _fadeInDuration.Text = Presenter.FmtSeconds(spec?.FadeInDuration);
         ShowReasons([]);
-        foreach (var control in new Control[] { _fadeOutFromEnd, _curve, _save, _revert, _remove, _render, _preview })
+        foreach (var control in new Control[] { _fadeOutFromEnd, _curve, _save, _revert, _remove, _removeOverride, _render, _preview })
         {
             control.Enabled = editing;
         }
@@ -363,12 +532,19 @@ internal sealed class TransitionEditorPanel : Panel
     /// or a preview runs, and the preview's buttons and line follow the preview.</summary>
     public void Refresh(PlayerView view)
     {
+        var choice = PlaylistChoice(view.OpenPlaylist);
+        if (_editPlaylist.Text != choice)
+        {
+            _editPlaylist.Text = choice;
+        }
+        _editPlaylist.Enabled = view.OpenPlaylist is not null;
         var canCapture = _adjacency is not null && (view.Attended is not null || view.Preview is not null);
         _captureOut.Enabled = canCapture;
         _captureIn.Enabled = canCapture;
         _preview.Text = view.Preview is null ? "Preview" : "Preview again";
         _stopPreview.Enabled = view.Preview is not null;
         _previewStatus.Text = Presenter.FmtPreview(view.Preview);
+        _previewStatus.Visible = view.Preview is not null; // no room kept for it otherwise
     }
 
     /// <summary>A capture that captured nothing leaves the field as it was; the engine says why.</summary>
@@ -399,7 +575,7 @@ internal sealed class TransitionEditorPanel : Panel
         }
         if (ParsedDraft("Not previewed") is { } spec)
         {
-            ShowReasons(_engine.Preview(_adjacency, spec));
+            ShowReasons(_engine.Preview(_adjacency, spec, Layer));
         }
     }
 
@@ -407,13 +583,13 @@ internal sealed class TransitionEditorPanel : Panel
     /// engine does the arithmetic; a field that is blank or not a number is left as it is.</summary>
     private void MeasureFadeOutFromOtherEnd()
     {
-        if (_adjacency is not null && PointOf(_fadeOutPoint, _fadeOut).Point is { } point)
+        if (_adjacency is not null && ShownPoint(fadeOut: true) is { } point)
         {
             ShowFadeOut(_engine.FromOtherEnd(_adjacency.Outgoing, point));
         }
     }
 
-    private void ShowCurve(FadeCurveKind curve) => _curve.SelectedIndex = _curve.Items.IndexOf(new CurveItem(curve));
+    private void ShowCurve(FadeCurveKind? curve) => _curve.SelectedIndex = _curve.Items.IndexOf(new CurveItem(curve));
 
     private void ShowFadeOut(Point? point)
     {
@@ -429,7 +605,11 @@ internal sealed class TransitionEditorPanel : Panel
         }
         if (ParsedDraft("Not saved") is { } spec)
         {
-            ShowReasons(_engine.Author(_adjacency, spec)); // saved or not, the engine says which
+            // Saved or not, the engine says which.
+            ShowReasons(Layer == TransitionLayer.Playlist
+                ? _engine.AuthorOverride(_adjacency, spec)
+                : _engine.Author(_adjacency, spec));
+            ShowLayers();
         }
     }
 
@@ -483,13 +663,27 @@ internal sealed class TransitionEditorPanel : Panel
     }
 
     /// <summary>Unauthors the adjacency and keeps the fields as an unsaved draft, so Save puts
-    /// the transition back.</summary>
+    /// the transition back. In playlist mode it is still the global transition that goes, and
+    /// the placeholders show that.</summary>
     internal void Remove()
     {
         if (_adjacency is not null)
         {
             _engine.Unauthor(_adjacency);
             ShowReasons([]);
+            ShowLayers();
+        }
+    }
+
+    /// <summary>Removes the open playlist's override, so it plays the global transition again,
+    /// and keeps the fields as an unsaved draft, as <see cref="Remove"/> does.</summary>
+    internal void RemoveOverride()
+    {
+        if (_adjacency is not null)
+        {
+            _engine.UnauthorOverride(_adjacency);
+            ShowReasons([]);
+            ShowLayers();
         }
     }
 

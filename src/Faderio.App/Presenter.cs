@@ -70,6 +70,33 @@ internal static class Presenter
     /// <summary>A fade curve as the editor's list names it.</summary>
     public static string FmtCurve(FadeCurveKind curve) => curve == FadeCurveKind.Linear ? "Linear" : "Equal-power";
 
+    /// <summary>A curve as the list names it in playlist mode, where none falls through to the
+    /// global transition's.</summary>
+    public static string FmtCurve(FadeCurveKind? curve) => curve is { } c ? FmtCurve(c) : "(global)";
+
+    /// <summary>The editor's heading line when the open playlist plays something other than the
+    /// global transition (playlists issue 04): each parameter of the effective transition, a blank
+    /// one as "blank".</summary>
+    public static string FmtEffective(string playlist, TransitionSpec? effective)
+    {
+        if (effective is null)
+        {
+            return $"{playlist} plays no transition here.";
+        }
+        static string Part(TimeSpan? seconds) => seconds is null ? "blank" : $"{FmtSeconds(seconds)} s";
+        var fromEnd = effective.FadeOutPoint?.FromEnd == true ? " from end" : "";
+        var parts = new List<string>
+        {
+            $"fade-out at {Part(effective.FadeOutPoint?.Position)}{fromEnd} for {Part(effective.FadeOutDuration)}",
+            $"fade-in from {Part(effective.FadeInPoint?.Position)} over {Part(effective.FadeInDuration)}",
+        };
+        if (effective.Curve is { } curve)
+        {
+            parts.Add(FmtCurve(curve).ToLowerInvariant());
+        }
+        return $"{playlist} plays: {string.Join(", ", parts)}.";
+    }
+
     /// <summary>The file name the render dialog suggests: "outgoing - incoming boundary.wav".</summary>
     public static string RenderFileName(Adjacency adjacency) =>
         $"{Path.GetFileNameWithoutExtension(adjacency.Outgoing.FilePath)} - " +

@@ -1,5 +1,6 @@
 using Faderio.Core.Domain;
 using Faderio.Core.Queue;
+using Faderio.Core.Transitions;
 
 namespace Faderio.Core.Playback;
 
@@ -93,12 +94,21 @@ public sealed partial class PlaybackEngine
     /// this transition for the adjacency, or holds nothing and the draft is blank, since a blank
     /// save stores nothing. A missing curve is equal-power, as the resolver reads it, and a blank
     /// entry left by an older build is nothing. The editor's test for unsaved edits (build issue
-    /// 15).</summary>
-    public bool IsAuthored(Adjacency adjacency, TransitionSpec draft)
+    /// 15).
+    /// <para>For <see cref="TransitionLayer.Playlist"/>, whether the open playlist's override is
+    /// the draft, as <see cref="AuthorOverride"/> would store it: a missing curve there is the
+    /// global's, so it is compared as it stands (playlists issue 04).</para></summary>
+    public bool IsAuthored(Adjacency adjacency, TransitionSpec draft, TransitionLayer layer = TransitionLayer.Global)
     {
         ThrowIfDisposed();
         return Run(() =>
         {
+            if (layer == TransitionLayer.Playlist)
+            {
+                var global = _store?.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
+                var storedOverride = StoredOverride(adjacency) is { } o ? OverrideToStore(global, o) : null;
+                return storedOverride == OverrideToStore(global, draft);
+            }
             var stored = _store?.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath) is { IsBlank: false } s ? s : null;
             if (stored is null || draft.IsBlank)
             {
@@ -110,11 +120,137 @@ public sealed partial class PlaybackEngine
         static TransitionSpec WithCurve(TransitionSpec spec) => spec with { Curve = spec.Curve ?? FadeCurveKind.EqualPower };
     }
 
-    /// <summary>The globally authored transition for the adjacency, or null.</summary>
-    public TransitionSpec? Transition(Adjacency adjacency)
+    /// <summary>The adjacency's transition, layer by layer: the global one, the open playlist's
+    /// override and what they merge to, the transition the open playlist plays (playlists issue
+    /// 04). With no playlist open there is no override.</summary>
+    public TransitionLayers Transition(Adjacency adjacency)
     {
         ThrowIfDisposed();
-        return Run(() => _store?.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath));
+        return Run(() =>
+        {
+            var global = _store?.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
+            var playlistOverride = StoredOverride(adjacency);
+            return new TransitionLayers(global, playlistOverride, TransitionResolver.Merge(global, playlistOverride));
+        });
+    }
+
+    /// <summary>The open playlist's override for the pair, as the resolver takes it; null with no
+    /// playlist open.</summary>
+    private TransitionSpec? OverrideOf(string outgoingPath, string incomingPath) =>
+        _openPlaylist is { } name ? _store?.GetOverride(name, outgoingPath, incomingPath) : null;
+
+    /// <summary>The open playlist's override for the adjacency; one that sets nothing, left by a
+    /// store written elsewhere, is none.</summary>
+    private TransitionSpec? StoredOverride(Adjacency adjacency) =>
+        OverrideOf(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath) is { IsEmpty: false } o ? o : null;
+
+    /// <summary>What <see cref="AuthorOverride"/> stores for <paramref name="partial"/>: the partial
+    /// itself, or nothing when it sets nothing, or when with no global transition it sets only a
+    /// curve, which shapes fades nobody placed.</summary>
+    private static TransitionSpec? OverrideToStore(TransitionSpec? global, TransitionSpec partial) =>
+        partial.IsEmpty || TransitionResolver.Merge(global, partial) is not { IsBlank: false } ? null : partial;
+
+    /// <summary>Stores <paramref name="partial"/> as the open playlist's override of the adjacency
+    /// (D21): the parameters it sets replace the global transition's in this playlist, and those it
+    /// leaves out follow the global, later edits too. With no global it is a playlist-only
+    /// transition (D22). It is validated as the transition the playlist will play, the global with
+    /// the override laid over it, and refused as <see cref="Author"/> refuses; a pending boundary is
+    /// rescheduled as <see cref="Author"/> reschedules it. A partial that sets nothing removes the
+    /// override. The outcome is a notice.</summary>
+    public IReadOnlyList<Refusal> AuthorOverride(Adjacency adjacency, TransitionSpec partial)
+    {
+        ThrowIfDisposed();
+        return Run(() =>
+        {
+            ObserveClock();
+            if (OverrideTarget("Not saved", adjacency) is not { } name)
+            {
+                return (IReadOnlyList<Refusal>)[];
+            }
+            var global = _store!.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
+            if (OverrideToStore(global, partial) is null)
+            {
+                if (!RemoveOverride(adjacency, name))
+                {
+                    RaiseNotice($"Nothing to save: {adjacency.Name} in {name} overrides nothing.");
+                }
+                return [];
+            }
+            var refusals = Refusals(adjacency, TransitionResolver.Merge(global, partial)!);
+            if (refusals.Count > 0)
+            {
+                RaiseNotice($"Not saved: {adjacency.Name} in {name}. " + string.Join(" ", refusals.Select(r => r.Reason)));
+                return refusals;
+            }
+            try
+            {
+                _store.UpsertOverride(name, adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath, partial);
+            }
+            catch (Exception e) when (IsStoreWriteFailure(e))
+            {
+                RaiseStoreWriteFailure("Not saved", adjacency, e);
+                return [];
+            }
+            StoreChanged();
+            RaiseNotice($"Saved {adjacency.Name} in {name}.");
+            RescheduleIfPending(adjacency);
+            return [];
+        });
+    }
+
+    /// <summary>Removes the open playlist's override of the adjacency, so the playlist plays the
+    /// global transition again, rescheduling as <see cref="Author"/> does.</summary>
+    public void UnauthorOverride(Adjacency adjacency)
+    {
+        ThrowIfDisposed();
+        Run(() =>
+        {
+            ObserveClock();
+            if (OverrideTarget("Not removed", adjacency) is { } name)
+            {
+                RemoveOverride(adjacency, name);
+            }
+        });
+    }
+
+    /// <summary>The playlist whose override a command writes: the open one. Null, with a notice
+    /// saying why, when there is no store or no playlist open.</summary>
+    private string? OverrideTarget(string outcome, Adjacency adjacency)
+    {
+        if (_store is null)
+        {
+            RaiseNotice($"{outcome}: {adjacency.Name}. {NoLibrary}");
+            return null;
+        }
+        if (_openPlaylist is not { } name)
+        {
+            RaiseNotice($"{outcome}: {adjacency.Name}. No playlist is open.");
+            return null;
+        }
+        return name;
+    }
+
+    /// <summary><see cref="UnauthorOverride"/>'s body, under the lock. True when an override was
+    /// removed; a failed write is a notice and false.</summary>
+    private bool RemoveOverride(Adjacency adjacency, string playlist)
+    {
+        bool removed;
+        try
+        {
+            removed = _store!.RemoveOverride(playlist, adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
+        }
+        catch (Exception e) when (IsStoreWriteFailure(e))
+        {
+            RaiseStoreWriteFailure("Not removed", adjacency, e);
+            return false;
+        }
+        if (removed)
+        {
+            StoreChanged();
+            RaiseNotice($"Removed the override of {adjacency.Name} in {playlist}.");
+            RescheduleIfPending(adjacency);
+        }
+        return removed;
     }
 
     /// <summary>Upserts the transition and, if the adjacency's boundary is pending in the current
@@ -207,17 +343,19 @@ public sealed partial class PlaybackEngine
         return removed;
     }
 
-    /// <summary>Whether one row into another is authored, as last read from the store. A row's
-    /// track never changes, so only a write to the store makes an answer stale, and every write
-    /// clears them all. Publishing, once per file during an add, then reads the store only for
-    /// rows that are new to it.</summary>
+    /// <summary>Whether one row into another is authored in the open playlist, its override
+    /// included, as last read from the store. A row's track never changes, so only a write to the
+    /// store or another playlist opening makes an answer stale, and each clears them all.
+    /// Publishing, once per file during an add, then reads the store only for rows that are new to
+    /// it.</summary>
     private readonly Dictionary<(RowId Outgoing, RowId Incoming), bool> _authoredPairs = new();
 
     private bool IsAuthoredPair(QueueEntry outgoing, QueueEntry incoming)
     {
         if (!_authoredPairs.TryGetValue((outgoing.Id, incoming.Id), out var authored))
         {
-            authored = _store?.Get(outgoing.Track.FilePath, incoming.Track.FilePath) is { IsBlank: false };
+            var (outPath, inPath) = (outgoing.Track.FilePath, incoming.Track.FilePath);
+            authored = TransitionResolver.Merge(_store?.Get(outPath, inPath), OverrideOf(outPath, inPath)) is { IsBlank: false };
             _authoredPairs[(outgoing.Id, incoming.Id)] = authored;
         }
         return authored;

@@ -1,4 +1,5 @@
 using Faderio.Core.Domain;
+using Faderio.Core.Transitions;
 
 namespace Faderio.Core.Playback;
 
@@ -91,14 +92,26 @@ public sealed partial class PlaybackEngine
     /// preview is restarted with this draft. Nothing reaches the store.
     /// <para>The draft's impossible values are refused as <see cref="Author"/> refuses them, and
     /// returned. An unreadable track is a notice and its rows are marked: the preview does not
-    /// start, and the queue is never held.</para></summary>
-    public IReadOnlyList<Refusal> Preview(Adjacency adjacency, TransitionSpec draft)
+    /// start, and the queue is never held.</para>
+    /// <para>The draft is the <paramref name="layer"/> the editor writes, and the preview plays what
+    /// the open playlist would (playlists issue 04): a global draft under the playlist's stored
+    /// override, or a drafted override over the stored global, refused as
+    /// <see cref="AuthorOverride"/> refuses it.</para></summary>
+    public IReadOnlyList<Refusal> Preview(Adjacency adjacency, TransitionSpec draft, TransitionLayer layer = TransitionLayer.Global)
     {
         ThrowIfDisposed();
         return Run(() =>
         {
             ObserveClock();
-            var refusals = Refusals(adjacency, draft);
+            var (outPath, inPath) = (adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
+            // A draft that saves as nothing plays as saving it would leave the adjacency.
+            var storedGlobal = layer == TransitionLayer.Playlist ? _store?.Get(outPath, inPath) : null;
+            var (global, playlistOverride) = layer == TransitionLayer.Playlist
+                ? (storedGlobal, OverrideToStore(storedGlobal, draft))
+                : (draft.IsBlank ? null : draft, OverrideOf(outPath, inPath));
+            var refusals = layer == TransitionLayer.Global
+                ? Refusals(adjacency, draft)
+                : Refusals(adjacency, TransitionResolver.Merge(global, playlistOverride) ?? new TransitionSpec());
             if (refusals.Count > 0)
             {
                 RaiseNotice($"Not previewed: {adjacency.Name}. " + string.Join(" ", refusals.Select(r => r.Reason)));
@@ -123,8 +136,7 @@ public sealed partial class PlaybackEngine
             {
                 HoldQueue();
             }
-            // A blank draft saves as nothing, so it plays as an unauthored adjacency.
-            StartPreview(adjacency, draft.IsBlank ? null : draft, outgoing, incoming);
+            StartPreview(adjacency, global, playlistOverride, outgoing, incoming);
             Publish();
             return [];
         });
@@ -185,10 +197,11 @@ public sealed partial class PlaybackEngine
     /// <summary>Lays out the preview on its own timeline, from zero, with the queue's boundary
     /// pieces: the same resolution, fade computation, voices and fades, so it plays what the
     /// queue would. A test holds its samples equal to a render of the same draft.</summary>
-    private void StartPreview(Adjacency adjacency, TransitionSpec? draft, ITrackSource outSource, ITrackSource inSource)
+    private void StartPreview(
+        Adjacency adjacency, TransitionSpec? global, TransitionSpec? playlistOverride, ITrackSource outSource, ITrackSource inSource)
     {
         var total = outSource.TotalFrames;
-        var transition = _resolver.Resolve(draft, null, TimeSpanOf(total), adjacency.Incoming.Length.TimeSpan);
+        var transition = _resolver.Resolve(global, playlistOverride, TimeSpanOf(total), adjacency.Incoming.Length.TimeSpan);
         // Where the queue would begin the transition, in the outgoing track.
         var begins = !transition.IsHardCut && TryComputeFade(0, total, transition, f => f, out var planned, out _)
             ? planned

@@ -83,7 +83,9 @@ internal sealed class TransitionResolver
         };
     }
 
-    private static TransitionSpec? Merge(TransitionSpec? global, TransitionSpec? playlistOverride)
+    /// <summary>The override laid over the global transition, parameter by parameter; either alone
+    /// when the other is absent.</summary>
+    internal static TransitionSpec? Merge(TransitionSpec? global, TransitionSpec? playlistOverride)
     {
         if (global is null)
         {

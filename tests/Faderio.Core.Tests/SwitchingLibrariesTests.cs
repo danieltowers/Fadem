@@ -76,7 +76,7 @@ public sealed class SwitchingLibrariesTests : IDisposable
         Assert.Empty(engine.View.Queue);
         Assert.Null(engine.View.Attended);
         Assert.Equal(new LibraryView(second, "Second", IsAvailable: true), engine.View.Library);
-        Assert.Null(engine.Transition(adjacency)); // the second library's store is empty
+        Assert.Null(engine.Transition(adjacency).Global); // the second library's store is empty
 
         engine.Author(adjacency, Crossfade());
 
@@ -136,7 +136,7 @@ public sealed class SwitchingLibrariesTests : IDisposable
             "The library Gone could not be opened (the folder does not exist). Nothing is saved until a " +
             "library opens; what is queued still plays.",
             sink.Notices[^1]);
-        Assert.Null(engine.Transition(adjacency)); // the first library's store is not kept open
+        Assert.Null(engine.Transition(adjacency).Global); // the first library's store is not kept open
         engine.Author(adjacency, Crossfade());
         Assert.Equal($"Not saved: {adjacency.Name}. The library Gone could not be opened (the folder does not exist).", sink.Notices[^1]);
 

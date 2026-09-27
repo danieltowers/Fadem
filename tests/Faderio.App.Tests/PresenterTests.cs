@@ -200,4 +200,22 @@ public sealed class PresenterTests
         Assert.Equal("2 clips · latest: C. The output went beyond full scale. Click to clear.",
             Presenter.ClipTip(new ClipView(2, ClipCause.Of(Named("C")))));
     }
+
+    [Fact]
+    public void FmtEffective_NamesThePlaylist_AndEachParameter_ABlankOneAsBlank()
+    {
+        Assert.Equal("Evening plays: fade-out at 8 s from end for 5 s, fade-in from blank over 2.5 s, linear.",
+            Presenter.FmtEffective("Evening", new TransitionSpec
+            {
+                FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(8), FromEnd: true),
+                FadeOutDuration = TimeSpan.FromSeconds(5),
+                FadeInDuration = TimeSpan.FromSeconds(2.5),
+                Curve = FadeCurveKind.Linear,
+            }));
+        Assert.Equal("Evening plays: fade-out at blank for blank, fade-in from 0 s over blank.",
+            Presenter.FmtEffective("Evening", new TransitionSpec { FadeInPoint = TimeSpan.Zero }));
+    }
+
+    [Fact]
+    public void FmtCurve_WithNoCurve_IsTheGlobalOne() => Assert.Equal("(global)", Presenter.FmtCurve((FadeCurveKind?)null));
 }

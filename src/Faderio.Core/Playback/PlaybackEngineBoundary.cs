@@ -203,7 +203,8 @@ public sealed partial class PlaybackEngine
 
         var inTrack = incoming.Track;
         var global = _store?.Get(outTrack.FilePath, inTrack.FilePath);
-        var transition = _resolver.Resolve(global, null, TimeSpanOf(total), inTrack.Length.TimeSpan);
+        var transition = _resolver.Resolve(
+            global, OverrideOf(outTrack.FilePath, inTrack.FilePath), TimeSpanOf(total), inTrack.Length.TimeSpan);
         if (transition.IsHardCut || !TryComputeFade(referencePosition, total, transition, TimelineOf, out var trig, out var dur))
         {
             // A hard cut, or an authored fade-out point already passed (e.g. manual seek): the
@@ -324,8 +325,9 @@ public sealed partial class PlaybackEngine
         var total = voice.Source.TotalFrames;
         var decodePosition = voice.Source.Position;
         var inTrack = _queue.Entries[next.Index].Track;
+        var outPath = _queue.Entries[index].Track.FilePath;
         var transition = _resolver.Resolve(
-            _store?.Get(_queue.Entries[index].Track.FilePath, inTrack.FilePath), null,
+            _store?.Get(outPath, inTrack.FilePath), OverrideOf(outPath, inTrack.FilePath),
             TimeSpanOf(total), inTrack.Length.TimeSpan, fadeOutAt: TimeSpanOf(decodePosition));
         if (transition.IsHardCut)
         {

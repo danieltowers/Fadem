@@ -2306,7 +2306,7 @@ public sealed class HeadlessFormTests
 
         Assert.NotNull(h.Store.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath));
         Assert.Equal("Second", h.Engine.View.Library!.Name);
-        Assert.Null(h.Engine.Transition(adjacency));
+        Assert.Null(h.Engine.Transition(adjacency).Global);
     });
 
     // ── Library issue 03: the window opens where it was closed ─────────────────────────
@@ -2774,5 +2774,196 @@ public sealed class HeadlessFormTests
         Assert.Equal(
             new[] { Path.Combine(album, "1 - One.wav"), Path.Combine(album, "2 - Two.wav") },
             File.ReadAllLines(file).Where(l => !l.StartsWith('#')));
+    });
+
+    // ── Overrides in the panel (playlists issue 04) ──────────────────────────────────────
+
+    private static readonly TransitionSpec GlobalAlphaBeta = new()
+    {
+        FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1.5), FromEnd: false),
+        FadeOutDuration = TimeSpan.FromSeconds(0.5),
+        FadeInPoint = TimeSpan.Zero,
+        FadeInDuration = TimeSpan.FromSeconds(0.5),
+        Curve = FadeCurveKind.Linear,
+    };
+
+    /// <summary>Alpha, beta and gamma queued in Untitled, alpha → beta authored globally, and the
+    /// editor open on it.</summary>
+    private static Adjacency EditingAlphaBeta(Harness h)
+    {
+        ThreeQueued(h);
+        var adjacency = h.Engine.AdjacenciesOf(h.Engine.View.Queue[0].Id).Next!;
+        h.Engine.Author(adjacency, GlobalAlphaBeta);
+        h.Form.EditTransitionAt(0);
+        return adjacency;
+    }
+
+    [Fact]
+    public void PlaylistMode_ShowsTheGlobalValuesGrey_AndOnlyWhatIsTypedIsSavedAsTheOverride() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var adjacency = EditingAlphaBeta(h);
+        var editor = h.Form._editor;
+        Assert.Equal("This playlist (Untitled)", editor._editPlaylist.Text);
+
+        editor._editPlaylist.Checked = true;
+
+        Assert.Equal(TransitionLayer.Playlist, editor.Layer);
+        Assert.Equal("", editor._fadeOutPoint.Text);
+        Assert.Equal("1.5", editor._fadeOutPoint.PlaceholderText);
+        Assert.Equal("0.5", editor._fadeOutDuration.PlaceholderText);
+        Assert.Equal("0", editor._fadeInPoint.PlaceholderText);
+        Assert.Equal("0.5", editor._fadeInDuration.PlaceholderText);
+        Assert.Equal("(global)", editor._curve.Text);
+        Assert.True(IsSetVisible(editor._removeOverride));
+        Assert.True(IsSetVisible(editor._remove)); // beside it, not replaced (D21)
+        Assert.False(IsSetVisible(editor._effective));
+        Assert.False(editor.HasUnsavedEdits);
+
+        editor._fadeOutPoint.Text = "1";
+        Assert.True(editor.HasUnsavedEdits);
+        Click(editor._save);
+
+        var layers = h.Engine.Transition(adjacency);
+        Assert.Equal(new TransitionSpec { FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1), FromEnd: false) }, layers.Override);
+        Assert.Equal(GlobalAlphaBeta, layers.Global);
+        Assert.False(editor.HasUnsavedEdits);
+        Assert.Equal($"Saved {adjacency.Name} in Untitled.", h.Form._status.Text);
+        Assert.True(IsSetVisible(editor._effective));
+        Assert.Equal("Untitled plays: fade-out at 1 s for 0.5 s, fade-in from 0 s over 0.5 s, linear.", editor._effective.Text);
+    });
+
+    [Fact]
+    public void PlaylistMode_ClearingABox_DropsItFromTheOverride_AndACurveCanBeOverridden() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var adjacency = EditingAlphaBeta(h);
+        h.Engine.AuthorOverride(adjacency, new TransitionSpec
+        {
+            FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1), FromEnd: false),
+            FadeInDuration = TimeSpan.FromSeconds(2),
+        });
+        var editor = h.Form._editor;
+        editor._editPlaylist.Checked = true;
+        Assert.Equal("1", editor._fadeOutPoint.Text);
+        Assert.Equal("2", editor._fadeInDuration.Text);
+
+        editor._fadeInDuration.Text = "";
+        editor._curve.SelectedIndex = editor._curve.FindStringExact("Equal-power");
+        Click(editor._save);
+
+        Assert.Equal(new TransitionSpec
+        {
+            FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1), FromEnd: false),
+            Curve = FadeCurveKind.EqualPower,
+        }, h.Engine.Transition(adjacency).Override);
+    });
+
+    [Fact]
+    public void RemoveOverride_PlaysTheGlobalAgain_AndKeepsTheFieldsAsADraft() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var adjacency = EditingAlphaBeta(h);
+        h.Engine.AuthorOverride(adjacency, new TransitionSpec { FadeOutDuration = TimeSpan.FromSeconds(2) });
+        var editor = h.Form._editor;
+        editor._editPlaylist.Checked = true;
+        Assert.True(IsSetVisible(editor._effective));
+
+        Click(editor._removeOverride);
+
+        Assert.Null(h.Engine.Transition(adjacency).Override);
+        Assert.Equal(GlobalAlphaBeta, h.Engine.Transition(adjacency).Global);
+        Assert.Equal("2", editor._fadeOutDuration.Text);
+        Assert.True(editor.HasUnsavedEdits); // Save puts it back
+        Assert.False(IsSetVisible(editor._effective));
+    });
+
+    [Fact]
+    public void GlobalMode_IsUnchanged_WithNoPlaceholders_NoGlobalCurve_AndNoRemoveOverride() => RunSta(() =>
+    {
+        using var h = new Harness();
+        EditingAlphaBeta(h);
+        var editor = h.Form._editor;
+
+        Assert.True(editor._editGlobal.Checked);
+        Assert.Equal("1.5", editor._fadeOutPoint.Text);
+        Assert.Equal("", editor._fadeOutPoint.PlaceholderText);
+        Assert.Equal(-1, editor._curve.FindStringExact("(global)"));
+        Assert.Equal("Linear", editor._curve.Text);
+        Assert.False(IsSetVisible(editor._removeOverride));
+    });
+
+    [Fact]
+    public void TheMode_IsRemembered_WhenTheEditorOpensAnotherAdjacency() => RunSta(() =>
+    {
+        using var h = new Harness();
+        EditingAlphaBeta(h);
+        var editor = h.Form._editor;
+        editor._editPlaylist.Checked = true;
+
+        h.Form.EditTransitionAt(1);
+
+        Assert.Equal(h.Engine.AdjacenciesOf(h.Engine.View.Queue[1].Id).Next!.Name, editor._title.Text);
+        Assert.True(editor._editPlaylist.Checked);
+        Assert.Equal(TransitionLayer.Playlist, editor.Layer);
+        Assert.Equal("(global)", editor._curve.Text);
+    });
+
+    [Fact]
+    public void SwitchingModes_WithUnsavedEdits_Asks_AndCancelStaysInTheModeWithTheDraft() => RunSta(() =>
+    {
+        using var h = new Harness();
+        EditingAlphaBeta(h);
+        var editor = h.Form._editor;
+        editor._fadeOutPoint.Text = "2";
+        var asked = 0;
+        h.Form.AskUnsavedEdits = _ =>
+        {
+            asked++;
+            return UnsavedEdits.Cancel;
+        };
+
+        editor._editPlaylist.Checked = true;
+
+        Assert.Equal(1, asked);
+        Assert.True(editor._editGlobal.Checked);
+        Assert.False(editor._editPlaylist.Checked);
+        Assert.Equal(TransitionLayer.Global, editor.Layer);
+        Assert.Equal("2", editor._fadeOutPoint.Text);
+    });
+
+    [Fact]
+    public void SwitchingModes_WithUnsavedEdits_SaveSavesInTheModeLeft_ThenLoadsTheOther() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var adjacency = EditingAlphaBeta(h);
+        var editor = h.Form._editor;
+        editor._fadeOutPoint.Text = "2";
+        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Save;
+
+        editor._editPlaylist.Checked = true;
+
+        Assert.Equal(TimeSpan.FromSeconds(2), h.Engine.Transition(adjacency).Global!.FadeOutPoint!.Position);
+        Assert.Null(h.Engine.Transition(adjacency).Override);
+        Assert.Equal(TransitionLayer.Playlist, editor.Layer);
+        Assert.Equal("", editor._fadeOutPoint.Text);
+        Assert.Equal("2", editor._fadeOutPoint.PlaceholderText);
+    });
+
+    [Fact]
+    public void PlaylistMode_ANudgeOnAnEmptyBox_StartsFromTheGlobalPoint_AndPreviewPlaysTheDraft() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var adjacency = EditingAlphaBeta(h);
+        var editor = h.Form._editor;
+        editor._editPlaylist.Checked = true;
+        Assert.True(editor._fadeOutMore.Enabled);
+
+        editor.NudgePoint(fadeOut: true, +1, coarse: false);
+
+        Assert.Equal("1.6", editor._fadeOutPoint.Text);
+        Click(editor._preview);
+        Assert.Equal(adjacency, h.Engine.View.Preview?.Adjacency);
+        Assert.Null(h.Engine.Transition(adjacency).Override); // a preview saves nothing
     });
 }

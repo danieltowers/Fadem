@@ -133,7 +133,7 @@ public sealed class EditorAuthoringTests
         var refusals = tc.Engine.Author(adjacency, new TransitionSpec { Curve = FadeCurveKind.Linear });
 
         Assert.Empty(refusals);
-        Assert.Null(tc.Engine.Transition(adjacency));
+        Assert.Null(tc.Engine.Transition(adjacency).Global);
         Assert.DoesNotContain("blank-a", File.ReadAllText(tc.Library.TransitionsPath));
         Assert.StartsWith("Removed blank-a", tc.Notices[^1]);
     }
@@ -149,7 +149,7 @@ public sealed class EditorAuthoringTests
 
         tc.Engine.Author(adjacency, new TransitionSpec());
 
-        Assert.Null(tc.Engine.Transition(adjacency));
+        Assert.Null(tc.Engine.Transition(adjacency).Global);
         Assert.False(File.Exists(tc.Library.TransitionsPath) &&
                      File.ReadAllText(tc.Library.TransitionsPath).Contains("blank2-a"));
         Assert.StartsWith("Nothing to save", tc.Notices[^1]);
@@ -193,7 +193,7 @@ public sealed class EditorAuthoringTests
         var refusal = Assert.Single(refusals);
         Assert.Equal(field, refusal.Field);
         Assert.Contains(reason, refusal.Reason);
-        Assert.Equal(saved, tc.Engine.Transition(adjacency)); // the saved one is untouched
+        Assert.Equal(saved, tc.Engine.Transition(adjacency).Global); // the saved one is untouched
         Assert.StartsWith($"Not saved: {adjacency.Name}.", tc.Notices[^1]);
         Assert.Contains(refusal.Reason, tc.Notices[^1]);
     }
@@ -217,7 +217,7 @@ public sealed class EditorAuthoringTests
         Assert.Equal(
             new[] { TransitionField.FadeOutPoint, TransitionField.FadeOutDuration, TransitionField.FadeInPoint, TransitionField.FadeInDuration },
             refusals.Select(r => r.Field));
-        Assert.Null(tc.Engine.Transition(tc.AdjacencyOf(a, b)));
+        Assert.Null(tc.Engine.Transition(tc.AdjacencyOf(a, b)).Global);
     }
 
     [Fact]
@@ -232,7 +232,7 @@ public sealed class EditorAuthoringTests
         var refusals = tc.Engine.Author(tc.AdjacencyOf(a, b), spec);
 
         Assert.Empty(refusals);
-        Assert.Equal(spec, tc.Engine.Transition(tc.AdjacencyOf(a, b)));
+        Assert.Equal(spec, tc.Engine.Transition(tc.AdjacencyOf(a, b)).Global);
     }
 
     [Fact]
@@ -249,6 +249,6 @@ public sealed class EditorAuthoringTests
         };
 
         Assert.Empty(tc.Engine.Author(adjacency, spec));
-        Assert.Equal(spec, tc.Engine.Transition(adjacency));
+        Assert.Equal(spec, tc.Engine.Transition(adjacency).Global);
     }
 }

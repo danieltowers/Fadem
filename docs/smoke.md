@@ -99,6 +99,13 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] Saving a fade-out point past the end of its track stores nothing: the strip says "Not
       saved", and the reason shows in red under the field, readable in full, without pushing
       the buttons out of sight. The next good save clears it.
+- [ ] At the top of the editor, "Editing: ● Global ○ This playlist (*name*)". Switched to This
+      playlist, the boxes are empty with the global values in grey, the curve reads "(global)",
+      and **Remove override** sits under Remove transition, beside Render; Render stays in view
+      at the default window size. Typing one value shows it black among the grey; Save says
+      "Saved *a* → *b* in *name*." and a grey line under the selector names what the playlist
+      plays. **Remove override** says "Removed the override of …" and the line goes. Switching
+      mode with unsaved edits asks Save / Discard / Cancel; the next ✎ opens in the last mode.
 - [ ] **Remove transition** says "Removed …" in the strip and leaves the fields filled; Save
       puts the transition back. **Revert** reloads what is stored.
 - [ ] Pressing capture writes a number into the field, and it is the number the time readout

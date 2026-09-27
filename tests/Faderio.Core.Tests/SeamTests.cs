@@ -227,7 +227,7 @@ public sealed class SeamTests
 
         Assert.Equal(0.4, tc.Rendered.ToneAmplitude(1000, 66150), 2); // A plays on, unfaded
         Assert.True(tc.Rendered.ToneAmplitude(2000, 66150) < 0.05);
-        Assert.Null(tc.Engine.Transition(tc.AdjacencyOf(a, b)));
+        Assert.Null(tc.Engine.Transition(tc.AdjacencyOf(a, b)).Global);
     }
 
     [Fact]

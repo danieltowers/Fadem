@@ -116,7 +116,7 @@ public sealed class PreviewTests
         Assert.Equal(0.55, tc.Rendered.DcLevel(tc.Rendered.Frames), 3); // A's eleventh second
         Assert.Equal(Transport.Paused, view.Transport);
         Assert.Equal(3.0, view.Attended!.Playhead.TotalSeconds, 3); // still held where it was
-        Assert.Null(tc.Engine.Transition(adjacency));
+        Assert.Null(tc.Engine.Transition(adjacency).Global);
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public sealed class PreviewTests
         tc.Engine.Author(adjacency, draft);
         tc.Output.Advance(Second);
 
-        Assert.Equal(draft, tc.Engine.Transition(adjacency));
+        Assert.Equal(draft, tc.Engine.Transition(adjacency).Global);
         Assert.Equal(10.0, tc.View.Preview!.Outgoing!.Value.TotalSeconds, 3);
     }
 
