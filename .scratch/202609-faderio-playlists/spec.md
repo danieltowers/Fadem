@@ -1,6 +1,6 @@
 # Spec — faderio v3: playlists, overrides and the manager
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: [library](../202609-faderio-library/spec.md)
 
 ## Problem
@@ -44,3 +44,9 @@ file disagree, the decisions file wins.** Third of the three interim specs (D1).
 Drag-to-add onto a sidebar playlist (D16), stable playlist ids (D15), album gain or ReplayGain
 column affecting playback (D25), year/genre columns, editing from the manager (D24), smart or
 auto playlists, and folders of playlists.
+
+## Comments
+
+- Resolved 2026-09-27: issues 01–06 built, each recorded in its own file. Three loose ends found
+  in issues 05 and 06 went to [phase 2](../202609-faderio-phase-2/spec.md): ✎ out of view with
+  extra columns, a gone track opened from the manager, and the flaky add-time budget test.
