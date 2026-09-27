@@ -167,6 +167,11 @@ public sealed partial class PlaybackEngine
             {
                 return (IReadOnlyList<Refusal>)[];
             }
+            if (GoneReason(adjacency) is { } gone)
+            {
+                RaiseNotice($"Not saved: {adjacency.Name} in {name}. {gone}");
+                return [];
+            }
             var global = _store!.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
             if (OverrideToStore(global, partial) is null)
             {
@@ -261,7 +266,10 @@ public sealed partial class PlaybackEngine
     /// <para>Impossible values are refused, not stored, and returned with their reasons for the
     /// editor to show beside each field (build issue 14). A duration that only runs past the end
     /// is not refused: the resolver shortens it. A blank spec removes the transition, as
-    /// <see cref="Unauthor"/> does, so the store never holds an empty one.</para></summary>
+    /// <see cref="Unauthor"/> does, so the store never holds an empty one.</para>
+    /// <para>An adjacency with a <see cref="Track.Gone"/> side stores nothing, blank or not, and the
+    /// notice names the file (phase 3 issue 02); <see cref="Unauthor"/> removes it. So does
+    /// <see cref="AuthorOverride"/>.</para></summary>
     public IReadOnlyList<Refusal> Author(Adjacency adjacency, TransitionSpec spec)
     {
         ThrowIfDisposed();
@@ -271,6 +279,11 @@ public sealed partial class PlaybackEngine
             if (_store is null)
             {
                 RaiseNotice($"Not saved: {adjacency.Name}. {NoLibrary}");
+                return (IReadOnlyList<Refusal>)[];
+            }
+            if (GoneReason(adjacency) is { } gone)
+            {
+                RaiseNotice($"Not saved: {adjacency.Name}. {gone}");
                 return (IReadOnlyList<Refusal>)[];
             }
             if (spec.IsBlank)
@@ -371,6 +384,17 @@ public sealed partial class PlaybackEngine
 
     /// <summary>The values no track can play: a point past its track's length, measured from
     /// either end, and a negative duration. Only the engine knows both lengths.</summary>
+    /// <summary>Why nothing can be saved for an adjacency with a gone side (phase 3 issue 02),
+    /// naming each gone file; null when both files were found. Not a refusal of any field's value:
+    /// the fields were never the problem.</summary>
+    private static string? GoneReason(Adjacency adjacency)
+    {
+        var gone = new[] { adjacency.Outgoing, adjacency.Incoming }
+            .Where(t => t.Gone).Select(t => t.FilePath).Distinct().ToList();
+        return gone.Count == 0 ? null
+            : $"{string.Join(" and ", gone)} {(gone.Count == 1 ? "is" : "are")} missing: this transition can be removed, not changed.";
+    }
+
     private static List<Refusal> Refusals(Adjacency adjacency, TransitionSpec spec)
     {
         var refusals = new List<Refusal>();

@@ -130,6 +130,11 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       its line ("Pre-roll · outgoing 0:05") beside **Stop preview**, which ends it. A double-click
       on a row opens it in the editor, in the editor's mode. The queue's right-click menu has
       "Transitions for this track…", opening it on that row's track. Esc and the close box hide it.
+      Author a transition, rename one of its files and open the manager: the row reads
+      "⚠ *path*", greyed, with a tooltip saying it was not found where the store says; the picker
+      marks that track the same way. Double-click it: under the heading the editor says
+      "*file* is missing: this transition can be removed, not changed."; Save, Revert, Preview,
+      Render, capture and ± are greyed; Remove transition removes it and the row leaves the manager.
 - [ ] **Remove transition** says "Removed …" in the strip and leaves the fields filled; Save
       puts the transition back. **Revert** reloads what is stored.
 - [ ] Pressing capture writes a number into the field, and it is the number the time readout

@@ -50,7 +50,7 @@ public sealed partial class PlaybackEngine
     /// <summary>Every track the open library's store names, in the adjacencies
     /// <see cref="AdjacenciesInStore"/> lists, by title. A queued track is the queue's; any other is
     /// probed as an add probes it, for its title and artist. One whose file cannot be probed, gone
-    /// or no longer promised, is its path alone, with no title. Nothing is decoded.</summary>
+    /// or no longer promised, is its path alone and <see cref="Track.Gone"/>. Nothing is decoded.</summary>
     public IReadOnlyList<Track> TracksInStore()
     {
         ThrowIfDisposed();
@@ -104,7 +104,7 @@ public sealed partial class PlaybackEngine
         {
             if (!_found.TryGetValue(path, out var track))
             {
-                track = ResolveFromDisk(path).Track ?? new Track { FilePath = path };
+                track = ResolveFromDisk(path).Track ?? new Track { FilePath = path, Gone = true };
                 _found[path] = track;
             }
             return track;

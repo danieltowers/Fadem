@@ -25,6 +25,12 @@ public sealed record Track
     /// probed, as the transition manager names a gone file.</summary>
     public AudioShape? Format { get; init; }
 
+    /// <summary>The file could not be probed when the engine issued this track: a path the
+    /// transition store names whose file is gone, moved or no longer promised (phase 3 issue 02).
+    /// Such a track is its path alone. Its transitions can be removed, not changed. A queued track
+    /// is never gone: it was probed when it was added, and a file lost since is unreadable.</summary>
+    public bool Gone { get; init; }
+
     /// <summary>ReplayGain track gain in dB, parsed from the file's tags. Null when untagged.</summary>
     public double? ReplayGainDb { get; init; }
 

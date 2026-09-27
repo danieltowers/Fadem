@@ -101,9 +101,23 @@ internal static class Presenter
     /// <summary>A track as the transition manager names it (playlists issue 05): "title — artist",
     /// the title alone with no artist, and the path when its file could not be probed.</summary>
     public static string FmtTrack(Track track) =>
-        string.IsNullOrEmpty(track.Title) ? track.FilePath
+        track.Gone ? "⚠ " + track.FilePath
+        : string.IsNullOrEmpty(track.Title) ? track.FilePath
         : string.IsNullOrEmpty(track.Artist) ? track.Title
         : $"{track.Title} — {track.Artist}";
+
+    /// <summary>A gone track's tooltip in the manager (phase 3 issue 02).</summary>
+    public static string FmtGoneTip(Track track) => $"Not found where the store says: {track.FilePath}";
+
+    /// <summary>The editor's line under the heading when a side of its adjacency is gone (phase 3
+    /// issue 02), naming each gone file; blank when both were found.</summary>
+    public static string FmtMissing(Adjacency adjacency)
+    {
+        var gone = new[] { adjacency.Outgoing, adjacency.Incoming }
+            .Where(t => t.Gone).Select(t => Path.GetFileName(t.FilePath)).Distinct().ToList();
+        return gone.Count == 0 ? ""
+            : $"{string.Join(" and ", gone)} {(gone.Count == 1 ? "is" : "are")} missing: this transition can be removed, not changed.";
+    }
 
     /// <summary>The manager's cells for one adjacency: the direction from the picked track, the
     /// other track, a "global | override" pair for each parameter and the curve, the effective

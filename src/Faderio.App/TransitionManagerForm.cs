@@ -54,7 +54,26 @@ internal sealed class TransitionManagerForm : Form
         MinimumSize = new Size(640, 240);
         KeyPreview = true;
 
-        _track = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 480, Margin = new Padding(4, 8, 4, 4) };
+        _track = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Width = 480,
+            Margin = new Padding(4, 8, 4, 4),
+            DrawMode = DrawMode.OwnerDrawFixed,
+        };
+        // Drawn so that a gone track reads grey, as its rows do (phase 3 issue 02).
+        _track.DrawItem += (_, e) =>
+        {
+            e.DrawBackground();
+            if (e.Index >= 0 && _track.Items[e.Index] is TrackItem item)
+            {
+                var selected = (e.State & DrawItemState.Selected) != 0;
+                var colour = item.Track.Gone && !selected ? SystemColors.GrayText : e.ForeColor;
+                TextRenderer.DrawText(e.Graphics, item.ToString(), e.Font, e.Bounds, colour,
+                    TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            }
+            e.DrawFocusRectangle();
+        };
         var top = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 38, WrapContents = false };
         top.Controls.Add(new Label { Text = "Track:", AutoSize = true, Margin = new Padding(8, 12, 0, 0) });
         top.Controls.Add(_track);
@@ -151,7 +170,15 @@ internal sealed class TransitionManagerForm : Form
                 Hide();
             }
         };
-        VisibleChanged += (_, _) => _open &= Visible;
+        VisibleChanged += (_, _) =>
+        {
+            _open &= Visible;
+            if (Visible)
+            {
+                // Shown for the first time, the grid picks its first row again.
+                _grid.ClearSelection();
+            }
+        };
     }
 
     private DataGridViewColumn Column(string header, int width)
@@ -212,7 +239,8 @@ internal sealed class TransitionManagerForm : Form
             _track.Items.Add(new TrackItem(track));
         }
         _track.EndUpdate();
-        var index = wanted is null ? -1 : tracks.ToList().IndexOf(wanted);
+        // By path: the same file is another track once it is gone, or found again.
+        var index = wanted is null ? -1 : tracks.ToList().FindIndex(t => t.FilePath == wanted.FilePath);
         _track.SelectedIndex = index >= 0 ? index : tracks.Count > 0 ? 0 : -1;
         _track.Enabled = tracks.Count > 0;
         _listing = false;
@@ -230,8 +258,15 @@ internal sealed class TransitionManagerForm : Form
             var index = _grid.Rows.Add(Presenter.ManagerRow(adjacency).Cast<object>().ToArray());
             var row = _grid.Rows[index];
             row.Tag = adjacency.Adjacency;
-            row.Cells[1].ToolTipText = adjacency.Other.FilePath;
+            row.Cells[1].ToolTipText = adjacency.Other.Gone ? Presenter.FmtGoneTip(adjacency.Other) : adjacency.Other.FilePath;
+            if (adjacency.Other.Gone)
+            {
+                row.DefaultCellStyle.ForeColor = SystemColors.GrayText;
+            }
         }
+        // The grid picks its first row for itself; that highlight means nothing in a read-only
+        // list, and would hide a gone row's grey.
+        _grid.ClearSelection();
     }
 
     // ── Commands: one intent, one engine call ───────────────────────────────────────────

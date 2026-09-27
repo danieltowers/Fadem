@@ -183,6 +183,97 @@ public sealed class TransitionManagerTests
         Assert.Equal([far, gone], listed.Select(s => s.Other.FilePath));
     }
 
+    // ── Gone tracks (phase 3 issue 02) ───────────────────────────────────────────────────
+
+    /// <summary>a queued in P, with a → far and far → a authored, and a → b authored where b's file
+    /// is then deleted: the manager's picture of a with one gone side.</summary>
+    private static (TestEngine Tc, Track A, string Far, string Gone) AWithAGoneNeighbour()
+    {
+        var (tc, p) = FiveInPAndQ();
+        var a = TrackAt(tc, p[0]);
+        var far = TestAudio.WriteDcWav("mgr-far.wav", 4, 0.2);
+        var gone = Path.Combine(tc.TempDir, "mgr-gone.wav");
+        File.Copy(TestAudio.WriteDcWav("mgr-soon-gone.wav", 3, 0.2), gone);
+        tc.Engine.Author(new Adjacency(a, tc.TrackOf(far)), Crossfade(2));
+        tc.Engine.Author(new Adjacency(tc.TrackOf(gone), a), Crossfade(2));
+        tc.Engine.AuthorOverride(new Adjacency(tc.TrackOf(gone), a), FadeOutAt(1.5));
+        File.Delete(gone);
+        return (tc, a, far, gone);
+    }
+
+    [Fact]
+    public void TheManagersAnswers_MarkAGoneTrack_OnWhicheverSide_AndNoPresentOne()
+    {
+        var (tc, a, far, gone) = AWithAGoneNeighbour();
+        using var _ = tc;
+        var elsewhere = Path.Combine(tc.TempDir, "mgr-gone-too.wav");
+        tc.Engine.Author(new Adjacency(a, tc.TrackOfLength(elsewhere, 3)), Crossfade(2)); // never there
+
+        var listed = tc.Engine.AdjacenciesInStore(a);
+
+        // Outgoing first, each by how the other reads: a gone track by its path, before any title.
+        Assert.Equal([(elsewhere, true), (far, false), (gone, true)], listed.Select(s => (s.Other.FilePath, s.Other.Gone)));
+        Assert.True(listed[2].Adjacency.Outgoing.Gone); // gone → a: the outgoing side
+        Assert.True(listed[0].Adjacency.Incoming.Gone); // a → elsewhere: the incoming side
+        Assert.All(listed, s => Assert.False((s.IsOutgoing ? s.Adjacency.Outgoing : s.Adjacency.Incoming).Gone));
+        var tracks = tc.Engine.TracksInStore();
+        Assert.Equal([elsewhere, gone], tracks.Where(t => t.Gone).Select(t => t.FilePath).Order());
+        Assert.DoesNotContain(tc.View.Queue, r => r.Track.Gone);
+    }
+
+    [Fact]
+    public void AuthorAndAuthorOverride_OnAGoneSide_StoreNothing_AndTheNoticeNamesTheFile()
+    {
+        var (tc, a, _, gone) = AWithAGoneNeighbour();
+        using var _ = tc;
+        var adjacency = tc.Engine.AdjacenciesInStore(a).Single(s => s.Other.Gone).Adjacency;
+        var global = tc.Store.Get(gone, a.FilePath);
+        var over = tc.Store.GetOverride("P", gone, a.FilePath);
+
+        Assert.Empty(tc.Engine.Author(adjacency, Crossfade(1)));
+        Assert.Contains(tc.Notices, n => n.StartsWith("Not saved") && n.Contains($"{gone} is missing"));
+        Assert.Empty(tc.Engine.Author(adjacency, new TransitionSpec())); // a blank is no way round it
+        Assert.Empty(tc.Engine.AuthorOverride(adjacency, FadeOutAt(1)));
+        Assert.Empty(tc.Engine.AuthorOverride(adjacency, new TransitionSpec()));
+
+        Assert.Equal(global, tc.Store.Get(gone, a.FilePath));
+        Assert.Equal(over, tc.Store.GetOverride("P", gone, a.FilePath));
+        Assert.Equal(4, tc.Notices.Count(n => n.StartsWith("Not saved") && n.Contains($"{gone} is missing")));
+    }
+
+    [Fact]
+    public void UnauthorAndUnauthorOverride_RemoveAGonePair_AndItLeavesTheManager()
+    {
+        var (tc, a, far, gone) = AWithAGoneNeighbour();
+        using var _ = tc;
+        var adjacency = tc.Engine.AdjacenciesInStore(a).Single(s => s.Other.Gone).Adjacency;
+
+        tc.Engine.UnauthorOverride(adjacency);
+        Assert.Null(tc.Store.GetOverride("P", gone, a.FilePath));
+        Assert.Contains(tc.Engine.AdjacenciesInStore(a), s => s.Other.FilePath == gone); // the global stays
+
+        tc.Engine.Unauthor(adjacency);
+
+        Assert.Null(tc.Store.Get(gone, a.FilePath));
+        Assert.Equal([far], tc.Engine.AdjacenciesInStore(a).Select(s => s.Other.FilePath));
+        Assert.DoesNotContain(tc.Engine.TracksInStore(), t => t.FilePath == gone);
+    }
+
+    [Fact]
+    public void AFileRestored_IsNoLongerGone_AndItsTransitionCanBeChangedAgain()
+    {
+        var (tc, a, _, gone) = AWithAGoneNeighbour();
+        using var _ = tc;
+        File.Copy(TestAudio.WriteDcWav("mgr-back.wav", 3, 0.2), gone);
+
+        var restored = tc.Engine.AdjacenciesInStore(a).Single(s => s.Other.FilePath == gone);
+
+        Assert.False(restored.Other.Gone);
+        Assert.Equal(3.0, restored.Other.Length.TotalSeconds, 3);
+        Assert.Empty(tc.Engine.Author(restored.Adjacency, Crossfade(1)));
+        Assert.Equal(Crossfade(1), tc.Store.Get(gone, a.FilePath));
+    }
+
     // ── PreviewStored ────────────────────────────────────────────────────────────────────
 
     /// <summary>A and B, 20 s each, playing 3 s into A: A → B authored to fade out at 12 s, and

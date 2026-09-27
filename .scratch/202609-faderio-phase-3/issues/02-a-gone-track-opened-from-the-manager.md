@@ -1,6 +1,6 @@
 # 02: A gone track opened from the manager
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 
 Recorded as "Not handled" in
@@ -46,12 +46,12 @@ to do with such a transition is remove it, and that works only by accident.
 
 ## Acceptance
 
-- [ ] A transition authored between two files, one of them then deleted: the manager lists the
+- [x] A transition authored between two files, one of them then deleted: the manager lists the
       row with "⚠" and the path, greyed.
-- [ ] A double-click opens the editor with the "is missing" line; Save and Preview are disabled;
+- [x] A double-click opens the editor with the "is missing" line; Save and Preview are disabled;
       **Remove transition** removes it and the row leaves the manager.
-- [ ] Calling `Author` on that adjacency stores nothing and the reason names the file.
-- [ ] Restoring the file and asking the manager again lists the row as normal and editable.
+- [x] Calling `Author` on that adjacency stores nothing and the reason names the file.
+- [x] Restoring the file and asking the manager again lists the row as normal and editable.
 
 ## Tests
 
@@ -68,3 +68,49 @@ to do with such a transition is remove it, and that works only by accident.
   Save is greyed, Remove transition removes it.
 
 ## Comments
+
+- Built 2026-09-27. **Engine:** `Track.Gone`, set only by the manager's lookup (`StoreTracks.Of`)
+  for a path whose file cannot be probed. Such a track is its path alone. The flag goes wherever
+  the manager's answers go: `StoredAdjacency.Other`, both sides of its `Adjacency`, and the
+  picker's `TracksInStore`. A queued track is never gone. `Author` and `AuthorOverride` on an
+  adjacency with a gone side store nothing, blank spec or not, and return no refusals. The
+  notice says "Not saved: *a → b*. *path* is missing: this transition can be removed, not
+  changed.", naming each gone file.
+- **Decided here: not a `Refusal`.** A refusal is a field's value refused, shown beside that
+  field. A gone file isn't about any field, so it takes the path the other whole-command failures
+  already take (no library, a store that can't be written): an empty list and a "Not saved"
+  notice. `Refusal` is unchanged.
+- **Shell:**
+  - `Presenter.FmtTrack` reads "⚠ *path*" for a gone track, in the grid and the picker. The
+    grid greys the row, and the path cell's tooltip says "Not found where the store says: *path*".
+    The picker is owner-drawn, so a gone track reads grey there too.
+  - The editor shows the line under the heading (`Presenter.FmtMissing`, by file name, in red).
+    The fields are read-only; Save, Revert, Preview, Render, From end, the curve, capture and ±
+    are disabled. Remove transition and Remove override stay live.
+  - `HasUnsavedEdits` is false on a gone adjacency: nothing there can be saved. So leaving after
+    Remove transition doesn't ask Save / Discard / Cancel.
+  - The picker keeps its track by path, not by record, so a track stays picked when its file goes
+    or comes back.
+- **Found in smoke:** the grid selects its first row for itself, so a lone gone row was always
+  highlighted and its grey never showed. The manager is read-only, so the grid now clears that
+  selection after listing and when the window is shown. A click still selects a row.
+- **Not handled:** the two-line message gives the editor panel a vertical scroll bar at the
+  default size, with Render (disabled here) at its edge. Separately, `--edit-first` twice failed
+  to open the editor at launch during the smoke. The same `EditTransitionAt(0)` passes every
+  headless test, so it looks like a startup race in `Program.cs`, not this change.
+- **Tests:** Core, four in `TransitionManagerTests`: gone flagged on either side and never on a
+  present or queued track; `Author` and `AuthorOverride` (with a spec and blank) store nothing and
+  name the file; `UnauthorOverride` then `Unauthor` empty the manager; a restored file is not gone
+  and saves again. Form, three in `HeadlessFormTests.TransitionManager`: the ⚠ row greyed with
+  its tooltip, other rows not greyed, the picker marked; the double-click opens the editor with
+  the line, read-only fields and disabled buttons, capture off even while playing, Remove override
+  live, and Remove transition empties the row; a restored file lists normally and opens editable.
+- **Looks smoke** (fresh temp library and machine folder):
+  - A transition saved in the editor, its incoming file renamed, the app relaunched: the picker
+    reads "⚠ *path*" greyed on the gone track. On Outgoing tone the row reads "⚠ *path*" (greyed
+    once the selection fix was in).
+  - Double-clicked, the editor shows "Incoming tone.wav is missing: this transition can be
+    removed, not changed." Save, Revert, Preview, Render and Capture are disabled; Remove
+    transition is enabled. Pressing it emptied `transitions.json` and the manager.
+  - With the file put back (store pre-written for this pass), the row reads "Incoming tone" in
+    normal text and opens editable, with Save and Preview enabled.

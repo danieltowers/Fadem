@@ -163,6 +163,13 @@ notice and keeps its row, trying it again next time. A file that plays but ends 
 length, such as one cut short, is not unreadable: it ends where its audio ends, with a notice.
 _Avoid_: Broken, missing, rejected, skipped (a skip is the user's action)
 
+**Gone**:
+A track the transition store names whose file cannot be probed when the transition manager asks:
+deleted, moved, or no longer promised. It is its path alone. Its transitions can be removed, not
+changed. A queued track is never gone: it was probed when added, and a file lost since is unreadable.
+The user reads "missing".
+_Avoid_: Unreadable (a queued track's), deleted
+
 **Probe**:
 Reading a file's header when it is added to decide whether it is promised or rejected. The
 probe decides before the file is queued and never after.

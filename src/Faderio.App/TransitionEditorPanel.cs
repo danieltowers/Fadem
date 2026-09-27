@@ -40,6 +40,7 @@ internal sealed class TransitionEditorPanel : Panel
     internal readonly RadioButton _editGlobal;
     internal readonly RadioButton _editPlaylist;
     internal readonly Label _effective;
+    internal readonly Label _missing;
     internal readonly Button _removeOverride;
     internal readonly TextBox _fadeOutPoint;
     internal readonly CheckBox _fadeOutFromEnd;
@@ -153,6 +154,19 @@ internal sealed class TransitionEditorPanel : Panel
         layout.SetColumnSpan(_effective, 2);
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         row++;
+        // Shown only on an adjacency with a gone side (phase 3 issue 02).
+        _missing = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(290, 0),
+            ForeColor = Color.Firebrick,
+            Visible = false,
+            Margin = new Padding(3, 0, 3, 6),
+        };
+        layout.Controls.Add(_missing, 0, row);
+        layout.SetColumnSpan(_missing, 2);
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        row++;
 
         _fadeOutFromEnd = new CheckBox { Text = "From end", Dock = DockStyle.Fill, Enabled = false };
         _fadeOutPoint = Field(layout, ref row, TransitionField.FadeOutPoint, "Fade-out point (s)", _fadeOutFromEnd, out _captureOut, "Capture");
@@ -213,6 +227,10 @@ internal sealed class TransitionEditorPanel : Panel
     }
 
     public Adjacency? Adjacency => _adjacency;
+
+    /// <summary>A side of the open adjacency is gone, as the engine marked it (phase 3 issue 02):
+    /// its transition can be removed, not changed.</summary>
+    private bool Gone => _adjacency is { } a && (a.Outgoing.Gone || a.Incoming.Gone);
 
     /// <summary>The layer the fields edit: the one chosen, while a playlist is open.</summary>
     internal TransitionLayer Layer =>
@@ -382,11 +400,11 @@ internal sealed class TransitionEditorPanel : Panel
     private static bool ShowsPlaceholder(TextBox box) => box.Text.Length == 0 && box.PlaceholderText.Length > 0;
 
     /// <summary>The nudge buttons live while an adjacency is open and their field shows a point,
-    /// its own or the global one as a placeholder.</summary>
+    /// its own or the global one as a placeholder; never on a gone adjacency.</summary>
     private void ShowNudges()
     {
-        var outLive = _adjacency is not null && (PointOf(_fadeOutPoint, _fadeOut).Point is not null || ShowsPlaceholder(_fadeOutPoint));
-        var inLive = _adjacency is not null && (PointOf(_fadeInPoint, _fadeIn).Point is not null || ShowsPlaceholder(_fadeInPoint));
+        var outLive = _adjacency is not null && !Gone && (PointOf(_fadeOutPoint, _fadeOut).Point is not null || ShowsPlaceholder(_fadeOutPoint));
+        var inLive = _adjacency is not null && !Gone && (PointOf(_fadeInPoint, _fadeIn).Point is not null || ShowsPlaceholder(_fadeInPoint));
         _fadeOutLess.Enabled = _fadeOutMore.Enabled = outLive;
         _fadeInLess.Enabled = _fadeInMore.Enabled = inLive;
     }
@@ -439,12 +457,12 @@ internal sealed class TransitionEditorPanel : Panel
 
     /// <summary>Saving would change the store: the engine says whether it holds the draft. Text
     /// that is not a number is an edit too. After Remove transition the store holds nothing, so
-    /// filled fields are unsaved.</summary>
+    /// filled fields are unsaved. On a gone adjacency nothing can be saved, so nothing is unsaved.</summary>
     internal bool HasUnsavedEdits
     {
         get
         {
-            if (_adjacency is null)
+            if (_adjacency is null || Gone)
             {
                 return false;
             }
@@ -523,10 +541,19 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeOutDuration.Text = Presenter.FmtSeconds(spec?.FadeOutDuration);
         _fadeInDuration.Text = Presenter.FmtSeconds(spec?.FadeInDuration);
         ShowReasons([]);
-        foreach (var control in new Control[] { _fadeOutFromEnd, _curve, _save, _revert, _remove, _removeOverride, _render, _preview })
+        // On a gone adjacency only the removals stay: the rest would act on a file not there.
+        var changeable = editing && !Gone;
+        foreach (var control in new Control[] { _fadeOutFromEnd, _curve, _save, _revert, _render, _preview })
         {
-            control.Enabled = editing;
+            control.Enabled = changeable;
         }
+        _remove.Enabled = _removeOverride.Enabled = editing;
+        foreach (var box in new[] { _fadeOutPoint, _fadeOutDuration, _fadeInPoint, _fadeInDuration })
+        {
+            box.ReadOnly = editing && !changeable;
+        }
+        _missing.Text = _adjacency is { } adjacency ? Presenter.FmtMissing(adjacency) : "";
+        _missing.Visible = _missing.Text.Length > 0;
         ShowNudges();
     }
 
@@ -540,7 +567,7 @@ internal sealed class TransitionEditorPanel : Panel
             _editPlaylist.Text = choice;
         }
         _editPlaylist.Enabled = view.OpenPlaylist is not null;
-        var canCapture = _adjacency is not null && (view.Attended is not null || view.Preview is not null);
+        var canCapture = _adjacency is not null && !Gone && (view.Attended is not null || view.Preview is not null);
         _captureOut.Enabled = canCapture;
         _captureIn.Enabled = canCapture;
         _preview.Text = view.Preview is null ? "Preview" : "Preview again";

@@ -168,4 +168,90 @@ public sealed partial class HeadlessFormTests
         Assert.Equal([("→", Title(d)), ("←", Title(a))],
             Enumerable.Range(0, manager._grid.Rows.Count).Select(r => (GridRow(manager, r)[0], GridRow(manager, r)[1])));
     });
+
+    // ── A gone track (phase 3 issue 02) ─────────────────────────────────────────────────
+
+    /// <summary>The manager fixture, and alpha → epsilon authored where epsilon, once queued, is
+    /// then taken off the queue and its file deleted.</summary>
+    private static (string A, string E) GoneFixture(Harness h)
+    {
+        var (a, _, _, _) = ManagerFixture(h);
+        var e = Path.Combine(h.TempDir, "epsilon.wav");
+        File.Copy(TestAudio.WriteDcWav("epsilon-source.wav", 3, 0.3), e);
+        h.Form.AddPaths(new[] { e });
+        var rows = h.Engine.View.Queue;
+        h.Engine.Author(new Adjacency(rows[0].Track, rows.Single(r => r.Track.FilePath == e).Track), FadeOutAt(2));
+        h.Engine.Remove([rows.Single(r => r.Track.FilePath == e).Id]);
+        File.Delete(e);
+        return (a, e);
+    }
+
+    private static int RowOfOther(TransitionManagerForm manager, string heading) =>
+        Enumerable.Range(0, manager._grid.Rows.Count).Single(r => GridRow(manager, r)[1] == heading);
+
+    [Fact]
+    public void AGoneTrack_ReadsWarningAndItsPath_Greyed_InTheGridAndThePicker() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (_, e) = GoneFixture(h);
+
+        var manager = OpenManager(h, row: 0); // alpha
+        var row = manager._grid.Rows[RowOfOther(manager, "⚠ " + e)];
+
+        Assert.Equal("→", row.Cells[0].Value);
+        Assert.Equal(SystemColors.GrayText, row.DefaultCellStyle.ForeColor);
+        Assert.Equal($"Not found where the store says: {e}", row.Cells[1].ToolTipText);
+        Assert.All(manager._grid.Rows.Cast<DataGridViewRow>().Where(r => r != row),
+            present => Assert.True(present.DefaultCellStyle.ForeColor.IsEmpty)); // not greyed
+        Assert.Contains("⚠ " + e, manager._track.Items.Cast<object>().Select(i => i.ToString()));
+    });
+
+    [Fact]
+    public void AGoneRowDoubleClicked_OpensAnEditorThatCanRemoveButNotChange_AndRemoveEmptiesTheRow() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (_, e) = GoneFixture(h);
+        var manager = OpenManager(h, row: 0);
+        var editor = h.Form._editor;
+
+        manager.EditAt(RowOfOther(manager, "⚠ " + e));
+
+        Assert.True(IsSetVisible(editor._missing));
+        Assert.Equal("epsilon.wav is missing: this transition can be removed, not changed.", editor._missing.Text);
+        Assert.Equal("2", editor._fadeOutPoint.Text); // what the store holds, to read
+        Assert.True(editor._fadeOutPoint.ReadOnly);
+        foreach (var button in new[] { editor._save, editor._revert, editor._preview, editor._render, editor._fadeOutLess, editor._fadeOutMore })
+        {
+            Assert.False(button.Enabled, button.Text);
+        }
+        Assert.False(editor._fadeOutFromEnd.Enabled);
+        Assert.False(editor.HasUnsavedEdits);
+        h.Engine.PlayRow(h.Engine.View.Queue[0].Id); // a voice to capture from, and still no capture
+        Assert.False(editor._captureOut.Enabled);
+
+        editor._editPlaylist.Checked = true; // no override here to remove, but the button is live
+        Assert.True(editor._removeOverride.Enabled);
+        Click(editor._remove);
+
+        Assert.DoesNotContain(Enumerable.Range(0, manager._grid.Rows.Count), r => GridRow(manager, r)[1] == "⚠ " + e);
+        Assert.DoesNotContain("⚠ " + e, manager._track.Items.Cast<object>().Select(i => i.ToString()));
+        Assert.False(editor.HasUnsavedEdits); // leaving asks nothing: it could never be saved
+    });
+
+    [Fact]
+    public void AGoneFileRestored_ListsAsNormal_AndOpensEditable() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (_, e) = GoneFixture(h);
+        File.Copy(TestAudio.WriteDcWav("epsilon-back.wav", 3, 0.3), e);
+
+        var manager = OpenManager(h, row: 0);
+        var index = RowOfOther(manager, "epsilon");
+        manager.EditAt(index);
+
+        Assert.True(manager._grid.Rows[index].DefaultCellStyle.ForeColor.IsEmpty);
+        Assert.False(IsSetVisible(h.Form._editor._missing));
+        Assert.True(h.Form._editor._save.Enabled);
+        Assert.False(h.Form._editor._fadeOutPoint.ReadOnly);
+    });
 }
