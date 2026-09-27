@@ -116,19 +116,28 @@ public sealed class PresenterTests
     public void Title_NamesTheModeInUse_OrThatThereIsNone()
     {
         var music = new LibraryView(@"C:\Music", "Music", IsAvailable: true);
-        Assert.Equal("faderio — Music · WASAPI shared at 48000 Hz", Presenter.Title(music, AudioOutputMode.WasapiShared, 48000));
-        Assert.Equal("faderio — Music · WASAPI exclusive at 44100 Hz", Presenter.Title(music, AudioOutputMode.WasapiExclusive, 44100));
-        Assert.Equal("faderio — Music · WaveOut at 44100 Hz", Presenter.Title(music, AudioOutputMode.WaveOut, 44100));
-        Assert.Equal("faderio — Music · no audio output", Presenter.Title(music, null, 44100));
+        Assert.Equal("faderio — Music · WASAPI shared at 48000 Hz", Presenter.Title(null, music, AudioOutputMode.WasapiShared, 48000));
+        Assert.Equal("faderio — Music · WASAPI exclusive at 44100 Hz", Presenter.Title(null, music, AudioOutputMode.WasapiExclusive, 44100));
+        Assert.Equal("faderio — Music · WaveOut at 44100 Hz", Presenter.Title(null, music, AudioOutputMode.WaveOut, 44100));
+        Assert.Equal("faderio — Music · no audio output", Presenter.Title(null, music, null, 44100));
+    }
+
+    [Fact]
+    public void Title_PutsTheOpenPlaylistInFront()
+    {
+        var music = new LibraryView(@"C:\Music", "Music", IsAvailable: true);
+        Assert.Equal(
+            "Evening — faderio — Music · WASAPI shared at 48000 Hz",
+            Presenter.Title("Evening", music, AudioOutputMode.WasapiShared, 48000));
     }
 
     [Fact]
     public void Title_NamesTheLibrary_OrThatThereIsNone()
     {
-        Assert.Equal("faderio — no library · WaveOut at 44100 Hz", Presenter.Title(null, AudioOutputMode.WaveOut, 44100));
+        Assert.Equal("faderio — no library · WaveOut at 44100 Hz", Presenter.Title(null, null, AudioOutputMode.WaveOut, 44100));
         Assert.Equal(
             "faderio — Locked (could not be opened) · WaveOut at 44100 Hz",
-            Presenter.Title(new LibraryView(@"D:\Locked", "Locked", IsAvailable: false), AudioOutputMode.WaveOut, 44100));
+            Presenter.Title(null, new LibraryView(@"D:\Locked", "Locked", IsAvailable: false), AudioOutputMode.WaveOut, 44100));
     }
 
     [Theory]

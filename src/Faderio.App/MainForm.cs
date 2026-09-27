@@ -7,7 +7,8 @@ namespace Faderio.App;
 
 /// <summary>
 /// The WinForms shell for the slice (ticket 05): add files or a folder, or drop either on the
-/// list (build issue 02), open a playlist or save the queue as one (build issue 03), a
+/// list (build issue 02), import a playlist into the library or export the open one (playlists
+/// issue 03, which replaced build issue 03's open and save), a
 /// multi-select list whose rows drag to a new place (build issue 05), a context menu that opens
 /// the editor on this → next, previous → this or, under repeat-one, this → this (build issue
 /// 15) and a button at each row's far right that opens this → next (interim transport 07), with
@@ -17,7 +18,8 @@ namespace Faderio.App;
 /// session's notice list (build issue 09), a Settings… dialog (build issue 12), and the clip
 /// light, which a click clears (build issue 17), Open library… with the library named in the
 /// title (library issue 02), the window opening where it was closed (library issue 03), and the
-/// playlist sidebar on the left (playlists issue 02). It renders <see cref="PlayerView"/>s and
+/// playlist sidebar on the left (playlists issue 02), and the open playlist named above the queue
+/// and in the title (playlists issue 03). It renders <see cref="PlayerView"/>s and
 /// issues commands; it holds no engine state between calls (the placement rule in CLAUDE.md). The
 /// seek bar's Maximum is the track length in milliseconds, so no scaling exists to get wrong
 /// (ticket 06).
@@ -35,8 +37,8 @@ internal sealed class MainForm : Form
     internal readonly Label _time;
     internal readonly Button _addFiles;
     internal readonly Button _addFolder;
-    internal readonly Button _openPlaylist;
-    internal readonly Button _saveAsPlaylist;
+    internal readonly Button _importPlaylist;
+    internal readonly Button _exportPlaylist;
     internal readonly Button _settings;
     internal readonly Button _openLibrary;
     internal readonly Button _prev;
@@ -53,6 +55,7 @@ internal sealed class MainForm : Form
     internal readonly ToolStripStatusLabel _clip;
     internal readonly TransitionEditorPanel _editor;
     internal readonly PlaylistSidebar _playlists;
+    internal readonly PlaylistNameBar _playlistName;
     internal readonly ToolStripMenuItem _editNext;
     internal readonly ToolStripMenuItem _editPrevious;
     internal readonly ToolStripMenuItem _editSelf;
@@ -84,7 +87,7 @@ internal sealed class MainForm : Form
         ChooseFiles = ShowFilesDialog;
         ChooseFolders = ShowFolderDialog;
         ChoosePlaylists = ShowPlaylistDialog;
-        ChoosePlaylistSavePath = ShowSavePlaylistDialog;
+        ChooseExportPath = ShowExportDialog;
         ConfirmClear = ShowClearDialog;
         ChooseLibrary = () => ShowLibraryDialog(this);
         AskUnsavedEdits = ShowUnsavedDialog;
@@ -116,13 +119,13 @@ internal sealed class MainForm : Form
 
         _addFiles = new Button { Text = "Add files…", Width = 90, Height = 28, Margin = new Padding(4, 8, 4, 0) };
         _addFolder = new Button { Text = "Add folder…", Width = 90, Height = 28, Margin = new Padding(0, 8, 4, 0) };
-        _openPlaylist = new Button { Text = "Open playlist…", Width = 104, Height = 28, Margin = new Padding(0, 8, 4, 0) };
-        _saveAsPlaylist = new Button { Text = "Save as playlist…", Width = 116, Height = 28, Margin = new Padding(0, 8, 4, 0) };
+        _importPlaylist = new Button { Text = "Import playlist…", Width = 112, Height = 28, Margin = new Padding(0, 8, 4, 0) };
+        _exportPlaylist = new Button { Text = "Export playlist…", Width = 112, Height = 28, Margin = new Padding(0, 8, 4, 0) };
         _openLibrary = new Button { Text = "Open library…", Width = 100, Height = 28, Margin = new Padding(16, 8, 4, 0) };
         _settings = new Button { Text = "Settings…", Width = 90, Height = 28, Margin = new Padding(0, 8, 4, 0) };
         // The queue's own commands get a row of their own, so the seek bar keeps its travel.
         var queueBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36, WrapContents = false };
-        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _openPlaylist, _saveAsPlaylist, _openLibrary, _settings });
+        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _importPlaylist, _exportPlaylist, _openLibrary, _settings });
         var symbols = new Font("Segoe UI Symbol", 9f);
         _prev = new Button { Text = "⏮", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
@@ -260,6 +263,11 @@ internal sealed class MainForm : Form
                 RemoveSelected();
                 e.Handled = true;
             }
+            else if (e.KeyCode == Keys.F2 && e.Modifiers == Keys.None)
+            {
+                _playlistName!.StartRename(); // the queue is the open playlist: F2 renames it (D18)
+                e.Handled = true;
+            }
         };
         _queueList.ContextMenuStrip = menu;
         _queueList.MouseClick += (_, e) =>
@@ -309,9 +317,12 @@ internal sealed class MainForm : Form
 
         _editor = new TransitionEditorPanel(engine, ShowNotice, ChooseRenderPath, a => AskUnsavedEdits(a));
         _playlists = new PlaylistSidebar(engine, LeaveEditor);
+        _playlistName = new PlaylistNameBar(engine);
 
-        // Docking order: the side panels and bottom strip first, the fill-docked list last.
+        // Docking order: the side panels and bottom strip first, then the name over the queue,
+        // between them, and the fill-docked list last.
         Controls.Add(_queueList);
+        Controls.Add(_playlistName);
         Controls.Add(_playlists);
         Controls.Add(_editor);
         Controls.Add(statusStrip);
@@ -320,8 +331,8 @@ internal sealed class MainForm : Form
 
         _addFiles.Click += (_, _) => AddChosen(ChooseFiles);
         _addFolder.Click += (_, _) => AddChosen(ChooseFolders);
-        _openPlaylist.Click += (_, _) => AddChosen(ChoosePlaylists);
-        _saveAsPlaylist.Click += (_, _) => SaveAsPlaylist();
+        _importPlaylist.Click += (_, _) => ImportPlaylists();
+        _exportPlaylist.Click += (_, _) => ExportPlaylist();
         _openLibrary.Click += (_, _) => OpenLibrary();
         _settings.Click += (_, _) => EditSettings();
         _cancelAdd.Click += (_, _) => _engine.CancelAdd();
@@ -394,7 +405,7 @@ internal sealed class MainForm : Form
         {
             return;
         }
-        var title = Presenter.Title(view.Library, _outputModeInUse(), _engine.SampleRate);
+        var title = Presenter.Title(view.OpenPlaylist, view.Library, _outputModeInUse(), _engine.SampleRate);
         if (Text != title)
         {
             Text = title;
@@ -467,6 +478,7 @@ internal sealed class MainForm : Form
 
         _editor.Refresh(view);
         _playlists.Render(view);
+        _playlistName.Render(view);
     }
 
     /// <summary>The clip light: dark, or lit red with the count and the latest cause. Set only when
@@ -579,12 +591,13 @@ internal sealed class MainForm : Form
     /// shell only passes them on.</summary>
     internal Func<IReadOnlyList<string>> ChooseFolders { get; set; }
 
-    /// <summary>The playlists picked in the Open playlist dialog, or none. Opening one is adding
-    /// it: the engine reads it and appends its tracks; there is no "replace the queue".</summary>
+    /// <summary>The playlists picked in the Import playlist dialog, or none. The engine copies them
+    /// into the library and opens the last; the shell never copies a file.</summary>
     internal Func<IReadOnlyList<string>> ChoosePlaylists { get; set; }
 
-    /// <summary>The path picked in the Save as playlist dialog, or null.</summary>
-    internal Func<string?> ChoosePlaylistSavePath { get; set; }
+    /// <summary>The path picked in the Export playlist dialog, which opens on the file name given,
+    /// or null.</summary>
+    internal Func<string, string?> ChooseExportPath { get; set; }
 
     /// <summary>Whether the user confirms clearing a queue of this many rows. A test replaces
     /// it, since a headless form cannot show a dialog.</summary>
@@ -693,29 +706,41 @@ internal sealed class MainForm : Form
     {
         using var dialog = new OpenFileDialog
         {
-            Title = "Open playlist",
-            Filter = "Playlists (M3U, M3U8)|*.m3u;*.m3u8|All files|*.*",
+            Title = "Import playlists into the library",
+            Filter = "Playlists (M3U, M3U8)|*.m3u;*.m3u8",
             Multiselect = true,
         };
         return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileNames : Array.Empty<string>();
     }
 
-    private string? ShowSavePlaylistDialog()
+    private string? ShowExportDialog(string fileName)
     {
         using var dialog = new SaveFileDialog
         {
-            Title = "Save the queue as a playlist",
+            Title = "Export the playlist",
             Filter = "UTF-8 playlist (M3U8)|*.m3u8",
             DefaultExt = "m3u8",
+            FileName = fileName,
         };
         return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
     }
 
-    /// <summary>The engine writes the file and says how it went; the shell never reads the queue
-    /// to write it.</summary>
-    private void SaveAsPlaylist()
+    /// <summary>Import opens a playlist (D19), so unsaved edits are settled once something was
+    /// picked; then one call for all of them.</summary>
+    private void ImportPlaylists()
     {
-        if (ChoosePlaylistSavePath() is { } path)
+        var paths = ChoosePlaylists();
+        if (paths.Count > 0 && LeaveEditor())
+        {
+            _ = _engine.ImportPlaylists(paths); // the rows and the notice arrive through the sink
+        }
+    }
+
+    /// <summary>The dialog opens on "&lt;open playlist&gt;.m3u8". The engine writes the queue as it
+    /// is shown and says how it went; the library's own copy is not touched.</summary>
+    private void ExportPlaylist()
+    {
+        if (ChooseExportPath($"{_engine.View.OpenPlaylist ?? "Playlist"}.m3u8") is { } path)
         {
             _engine.SaveAsPlaylist(path);
         }

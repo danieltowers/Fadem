@@ -49,10 +49,15 @@ queue's ✎ button is different: the list answers a click where the real cursor 
 posted click says, so move the cursor onto the cell (`SetCursorPos`) before posting the click.
 
 - [ ] The window opens without an error dialog.
-- [ ] The title reads "faderio — *temp folder's name* · WASAPI shared at 44100 Hz" (or the mode
-      in use), and nothing asked for a folder. **Open library…** sits between **Save as
-      playlist…** and **Settings…**; choosing another folder in it empties the queue and the
-      editor and puts that folder's name in the title.
+- [ ] The title reads "Untitled — faderio — *temp folder's name* · WASAPI shared at 44100 Hz"
+      (or the mode in use), and nothing asked for a folder. **Open library…** sits between
+      **Export playlist…** and **Settings…**; choosing another folder in it empties the queue and
+      the editor and puts that folder's name in the title.
+- [ ] Above the queue, beside the sidebar, the open playlist's name reads in a larger font, and
+      the title bar starts with the same name. Double-click it, or press F2 in the queue: it
+      becomes a text box holding the name, all selected. Enter renames it there, in the sidebar
+      and in the title; Esc puts the old name back. A name another playlist has is refused with
+      "Not renamed: …" in the strip, and the old name stays.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
 - [ ] The transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, then −5 s, the seek bar, +5 s and the time; no ⏹.
 - [ ] At launch the first row carries the marker, dimmed (a greyer yellow than while playing).
@@ -120,9 +125,12 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       "1" to "10" in natural order. The cover scans are ignored without a notice.
 - [ ] Dropping a mix of files and folders from Explorer onto the list adds them in the order
       dropped, each folder expanded in place.
-- [ ] **Save as playlist…** then **Open playlist…** on the file just saved doubles the queue
-      in the same order, and the status strip names the file saved. Save it in a folder whose
-      name has `†` or `⭐️`.
+- [ ] **Export playlist…** offers "*open playlist*.m3u8"; saved in a folder whose name has `†`
+      or `⭐️`, the strip names the file saved. **Import playlist…** on that file (it takes
+      several, and only `.m3u`/`.m3u8`) adds it to the sidebar as "*name* 2", open, with the same
+      rows in the same order; the strip says "Imported *file* as *name* 2.". A `.m3u` of relative
+      paths from another folder imports with its paths made absolute in
+      `<library>\.faderio\playlists\`.
 - [ ] Ctrl-click or Shift-click selects several rows. **Delete** removes them all at once and
       the numbering closes up. The context menu's **Remove** does the same, and is disabled
       when nothing is selected.

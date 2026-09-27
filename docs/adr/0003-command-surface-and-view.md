@@ -226,3 +226,13 @@ background add that publishes once per file otherwise kept the window from answe
 add ended. A notice renders any view still waiting first, so no view published before a notice
 shows after it. The form's timer still renders `View` every 100 ms, including inside native
 modal loops, which raise no idle.
+
+## Addendum: Import and Export replace Open and Save as (2026-09-27)
+
+**Import playlist…** and **Export playlist…** replace the two dialogs above (D19,
+[playlists issue 03](../../.scratch/202609-faderio-playlists/issues/03-the-open-playlists-name-import-and-export.md)).
+Import is one command for the dialog's whole selection, `ImportPlaylists(paths)`: the engine
+copies each file into the library's playlists folder, its entries made absolute, and opens the
+last one copied. The shell never copies a file. Export is still `SaveAsPlaylist(path)`, its
+dialog opening on the open playlist's name. `Add` of an `.m3u` still appends, so a playlist
+dropped on the queue is added to the open one.

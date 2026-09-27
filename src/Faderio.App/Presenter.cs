@@ -191,9 +191,9 @@ internal static class Presenter
     public static string FmtModeInUse(AudioOutputMode chosen, AudioOutputMode? inUse) =>
         inUse == chosen ? "" : $"In use now: {(inUse is { } mode ? FmtOutputMode(mode) : "no audio output")}";
 
-    /// <summary>The window title: the open library (library issue 02), then the output mode
-    /// actually in use, not the one asked for.</summary>
-    public static string Title(LibraryView? library, AudioOutputMode? inUse, int sampleRate)
+    /// <summary>The window title: the open playlist in front (playlists issue 03), then the open
+    /// library (library issue 02), then the output mode actually in use, not the one asked for.</summary>
+    public static string Title(string? playlist, LibraryView? library, AudioOutputMode? inUse, int sampleRate)
     {
         var name = library switch
         {
@@ -202,7 +202,8 @@ internal static class Presenter
             _ => library.Name,
         };
         var output = inUse is { } mode ? $"{FmtOutputMode(mode)} at {sampleRate} Hz" : "no audio output";
-        return $"faderio — {name} · {output}";
+        var title = $"faderio — {name} · {output}";
+        return playlist is null ? title : $"{playlist} — {title}";
     }
 
     /// <summary>"--library=&lt;folder&gt;": for smoke runs, the library to open instead of the

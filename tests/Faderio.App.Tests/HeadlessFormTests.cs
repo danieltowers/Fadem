@@ -164,7 +164,7 @@ public sealed class HeadlessFormTests
     });
 
     [Fact]
-    public void OpenPlaylist_PassesThePickedPlaylistToAdd_AndAppendsItsTracks() => RunSta(() =>
+    public void ImportPlaylist_CopiesThePickedPlaylistIntoTheLibrary_AndOpensIt() => RunSta(() =>
     {
         using var h = new Harness();
         var a = TestAudio.WriteDcWav("alpha.wav", 1, 0.4);
@@ -174,36 +174,87 @@ public sealed class HeadlessFormTests
         File.WriteAllLines(playlist, new[] { "#EXTM3U", b, a });
         h.Form.ChoosePlaylists = () => new[] { playlist };
 
-        Click(h.Form._openPlaylist);
+        Click(h.Form._importPlaylist);
 
-        Assert.Equal(new[] { a, b, a }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
-        Assert.Equal(3, h.Form._queueList.Items.Count);
+        Assert.Equal("mix † ⭐️", h.Engine.View.OpenPlaylist);
+        Assert.Equal(new[] { b, a }, Queued(h));
+        Assert.Equal(2, h.Form._queueList.Items.Count);
+        Assert.Equal(new[] { "mix † ⭐️", "Untitled" }, Names(h.Form._playlists));
+        Assert.Equal("mix † ⭐️", h.Form._playlistName._name.Text);
+        Assert.True(File.Exists(Path.Combine(h.Library.PlaylistsFolder, "mix † ⭐️.m3u8")));
     });
 
     [Fact]
-    public void SaveAsPlaylist_WritesTheQueueToThePickedPath_AndSaysSo() => RunSta(() =>
+    public void ImportPlaylist_Cancelled_ImportsNothing_AndAsksNothing() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Form.ChoosePlaylists = Array.Empty<string>;
+        h.Form.AskUnsavedEdits = _ => throw new InvalidOperationException("nothing was picked");
+
+        Click(h.Form._importPlaylist);
+
+        Assert.Equal(new[] { "Untitled" }, h.Engine.View.Playlists);
+        Assert.Equal("Ready.", h.Form._status.Text);
+    });
+
+    [Fact]
+    public void ImportPlaylist_WithUnsavedEdits_Asks_AndCancelImportsNothing() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+        h.Form._editor._fadeOutPoint.Text = "2";
+        var playlist = Path.Combine(h.TempDir, "Evening.m3u8");
+        File.WriteAllLines(playlist, new[] { "#EXTM3U", TestAudio.WriteDcWav("delta.wav", 1, 0.2) });
+        h.Form.ChoosePlaylists = () => new[] { playlist };
+        var asked = 0;
+        h.Form.AskUnsavedEdits = _ =>
+        {
+            asked++;
+            return UnsavedEdits.Cancel;
+        };
+
+        Click(h.Form._importPlaylist);
+
+        Assert.Equal(1, asked);
+        Assert.Equal(new[] { "Untitled" }, h.Engine.View.Playlists);
+        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
+    });
+
+    [Fact]
+    public void ExportPlaylist_OffersTheOpenPlaylistsName_WritesTheQueueThere_AndLeavesTheLibraryCopy() => RunSta(() =>
     {
         using var h = new Harness();
         var a = TestAudio.WriteDcWav("alpha.wav", 1, 0.4);
         var b = TestAudio.WriteDcWav("beta.wav", 1, 0.2);
         h.Form.AddPaths(new[] { b, a });
+        h.Engine.RenamePlaylist("Untitled", "Evening");
+        var libraryCopy = Path.Combine(h.Library.PlaylistsFolder, "Evening.m3u8");
+        var before = File.ReadAllBytes(libraryCopy);
         var playlist = Path.Combine(h.TempDir, "saved.m3u8");
-        h.Form.ChoosePlaylistSavePath = () => playlist;
+        string? offered = null;
+        h.Form.ChooseExportPath = name =>
+        {
+            offered = name;
+            return playlist;
+        };
 
-        Click(h.Form._saveAsPlaylist);
+        Click(h.Form._exportPlaylist);
 
+        Assert.Equal("Evening.m3u8", offered);
         Assert.Equal(new[] { b, a }, File.ReadAllLines(playlist).Where(l => !l.StartsWith('#')));
         Assert.Equal("Saved 2 tracks to saved.m3u8.", h.Form._status.Text);
+        Assert.Equal(before, File.ReadAllBytes(libraryCopy));
     });
 
     [Fact]
-    public void SaveAsPlaylist_Cancelled_WritesNothing() => RunSta(() =>
+    public void ExportPlaylist_Cancelled_WritesNothing() => RunSta(() =>
     {
         using var h = new Harness();
         h.Form.AddPaths(new[] { TestAudio.WriteDcWav("alpha.wav", 1, 0.4) });
-        h.Form.ChoosePlaylistSavePath = () => null;
+        h.Form.ChooseExportPath = _ => null;
 
-        Click(h.Form._saveAsPlaylist);
+        Click(h.Form._exportPlaylist);
 
         Assert.Empty(Directory.GetFiles(h.TempDir, "*.m3u8"));
         Assert.Equal("Ready.", h.Form._status.Text);
@@ -2178,7 +2229,7 @@ public sealed class HeadlessFormTests
     {
         using var h = new Harness();
 
-        Assert.Equal($"faderio — {h.Library.Name} · WASAPI shared at {h.Engine.SampleRate} Hz", h.Form.Text);
+        Assert.Equal($"Untitled — faderio — {h.Library.Name} · WASAPI shared at {h.Engine.SampleRate} Hz", h.Form.Text);
     });
 
     [Fact]
@@ -2194,7 +2245,7 @@ public sealed class HeadlessFormTests
         Click(h.Form._openLibrary);
 
         Assert.Equal("Second library", h.Engine.View.Library!.Name);
-        Assert.StartsWith("faderio — Second library · ", h.Form.Text);
+        Assert.StartsWith("Untitled — faderio — Second library · ", h.Form.Text);
         Assert.Empty(h.Form._queueList.Items);
         Assert.Null(h.Form._editor.Adjacency); // what it had open was the other library's
         Assert.Equal("No boundary selected", h.Form._editor._title.Text);
@@ -2609,5 +2660,119 @@ public sealed class HeadlessFormTests
         Assert.Equal(new[] { "delete", "unsaved" }, asks);
         Assert.Equal(new[] { "Evening", "Untitled" }, h.Engine.View.Playlists);
         Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
+    });
+
+    // ── Playlists issue 03: the open playlist's name ────────────────────────────────────
+
+    [Fact]
+    public void AtLaunch_TheNameAboveTheQueue_AndTheTitle_NameTheOpenPlaylist() => RunSta(() =>
+    {
+        using var h = new Harness();
+
+        Assert.Equal("Untitled", h.Form._playlistName._name.Text);
+        Assert.Equal($"Untitled — faderio — {Path.GetFileName(h.TempDir)} · WASAPI shared at 44100 Hz", h.Form.Text);
+
+        h.Form._playlists._new.PerformClick(); // an empty Untitled is already new: nothing changes
+        ThreeQueued(h);
+        h.Form._playlists._new.PerformClick();
+
+        Assert.Equal("Untitled 2", h.Form._playlistName._name.Text);
+        Assert.StartsWith("Untitled 2 — faderio — ", h.Form.Text);
+    });
+
+    [Fact]
+    public void F2InTheQueue_TypeAndEnter_RenamesThePlaylist_InTheSidebarToo() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+
+        PressKey(h.Form._queueList, Keys.F2);
+        Assert.True(h.Form._playlistName.IsRenaming);
+        Assert.Equal("Untitled", h.Form._playlistName._edit.Text);
+        h.Form._playlistName._edit.Text = "Evening";
+        PressKey(h.Form._playlistName._edit, Keys.Enter);
+
+        Assert.False(h.Form._playlistName.IsRenaming);
+        Assert.Equal("Evening", h.Engine.View.OpenPlaylist);
+        Assert.Equal("Evening", h.Form._playlistName._name.Text);
+        h.Form.Render();
+        Assert.Equal(new[] { "Evening" }, Names(h.Form._playlists));
+        Assert.StartsWith("Evening — faderio — ", h.Form.Text);
+    });
+
+    [Fact]
+    public void ADoubleClickOnTheName_StartsTheRename() => RunSta(() =>
+    {
+        using var h = new Harness();
+
+        typeof(Control).GetMethod("OnDoubleClick", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(h.Form._playlistName._name, new object[] { EventArgs.Empty });
+
+        Assert.True(h.Form._playlistName.IsRenaming);
+        Assert.Equal("Untitled", h.Form._playlistName._edit.Text);
+    });
+
+    [Fact]
+    public void Esc_PutsTheNameBack_AndRenamesNothing() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        PressKey(h.Form._queueList, Keys.F2);
+        h.Form._playlistName._edit.Text = "Evening";
+
+        PressKey(h.Form._playlistName._edit, Keys.Escape);
+
+        Assert.False(h.Form._playlistName.IsRenaming);
+        Assert.Equal("Untitled", h.Form._playlistName._name.Text);
+        Assert.Equal(new[] { "Untitled" }, h.Engine.View.Playlists);
+        Assert.Equal("Ready.", h.Form._status.Text);
+    });
+
+    [Fact]
+    public void ARefusedRename_KeepsTheOldName_WithTheEnginesNotice() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        File.WriteAllText(Path.Combine(h.Library.PlaylistsFolder, "Evening.m3u8"), "#EXTM3U\n");
+        PressKey(h.Form._queueList, Keys.F2);
+        h.Form._playlistName._edit.Text = "evening";
+
+        PressKey(h.Form._playlistName._edit, Keys.Enter);
+
+        Assert.Equal("Untitled", h.Form._playlistName._name.Text);
+        Assert.Equal("Not renamed: Untitled. There is already a playlist called Evening.", h.Form._status.Text);
+    });
+
+    [Fact]
+    public void WhileTheNameIsEdited_ARenderLeavesWhatIsTyped() => RunSta(() =>
+    {
+        using var h = new Harness();
+        PressKey(h.Form._queueList, Keys.F2);
+        h.Form._playlistName._edit.Text = "Eve";
+
+        h.Form.Render();
+
+        Assert.True(h.Form._playlistName.IsRenaming);
+        Assert.Equal("Eve", h.Form._playlistName._edit.Text);
+    });
+
+    [Fact]
+    public void AddFolder_WhileUntitled2IsOpen_GrowsItsFile() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        h.Form._playlists._new.PerformClick();
+        var album = Path.Combine(h.TempDir, "Album");
+        Directory.CreateDirectory(album);
+        File.Copy(TestAudio.WriteDcWav("one.wav", 1, 0.2), Path.Combine(album, "1 - One.wav"));
+        File.Copy(TestAudio.WriteDcWav("two.wav", 1, 0.2), Path.Combine(album, "2 - Two.wav"));
+        h.Form.ChooseFolders = () => new[] { album };
+
+        Click(h.Form._addFolder);
+
+        var file = Path.Combine(h.Library.PlaylistsFolder, "Untitled 2.m3u8");
+        Assert.Equal(
+            new[] { Path.Combine(album, "1 - One.wav"), Path.Combine(album, "2 - Two.wav") },
+            File.ReadAllLines(file).Where(l => !l.StartsWith('#')));
     });
 }

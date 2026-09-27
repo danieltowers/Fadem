@@ -73,18 +73,22 @@ internal static partial class PlaylistFolder
     public static bool IsUntitled(string name) => UntitledName().IsMatch(name);
 
     /// <summary>"Untitled", or else "Untitled N" for the first N from 2 that no playlist has.</summary>
-    public static string FirstFreeUntitled(IEnumerable<string> existing)
+    public static string FirstFreeUntitled(IEnumerable<string> existing) => FirstFree(Untitled, existing);
+
+    /// <summary><paramref name="name"/>, or else "<paramref name="name"/> N" for the first N from 2
+    /// that no playlist has.</summary>
+    public static string FirstFree(string name, IEnumerable<string> existing)
     {
         var taken = new HashSet<string>(existing, Names);
-        if (!taken.Contains(Untitled))
+        if (!taken.Contains(name))
         {
-            return Untitled;
+            return name;
         }
         for (var n = 2; ; n++)
         {
-            if (!taken.Contains($"{Untitled} {n}"))
+            if (!taken.Contains($"{name} {n}"))
             {
-                return $"{Untitled} {n}";
+                return $"{name} {n}";
             }
         }
     }

@@ -215,6 +215,93 @@ public sealed partial class PlaybackEngine
         }));
     }
 
+    /// <summary>
+    /// Imports playlists from anywhere (D19): each of <paramref name="paths"/>, an M3U or M3U8, is
+    /// copied into the library's playlists folder as a playlist named by its file name, numbered
+    /// as a new Untitled is ("Evening 2") if a playlist has that name. The copy's entries are
+    /// absolute, a relative one resolved against the source's own folder; the source is not
+    /// touched. The last one copied then opens as <see cref="OpenPlaylist"/> opens one. A file that
+    /// is missing, unreadable or not a playlist, or whose copy cannot be written, is a notice and
+    /// the others are still imported. The task completes with the opened playlist's load report.
+    /// One call for the dialog's whole selection: which of them opens is the engine's to say.
+    /// </summary>
+    public Task<AddReport> ImportPlaylists(IEnumerable<string> paths)
+    {
+        ThrowIfDisposed();
+        var sources = paths.ToList();
+        return Loaded(Run(() =>
+        {
+            ObserveClock();
+            if (sources.Count == 0 || !HavePlaylists("Not imported"))
+            {
+                return Opened.Nothing;
+            }
+            var imported = sources
+                .Select(ImportPlaylistFile)
+                .OfType<(string Told, string Name, IReadOnlyList<string> Entries)>()
+                .ToList();
+            if (imported.Count == 0)
+            {
+                return Opened.Nothing;
+            }
+            RaiseNotice($"Imported {string.Join(", ", imported.Select(i => i.Told))}.");
+            var (_, name, entries) = imported[^1];
+            var opened = SwitchTo(name, entries);
+            Publish();
+            return opened;
+        }));
+    }
+
+    /// <summary>Copies one playlist into the folder; returns how the notice names it, its name and
+    /// its entries, or null with a notice saying why not.</summary>
+    private (string Told, string Name, IReadOnlyList<string> Entries)? ImportPlaylistFile(string source)
+    {
+        var file = Path.GetFileName(source);
+        void Refuse(string why) => RaiseNotice($"Not imported: {file}. {why}");
+        if (!M3UPlaylist.IsPlaylist(source))
+        {
+            Refuse("Only M3U and M3U8 playlists can be imported.");
+            return null;
+        }
+        if (!File.Exists(source))
+        {
+            Refuse("The file does not exist.");
+            return null;
+        }
+        IReadOnlyList<string> entries;
+        try
+        {
+            entries = M3UPlaylist.Read(source);
+        }
+        catch (Exception e) when (IsStoreWriteFailure(e))
+        {
+            Refuse($"It could not be read: {e.Message}");
+            return null;
+        }
+        var wanted = Path.GetFileNameWithoutExtension(source).Trim();
+        RefreshPlaylists();
+        var name = PlaylistFolder.FirstFree(wanted, _playlists);
+        if (PlaylistFolder.Refusal(name) is { } refusal)
+        {
+            Refuse(refusal);
+            return null;
+        }
+        try
+        {
+            lock (_saveGate)
+            {
+                M3UPlaylist.WriteEntries(PlaylistPath(name), entries);
+            }
+        }
+        catch (Exception e) when (IsStoreWriteFailure(e))
+        {
+            Refuse($"Its copy could not be written: {e.Message}");
+            return null;
+        }
+        RefreshPlaylists();
+        return (name == wanted ? name : $"{file} as {name}", name, entries);
+    }
+
     // ── Opening, under the lock ──────────────────────────────────────────────────────────
 
     /// <summary>The library's last open playlist (D20), with row 0 attended at 0:00 since nothing

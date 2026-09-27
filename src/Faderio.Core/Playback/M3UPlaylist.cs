@@ -6,9 +6,10 @@ namespace Faderio.Core.Playback;
 /// <summary>
 /// M3U with <c>#EXTINF</c>, kept interoperable (ADR 0005): transitions never travel in the
 /// playlist file, they live in the store. Behind the engine (build issue 03): <c>Add</c> reads
-/// one where a folder would be listed, and <c>SaveAsPlaylist</c> writes one. Writing is always
-/// UTF-8 with absolute paths, since library folder names carry <c>†</c> and <c>⭐️</c> and the
-/// store is keyed by full path.
+/// one where a folder would be listed, and <c>SaveAsPlaylist</c> writes one; the library's
+/// playlists are kept in it, and <c>ImportPlaylists</c> copies one in (playlists issues 01 and
+/// 03). Writing is always UTF-8 with absolute paths, since library folder names carry <c>†</c>
+/// and <c>⭐️</c> and the store is keyed by full path.
 /// </summary>
 internal static class M3UPlaylist
 {
@@ -89,7 +90,31 @@ internal static class M3UPlaylist
     /// as an absolute path under an <c>#EXTINF</c> in whole seconds. Written beside the target
     /// under a name of its own and renamed over it, so a failed save never leaves half a playlist
     /// and never touches another file.</summary>
-    public static void Write(string path, IReadOnlyList<Track> tracks)
+    public static void Write(string path, IReadOnlyList<Track> tracks) =>
+        WriteAtomically(path, writer =>
+        {
+            foreach (var track in tracks)
+            {
+                var seconds = (int)Math.Round(track.Length.TotalSeconds);
+                writer.WriteLine($"#EXTINF:{seconds},{Label(track)}");
+                writer.WriteLine(Path.GetFullPath(track.FilePath));
+            }
+        });
+
+    /// <summary>Writes <paramref name="entries"/> as <see cref="Read"/> returns them, one per line
+    /// with no <c>#EXTINF</c>, as <see cref="Write"/> writes: for an import (playlists issue 03),
+    /// whose entries are not probed until it opens. Once edited, the playlist is written with
+    /// them.</summary>
+    public static void WriteEntries(string path, IReadOnlyList<string> entries) =>
+        WriteAtomically(path, writer =>
+        {
+            foreach (var entry in entries)
+            {
+                writer.WriteLine(entry);
+            }
+        });
+
+    private static void WriteAtomically(string path, Action<StreamWriter> writeEntries)
     {
         var temp = $"{path}.{Guid.NewGuid():N}.tmp";
         try
@@ -97,12 +122,7 @@ internal static class M3UPlaylist
             using (var writer = new StreamWriter(temp, append: false, Utf8))
             {
                 writer.WriteLine("#EXTM3U");
-                foreach (var track in tracks)
-                {
-                    var seconds = (int)Math.Round(track.Length.TotalSeconds);
-                    writer.WriteLine($"#EXTINF:{seconds},{Label(track)}");
-                    writer.WriteLine(Path.GetFullPath(track.FilePath));
-                }
+                writeEntries(writer);
             }
             File.Move(temp, path, overwrite: true);
         }
