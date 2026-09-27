@@ -201,7 +201,7 @@ public sealed partial class PlaybackEngine
         _pendingBoundary = boundary;
 
         var inTrack = incoming.Track;
-        var global = _store.Get(outTrack.FilePath, inTrack.FilePath);
+        var global = _store?.Get(outTrack.FilePath, inTrack.FilePath);
         var transition = _resolver.Resolve(global, null, TimeSpanOf(total), inTrack.Length.TimeSpan);
         if (transition.IsHardCut || !TryComputeFade(referencePosition, total, transition, TimelineOf, out var trig, out var dur))
         {
@@ -324,7 +324,7 @@ public sealed partial class PlaybackEngine
         var decodePosition = voice.Source.Position;
         var inTrack = _queue.Entries[next.Index].Track;
         var transition = _resolver.Resolve(
-            _store.Get(_queue.Entries[index].Track.FilePath, inTrack.FilePath), null,
+            _store?.Get(_queue.Entries[index].Track.FilePath, inTrack.FilePath), null,
             TimeSpanOf(total), inTrack.Length.TimeSpan, fadeOutAt: TimeSpanOf(decodePosition));
         if (transition.IsHardCut)
         {

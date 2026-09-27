@@ -29,7 +29,9 @@ resolves there, not where you typed the command. A path that does not exist is r
 any other file: nothing is queued and the only sign is one line in the status strip
 ("Nothing added: … The file does not exist."). The agent generates its own WAVs for the Looks
 half; the Sounds half uses the two tracks of a boundary already in the store
-(`%APPDATA%\faderio\transitions.json` lists them by full path).
+(`%APPDATA%\faderio\.faderio\transitions.json` lists them by full path). Until the library can
+be chosen (library issue 02), the app opens `%APPDATA%\faderio` as its library, so everything it
+writes is under `.faderio\` there.
 
 Capture the window with `PrintWindow` rather than a screen grab, so it need not be in front.
 There is no ⏹ button (the engine still stops at launch and when the queue ends). UI Automation
@@ -139,7 +141,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       long cause is cut short without pushing the notice count off; its tooltip has it whole.
       Clicking it turns it dark again. (A track tagged well above 0 dB, with ReplayGain on,
       lights it.)
-- [ ] Launching with a corrupt `%APPDATA%\faderio\transitions.json` (back it up first) shows
+- [ ] Launching with a corrupt `%APPDATA%\faderio\.faderio\transitions.json` (back it up first) shows
       no dialog: the strip says the file was moved aside to `transitions.json.corrupt`.
 - [ ] A queued file renamed before the track ahead of it starts is marked when that track starts:
       "⚠" before its row number, the row greyed, and a tooltip saying it is unreadable. The
@@ -157,7 +159,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       N greyed out under *Hard cut*; and ReplayGain. Launched into a fallback as above, it also
       reads "In use now: WASAPI shared" (or WaveOut) under the mode chosen.
 - [ ] A setting changed and saved with OK is still set after a restart; Cancel keeps nothing.
-- [ ] Launching with a corrupt `%APPDATA%\faderio\settings.json` (back it up first) shows no
+- [ ] Launching with a corrupt `%APPDATA%\faderio\.faderio\settings.json` (back it up first) shows no
       dialog: the strip says the file was moved aside to `settings.json.corrupt`, and
       **Settings…** shows the defaults.
 - [ ] Adding the library's longest FLAC (about 26 minutes) shows its full length in the time

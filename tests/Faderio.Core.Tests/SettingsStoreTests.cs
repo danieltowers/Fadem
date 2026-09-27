@@ -1,3 +1,4 @@
+using Faderio.Core.Persistence;
 using Faderio.Core.Playback;
 using Faderio.Core.Settings;
 
@@ -12,7 +13,7 @@ public sealed class SettingsStoreTests : IDisposable
     {
         _dir = Path.Combine(Path.GetTempPath(), "faderio-settings", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_dir);
-        _path = Path.Combine(_dir, "settings.json");
+        _path = Library.Open(_dir).SettingsPath; // where a library keeps it
     }
 
     public void Dispose()

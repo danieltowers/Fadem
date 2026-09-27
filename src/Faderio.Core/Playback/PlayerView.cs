@@ -67,7 +67,15 @@ public sealed record PlayerView(
     /// <summary>The clip light (build issue 17): the clips heard since it was last cleared, or null.
     /// A clip is latched when the listener hears it, not when it is rendered.</summary>
     public ClipView? Clip { get; init; }
+
+    /// <summary>The library open, or null before any library has been opened (ADR 0011).</summary>
+    public LibraryView? Library { get; init; }
 }
+
+/// <summary>The open library as the shell sees it: its folder, the folder's leaf name, and
+/// whether it opened. An unavailable library holds no store: authoring is refused with a notice,
+/// and what is queued still plays.</summary>
+public sealed record LibraryView(string Path, string Name, bool IsAvailable);
 
 /// <summary>The clips heard since the light was last cleared (build issue 17): how many, and the
 /// cause of the latest, which is what the listener most likely just heard.</summary>

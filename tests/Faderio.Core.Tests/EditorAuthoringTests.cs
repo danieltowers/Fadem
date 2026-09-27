@@ -114,7 +114,7 @@ public sealed class EditorAuthoringTests
 
         // Mid-overlap, linear is ½·0.4 + ½·0.2 = 0.3; equal-power would be about 0.42.
         Assert.Equal(0.3, tc.Rendered.Sample(Rate + Rate / 2, 0), 2);
-        var reopened = new JsonTransitionStore(Path.Combine(tc.TempDir, "transitions.json"));
+        var reopened = new JsonTransitionStore(tc.Library.TransitionsPath);
         Assert.Equal(FadeCurveKind.Linear, reopened.Get(a, b)!.Curve);
     }
 
@@ -134,7 +134,7 @@ public sealed class EditorAuthoringTests
 
         Assert.Empty(refusals);
         Assert.Null(tc.Engine.Transition(adjacency));
-        Assert.DoesNotContain("blank-a", File.ReadAllText(Path.Combine(tc.TempDir, "transitions.json")));
+        Assert.DoesNotContain("blank-a", File.ReadAllText(tc.Library.TransitionsPath));
         Assert.StartsWith("Removed blank-a", tc.Notices[^1]);
     }
 
@@ -150,8 +150,8 @@ public sealed class EditorAuthoringTests
         tc.Engine.Author(adjacency, new TransitionSpec());
 
         Assert.Null(tc.Engine.Transition(adjacency));
-        Assert.False(File.Exists(Path.Combine(tc.TempDir, "transitions.json")) &&
-                     File.ReadAllText(Path.Combine(tc.TempDir, "transitions.json")).Contains("blank2-a"));
+        Assert.False(File.Exists(tc.Library.TransitionsPath) &&
+                     File.ReadAllText(tc.Library.TransitionsPath).Contains("blank2-a"));
         Assert.StartsWith("Nothing to save", tc.Notices[^1]);
     }
 

@@ -20,7 +20,7 @@ public static class Renderer
     public static readonly TimeSpan DefaultTail = TimeSpan.FromSeconds(5);
 
     public static RenderReport RenderBoundary(
-        Adjacency adjacency, ITransitionStore store, string wavPath,
+        Adjacency adjacency, ITransitionStore? store, string wavPath,
         TimeSpan? preRoll = null, TimeSpan? tail = null, int sampleRate = 44100)
     {
         var pre = preRoll ?? DefaultPreRoll;
@@ -41,7 +41,7 @@ public static class Renderer
         // Where the outgoing track starts fading, resolved the way the engine resolves it.
         var resolver = new TransitionResolver(new Settings.PlayerSettings());
         var effective = resolver.Resolve(
-            store.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath), null,
+            store?.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath), null,
             outgoingRow.Track.Length.TimeSpan, incomingRow.Track.Length.TimeSpan);
         var fadeOutPoint = effective.IsHardCut ? outgoingRow.Track.Length.TimeSpan : effective.FadeOutPoint;
         var start = fadeOutPoint - pre < TimeSpan.Zero ? TimeSpan.Zero : fadeOutPoint - pre;

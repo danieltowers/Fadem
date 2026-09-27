@@ -4,7 +4,6 @@ using Faderio.Core.Domain;
 using Faderio.Core.Playback;
 using Faderio.Core.Queue;
 using Faderio.Core.Settings;
-using Faderio.Core.Transitions;
 
 using Point = Faderio.Core.Domain.Point;
 
@@ -120,49 +119,6 @@ public sealed class PresenterTests
         Assert.Equal("faderio — WASAPI exclusive at 44100 Hz", Presenter.Title(AudioOutputMode.WasapiExclusive, 44100));
         Assert.Equal("faderio — WaveOut at 44100 Hz", Presenter.Title(AudioOutputMode.WaveOut, 44100));
         Assert.Equal("faderio — no audio output", Presenter.Title(null, 44100));
-    }
-
-    [Fact]
-    public void OpenTransitionStore_RecoversACorruptFile_Visibly()
-    {
-        var dir = Path.Combine(Path.GetTempPath(), "faderio-app", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, "transitions.json");
-        File.WriteAllText(path, "{ this is not json");
-        var warnings = new List<string>();
-
-        var store = Presenter.OpenTransitionStore(path, warnings.Add);
-
-        Assert.NotNull(store);
-        Assert.Single(warnings);
-        Assert.True(File.Exists(path + ".corrupt"), "the corrupt file is moved aside, not deleted");
-        Directory.Delete(dir, recursive: true);
-    }
-
-    [Fact]
-    public void OpenTransitionStore_ACorruptFileThatCannotBeMovedAside_IsANotice_NotACrash()
-    {
-        // Build issue 09: the move-aside's failure was swallowed, and the fresh store then
-        // reopened the same corrupt file and threw at launch.
-        var dir = Path.Combine(Path.GetTempPath(), "faderio-app", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, "transitions.json");
-        File.WriteAllText(path, "{ this is not json");
-        var warnings = new List<string>();
-        ITransitionStore store;
-
-        using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) // no delete, so no move
-        {
-            store = Presenter.OpenTransitionStore(path, warnings.Add);
-            store.Upsert(@"C:\a.wav", @"C:\b.wav", new TransitionSpec { FadeOutDuration = TimeSpan.FromSeconds(1) });
-        }
-
-        var warning = Assert.Single(warnings);
-        Assert.Contains("could not be moved aside", warning);
-        Assert.Equal("{ this is not json", File.ReadAllText(path)); // left untouched
-        Assert.False(File.Exists(path + ".corrupt"));
-        Assert.True(File.Exists(path + ".recovered"), "writes go to a fresh file beside it");
-        Directory.Delete(dir, recursive: true);
     }
 
     [Fact]

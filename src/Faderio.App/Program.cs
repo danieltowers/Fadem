@@ -1,4 +1,5 @@
 using Faderio.App.Audio;
+using Faderio.Core.Persistence;
 using Faderio.Core.Playback;
 using Faderio.Core.Settings;
 
@@ -25,16 +26,18 @@ internal static class Program
         // once the form's message loop runs. The output's notices (each fallback step) are posted
         // too, so none is handled under the engine lock while the output reopens.
         Action<string> notify = ((IEngineSink)sink).Notice;
-        var store = Presenter.OpenTransitionStore(Path.Combine(appData, "transitions.json"), notify);
 
-        // The engine owns the settings file; only the output mode is read here, since the output
-        // is opened before the engine that runs at its rate (ADR 0008).
-        var settings = new SettingsStore(Path.Combine(appData, "settings.json"));
+        // Until the user chooses a library (library issue 02), the AppData folder is opened as one.
+        var library = Library.Open(appData);
+
+        // The engine owns the library and its settings; only the output mode is read here, since
+        // the output is opened before the engine that runs at its rate (ADR 0008).
         var output = new NAudioAudioOutput(
-            settings.Settings.OutputMode, notify, Presenter.ParseUnavailableOutputs(args));
-        var engine = new PlaybackEngine(output, store, sink, settings);
+            (library.Settings?.Settings ?? new PlayerSettings()).OutputMode, notify,
+            Presenter.ParseUnavailableOutputs(args));
+        var engine = new PlaybackEngine(output, library, sink);
 
-        var form = new MainForm(engine, store, sink, () => output.Mode);
+        var form = new MainForm(engine, sink, () => output.Mode);
         form.Text = Presenter.Title(output.Mode, engine.SampleRate);
         output.ModeChanged += () => form.BeginInvoke(() => form.Text = Presenter.Title(output.Mode, engine.SampleRate));
         form.Shown += (_, _) =>

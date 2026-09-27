@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Faderio.Core.Domain;
+using Faderio.Core.Persistence;
 using Faderio.Core.Queue;
 using Faderio.Core.Settings;
 using Faderio.Core.Transitions;
@@ -16,7 +17,12 @@ namespace Faderio.Core.Playback;
 public sealed partial class PlaybackEngine : IDisposable
 {
     private readonly IAudioOutput _output;
-    private readonly ITransitionStore _store;
+
+    /// <summary>The open library's transition store, or null when there is none: no library, or
+    /// one that could not be opened. Authoring is then refused with a notice, and every
+    /// adjacency plays as unauthored (ADR 0011).</summary>
+    private readonly ITransitionStore? _store;
+    private readonly Library? _library;
     private readonly IEngineSink _sink;
     private readonly TransitionResolver _resolver;
     private readonly SettingsStore? _settingsStore;
@@ -85,15 +91,36 @@ public sealed partial class PlaybackEngine : IDisposable
     private bool _viewDirty;
     private readonly List<string> _pendingNotices = new();
 
+    /// <summary>An engine on a store and settings of its own, outside any library: the renderer's,
+    /// and the tests'. A null store is no library.</summary>
     public PlaybackEngine(
         IAudioOutput output,
-        ITransitionStore store,
+        ITransitionStore? store,
         IEngineSink sink,
         SettingsStore? settings = null,
         Random? rng = null)
+        : this(output, store, sink, settings, null, rng)
+    {
+    }
+
+    /// <summary>An engine on an opened library (ADR 0011): its stores, or none when it could not
+    /// be opened. What went wrong opening it is raised as notices.</summary>
+    public PlaybackEngine(IAudioOutput output, Library library, IEngineSink sink, Random? rng = null)
+        : this(output, library.Transitions, sink, library.Settings, library, rng)
+    {
+    }
+
+    private PlaybackEngine(
+        IAudioOutput output,
+        ITransitionStore? store,
+        IEngineSink sink,
+        SettingsStore? settings,
+        Library? library,
+        Random? rng)
     {
         _output = output;
         _store = store;
+        _library = library;
         _sink = sink;
         _settingsStore = settings;
         _settings = settings?.Settings ?? new PlayerSettings();
@@ -113,10 +140,11 @@ public sealed partial class PlaybackEngine : IDisposable
         _output.Stopped += OnOutputStopped;
         _output.Initialise(new EngineFrameSource(this));
 
-        // Nothing holds the lock yet, so the store's trouble opening is told straight away.
-        if (settings?.LoadNotice is { } notice)
+        // Nothing holds the lock yet, so the stores' trouble opening is told straight away.
+        var notices = library?.Notices ?? (settings?.LoadNotice is { } notice ? [notice] : []);
+        foreach (var opening in notices)
         {
-            _sink.Notice(notice);
+            _sink.Notice(opening);
         }
     }
 
@@ -354,7 +382,7 @@ public sealed partial class PlaybackEngine : IDisposable
             _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null, _finishAt is not null,
             _shuffle, _repeat, Adding, _rate, _unreadable.ToImmutableHashSet(), _settings,
             _queueBase, _preview is null ? null : _mixer.Timeline, _previewOrigin, _preview?.Snap(), _clips.Snap());
-        return snapshot with { Onward = snapshot.OnwardOf(IsAuthoredPair) };
+        return snapshot with { Onward = snapshot.OnwardOf(IsAuthoredPair), Library = _library?.View };
     }
 
     /// <summary>One voice's clock frozen for the view: its reference history and its length. The
@@ -415,6 +443,8 @@ public sealed partial class PlaybackEngine : IDisposable
         /// it is authored (interim transport 07). A row with none is absent.</summary>
         public IReadOnlyDictionary<RowId, bool> Onward { get; init; } = new Dictionary<RowId, bool>();
 
+        public LibraryView? Library { get; init; }
+
         /// <param name="emitted">The device's count. The queue's clock is that from
         /// <see cref="QueueBase"/>; while a preview holds the queue, it stops where the queue's
         /// mixer stopped, once the device has played out what it had of the queue. The preview's
@@ -446,6 +476,7 @@ public sealed partial class PlaybackEngine : IDisposable
                 Settings = Settings,
                 Preview = preview,
                 Clip = clip,
+                Library = Library,
             };
         }
 

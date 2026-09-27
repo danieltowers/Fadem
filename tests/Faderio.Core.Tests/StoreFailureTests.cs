@@ -113,7 +113,7 @@ public sealed class StoreFailureTests
         var b = TestAudio.WriteToneWav("b.wav", 4, 2000);
         var c = TestAudio.WriteToneWav("c.wav", 4, 3000);
         tc.Store.Upsert(b, c, Crossfade()); // the file exists before it is made read-only
-        var file = Path.Combine(tc.TempDir, "transitions.json");
+        var file = tc.Library.TransitionsPath;
         File.SetAttributes(file, FileAttributes.ReadOnly);
         try
         {

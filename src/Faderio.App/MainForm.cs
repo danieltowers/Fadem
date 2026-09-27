@@ -2,7 +2,6 @@ using Faderio.Core.Domain;
 using Faderio.Core.Playback;
 using Faderio.Core.Queue;
 using Faderio.Core.Settings;
-using Faderio.Core.Transitions;
 
 namespace Faderio.App;
 
@@ -70,7 +69,7 @@ internal sealed class MainForm : Form
 
     /// <param name="outputModeInUse">The mode the output opened in, or null when none could be:
     /// the output adapter's, for the settings dialog.</param>
-    public MainForm(PlaybackEngine engine, ITransitionStore store, PostingSink sink, Func<AudioOutputMode?> outputModeInUse)
+    public MainForm(PlaybackEngine engine, PostingSink sink, Func<AudioOutputMode?> outputModeInUse)
     {
         _engine = engine;
         _outputModeInUse = outputModeInUse;
@@ -296,7 +295,7 @@ internal sealed class MainForm : Form
             }
         };
 
-        _editor = new TransitionEditorPanel(engine, store, ShowNotice, ChooseRenderPath, a => AskUnsavedEdits(a));
+        _editor = new TransitionEditorPanel(engine, ShowNotice, ChooseRenderPath, a => AskUnsavedEdits(a));
 
         // Docking order: right-docked editor and bottom strip first, the fill-docked list last.
         Controls.Add(_queueList);

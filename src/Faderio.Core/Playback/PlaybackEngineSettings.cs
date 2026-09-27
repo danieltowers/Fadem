@@ -19,7 +19,8 @@ public sealed partial class PlaybackEngine
     /// (build issue 13). The output mode is saved for the next launch: the engine rate is fixed
     /// at launch (ADR 0008).
     /// N out of range is brought into it. The outcome is a notice, as for authoring: saved, or
-    /// not saved and why, and then nothing changes.</summary>
+    /// not saved and why, and then nothing changes. With no library open there is nowhere to
+    /// save them, so nothing changes.</summary>
     public void ChangeSettings(PlayerSettings settings)
     {
         ThrowIfDisposed();
@@ -29,6 +30,11 @@ public sealed partial class PlaybackEngine
             var next = settings.Normalised();
             if (next == _settings)
             {
+                return;
+            }
+            if (_store is null)
+            {
+                RaiseNotice($"Not saved: settings. {NoLibrary}");
                 return;
             }
             try

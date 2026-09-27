@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Runtime.ExceptionServices;
 using Faderio.App;
 using Faderio.Core.Domain;
+using Faderio.Core.Persistence;
 using Faderio.Core.Playback;
 using Faderio.Core.Queue;
 using Faderio.Core.Settings;
@@ -22,26 +23,27 @@ public sealed class HeadlessFormTests
     private sealed class Harness : IDisposable
     {
         public string TempDir { get; } = Path.Combine(Path.GetTempPath(), "faderio-app", Guid.NewGuid().ToString("N"));
+        public Library Library { get; }
         public FakeAudioOutput Output { get; }
         public JsonTransitionStore Store { get; }
         public PlaybackEngine Engine { get; }
         public MainForm Form { get; }
         public IEngineSink Sink { get; }
-        public string SettingsPath { get; }
+        public string SettingsPath => Library.SettingsPath;
 
         /// <param name="inUse">The mode the output opened in, as the NAudio adapter reports it.</param>
         public Harness(int latency = 0, AudioOutputMode? inUse = AudioOutputMode.WasapiShared)
         {
             Directory.CreateDirectory(TempDir);
             Output = new FakeAudioOutput { Latency = latency };
-            Store = new JsonTransitionStore(Path.Combine(TempDir, "transitions.json"));
+            Library = Library.Open(TempDir);
+            Store = Library.Transitions!;
             var sink = new PostingSink(null); // inline: no message pump in a headless test
             Sink = sink;
             // The add worker runs inline, so an add completes on this STA thread and the inline
             // sink never touches a control from another thread.
-            SettingsPath = Path.Combine(TempDir, "settings.json");
-            Engine = new PlaybackEngine(Output, Store, sink, new SettingsStore(SettingsPath)) { StartAddWorker = work => work() };
-            Form = new MainForm(Engine, Store, sink, () => inUse);
+            Engine = new PlaybackEngine(Output, Library, sink) { StartAddWorker = work => work() };
+            Form = new MainForm(Engine, sink, () => inUse);
         }
 
         public void Dispose()
@@ -641,7 +643,7 @@ public sealed class HeadlessFormTests
         Click(editor._save);
 
         Assert.Null(h.Store.Get(a, b));
-        Assert.DoesNotContain("alpha", File.ReadAllText(Path.Combine(h.TempDir, "transitions.json")));
+        Assert.DoesNotContain("alpha", File.ReadAllText(h.Library.TransitionsPath));
     });
 
     [Fact]
@@ -1860,7 +1862,7 @@ public sealed class HeadlessFormTests
         h.Form.EditTransitionAt(0);
         Fill(h.Form._editor, "1.5", "0.5", "0", "0.5");
         Click(h.Form._editor._save);
-        var path = Path.Combine(h.TempDir, "transitions.json");
+        var path = h.Library.TransitionsPath;
         File.SetAttributes(path, FileAttributes.ReadOnly);
         try
         {

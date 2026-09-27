@@ -99,7 +99,7 @@ public sealed partial class PlaybackEngine
         ThrowIfDisposed();
         return Run(() =>
         {
-            var stored = _store.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath) is { IsBlank: false } s ? s : null;
+            var stored = _store?.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath) is { IsBlank: false } s ? s : null;
             if (stored is null || draft.IsBlank)
             {
                 return stored is null && draft.IsBlank;
@@ -114,7 +114,7 @@ public sealed partial class PlaybackEngine
     public TransitionSpec? Transition(Adjacency adjacency)
     {
         ThrowIfDisposed();
-        return Run(() => _store.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath));
+        return Run(() => _store?.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath));
     }
 
     /// <summary>Upserts the transition and, if the adjacency's boundary is pending in the current
@@ -132,6 +132,11 @@ public sealed partial class PlaybackEngine
         return Run(() =>
         {
             ObserveClock();
+            if (_store is null)
+            {
+                RaiseNotice($"Not saved: {adjacency.Name}. {NoLibrary}");
+                return (IReadOnlyList<Refusal>)[];
+            }
             if (spec.IsBlank)
             {
                 if (!RemoveTransition(adjacency))
@@ -178,6 +183,11 @@ public sealed partial class PlaybackEngine
     /// removed; a failed write is a notice and false.</summary>
     private bool RemoveTransition(Adjacency adjacency)
     {
+        if (_store is null)
+        {
+            RaiseNotice($"Not removed: {adjacency.Name}. {NoLibrary}");
+            return false;
+        }
         bool removed;
         try
         {
@@ -207,7 +217,7 @@ public sealed partial class PlaybackEngine
     {
         if (!_authoredPairs.TryGetValue((outgoing.Id, incoming.Id), out var authored))
         {
-            authored = _store.Get(outgoing.Track.FilePath, incoming.Track.FilePath) is { IsBlank: false };
+            authored = _store?.Get(outgoing.Track.FilePath, incoming.Track.FilePath) is { IsBlank: false };
             _authoredPairs[(outgoing.Id, incoming.Id)] = authored;
         }
         return authored;
@@ -254,6 +264,19 @@ public sealed partial class PlaybackEngine
         return point.FromEnd
             ? $"The {name}, measured from the end, is longer than {title}, which is {track.Length} long."
             : $"The {name} is past the end of {title}, which is {track.Length} long.";
+    }
+
+    /// <summary>Why there is no store to author in, worded for the user.</summary>
+    private string NoLibrary => _library is { UnavailableReason: { } reason } library
+        ? $"The library {library.Name} could not be opened ({reason})."
+        : "No library is open.";
+
+    /// <summary>Renders the adjacency's boundary to a WAV file as the open library has it: the
+    /// editor's Render button (ticket 06). With no library it renders as unauthored.</summary>
+    public RenderReport RenderBoundary(Adjacency adjacency, string wavPath)
+    {
+        ThrowIfDisposed();
+        return Renderer.RenderBoundary(adjacency, _store, wavPath);
     }
 
     /// <summary>What a file write can throw, as <see cref="SaveAsPlaylist"/> catches it.</summary>

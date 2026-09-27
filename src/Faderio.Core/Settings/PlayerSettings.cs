@@ -23,8 +23,8 @@ public enum UnauthoredAdjacency
 }
 
 /// <summary>
-/// The player's three settings (wayfinder ticket 10), persisted as JSON at
-/// %APPDATA%\faderio\settings.json; missing keys fall back to these built-in defaults. The
+/// The player's three settings (wayfinder ticket 10), persisted as JSON in the library's
+/// .faderio\settings.json (ADR 0011); missing keys fall back to these built-in defaults. The
 /// output mode takes effect at the next launch (ADR 0008); the others at once.
 /// </summary>
 public sealed record PlayerSettings

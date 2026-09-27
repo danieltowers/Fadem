@@ -1,4 +1,5 @@
 using Faderio.Core.Domain;
+using Faderio.Core.Persistence;
 using Faderio.Core.Playback;
 using Faderio.Core.Settings;
 using Faderio.Core.Transitions;
@@ -6,17 +7,19 @@ using Faderio.Core.Transitions;
 namespace Faderio.Core.Tests;
 
 /// <summary>
-/// Builds a full engine on the fake output with a temp-dir JSON store and a
+/// Builds a full engine on the fake output with a temp library folder and a
 /// <see cref="RecordingSink"/>. Everything a test observes comes through the seam: the view,
 /// the recorded publications, the notices and the rendered blocks.
 /// </summary>
 public sealed class TestEngine : IDisposable
 {
+    /// <summary>The library folder, deleted with the engine.</summary>
     public string TempDir { get; }
+    public Library Library { get; }
     public FakeAudioOutput Output { get; }
     public JsonTransitionStore Store { get; }
-    /// <summary>The engine's settings.json, in the temp dir.</summary>
-    public string SettingsPath { get; }
+    /// <summary>The library's settings.json.</summary>
+    public string SettingsPath => Library.SettingsPath;
     public RecordingSink Sink { get; } = new();
     public PlaybackEngine Engine { get; }
 
@@ -27,16 +30,15 @@ public sealed class TestEngine : IDisposable
     {
         TempDir = tempDir;
         Directory.CreateDirectory(tempDir);
-        SettingsPath = Path.Combine(tempDir, "settings.json");
-        var settingsStore = new SettingsStore(SettingsPath);
+        Library = Library.Open(tempDir);
         if (settings is not null)
         {
-            settingsStore.Save(settings);
+            Library.Settings!.Save(settings);
         }
-        Store = new JsonTransitionStore(Path.Combine(tempDir, "transitions.json"));
+        Store = Library.Transitions!;
         Output = new FakeAudioOutput { Latency = latency };
         Sink.OnChanged = _ => EmittedAtPublication.Add(Output.FramesEmitted.Count);
-        Engine = new PlaybackEngine(Output, Store, Sink, settingsStore, rng);
+        Engine = new PlaybackEngine(Output, Library, Sink, rng);
         if (!backgroundAdd)
         {
             Engine.StartAddWorker = work => work();

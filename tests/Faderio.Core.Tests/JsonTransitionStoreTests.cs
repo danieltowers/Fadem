@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Faderio.Core.Domain;
+using Faderio.Core.Persistence;
 using Faderio.Core.Transitions;
 
 namespace Faderio.Core.Tests;
@@ -13,7 +14,7 @@ public sealed class JsonTransitionStoreTests : IDisposable
     {
         _dir = Path.Combine(Path.GetTempPath(), "faderio-store", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_dir);
-        _path = Path.Combine(_dir, "transitions.json");
+        _path = Library.Open(_dir).TransitionsPath; // where a library keeps it
     }
 
     public void Dispose()

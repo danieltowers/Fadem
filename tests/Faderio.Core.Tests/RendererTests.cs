@@ -65,6 +65,35 @@ public sealed class RendererTests
     }
 
     [Fact]
+    public void TheEngine_RendersABoundaryAsItsLibraryHasIt()
+    {
+        // The editor's Render button (library issue 01): the engine hands the renderer its store.
+        using var tc = TestEngine.Create();
+        var a = TestAudio.WriteDcWav("a.wav", 4, 0.4);
+        var b = TestAudio.WriteDcWav("b.wav", 4, 0.2);
+        tc.Store.Upsert(a, b, FadeAt1500ms);
+        var adjacency = new Adjacency(tc.TrackOf(a), tc.TrackOf(b));
+
+        var report = tc.Engine.RenderBoundary(adjacency, Path.Combine(tc.TempDir, "engine.wav"));
+
+        Assert.Equal(1500, report.FadeOutPointInFile.Milliseconds); // pre-roll reaches back to 0.0 s
+    }
+
+    [Fact]
+    public void AnEngineWithNoLibrary_RendersTheBoundaryUnauthored()
+    {
+        using var tc = TestEngine.Create();
+        using var engine = new PlaybackEngine(new FakeAudioOutput(), store: null, new RecordingSink());
+        var a = TestAudio.WriteDcWav("a.wav", 4, 0.4);
+        var b = TestAudio.WriteDcWav("b.wav", 4, 0.2);
+        var adjacency = new Adjacency(tc.TrackOf(a), tc.TrackOf(b));
+
+        var report = engine.RenderBoundary(adjacency, Path.Combine(tc.TempDir, "none.wav"));
+
+        Assert.Equal(4000, report.FadeOutPointInFile.Milliseconds); // a hard cut at A's end
+    }
+
+    [Fact]
     public void TheFile_IsTheSameAudio_TheFakeOutputRendersInMemory()
     {
         // S3's promise: the artifact the human hears is the artifact the suite measured.

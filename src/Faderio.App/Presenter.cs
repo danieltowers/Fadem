@@ -3,7 +3,6 @@ using Faderio.Core.Domain;
 using Faderio.Core.Playback;
 using Faderio.Core.Queue;
 using Faderio.Core.Settings;
-using Faderio.Core.Transitions;
 
 using Point = Faderio.Core.Domain.Point;
 
@@ -217,36 +216,4 @@ internal static class Presenter
         "waveout" => AudioOutputMode.WaveOut,
         _ => AudioOutputMode.WasapiShared,
     };
-
-    /// <summary>Opens the transition store; a corrupt or newer-version file is reported visibly
-    /// and playback continues with a fresh store, never silently. The corrupt file is moved
-    /// aside, so recovery is visible on disk too. When it cannot be moved, it is left where it
-    /// is and the fresh store is written beside it, as for a newer version.</summary>
-    public static ITransitionStore OpenTransitionStore(string path, Action<string> warn)
-    {
-        try
-        {
-            return new JsonTransitionStore(path);
-        }
-        catch (TransitionStoreVersionException e)
-        {
-            warn(e.Message + " A fresh store will be used; your file is left untouched.");
-            return new JsonTransitionStore(path + ".recovered");
-        }
-        catch (InvalidDataException e)
-        {
-            try
-            {
-                File.Move(path, path + ".corrupt", overwrite: true);
-            }
-            catch (Exception moveFailure) when (moveFailure is IOException or UnauthorizedAccessException)
-            {
-                warn(e.Message + $" It could not be moved aside ({moveFailure.Message}), so it is left " +
-                    $"untouched and a fresh store is used in {Path.GetFileName(path)}.recovered.");
-                return new JsonTransitionStore(path + ".recovered");
-            }
-            warn(e.Message + $" It was moved aside to {Path.GetFileName(path)}.corrupt and a fresh store is used.");
-            return new JsonTransitionStore(path);
-        }
-    }
 }

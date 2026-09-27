@@ -1,6 +1,5 @@
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;
-using Faderio.Core.Transitions;
 
 using Point = Faderio.Core.Domain.Point;
 
@@ -28,7 +27,6 @@ internal enum UnsavedEdits
 internal sealed class TransitionEditorPanel : Panel
 {
     private readonly PlaybackEngine _engine;
-    private readonly ITransitionStore _store;
     private readonly Action<string> _notice;
     private readonly Func<string, string?> _chooseRenderPath;
     private readonly Func<Adjacency, UnsavedEdits> _askUnsaved;
@@ -67,11 +65,10 @@ internal sealed class TransitionEditorPanel : Panel
     }
 
     public TransitionEditorPanel(
-        PlaybackEngine engine, ITransitionStore store, Action<string> notice,
+        PlaybackEngine engine, Action<string> notice,
         Func<string, string?> chooseRenderPath, Func<Adjacency, UnsavedEdits> askUnsaved)
     {
         _engine = engine;
-        _store = store;
         _notice = notice;
         _chooseRenderPath = chooseRenderPath;
         _askUnsaved = askUnsaved;
@@ -510,7 +507,7 @@ internal sealed class TransitionEditorPanel : Panel
         }
         try
         {
-            var report = Renderer.RenderBoundary(_adjacency, _store, path);
+            var report = _engine.RenderBoundary(_adjacency, path);
             _notice($"Rendered {Presenter.Fmt(report.Rendered)} to {Path.GetFileName(report.Path)}; " +
                     $"the fade-out point is at {Presenter.FmtSeconds(Point.FromSeconds(report.FadeOutPointInFile.TotalSeconds))} s.");
         }
