@@ -1,6 +1,6 @@
 # Spec — faderio v3: interim transport fixes
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 
 ## Problem
