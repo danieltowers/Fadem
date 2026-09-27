@@ -6,9 +6,9 @@ spec and this file disagree, this file wins.** Glossary terms settled here are a
 
 ## Shape
 
-- **D1** Three specs, built in this order: [interim-transport](../202609-faderio-interim-transport/spec.md)
-  (no storage) → [library](../202609-faderio-library/spec.md) (where everything lives) →
-  [playlists](../202609-faderio-playlists/spec.md) (on top of the library).
+- **D1** Three specs, built in this order: [interim-transport](../202609-faderio-phase-2-interim-transport/spec.md)
+  (no storage) → [library](../202609-faderio-phase-2-library/spec.md) (where everything lives) →
+  [playlists](../202609-faderio-phase-2-playlists/spec.md) (on top of the library).
 - **D2** [ADR 0011](../../docs/adr/0011-the-library-folder-owns-the-store.md) records the library move.
 
 ## Transport

@@ -230,7 +230,7 @@ modal loops, which raise no idle.
 ## Addendum: Import and Export replace Open and Save as (2026-09-27)
 
 **Import playlist…** and **Export playlist…** replace the two dialogs above (D19,
-[playlists issue 03](../../.scratch/202609-faderio-playlists/issues/03-the-open-playlists-name-import-and-export.md)).
+[playlists issue 03](../../.scratch/202609-faderio-phase-2-playlists/issues/03-the-open-playlists-name-import-and-export.md)).
 Import is one command for the dialog's whole selection, `ImportPlaylists(paths)`: the engine
 copies each file into the library's playlists folder, its entries made absolute, and opens the
 last one copied. The shell never copies a file. Export is still `SaveAsPlaylist(path)`, its
@@ -240,7 +240,7 @@ dropped on the queue is added to the open one.
 ## Addendum: an override is authored as the global is, and `Transition` returns both layers (2026-09-27)
 
 `AuthorOverride(adjacency, partial)` and `UnauthorOverride(adjacency)` join `Author` and
-`Unauthor` ([playlists issue 04](../../.scratch/202609-faderio-playlists/issues/04-overrides-resolved-by-the-engine-authored-in-the-panel.md)).
+`Unauthor` ([playlists issue 04](../../.scratch/202609-faderio-phase-2-playlists/issues/04-overrides-resolved-by-the-engine-authored-in-the-panel.md)).
 They write the open playlist's override, so neither takes a playlist name: the shell never
 names the playlist a command acts on. `AuthorOverride` returns refusals in the same shape,
 checked against the effective transition (the global with the override laid over it), and a

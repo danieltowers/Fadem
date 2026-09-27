@@ -3,7 +3,7 @@
 Status: resolved
 Blocked by: 01
 
-Decided in [D21, D22, D23](../../202609-faderio-interim-improvements/decisions.md), ADR 0005.
+Decided in [D21, D22, D23](../../202609-faderio-phase-2-interim-improvements/decisions.md), ADR 0005.
 Glossary: **Transition override**.
 
 ## What happens today

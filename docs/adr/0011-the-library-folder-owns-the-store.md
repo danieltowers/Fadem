@@ -12,7 +12,7 @@ which library to open, and window geometry. Audio files may live anywhere; a pla
 still a path.
 
 Decided in the interim-improvements grilling
-([decisions D10–D13](../../.scratch/202609-faderio-interim-improvements/decisions.md)).
+([decisions D10–D13](../../.scratch/202609-faderio-phase-2-interim-improvements/decisions.md)).
 
 ## Considered options
 

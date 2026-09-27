@@ -1,7 +1,7 @@
 # Spec — faderio v3 phase 3: the playlists build's loose ends
 
 Status: ready-for-agent
-Blocked by: [playlists](../202609-faderio-playlists/spec.md)
+Blocked by: [playlists](../202609-faderio-phase-2-playlists/spec.md)
 
 ## Problem
 
@@ -9,10 +9,10 @@ The three interim specs are built. Building them left three loose ends, each rec
 was found but not fixed:
 
 - With extra columns shown, the queue's ✎ button scrolls out of view
-  ([playlists 06](../202609-faderio-playlists/issues/06-configurable-columns.md)).
+  ([playlists 06](../202609-faderio-phase-2-playlists/issues/06-configurable-columns.md)).
 - A double-click in the transition manager on a row whose other track's file is gone opens the
   editor on a track of length 0. Every save there is refused as "past its end", which is not the
-  reason ([playlists 05](../202609-faderio-playlists/issues/05-the-transition-manager.md)).
+  reason ([playlists 05](../202609-faderio-phase-2-playlists/issues/05-the-transition-manager.md)).
 - `AddTimeBudgetTests` fails about one full `dotnet test` run in three, under the load of the
   rest of the suite. Every commit message has to explain it away.
 

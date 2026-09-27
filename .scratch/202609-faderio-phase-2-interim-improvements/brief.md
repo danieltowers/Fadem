@@ -24,6 +24,6 @@
 ---
 
 Grilled 2026-09-26 → [decisions.md](decisions.md), which feeds three specs:
-[interim-transport](../202609-faderio-interim-transport/spec.md) →
-[library](../202609-faderio-library/spec.md) →
-[playlists](../202609-faderio-playlists/spec.md).
+[interim-transport](../202609-faderio-phase-2-interim-transport/spec.md) →
+[library](../202609-faderio-phase-2-library/spec.md) →
+[playlists](../202609-faderio-phase-2-playlists/spec.md).

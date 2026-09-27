@@ -3,7 +3,7 @@
 Status: ready-for-agent
 Blocked by: —
 
-Found in [playlists 06](../../202609-faderio-playlists/issues/06-configurable-columns.md)'s smoke.
+Found in [playlists 06](../../202609-faderio-phase-2-playlists/issues/06-configurable-columns.md)'s smoke.
 
 ## What happens today
 

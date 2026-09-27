@@ -1,7 +1,7 @@
 # Spec — faderio v3: the library
 
 Status: resolved
-Blocked by: [interim-transport](../202609-faderio-interim-transport/spec.md)
+Blocked by: [interim-transport](../202609-faderio-phase-2-interim-transport/spec.md)
 
 ## Problem
 
@@ -12,7 +12,7 @@ by, nothing can be carried to another machine, and a playlist is any file the us
 
 A **Library** is a folder the user chooses; everything faderio writes goes to
 `<library>/.faderio/`. Recorded in [ADR 0011](../../docs/adr/0011-the-library-folder-owns-the-store.md);
-decided as D10–D13 in [decisions.md](../202609-faderio-interim-improvements/decisions.md).
+decided as D10–D13 in [decisions.md](../202609-faderio-phase-2-interim-improvements/decisions.md).
 **When an issue and that file disagree, the decisions file wins.** Second of the three interim
 specs (D1); the playlists spec builds on this one.
 

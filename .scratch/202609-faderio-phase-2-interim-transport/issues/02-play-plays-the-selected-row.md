@@ -3,7 +3,7 @@
 Status: resolved
 Blocked by: —
 
-Decided in [D4](../../202609-faderio-interim-improvements/decisions.md).
+Decided in [D4](../../202609-faderio-phase-2-interim-improvements/decisions.md).
 
 ## What happens today
 

@@ -3,7 +3,7 @@
 Status: resolved
 Blocked by: 01
 
-Decided in [D5](../../202609-faderio-interim-improvements/decisions.md). Glossary: **Attended
+Decided in [D5](../../202609-faderio-phase-2-interim-improvements/decisions.md). Glossary: **Attended
 row** in `CONTEXT.md`.
 
 ## What happens today

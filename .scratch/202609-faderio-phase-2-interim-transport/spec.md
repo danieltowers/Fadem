@@ -13,7 +13,7 @@ point by a tenth of a second means retyping it. The editor is reached only by ri
 ## Solution
 
 Seven small vertical slices, none touching storage. Every decision is in
-[decisions.md](../202609-faderio-interim-improvements/decisions.md) (D3–D9); **when an issue
+[decisions.md](../202609-faderio-phase-2-interim-improvements/decisions.md) (D3–D9); **when an issue
 and that file disagree, the decisions file wins.** First of the three interim specs (D1).
 
 ## Rules every issue inherits

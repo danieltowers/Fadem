@@ -3,7 +3,7 @@
 Status: resolved
 Blocked by: —
 
-Decided in [D9](../../202609-faderio-interim-improvements/decisions.md). The "keeps its last
+Decided in [D9](../../202609-faderio-phase-2-interim-improvements/decisions.md). The "keeps its last
 mode" half of D9 belongs to the playlists spec, where the mode is born.
 
 ## What happens today

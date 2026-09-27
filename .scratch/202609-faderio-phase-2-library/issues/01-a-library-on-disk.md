@@ -3,7 +3,7 @@
 Status: resolved
 Blocked by: —
 
-Decided in [D10](../../202609-faderio-interim-improvements/decisions.md), ADR 0011.
+Decided in [D10](../../202609-faderio-phase-2-interim-improvements/decisions.md), ADR 0011.
 
 ## What to build
 

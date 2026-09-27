@@ -3,7 +3,7 @@
 Status: resolved
 Blocked by: —
 
-Decided in [D14, D15, D16 (join), D17, D20](../../202609-faderio-interim-improvements/decisions.md),
+Decided in [D14, D15, D16 (join), D17, D20](../../202609-faderio-phase-2-interim-improvements/decisions.md),
 ADR 0011. Amends ADR 0003's "there is no replace the queue".
 
 ## What to build

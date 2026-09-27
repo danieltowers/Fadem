@@ -1,7 +1,7 @@
 # Spec — faderio v3: playlists, overrides and the manager
 
 Status: resolved
-Blocked by: [library](../202609-faderio-library/spec.md)
+Blocked by: [library](../202609-faderio-phase-2-library/spec.md)
 
 ## Problem
 
@@ -13,7 +13,7 @@ how one track meets every other. The queue shows four fixed columns.
 ## Solution
 
 Six slices on top of the library. Decided as D14–D25 in
-[decisions.md](../202609-faderio-interim-improvements/decisions.md); **when an issue and that
+[decisions.md](../202609-faderio-phase-2-interim-improvements/decisions.md); **when an issue and that
 file disagree, the decisions file wins.** Third of the three interim specs (D1). Glossary:
 **Playlist**, **Queue**, **Transition override** in `CONTEXT.md`.
 

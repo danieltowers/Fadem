@@ -3,7 +3,7 @@
 Status: resolved
 Blocked by: 03
 
-Decided in [D11](../../202609-faderio-interim-improvements/decisions.md), Q34.
+Decided in [D11](../../202609-faderio-phase-2-interim-improvements/decisions.md), Q34.
 
 ## What to build
 
