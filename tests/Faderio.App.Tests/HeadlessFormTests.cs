@@ -1696,13 +1696,13 @@ public sealed partial class HeadlessFormTests
     private static void ClickEditButton(ListView list, int index)
     {
         _ = list.Handle;
-        var cell = list.Items[index].SubItems[MainForm.EditColumn].Bounds;
+        var cell = list.Items[index].SubItems[list.Columns.Count - 1].Bounds;
         var args = new MouseEventArgs(MouseButtons.Left, 1, cell.X + cell.Width / 2, cell.Y + cell.Height / 2, 0);
         typeof(Control).GetMethod("OnMouseClick", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
     }
 
     private static string[] EditGlyphs(ListView list) =>
-        list.Items.Cast<ListViewItem>().Select(i => i.SubItems[MainForm.EditColumn].Text).ToArray();
+        list.Items.Cast<ListViewItem>().Select(i => i.SubItems[list.Columns.Count - 1].Text).ToArray();
 
     [Fact]
     public void TheRowButton_OpensThisToNext_AsTheMenuDoes() => RunSta(() =>
@@ -1725,7 +1725,7 @@ public sealed partial class HeadlessFormTests
         using var h = new Harness();
         ThreeQueued(h);
 
-        Assert.Equal(MainForm.EditColumn, h.Form._queueList.Columns.Count - 1);
+        Assert.Equal(h.Form.EditColumn, h.Form._queueList.Columns.Count - 1);
         Assert.Equal(new[] { "✎", "✎", "" }, EditGlyphs(h.Form._queueList));
 
         h.Engine.SetRepeat(RepeatMode.All); // the last row has a this → next, but no button (D9)
@@ -1746,7 +1746,7 @@ public sealed partial class HeadlessFormTests
             FadeOutDuration = TimeSpan.FromSeconds(0.5),
         });
 
-        var cells = h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.SubItems[MainForm.EditColumn]).ToArray();
+        var cells = h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.SubItems[h.Form.EditColumn]).ToArray();
         Assert.True(cells[0].Font.Bold);
         Assert.Equal(SystemColors.WindowText, cells[0].ForeColor);
         Assert.False(cells[1].Font.Bold);
@@ -1786,7 +1786,7 @@ public sealed partial class HeadlessFormTests
         var title = h.Form._queueList.Items[1].SubItems[1].Bounds;
 
         Assert.Null(h.Form.EditButtonAt(new System.Drawing.Point(title.X + 4, title.Y + 4)));
-        Assert.Equal(1, h.Form.EditButtonAt(h.Form._queueList.Items[1].SubItems[MainForm.EditColumn].Bounds.Location + new Size(4, 4)));
+        Assert.Equal(1, h.Form.EditButtonAt(h.Form._queueList.Items[1].SubItems[h.Form.EditColumn].Bounds.Location + new Size(4, 4)));
     });
 
     [Fact]

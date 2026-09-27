@@ -334,7 +334,7 @@ public sealed partial class PlaybackEngine
     private static (Track? Track, Rejection? Rejection) ResolveFromDisk(string path)
     {
         var rejection = AudioProbe.Probe(path, out var probed);
-        return rejection is not null ? (null, rejection) : (TrackMetadataReader.Read(path, probed!.Length), null);
+        return rejection is not null ? (null, rejection) : (TrackMetadataReader.Read(path, probed!.Length, probed.Shape), null);
     }
 
     private AddProgress? Adding => _addTotal == 0 ? null : new AddProgress(_addResolved, _addTotal);

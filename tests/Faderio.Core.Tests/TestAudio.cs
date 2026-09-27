@@ -89,6 +89,27 @@ public static class TestAudio
     /// decode; a tone would match every cycle. Paul Kellet's three-pole filter over seeded
     /// white noise, so the same seed is the same file. Mirrors ffmpeg's <c>anoisesrc</c> for
     /// the checked-in fixtures.</summary>
+    /// <summary>A copy of the 2 s 44.1 kHz 16-bit stereo tone FLAC, tagged as a user's library
+    /// would be: title "Quiet Song", artist "Example Band", and the album and ReplayGain track gain given, if any
+    /// (playlists issue 06).</summary>
+    public static string WriteTaggedFlac(string name, string? album, string? replayGain)
+    {
+        Directory.CreateDirectory(Dir);
+        var path = Path.Combine(Dir, $"{Path.GetFileNameWithoutExtension(name)}-{Interlocked.Increment(ref _fileCounter)}.flac");
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "Fixtures", "tone-44100-16-2.flac"), path);
+        using var file = TagLib.File.Create(path);
+        file.Tag.Title = "Quiet Song";
+        file.Tag.Performers = ["Example Band"];
+        file.Tag.Album = album;
+        if (replayGain is not null)
+        {
+            var xiph = (TagLib.Ogg.XiphComment)file.GetTag(TagLib.TagTypes.Xiph, create: true);
+            xiph.SetField(TrackMetadataReader.ReplayGainTrackGainKey, replayGain);
+        }
+        file.Save();
+        return path;
+    }
+
     public static double[] PinkNoise(long frames, int seed = 42, double peak = 0.5)
     {
         var rng = new Random(seed);

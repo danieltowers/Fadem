@@ -10,9 +10,10 @@ internal static class TrackMetadataReader
 {
     public const string ReplayGainTrackGainKey = "REPLAYGAIN_TRACK_GAIN";
 
-    /// <summary>Title, artist and ReplayGain from the tags. Length is not read here: the probe
-    /// issues it from the stream header (ADR 0010), so a track has exactly one length.</summary>
-    public static Track Read(string filePath, Length length)
+    /// <summary>Title, artist, album and ReplayGain from the tags. Length and format are not read
+    /// here: the probe issues both from the stream header (ADR 0010), so a track has exactly one
+    /// length, and the caller passes them in.</summary>
+    public static Track Read(string filePath, Length length, AudioShape format)
     {
         try
         {
@@ -23,14 +24,16 @@ internal static class TrackMetadataReader
                 FilePath = filePath,
                 Title = string.IsNullOrWhiteSpace(tag.Title) ? Path.GetFileNameWithoutExtension(filePath) : tag.Title,
                 Artist = tag.FirstPerformer ?? "",
+                Album = tag.Album ?? "",
                 Length = length,
+                Format = format,
                 ReplayGainDb = ReadReplayGainDb(file),
             };
         }
         catch (Exception e) when (e is TagLib.CorruptFileException or TagLib.UnsupportedFormatException)
         {
             // Tags are a convenience; a file whose tags cannot be read still plays under its name.
-            return new Track { FilePath = filePath, Title = Path.GetFileNameWithoutExtension(filePath), Length = length };
+            return new Track { FilePath = filePath, Title = Path.GetFileNameWithoutExtension(filePath), Length = length, Format = format };
         }
     }
 

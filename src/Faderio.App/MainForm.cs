@@ -20,10 +20,11 @@ namespace Faderio.App;
 /// title (library issue 02), the window opening where it was closed (library issue 03), and the
 /// playlist sidebar on the left (playlists issue 02), the open playlist named above the queue
 /// and in the title (playlists issue 03), and Transitions…, which opens the transition manager,
-/// as the queue's menu does on a row's track (playlists issue 05). It renders
-/// <see cref="PlayerView"/>s and issues commands; it holds no engine state between calls (the
-/// placement rule in CLAUDE.md). The seek bar's Maximum is the track length in milliseconds, so
-/// no scaling exists to get wrong (ticket 06).
+/// as the queue's menu does on a row's track (playlists issue 05), and the queue's columns, chosen
+/// from the header's menu, dragged into order and sized, kept per library (playlists issue 06). It
+/// renders <see cref="PlayerView"/>s and issues commands; it holds no engine state between calls
+/// (the placement rule in CLAUDE.md). The seek bar's Maximum is the track length in milliseconds,
+/// so no scaling exists to get wrong (ticket 06).
 /// </summary>
 internal sealed class MainForm : Form
 {
@@ -79,6 +80,23 @@ internal sealed class MainForm : Form
 
     private long _shownQueue = -1;
 
+    /// <summary>The header's menu: a tick for each column (playlists issue 06).</summary>
+    internal readonly ContextMenuStrip _columnMenu;
+    private readonly System.Windows.Forms.Timer _saveColumns;
+
+    /// <summary>The columns shown and where their layout is kept: view state, the shell's own, as
+    /// the window's geometry is. The file is the open library's, or none without one.</summary>
+    private ColumnLayout _columns;
+    private string? _columnsFile;
+    private bool _columnsRead;
+    private bool _columnsChanged;
+    private bool _buildingColumns;
+
+    /// <summary>The width the shell last gave each column. The list reports every width change,
+    /// among them its own replay of these when its handle is made, so only a width that differs
+    /// is one the user dragged.</summary>
+    private readonly Dictionary<QueueColumn, int> _widthsSet = new();
+
     /// <param name="outputModeInUse">The mode the output opened in, or null when none could be:
     /// the output adapter's, for the settings dialog.</param>
     /// <param name="windowFile">The machine's window.json: where the window opens, and where it
@@ -102,7 +120,7 @@ internal sealed class MainForm : Form
 
         Text = "faderio";
         // The sidebar's 200 px on top of what the queue and the editor need: at the least width the
-        // queue still shows every column, the row buttons in view.
+        // queue still shows the default columns, the row buttons in view.
         MinimumSize = new Size(960, 480);
         Size = new Size(1240, 600);
         StartPosition = FormStartPosition.CenterScreen;
@@ -186,12 +204,10 @@ internal sealed class MainForm : Form
             AllowDrop = true,
             ShowItemToolTips = true,
         };
-        _queueList.Columns.Add("#", 48);
-        _queueList.Columns.Add("Title", 320);
-        _queueList.Columns.Add("Artist", 200);
-        _queueList.Columns.Add("Length", 70, HorizontalAlignment.Right);
-        // The editor button (interim transport 07): fixed, never one of the columns a user sizes.
-        _queueList.Columns.Add("", 28, HorizontalAlignment.Center);
+        // The columns (playlists issue 06): the default four until the library's own layout is
+        // read, at the first render.
+        _columns = ColumnLayout.Default;
+        BuildColumns();
         _queueList.ColumnWidthChanging += (_, e) =>
         {
             if (e.ColumnIndex == EditColumn)
@@ -199,7 +215,44 @@ internal sealed class MainForm : Form
                 e.NewWidth = _queueList.Columns[EditColumn].Width;
                 e.Cancel = true;
             }
+            else if (e.NewWidth < ColumnLayout.MinWidth)
+            {
+                // Dragged shut, a column is hidden without a tick to say so; the header menu hides.
+                e.NewWidth = ColumnLayout.MinWidth;
+                e.Cancel = true;
+            }
         };
+        // A header dragged to a new place: the layout moves it and the columns are made again in
+        // its order, so # stays first and the editor button last. The list is not left to move it.
+        _queueList.ColumnReordered += (_, e) =>
+        {
+            e.Cancel = true;
+            if (e.Header?.Tag is QueueColumn column)
+            {
+                var to = e.NewDisplayIndex;
+                BeginInvoke(() => MoveColumn(column, to));
+            }
+        };
+        _columnMenu = new ContextMenuStrip();
+        foreach (var column in Enum.GetValues<QueueColumn>())
+        {
+            var item = new ToolStripMenuItem(Presenter.ColumnHeading(column))
+            {
+                Tag = column,
+                Enabled = column != QueueColumn.Number, // # is always shown
+            };
+            item.Click += (_, _) => ToggleColumn(column);
+            _columnMenu.Items.Add(item);
+        }
+        _columnMenu.Opening += (_, _) =>
+        {
+            foreach (ToolStripMenuItem item in _columnMenu.Items)
+            {
+                item.Checked = _columns[(QueueColumn)item.Tag!].Visible;
+            }
+        };
+        _saveColumns = new System.Windows.Forms.Timer { Interval = 400 };
+        _saveColumns.Tick += (_, _) => SaveColumns();
         // The title takes what the other columns leave, so the button stays at the far right
         // at any width, not scrolled out of sight.
         _queueList.Resize += (_, _) =>
@@ -217,7 +270,22 @@ internal sealed class MainForm : Form
         };
         _queueList.ColumnWidthChanged += (_, e) =>
         {
-            if (e.ColumnIndex != TitleColumn && e.ColumnIndex != ArtistColumn)
+            if (_buildingColumns || _queueList.Columns[e.ColumnIndex].Tag is not QueueColumn column)
+            {
+                return;
+            }
+            // The user's width, kept; one the fit gives the title or takes from the artist is not.
+            var width = _queueList.Columns[e.ColumnIndex].Width;
+            if (_widthsSet.GetValueOrDefault(column) != width && _columns[column].Width != width)
+            {
+                _widthsSet[column] = width;
+                _columns = _columns.Resize(column, width);
+                _columnsChanged = true;
+                // A drag changes the width at every step, so the file is written once it rests.
+                _saveColumns.Stop();
+                _saveColumns.Start();
+            }
+            if (column is not QueueColumn.Title and not QueueColumn.Artist)
             {
                 FitColumns();
             }
@@ -242,8 +310,17 @@ internal sealed class MainForm : Form
         {
             Items = { _editNext, _editPrevious, _editSelf, _transitionsForTrack, new ToolStripSeparator(), _removeRows, _clearQueue },
         };
-        menu.Opening += (_, _) =>
+        menu.Opening += (_, e) =>
         {
+            // The list shows its menu for a right-click on the header too: there, the columns'.
+            if (IsOverHeader(Cursor.Position))
+            {
+                // Shown once this menu's opening is over: shown from inside it, it closes at once.
+                e.Cancel = true;
+                var at = Cursor.Position;
+                BeginInvoke(() => _columnMenu.Show(at));
+                return;
+            }
             var adjacencies = SelectedAdjacencies();
             _editNext.Enabled = adjacencies.Next is not null;
             _editPrevious.Enabled = adjacencies.Previous is not null;
@@ -369,6 +446,8 @@ internal sealed class MainForm : Form
                 return;
             }
             _timer.Stop();
+            SaveColumns(); // a width still settling
+            _saveColumns.Dispose();
             _tips.Dispose();
             if (_windowFile is not null)
             {
@@ -421,11 +500,22 @@ internal sealed class MainForm : Form
         ShowTip(_shuffle, Presenter.ShuffleTip(view.Shuffle));
         ShowTip(_repeat, Presenter.RepeatTip(view.Repeat));
 
+        var columnsFile = ColumnLayout.FileIn(view.Library);
+        if (!_columnsRead || columnsFile != _columnsFile)
+        {
+            // Another library, or the first render: the layout left is written, and this one read.
+            SaveColumns();
+            _columnsFile = columnsFile;
+            _columnsRead = true;
+            ShowColumns(columnsFile is null ? ColumnLayout.Default : ColumnLayout.Load(columnsFile));
+            _shownQueue = -1;
+        }
         if (view.QueueVersion != _shownQueue)
         {
-            RebuildRows(view);
+            RebuildRows(view, SelectedRows());
             _shownQueue = view.QueueVersion;
         }
+        var editColumn = EditColumn;
         for (var i = 0; i < _queueList.Items.Count && i < view.Queue.Count; i++)
         {
             var row = view.Queue[i];
@@ -444,13 +534,13 @@ internal sealed class MainForm : Form
                 {
                     cell.BackColor = back;
                 }
-                var cellFore = cell == item.SubItems[EditColumn] && !authored ? SystemColors.GrayText : fore;
+                var cellFore = cell == item.SubItems[editColumn] && !authored ? SystemColors.GrayText : fore;
                 if (cell.ForeColor != cellFore)
                 {
                     cell.ForeColor = cellFore;
                 }
             }
-            var button = item.SubItems[EditColumn];
+            var button = item.SubItems[editColumn];
             var glyph = Presenter.EditGlyph(row.NextAuthored, isLast: i == view.Queue.Count - 1);
             if (button.Text != glyph)
             {
@@ -519,11 +609,11 @@ internal sealed class MainForm : Form
     /// <summary>A background add publishes once per file, so rows the list already shows in
     /// the same places are kept and only the new ones are made: a whole library would otherwise
     /// rebuild the list once per file, and the window would stop answering.</summary>
-    private void RebuildRows(PlayerView view)
+    private void RebuildRows(PlayerView view, IReadOnlySet<RowId> selected)
     {
         _queueList.BeginUpdate();
         // A row keeps its selection wherever it moves to.
-        var selected = _queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToHashSet();
+        var shown = _columns.Shown;
         var kept = 0;
         while (kept < _queueList.Items.Count && kept < view.Queue.Count && RowOf(_queueList.Items[kept]) == view.Queue[kept].Id)
         {
@@ -535,15 +625,131 @@ internal sealed class MainForm : Form
         }
         foreach (var row in view.Queue.Skip(kept))
         {
+            // # is the row's own text; each other column shown is a cell, then the editor button.
             var item = new ListViewItem((++kept).ToString()) { Tag = row.Id, UseItemStyleForSubItems = false };
-            item.SubItems.Add(string.IsNullOrEmpty(row.Track.Title) ? Path.GetFileName(row.Track.FilePath) : row.Track.Title);
-            item.SubItems.Add(row.Track.Artist);
-            item.SubItems.Add(Presenter.Fmt(row.Track.Length));
+            foreach (var column in shown.Skip(1))
+            {
+                item.SubItems.Add(Presenter.QueueCell(column.Column, row.Track));
+            }
             item.SubItems.Add(""); // the editor button, drawn by Render
             _queueList.Items.Add(item);
             item.Selected = selected.Contains(row.Id);
         }
         _queueList.EndUpdate();
+    }
+
+    private IReadOnlySet<RowId> SelectedRows() =>
+        _queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToHashSet();
+
+    // ── Columns (playlists issue 06): shell view state, kept per library ────────────────
+
+    /// <summary>Makes the header's columns from the layout: the ones shown, in its order, at its
+    /// widths, then the editor button.</summary>
+    private void BuildColumns()
+    {
+        _buildingColumns = true;
+        try
+        {
+            _queueList.Columns.Clear();
+            _widthsSet.Clear();
+            foreach (var setting in _columns.Shown)
+            {
+                _widthsSet[setting.Column] = setting.Width;
+                var header = _queueList.Columns.Add(Presenter.ColumnHeading(setting.Column), setting.Width, AlignmentOf(setting.Column));
+                header.Tag = setting.Column;
+            }
+            // The editor button (interim transport 07): fixed at the far right, never one of the
+            // columns a user shows, sizes or moves.
+            _queueList.Columns.Add("", 28, HorizontalAlignment.Center);
+            _queueList.AllowColumnReorder = true;
+        }
+        finally
+        {
+            _buildingColumns = false;
+        }
+        FitColumns();
+    }
+
+    private static HorizontalAlignment AlignmentOf(QueueColumn column) =>
+        column is QueueColumn.Length or QueueColumn.ReplayGain ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+
+    /// <summary>Shows <paramref name="layout"/>: the rows are made again, since each has a cell per
+    /// column shown, and keep their selection.</summary>
+    private void ShowColumns(ColumnLayout layout)
+    {
+        var selected = SelectedRows();
+        _columns = layout;
+        _queueList.BeginUpdate();
+        _queueList.Items.Clear();
+        BuildColumns();
+        _queueList.EndUpdate();
+        RebuildRows(_engine.View, selected);
+        _shownQueue = _engine.View.QueueVersion;
+    }
+
+    /// <summary>A tick in the header's menu: the column shows or hides, and the layout is written.</summary>
+    internal void ToggleColumn(QueueColumn column) => ChangeColumns(_columns.Toggle(column));
+
+    /// <summary>A header dropped at <paramref name="displayIndex"/>: # stays first and the editor
+    /// button last, so a drop on either lands beside it.</summary>
+    internal void MoveColumn(QueueColumn column, int displayIndex) => ChangeColumns(_columns.Move(column, displayIndex));
+
+    private void ChangeColumns(ColumnLayout layout)
+    {
+        if (layout.Same(_columns))
+        {
+            return;
+        }
+        ShowColumns(layout);
+        Render();
+        _columnsChanged = true;
+        SaveColumns();
+    }
+
+    /// <summary>Writes the layout to the open library's columns.json, if a change is waiting to be.</summary>
+    internal void SaveColumns()
+    {
+        _saveColumns.Stop();
+        if (!_columnsChanged)
+        {
+            return;
+        }
+        _columnsChanged = false;
+        if (_columnsFile is not null)
+        {
+            _columns.Save(_columnsFile);
+        }
+    }
+
+    /// <summary>Whether a point on screen is on the queue's header, where a right-click asks for
+    /// the columns rather than the rows.</summary>
+    private bool IsOverHeader(System.Drawing.Point screen)
+    {
+        if (!_queueList.IsHandleCreated)
+        {
+            return false;
+        }
+        var header = NativeMethods.SendMessage(_queueList.Handle, NativeMethods.LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero);
+        return header != IntPtr.Zero && NativeMethods.GetWindowRect(header, out var bounds)
+            && screen.X >= bounds.Left && screen.X < bounds.Right && screen.Y >= bounds.Top && screen.Y < bounds.Bottom;
+    }
+
+    private static class NativeMethods
+    {
+        public const int LVM_GETHEADER = 0x1000 + 31;
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        public struct Rect
+        {
+            public int Left, Top, Right, Bottom;
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        public static extern bool GetWindowRect(IntPtr window, out Rect rect);
     }
 
     /// <summary>Every notice, the engine's and the shell's own, goes into the session's list;
@@ -801,31 +1007,42 @@ internal sealed class MainForm : Form
 
     internal static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
 
-    /// <summary>The queue's last column: each row's editor button (interim transport 07).</summary>
-    internal const int EditColumn = 4;
+    /// <summary>The queue's last column: each row's editor button (interim transport 07), after
+    /// every column shown (playlists issue 06).</summary>
+    internal int EditColumn => _queueList.Columns.Count - 1;
 
-    private const int TitleColumn = 1;
-    private const int ArtistColumn = 2;
     private const int MinTitleWidth = 100;
     private const int MinArtistWidth = 60;
 
     /// <summary>Sizes the title to the list's width less the other columns and room for a
     /// scroll bar, which appears without resizing the list. Where that would squeeze the title
-    /// below its least, the artist gives way first.</summary>
+    /// below its least, the artist gives way first, and takes back up to its own width as room
+    /// returns. With the title hidden, nothing fills: the columns keep their widths.</summary>
     private void FitColumns()
     {
-        var columns = _queueList.Columns;
-        var free = _queueList.ClientSize.Width - SystemInformation.VerticalScrollBarWidth
-            - columns.Cast<ColumnHeader>().Where(c => c.Index is not TitleColumn and not ArtistColumn).Sum(c => c.Width);
-        var artist = Math.Clamp(free - MinTitleWidth, MinArtistWidth, columns[ArtistColumn].Width);
-        var title = Math.Max(MinTitleWidth, free - artist);
-        if (columns[ArtistColumn].Width != artist)
+        var headers = _queueList.Columns.Cast<ColumnHeader>().ToList();
+        if (headers.Find(c => c.Tag is QueueColumn.Title) is not { } title)
         {
-            columns[ArtistColumn].Width = artist;
+            return;
         }
-        if (columns[TitleColumn].Width != title)
+        var artist = headers.Find(c => c.Tag is QueueColumn.Artist);
+        var free = _queueList.ClientSize.Width - SystemInformation.VerticalScrollBarWidth
+            - headers.Where(c => c != title && c != artist).Sum(c => c.Width);
+        if (artist is not null)
         {
-            columns[TitleColumn].Width = title;
+            var artistWidth = Math.Min(Math.Max(free - MinTitleWidth, MinArtistWidth), _columns[QueueColumn.Artist].Width);
+            _widthsSet[QueueColumn.Artist] = artistWidth;
+            if (artist.Width != artistWidth)
+            {
+                artist.Width = artistWidth;
+            }
+            free -= artistWidth;
+        }
+        var titleWidth = Math.Max(MinTitleWidth, free);
+        _widthsSet[QueueColumn.Title] = titleWidth;
+        if (title.Width != titleWidth)
+        {
+            title.Width = titleWidth;
         }
     }
 

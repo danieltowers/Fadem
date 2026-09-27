@@ -84,6 +84,16 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       under repeat-all. Clicking it opens the editor on this → next, as the menu does: the
       heading changes to that adjacency. Saving or removing the transition flips its row's ✎.
       At the 960 px minimum width it is still in view, with no sideways scroll bar.
+- [ ] A fresh library shows the queue's default four columns: #, Title, Artist, Length. A
+      right-click on the header (not on a row) shows a checklist of #, Title, Artist, Album,
+      Length, Format, Replay gain and Path, with # ticked and greyed out. Ticking Path adds a Path
+      column showing each row's full path; ticking Album, Format and Replay gain shows, for a
+      tagged FLAC, its album, "44.1 kHz / 16-bit" and "−7.2 dB" (blank where untagged). ✎ stays
+      the rightmost column; with more columns than the list's width, the list scrolls sideways
+      to it. Dragging a header moves it (never before # or after ✎), and a dragged width holds.
+      A right-click on a row still shows the row's menu. Relaunched, or after **Open library…** elsewhere and back, the
+      layout is as it was left; the other library shows its own. The file is
+      `<library>\.faderio\columns.json`.
 - [ ] With unsaved edits (a field, **From end** or the curve changed, or **Remove transition**
       pressed), opening another adjacency asks **Save / Discard / Cancel**, and so does closing
       the window. Cancel keeps the edits and stays; Discard drops them; Save saves and moves on,

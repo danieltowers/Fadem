@@ -187,6 +187,48 @@ internal static class Presenter
     /// <summary>A queue row's number, marked ⚠ while its file is unreadable (build issue 10).</summary>
     public static string RowLabel(int number, bool unreadable) => unreadable ? $"⚠ {number}" : number.ToString();
 
+    /// <summary>A queue column's heading, as the header and its menu name it (playlists issue 06).</summary>
+    public static string ColumnHeading(QueueColumn column) => column switch
+    {
+        QueueColumn.Number => "#",
+        QueueColumn.ReplayGain => "Replay gain",
+        _ => column.ToString(),
+    };
+
+    /// <summary>A queue row's cell in <paramref name="column"/>. # is the row's label, not the
+    /// track's, so it has none here.</summary>
+    public static string QueueCell(QueueColumn column, Track track) => column switch
+    {
+        QueueColumn.Title => string.IsNullOrEmpty(track.Title) ? Path.GetFileName(track.FilePath) : track.Title,
+        QueueColumn.Artist => track.Artist,
+        QueueColumn.Album => track.Album,
+        QueueColumn.Length => Fmt(track.Length),
+        QueueColumn.Format => FmtFormat(track.Format),
+        QueueColumn.ReplayGain => FmtReplayGain(track.ReplayGainDb),
+        QueueColumn.Path => track.FilePath,
+        _ => "",
+    };
+
+    /// <summary>The Format column (D25): "44.1 kHz / 16-bit"; an MP3 has no bit depth, so its rate
+    /// alone. Blank for a track never probed.</summary>
+    public static string FmtFormat(AudioShape? format) =>
+        format is null ? ""
+        : (format.SampleRate / 1000.0).ToString("0.#", CultureInfo.InvariantCulture) + " kHz"
+          + (format.BitDepth is { } depth ? $" / {depth}-bit" : "");
+
+    /// <summary>The Replay gain column (D25): the track gain to a tenth, "−7.2 dB" with a true minus
+    /// and "+1.5 dB" with a plus; blank when untagged. Display only: playback reads the value.</summary>
+    public static string FmtReplayGain(double? db)
+    {
+        if (db is not { } value)
+        {
+            return "";
+        }
+        var tenths = Math.Round(value, 1, MidpointRounding.AwayFromZero);
+        var sign = tenths < 0 ? "−" : tenths > 0 ? "+" : "";
+        return $"{sign}{Math.Abs(tenths).ToString("0.0", CultureInfo.InvariantCulture)} dB";
+    }
+
     /// <summary>A queue row's tooltip: why it is marked, and what a double-click does. Blank
     /// otherwise.</summary>
     public static string RowTip(bool unreadable) =>

@@ -275,4 +275,52 @@ public sealed class PresenterTests
             Presenter.ManagerLegend("Evening", anyTracks: true));
         Assert.Equal("No transitions are saved in this library yet.", Presenter.ManagerLegend("Evening", anyTracks: false));
     }
+
+    // ── Playlists issue 06: the queue's columns ─────────────────────────────────────────
+
+    [Theory]
+    [InlineData(AudioFormat.Flac, 44100, 16, "44.1 kHz / 16-bit")]
+    [InlineData(AudioFormat.Wav, 48000, 24, "48 kHz / 24-bit")]
+    [InlineData(AudioFormat.Flac, 96000, 24, "96 kHz / 24-bit")]
+    [InlineData(AudioFormat.Mp3, 44100, null, "44.1 kHz")] // an MP3 has no bit depth
+    public void FmtFormat_IsRateAndDepth(AudioFormat format, int rate, int? depth, string expected) =>
+        Assert.Equal(expected, Presenter.FmtFormat(new AudioShape(format, rate, depth, 2)));
+
+    [Fact]
+    public void FmtFormat_IsBlank_ForATrackNeverProbed() => Assert.Equal("", Presenter.FmtFormat(null));
+
+    [Theory]
+    [InlineData(-7.2, "−7.2 dB")] // a true minus
+    [InlineData(1.5, "+1.5 dB")]
+    [InlineData(-7.25, "−7.3 dB")]
+    [InlineData(0.0, "0.0 dB")]
+    [InlineData(-0.04, "0.0 dB")] // no minus on what reads as nothing
+    [InlineData(null, "")]        // untagged
+    public void FmtReplayGain_IsTheTrackGainToATenth(double? db, string expected) =>
+        Assert.Equal(expected, Presenter.FmtReplayGain(db));
+
+    [Fact]
+    public void QueueCell_FormatsEachColumnFromTheTrack()
+    {
+        var track = new Track
+        {
+            FilePath = @"D:\Music\Example Band\First Album\03 Closing Song.flac",
+            Title = "Closing Song",
+            Artist = "Example Band",
+            Album = "First Album",
+            Length = Length.FromFrames(44100 * 65, 44100),
+            Format = new AudioShape(AudioFormat.Flac, 44100, 16, 2),
+            ReplayGainDb = -7.2,
+        };
+
+        Assert.Equal(
+            ["", "Closing Song", "Example Band", "First Album", "1:05", "44.1 kHz / 16-bit", "−7.2 dB", @"D:\Music\Example Band\First Album\03 Closing Song.flac"],
+            Enum.GetValues<QueueColumn>().Select(c => Presenter.QueueCell(c, track)));
+        Assert.Equal("03 Closing Song.flac", Presenter.QueueCell(QueueColumn.Title, track with { Title = "" }));
+    }
+
+    [Fact]
+    public void ColumnHeading_NamesEachColumn() =>
+        Assert.Equal(["#", "Title", "Artist", "Album", "Length", "Format", "Replay gain", "Path"],
+            Enum.GetValues<QueueColumn>().Select(Presenter.ColumnHeading));
 }
