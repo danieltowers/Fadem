@@ -345,11 +345,16 @@ public sealed partial class PlaybackEngine : IDisposable
         var attended = _attendedVoice is { } av && av != _currentVoice && _voiceEntry.TryGetValue(av, out var ae)
             ? VoiceSnap.Of(av, ae)
             : null;
-        return new Snapshot(
+        if (_authoredPairs.Count > 2 * _queue.Entries.Count + 1024)
+        {
+            _authoredPairs.Clear(); // pairs of rows long since moved apart or removed
+        }
+        var snapshot = new Snapshot(
             _version, _queueVersion, TransportNow, _queue.Entries.ToImmutableArray(),
             _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null, _finishAt is not null,
             _shuffle, _repeat, Adding, _rate, _unreadable.ToImmutableHashSet(), _settings,
             _queueBase, _preview is null ? null : _mixer.Timeline, _previewOrigin, _preview?.Snap(), _clips.Snap());
+        return snapshot with { Onward = snapshot.OnwardOf(IsAuthoredPair) };
     }
 
     /// <summary>One voice's clock frozen for the view: its reference history and its length. The
@@ -379,10 +384,8 @@ public sealed partial class PlaybackEngine : IDisposable
     {
         public static VoiceSnap Of(MixerVoice voice, QueueEntry entry) => new(entry, VoiceClock.Of(voice));
 
-        public VoiceView At(long emitted, bool isCurrent, int rate, ImmutableHashSet<RowId> unreadable) =>
-            new(new QueueRow(Entry.Id, Entry.Track, isCurrent, unreadable.Contains(Entry.Id)),
-                Playhead.FromFrames(Clock.PlayheadFrames(emitted), rate),
-                Entry.Track.Length);
+        public VoiceView At(long emitted, QueueRow row, int rate) =>
+            new(row, Playhead.FromFrames(Clock.PlayheadFrames(emitted), rate), Entry.Track.Length);
     }
 
     private sealed record Snapshot(
@@ -408,6 +411,10 @@ public sealed partial class PlaybackEngine : IDisposable
         PreviewSnap? Preview,
         ClipSnap Clips)
     {
+        /// <summary>Each row's this → next, as <see cref="AdjacenciesOf"/> gives it, and whether
+        /// it is authored (interim transport 07). A row with none is absent.</summary>
+        public IReadOnlyDictionary<RowId, bool> Onward { get; init; } = new Dictionary<RowId, bool>();
+
         /// <param name="emitted">The device's count. The queue's clock is that from
         /// <see cref="QueueBase"/>; while a preview holds the queue, it stops where the queue's
         /// mixer stopped, once the device has played out what it had of the queue. The preview's
@@ -427,12 +434,12 @@ public sealed partial class PlaybackEngine : IDisposable
                 heardAlone = handedOver && !Overlap && !Finishing;
             }
             var currentRow = attended?.Entry.Id ?? CurrentRow;
-            var rows = Entries.Select(e => new QueueRow(e.Id, e.Track, e.Id == currentRow, Unreadable.Contains(e.Id))).ToList();
+            var rows = Entries.Select(e => Row(e, e.Id == currentRow)).ToList();
             var next = NextAdjacencyFrom(currentRow);
             return new PlayerView(
                 Version, QueueVersion, Transport, rows,
-                attended?.At(emitted, true, Rate, Unreadable),
-                incoming?.At(emitted, false, Rate, Unreadable),
+                attended?.At(emitted, Row(attended.Entry, true), Rate),
+                incoming?.At(emitted, Row(incoming.Entry, false), Rate),
                 Shuffle, Repeat, Adding, next,
                 CanTransitionNow: Transport == Transport.Playing && heardAlone && next is not null)
             {
@@ -440,6 +447,25 @@ public sealed partial class PlaybackEngine : IDisposable
                 Preview = preview,
                 Clip = clip,
             };
+        }
+
+        private QueueRow Row(QueueEntry entry, bool isCurrent) =>
+            new(entry.Id, entry.Track, isCurrent, Unreadable.Contains(entry.Id),
+                Onward.TryGetValue(entry.Id, out var authored) ? authored : null);
+
+        /// <summary>Builds <see cref="Onward"/>: every row's this → next, told whether
+        /// <paramref name="authored"/>.</summary>
+        public Dictionary<RowId, bool> OnwardOf(Func<QueueEntry, QueueEntry, bool> authored)
+        {
+            var onward = new Dictionary<RowId, bool>(Entries.Length);
+            for (var i = 0; i < Entries.Length; i++)
+            {
+                if (FirstReadable(i, After) is { } next)
+                {
+                    onward[Entries[i].Id] = authored(Entries[i], Entries[next]);
+                }
+            }
+            return onward;
         }
 
         private Adjacency? NextAdjacencyFrom(RowId? row) =>

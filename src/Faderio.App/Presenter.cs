@@ -124,6 +124,10 @@ internal static class Presenter
     public static string RowTip(bool unreadable) =>
         unreadable ? "Unreadable: its file could not be opened, so it is passed over. Double-click to try it again." : "";
 
+    /// <summary>A queue row's editor button (interim transport 07): on every row that has a
+    /// this → next, except the last, which has none even where repeat-all gives it one (D9).</summary>
+    public static string EditGlyph(bool? nextAuthored, bool isLast) => !isLast && nextAuthored is not null ? "✎" : "";
+
     public static string PlayPauseGlyph(Transport transport) => transport == Transport.Playing ? "⏸" : "▶";
 
     /// <summary>The main window's time readout for the attended voice, marked "Held" while a

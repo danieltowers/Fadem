@@ -11,7 +11,8 @@ namespace Faderio.App;
 /// list (build issue 02), open a playlist or save the queue as one (build issue 03), a
 /// multi-select list whose rows drag to a new place (build issue 05), a context menu that opens
 /// the editor on this → next, previous → this or, under repeat-one, this → this (build issue
-/// 15), with Remove and Clear queue (build issue 04; Delete removes too), transport with a
+/// 15) and a button at each row's far right that opens this → next (interim transport 07), with
+/// Remove and Clear queue (build issue 04; Delete removes too), transport with a
 /// shuffle toggle and a repeat button (build issue 07), a seek bar in milliseconds, the
 /// transition editor, a status strip showing the latest notice and a count that opens this
 /// session's notice list (build issue 09), a Settings… dialog (build issue 12), and the clip
@@ -176,6 +177,47 @@ internal sealed class MainForm : Form
         _queueList.Columns.Add("Title", 320);
         _queueList.Columns.Add("Artist", 200);
         _queueList.Columns.Add("Length", 70, HorizontalAlignment.Right);
+        // The editor button (interim transport 07): fixed, never one of the columns a user sizes.
+        _queueList.Columns.Add("", 28, HorizontalAlignment.Center);
+        _queueList.ColumnWidthChanging += (_, e) =>
+        {
+            if (e.ColumnIndex == EditColumn)
+            {
+                e.NewWidth = _queueList.Columns[EditColumn].Width;
+                e.Cancel = true;
+            }
+        };
+        // The title takes what the other columns leave, so the button stays at the far right
+        // at any width, not scrolled out of sight.
+        _queueList.Resize += (_, _) =>
+        {
+            if (_queueList.IsHandleCreated)
+            {
+                // Once the list has finished sizing: fitted while it sizes, it keeps a
+                // horizontal scroll bar for the wider columns it had.
+                _queueList.BeginInvoke(FitColumns);
+            }
+            else
+            {
+                FitColumns();
+            }
+        };
+        _queueList.ColumnWidthChanged += (_, e) =>
+        {
+            if (e.ColumnIndex != TitleColumn && e.ColumnIndex != ArtistColumn)
+            {
+                FitColumns();
+            }
+        };
+        // The list's own size draws the pencil at eight pixels; this size fits the row.
+        _buttonFont = new Font("Segoe UI Symbol", 11f);
+        _authoredFont = new Font(_buttonFont, FontStyle.Bold);
+        Disposed += (_, _) =>
+        {
+            // After the list, which draws with them.
+            _buttonFont.Dispose();
+            _authoredFont.Dispose();
+        };
 
         _editNext = new ToolStripMenuItem("Edit transition: this → next");
         _editPrevious = new ToolStripMenuItem("Edit transition: previous → this");
@@ -209,7 +251,21 @@ internal sealed class MainForm : Form
             }
         };
         _queueList.ContextMenuStrip = menu;
-        _queueList.DoubleClick += (_, _) => PlaySelected();
+        _queueList.MouseClick += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left && EditButtonAt(e.Location) is { } index)
+            {
+                EditTransitionAt(index);
+            }
+        };
+        // A double-click on the button is two presses of it, not a request to play the row.
+        _queueList.MouseDoubleClick += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left && EditButtonAt(e.Location) is null)
+            {
+                PlaySelected();
+            }
+        };
         // The drop line: where dragged rows will land. A ListView draws no insertion mark in
         // details view, so it is a thin panel over the list.
         _dropLine = new Panel { Height = 2, BackColor = SystemColors.Highlight, Visible = false };
@@ -323,14 +379,32 @@ internal sealed class MainForm : Form
             var back = !row.IsCurrent ? SystemColors.Window
                 : view.Transport == Transport.Stopped ? RestingMarker
                 : SystemColors.Info;
-            if (item.BackColor != back)
-            {
-                item.BackColor = back;
-            }
             var fore = row.IsUnreadable ? SystemColors.GrayText : SystemColors.WindowText;
-            if (item.ForeColor != fore)
+            // Each cell is styled on its own, for the editor button's: bold while its adjacency
+            // is authored, grey and plain while it is not.
+            var authored = row.NextAuthored == true;
+            foreach (ListViewItem.ListViewSubItem cell in item.SubItems)
             {
-                item.ForeColor = fore;
+                if (cell.BackColor != back)
+                {
+                    cell.BackColor = back;
+                }
+                var cellFore = cell == item.SubItems[EditColumn] && !authored ? SystemColors.GrayText : fore;
+                if (cell.ForeColor != cellFore)
+                {
+                    cell.ForeColor = cellFore;
+                }
+            }
+            var button = item.SubItems[EditColumn];
+            var glyph = Presenter.EditGlyph(row.NextAuthored, isLast: i == view.Queue.Count - 1);
+            if (button.Text != glyph)
+            {
+                button.Text = glyph;
+            }
+            var font = authored ? _authoredFont : _buttonFont;
+            if (button.Font != font)
+            {
+                button.Font = font;
             }
             var label = Presenter.RowLabel(i + 1, row.IsUnreadable);
             if (item.Text != label)
@@ -403,10 +477,11 @@ internal sealed class MainForm : Form
         }
         foreach (var row in view.Queue.Skip(kept))
         {
-            var item = new ListViewItem((++kept).ToString()) { Tag = row.Id };
+            var item = new ListViewItem((++kept).ToString()) { Tag = row.Id, UseItemStyleForSubItems = false };
             item.SubItems.Add(string.IsNullOrEmpty(row.Track.Title) ? Path.GetFileName(row.Track.FilePath) : row.Track.Title);
             item.SubItems.Add(row.Track.Artist);
             item.SubItems.Add(Presenter.Fmt(row.Track.Length));
+            item.SubItems.Add(""); // the editor button, drawn by Render
             _queueList.Items.Add(item);
             item.Selected = selected.Contains(row.Id);
         }
@@ -565,6 +640,45 @@ internal sealed class MainForm : Form
         (SystemColors.Info.B + SystemColors.Control.B) / 2);
 
     internal static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
+
+    /// <summary>The queue's last column: each row's editor button (interim transport 07).</summary>
+    internal const int EditColumn = 4;
+
+    private const int TitleColumn = 1;
+    private const int ArtistColumn = 2;
+    private const int MinTitleWidth = 100;
+    private const int MinArtistWidth = 60;
+
+    /// <summary>Sizes the title to the list's width less the other columns and room for a
+    /// scroll bar, which appears without resizing the list. Where that would squeeze the title
+    /// below its least, the artist gives way first.</summary>
+    private void FitColumns()
+    {
+        var columns = _queueList.Columns;
+        var free = _queueList.ClientSize.Width - SystemInformation.VerticalScrollBarWidth
+            - columns.Cast<ColumnHeader>().Where(c => c.Index is not TitleColumn and not ArtistColumn).Sum(c => c.Width);
+        var artist = Math.Clamp(free - MinTitleWidth, MinArtistWidth, columns[ArtistColumn].Width);
+        var title = Math.Max(MinTitleWidth, free - artist);
+        if (columns[ArtistColumn].Width != artist)
+        {
+            columns[ArtistColumn].Width = artist;
+        }
+        if (columns[TitleColumn].Width != title)
+        {
+            columns[TitleColumn].Width = title;
+        }
+    }
+
+    private readonly Font _buttonFont;
+    private readonly Font _authoredFont;
+
+    /// <summary>The row whose editor button is at <paramref name="location"/>, or null: a click
+    /// anywhere else on a row, or on a row that shows no button, is not a press of it.</summary>
+    internal int? EditButtonAt(System.Drawing.Point location) =>
+        _queueList.HitTest(location) is { Item: { } item, SubItem: { } cell }
+            && cell == item.SubItems[EditColumn] && cell.Text.Length > 0
+            ? item.Index
+            : null;
 
     /// <summary>The row ▶ hands the engine: the selected one when exactly one is, else none.</summary>
     private RowId? SingleSelectedRow() =>

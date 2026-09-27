@@ -14,8 +14,11 @@ public readonly record struct RowId(long Value)
 /// <summary>One row of the queue as the shell sees it. <see cref="IsCurrent"/> follows the
 /// attended voice: it flips at the audible handover, not when the incoming voice is spawned.
 /// <see cref="IsUnreadable"/> is set when the row's file could not be opened the last time the
-/// queue reached it, and clears the next time it opens (build issue 10).</summary>
-public sealed record QueueRow(RowId Id, Track Track, bool IsCurrent, bool IsUnreadable = false);
+/// queue reached it, and clears the next time it opens (build issue 10). <see cref="NextAuthored"/>
+/// is whether the row's this → next, the <see cref="RowAdjacencies.Next"/> the editor opens from
+/// it, has a transition in the store: null where the row has none, and in an
+/// <see cref="AddReport"/> (interim transport 07).</summary>
+public sealed record QueueRow(RowId Id, Track Track, bool IsCurrent, bool IsUnreadable = false, bool? NextAuthored = null);
 
 /// <summary>One voice as the shell sees it: which row, where the listener is within it, and how
 /// long it is. <see cref="Playhead"/> is audible time, derived from the frames the device has

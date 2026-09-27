@@ -1,4 +1,5 @@
 using Faderio.Core.Domain;
+using Faderio.Core.Queue;
 
 namespace Faderio.Core.Playback;
 
@@ -154,6 +155,7 @@ public sealed partial class PlaybackEngine
                 RaiseStoreWriteFailure("Not saved", adjacency, e);
                 return [];
             }
+            StoreChanged();
             RaiseNotice($"Saved {adjacency.Name}.");
             RescheduleIfPending(adjacency);
             return [];
@@ -188,10 +190,34 @@ public sealed partial class PlaybackEngine
         }
         if (removed)
         {
+            StoreChanged();
             RaiseNotice($"Removed {adjacency.Name}.");
             RescheduleIfPending(adjacency);
         }
         return removed;
+    }
+
+    /// <summary>Whether one row into another is authored, as last read from the store. A row's
+    /// track never changes, so only a write to the store makes an answer stale, and every write
+    /// clears them all. Publishing, once per file during an add, then reads the store only for
+    /// rows that are new to it.</summary>
+    private readonly Dictionary<(RowId Outgoing, RowId Incoming), bool> _authoredPairs = new();
+
+    private bool IsAuthoredPair(QueueEntry outgoing, QueueEntry incoming)
+    {
+        if (!_authoredPairs.TryGetValue((outgoing.Id, incoming.Id), out var authored))
+        {
+            authored = _store.Get(outgoing.Track.FilePath, incoming.Track.FilePath) is { IsBlank: false };
+            _authoredPairs[(outgoing.Id, incoming.Id)] = authored;
+        }
+        return authored;
+    }
+
+    /// <summary>A transition was saved or removed: the rows' authored marks are published again.</summary>
+    private void StoreChanged()
+    {
+        _authoredPairs.Clear();
+        Publish();
     }
 
     /// <summary>The values no track can play: a point past its track's length, measured from

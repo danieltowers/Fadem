@@ -36,7 +36,9 @@ There is no ⏹ button (the engine still stops at launch and when the queue ends
 folds some symbol glyphs together, so find a transport button by comparing names ordinally, not
 with a name condition. The status strip's items are not exposed to it; read them
 from a capture. The seek bar is a pane named "Seek" whose thumb is not an element of its own: find
-the thumb in a capture (the highlight colour), and click it with posted mouse messages.
+the thumb in a capture (the highlight colour), and click it with posted mouse messages. The
+queue's ✎ button is different: the list answers a click where the real cursor is, not where a
+posted click says, so move the cursor onto the cell (`SetCursorPos`) before posting the click.
 
 - [ ] The window opens without an error dialog.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
@@ -60,6 +62,11 @@ the thumb in a capture (the highlight colour), and click it with posted mouse me
       clearly, and a disabled one looks disabled. With repeat off, this → next is disabled on
       the last row and previous → this on the first. Under repeat-all, this → next on the last
       row opens last → first. This → this opens the row into itself.
+- [ ] At the far right of every row but the last sits ✎: bold and black where that row into the
+      next has a saved transition, plain and grey where it has none. The last row has none, even
+      under repeat-all. Clicking it opens the editor on this → next, as the menu does: the
+      heading changes to that adjacency. Saving or removing the transition flips its row's ✎.
+      At the 760 px minimum width it is still in view, with no sideways scroll bar.
 - [ ] With unsaved edits (a field, **From end** or the curve changed, or **Remove transition**
       pressed), opening another adjacency asks **Save / Discard / Cancel**, and so does closing
       the window. Cancel keeps the edits and stays; Discard drops them; Save saves and moves on,

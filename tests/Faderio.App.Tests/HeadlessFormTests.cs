@@ -1538,6 +1538,106 @@ public sealed class HeadlessFormTests
         Assert.Contains("this → this", h.Form._editSelf.Text);
     });
 
+    // ── The row button (interim transport 07) ───────────────────────────────────────────
+
+    /// <summary>Presses the row's editor button as a click does: a left click at the middle of
+    /// its cell, through the list's own mouse handler.</summary>
+    private static void ClickEditButton(ListView list, int index)
+    {
+        _ = list.Handle;
+        var cell = list.Items[index].SubItems[MainForm.EditColumn].Bounds;
+        var args = new MouseEventArgs(MouseButtons.Left, 1, cell.X + cell.Width / 2, cell.Y + cell.Height / 2, 0);
+        typeof(Control).GetMethod("OnMouseClick", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
+    }
+
+    private static string[] EditGlyphs(ListView list) =>
+        list.Items.Cast<ListViewItem>().Select(i => i.SubItems[MainForm.EditColumn].Text).ToArray();
+
+    [Fact]
+    public void TheRowButton_OpensThisToNext_AsTheMenuDoes() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (_, b, c) = ThreeQueued(h);
+
+        ClickEditButton(h.Form._queueList, 1);
+
+        Assert.Equal((b, c), Opened(h));
+        Assert.Equal(h.Engine.AdjacenciesOf(h.Engine.View.Queue[1].Id).Next!.Name, h.Form._editor._title.Text);
+        OpenMenuOn(h.Form._queueList, 1);
+        Click(h.Form._editNext);
+        Assert.Equal((b, c), Opened(h));
+    });
+
+    [Fact]
+    public void TheRowButton_IsTheRightmostColumn_OnEveryRowButTheLast_EvenUnderRepeatAll() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+
+        Assert.Equal(MainForm.EditColumn, h.Form._queueList.Columns.Count - 1);
+        Assert.Equal(new[] { "✎", "✎", "" }, EditGlyphs(h.Form._queueList));
+
+        h.Engine.SetRepeat(RepeatMode.All); // the last row has a this → next, but no button (D9)
+        ClickEditButton(h.Form._queueList, 2);
+
+        Assert.Equal(new[] { "✎", "✎", "" }, EditGlyphs(h.Form._queueList));
+        Assert.Null(h.Form._editor.Adjacency);
+    });
+
+    [Fact]
+    public void TheRowButton_IsBoldWhileItsAdjacencyIsAuthored_AndGreyWhileNot() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        h.Engine.Author(h.Engine.AdjacenciesOf(h.Engine.View.Queue[0].Id).Next!, new TransitionSpec
+        {
+            FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1), FromEnd: false),
+            FadeOutDuration = TimeSpan.FromSeconds(0.5),
+        });
+
+        var cells = h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.SubItems[MainForm.EditColumn]).ToArray();
+        Assert.True(cells[0].Font.Bold);
+        Assert.Equal(SystemColors.WindowText, cells[0].ForeColor);
+        Assert.False(cells[1].Font.Bold);
+        Assert.Equal(SystemColors.GrayText, cells[1].ForeColor);
+
+        h.Engine.Unauthor(h.Engine.AdjacenciesOf(h.Engine.View.Queue[0].Id).Next!);
+
+        Assert.False(cells[0].Font.Bold);
+    });
+
+    [Fact]
+    public void TheRowButton_WithUnsavedEdits_Asks_AsTheMenuDoes() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b, _) = ThreeQueued(h);
+        ClickEditButton(h.Form._queueList, 0);
+        h.Form._editor._fadeOutPoint.Text = "2";
+        var asked = 0;
+        h.Form.AskUnsavedEdits = _ =>
+        {
+            asked++;
+            return UnsavedEdits.Cancel;
+        };
+
+        ClickEditButton(h.Form._queueList, 1);
+
+        Assert.Equal(1, asked);
+        Assert.Equal((a, b), Opened(h));
+    });
+
+    [Fact]
+    public void AClickElsewhereOnARow_OpensNothing() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        _ = h.Form._queueList.Handle;
+        var title = h.Form._queueList.Items[1].SubItems[1].Bounds;
+
+        Assert.Null(h.Form.EditButtonAt(new System.Drawing.Point(title.X + 4, title.Y + 4)));
+        Assert.Equal(1, h.Form.EditButtonAt(h.Form._queueList.Items[1].SubItems[MainForm.EditColumn].Bounds.Location + new Size(4, 4)));
+    });
+
     [Fact]
     public void EditTransitionAt_ARowOutOfRange_OpensNothing() => RunSta(() =>
     {
