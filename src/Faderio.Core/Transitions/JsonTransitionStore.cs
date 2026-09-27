@@ -91,6 +91,31 @@ public sealed class JsonTransitionStore : ITransitionStore
         return true;
     }
 
+    public void RenamePlaylist(string oldName, string newName)
+    {
+        if (oldName == newName ||
+            (!_model.PlaylistOverrides.ContainsKey(oldName) && !_model.PlaylistOverrides.ContainsKey(newName)))
+        {
+            return;
+        }
+        Commit(model =>
+        {
+            model.PlaylistOverrides.Remove(newName);
+            if (model.PlaylistOverrides.Remove(oldName, out var byPair))
+            {
+                model.PlaylistOverrides[newName] = byPair;
+            }
+        });
+    }
+
+    public void RemovePlaylist(string playlistName)
+    {
+        if (_model.PlaylistOverrides.ContainsKey(playlistName))
+        {
+            Commit(model => model.PlaylistOverrides.Remove(playlistName));
+        }
+    }
+
     internal static string PairKey(string outgoingPath, string incomingPath) =>
         Normalize(outgoingPath) + "|" + Normalize(incomingPath);
 

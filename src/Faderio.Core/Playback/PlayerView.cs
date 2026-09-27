@@ -74,6 +74,15 @@ public sealed record PlayerView(
 
     /// <summary>The library open, or null before any library has been opened (ADR 0011).</summary>
     public LibraryView? Library { get; init; }
+
+    /// <summary>The library's playlists by name, sorted ignoring case (playlists issue 01, D14):
+    /// empty when no library is open.</summary>
+    public IReadOnlyList<string> Playlists { get; init; } = [];
+
+    /// <summary>The playlist the queue mirrors (D15): always one while a library is open, null
+    /// when none is. A row still sounding from the playlist open before is in <see cref="Queue"/>
+    /// until it falls silent, but not in this playlist.</summary>
+    public string? OpenPlaylist { get; init; }
 }
 
 /// <summary>The open library as the shell sees it: its folder, the folder's leaf name, and

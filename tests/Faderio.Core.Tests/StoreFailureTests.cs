@@ -31,6 +31,10 @@ public sealed class StoreFailureTests
             throw Failure;
 
         public bool RemoveOverride(string playlistName, string outgoingPath, string incomingPath) => throw Failure;
+
+        public void RenamePlaylist(string oldName, string newName) => throw Failure;
+
+        public void RemovePlaylist(string playlistName) => throw Failure;
     }
 
     private static TransitionSpec Crossfade() => new()

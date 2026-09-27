@@ -169,6 +169,14 @@ public sealed partial class PlaybackEngine : IDisposable
         {
             _sink.Notice(opening);
         }
+
+        // The library's last open playlist, or a new Untitled (D20).
+        Launched = Loaded(Run(() =>
+        {
+            var opened = OpenLastPlaylist();
+            Publish();
+            return opened;
+        }));
     }
 
     /// <summary>The player at this instant. Discrete state is whatever was last published; the
@@ -190,6 +198,11 @@ public sealed partial class PlaybackEngine : IDisposable
             }
             _disposed = true;
             unanswered = EndAddRun(cancelled: true, notify: false);
+            lock (_saveGate)
+            {
+                WritePendingUnderGate(_ => { }); // nobody is left to tell
+            }
+            DeleteIfEmptyUntitled();
             ReleasePreview();
             ResetForRestart();
             _output.Stopped -= OnOutputStopped;
@@ -217,18 +230,25 @@ public sealed partial class PlaybackEngine : IDisposable
         T result;
         PlayerView? view = null;
         string[]? notices = null;
+        var saveDue = false;
         try
         {
             _depth++;
             try
             {
                 result = body();
+                if (_depth == 1)
+                {
+                    DropSilentPassingRows();
+                }
             }
             finally
             {
                 _depth--;
                 if (_depth == 0)
                 {
+                    saveDue = _saveRequested;
+                    _saveRequested = false;
                     if (_viewDirty)
                     {
                         _viewDirty = false;
@@ -256,6 +276,10 @@ public sealed partial class PlaybackEngine : IDisposable
         if (view is not null)
         {
             _sink.Changed(view);
+        }
+        if (saveDue)
+        {
+            WritePendingPlaylist();
         }
         return result;
     }
@@ -404,12 +428,17 @@ public sealed partial class PlaybackEngine : IDisposable
             _version, _queueVersion, TransportNow, _queue.Entries.ToImmutableArray(),
             _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null, _finishAt is not null,
             _settings.Shuffle, _settings.Repeat, Adding, _rate, _unreadable.ToImmutableHashSet(), _settings,
-            _queueBase, _preview is null ? null : _mixer.Timeline, _previewOrigin, _preview?.Snap(), _clips.Snap());
+            _queueBase, _preview is null ? null : _mixer.Timeline, _previewOrigin, _preview?.Snap(), _clips.Snap())
+        {
+            Passing = _passing.Select(e => e.Id).ToImmutableHashSet(), // before Onward, which skips them
+        };
         return snapshot with
         {
             Onward = snapshot.OnwardOf(IsAuthoredPair),
             Library = _library?.View,
             MachineSettings = _machine?.Settings ?? new MachineSettings(),
+            Playlists = _playlists,
+            OpenPlaylist = _openPlaylist,
         };
     }
 
@@ -475,6 +504,14 @@ public sealed partial class PlaybackEngine : IDisposable
 
         public MachineSettings MachineSettings { get; init; } = new();
 
+        public IReadOnlyList<string> Playlists { get; init; } = [];
+
+        public string? OpenPlaylist { get; init; }
+
+        /// <summary>Rows still sounding from the playlist open before (playlists issue 01): the
+        /// queue passes out of them and never steps into one.</summary>
+        public ImmutableHashSet<RowId> Passing { get; init; } = [];
+
         /// <param name="emitted">The device's count. The queue's clock is that from
         /// <see cref="QueueBase"/>; while a preview holds the queue, it stops where the queue's
         /// mixer stopped, once the device has played out what it had of the queue. The preview's
@@ -508,6 +545,8 @@ public sealed partial class PlaybackEngine : IDisposable
                 Clip = clip,
                 Library = Library,
                 MachineSettings = MachineSettings,
+                Playlists = Playlists,
+                OpenPlaylist = OpenPlaylist,
             };
         }
 
@@ -522,7 +561,7 @@ public sealed partial class PlaybackEngine : IDisposable
             var onward = new Dictionary<RowId, bool>(Entries.Length);
             for (var i = 0; i < Entries.Length; i++)
             {
-                if (FirstReadable(i, After) is { } next)
+                if (FirstReadable(i, After, intoPassing: false) is { } next)
                 {
                     onward[Entries[i].Id] = authored(Entries[i], Entries[next]);
                 }
@@ -531,7 +570,7 @@ public sealed partial class PlaybackEngine : IDisposable
         }
 
         private Adjacency? NextAdjacencyFrom(RowId? row) =>
-            IndexOf(row) is { } i && FirstReadable(i, After) is { } next
+            IndexOf(row) is { } i && FirstReadable(i, After, intoPassing: false) is { } next
                 ? new Adjacency(Entries[i].Track, Entries[next].Track)
                 : null;
 
@@ -544,7 +583,7 @@ public sealed partial class PlaybackEngine : IDisposable
             }
             var track = Entries[i].Track;
             return new RowAdjacencies(
-                FirstReadable(i, Before) is { } previous ? new Adjacency(Entries[previous].Track, track) : null,
+                FirstReadable(i, Before, intoPassing: true) is { } previous ? new Adjacency(Entries[previous].Track, track) : null,
                 NextAdjacencyFrom(row),
                 Repeat == RepeatMode.One ? new Adjacency(track, track) : null);
         }
@@ -566,12 +605,14 @@ public sealed partial class PlaybackEngine : IDisposable
         }
 
         /// <summary>The first row <paramref name="step"/> reaches from <paramref name="index"/>
-        /// that is not marked unreadable: a skip passes over the marked rows, and so does this.</summary>
-        private int? FirstReadable(int index, Func<int, int?> step)
+        /// that is not marked unreadable: a skip passes over the marked rows, and so does this.
+        /// Unless <paramref name="intoPassing"/>, a passing row is passed over too: the queue never
+        /// steps on into one, but the row a passing row leads to still comes after it.</summary>
+        private int? FirstReadable(int index, Func<int, int?> step, bool intoPassing)
         {
             foreach (var other in PlaybackQueue.Walk(step(index), step))
             {
-                if (!Unreadable.Contains(Entries[other].Id))
+                if (!Unreadable.Contains(Entries[other].Id) && (intoPassing || !Passing.Contains(Entries[other].Id)))
                 {
                     return other;
                 }

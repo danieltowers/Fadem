@@ -49,7 +49,7 @@ public sealed partial class PlaybackEngine
         var index = heard is null ? -1 : _queue.IndexOf(heard.Row.Id);
         ResetForRestart();
         StopOutputOrNotice();
-        if (index < 0 || OpenFirstReadable(index, RowAfter, retryMarked: true) is not { } landing)
+        if (index < 0 || OpenFirstReadable(index, RowAfter, retryMarked: true, intoPassing: true) is not { } landing)
         {
             return; // nothing was playing, or nothing is readable: stopped
         }

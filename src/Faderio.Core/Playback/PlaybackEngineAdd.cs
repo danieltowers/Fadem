@@ -11,8 +11,16 @@ public sealed partial class PlaybackEngine
     /// once listed. Touched only under the engine lock.</summary>
     private sealed class AddJob
     {
-        public AddJob(IReadOnlyList<string> paths) =>
-            Remaining = new LinkedList<PendingPath>(paths.Select(p => new PendingPath(p, Named: true)));
+        /// <param name="opening">The job loads a playlist being opened: its entries are not named, so
+        /// a playlist among them is not followed, and its rows are the file's already, so they are not
+        /// written back to it.</param>
+        public AddJob(IReadOnlyList<string> paths, bool opening = false)
+        {
+            Opening = opening;
+            Remaining = new LinkedList<PendingPath>(paths.Select(p => new PendingPath(p, Named: !opening)));
+        }
+
+        public bool Opening { get; }
 
         public LinkedList<PendingPath> Remaining { get; }
         public List<QueueRow> Added { get; } = new();
@@ -86,21 +94,29 @@ public sealed partial class PlaybackEngine
         {
             ThrowIfDisposed(); // again under the lock: a job joining a run Dispose ended would never be answered
             ObserveClock();
-            _addRun.Add(job);
-            _addTotal += list.Count;
+            var startWorker = Enqueue(job);
             Publish();
-            if (_addWorkerAlive)
-            {
-                return false;
-            }
-            _addWorkerAlive = true;
-            return true;
+            return startWorker;
         });
         if (start)
         {
             StartAddWorker(AddWorker);
         }
         return job.Done.Task;
+    }
+
+    /// <summary>Joins <paramref name="job"/> to the run. Returns whether the caller starts the
+    /// worker, once the lock is released: there is none yet.</summary>
+    private bool Enqueue(AddJob job)
+    {
+        _addRun.Add(job);
+        _addTotal += job.Remaining.Count;
+        if (_addWorkerAlive)
+        {
+            return false;
+        }
+        _addWorkerAlive = true;
+        return true;
     }
 
     /// <summary>Ends the current add at once, queued adds included: no further file is probed, a
@@ -206,6 +222,10 @@ public sealed partial class PlaybackEngine
             job.Added.Add(Append(track));
             _queueVersion++;
             RescheduleCurrentBoundary();
+            if (!job.Opening)
+            {
+                SaveOpenPlaylist(throttled: true);
+            }
         }
         else
         {
@@ -254,6 +274,10 @@ public sealed partial class PlaybackEngine
         if (job.Remaining.Count == 0 && !job.Reported)
         {
             done.Add(Report(job, cancelled: false));
+            if (job == _loading)
+            {
+                LoadEnded();
+            }
         }
         if (_addRun.All(j => j.Remaining.Count == 0))
         {
@@ -279,6 +303,14 @@ public sealed partial class PlaybackEngine
         _addResolved = 0;
         _addTotal = 0;
         _addRunId++;
+        if (_loading is not null)
+        {
+            LoadEnded(); // cut short
+        }
+        if (_saveDeferred)
+        {
+            SaveOpenPlaylist(); // the add's last rows
+        }
         return done;
     }
 

@@ -20,6 +20,14 @@ public interface ITransitionStore
     void UpsertOverride(string playlistName, string outgoingPath, string incomingPath, TransitionSpec partial);
 
     bool RemoveOverride(string playlistName, string outgoingPath, string incomingPath);
+
+    /// <summary>Rekeys every override of <paramref name="oldName"/> to <paramref name="newName"/>,
+    /// replacing any left under the new name: a playlist rename (D14). Nothing to move is no write.</summary>
+    void RenamePlaylist(string oldName, string newName);
+
+    /// <summary>Removes every override of the playlist: a playlist delete (D17). Nothing to remove
+    /// is no write.</summary>
+    void RemovePlaylist(string playlistName);
 }
 
 /// <summary>The store file claims a schema version this build does not understand.</summary>

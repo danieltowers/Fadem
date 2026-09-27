@@ -95,6 +95,7 @@ public sealed class ShuffleAndRepeatRememberedTests : IDisposable
         Assert.Equal(queue, tc.View.Queue.Select(r => r.Id));
         Assert.Collection(
             tc.Notices,
+            n => Assert.StartsWith("Not saved: the playlist to reopen at launch. The settings file could not be written", n),
             n => Assert.StartsWith("Not saved: shuffle. The settings file could not be written", n),
             n => Assert.StartsWith("Not saved: repeat. The settings file could not be written", n));
     }

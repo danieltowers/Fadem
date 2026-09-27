@@ -21,14 +21,18 @@ public sealed partial class PlaybackEngine
     /// not saved and why, and then nothing changes. With no library open there is nowhere to
     /// save them, so nothing changes. Settings the same as those in force are no change and
     /// no notice. Shuffle and repeat are the transport's (<see cref="SetShuffle"/>,
-    /// <see cref="SetRepeat"/>): the ones in <paramref name="settings"/> are not used.</summary>
+    /// <see cref="SetRepeat"/>) and the last playlist is the engine's (playlists issue 01): the
+    /// ones in <paramref name="settings"/> are not used.</summary>
     public void ChangeSettings(PlayerSettings settings)
     {
         ThrowIfDisposed();
         Run(() =>
         {
             ObserveClock();
-            var next = settings.Normalised() with { Shuffle = _settings.Shuffle, Repeat = _settings.Repeat };
+            var next = settings.Normalised() with
+            {
+                Shuffle = _settings.Shuffle, Repeat = _settings.Repeat, LastPlaylist = _settings.LastPlaylist,
+            };
             var previous = _settings;
             if (next == previous || !KeepSettings(next, "settings"))
             {

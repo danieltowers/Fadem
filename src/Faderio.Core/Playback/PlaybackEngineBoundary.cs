@@ -81,14 +81,15 @@ public sealed partial class PlaybackEngine
     /// <summary>Opens the first readable row from <paramref name="first"/>, stepping with
     /// <paramref name="step"/> past each row that cannot be opened: it is marked, with one notice,
     /// and its row stays. A row already marked is passed over without being tried, unless
-    /// <paramref name="retryMarked"/>: the queue reaching it again tries it again. Null when no
-    /// row is readable.</summary>
-    private OpenedTrack? OpenFirstReadable(int? first, Func<int, int?> step, bool retryMarked)
+    /// <paramref name="retryMarked"/>: the queue reaching it again tries it again. A passing row
+    /// (playlists issue 01) is never stepped into, unless <paramref name="intoPassing"/>: going
+    /// back, or landing where the listener was. Null when no row is readable.</summary>
+    private OpenedTrack? OpenFirstReadable(int? first, Func<int, int?> step, bool retryMarked, bool intoPassing = false)
     {
         foreach (var i in PlaybackQueue.Walk(first, step))
         {
             var entry = _queue.Entries[i];
-            if (!retryMarked && _unreadable.Contains(entry.Id))
+            if ((!retryMarked && _unreadable.Contains(entry.Id)) || (!intoPassing && _passing.Contains(entry)))
             {
                 continue;
             }

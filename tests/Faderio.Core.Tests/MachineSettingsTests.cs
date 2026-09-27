@@ -134,8 +134,8 @@ public sealed class MachineSettingsTests : IDisposable
         // Nothing changes now: the engine rate is fixed at launch (ADR 0008).
         Assert.Equal(Rate, engine.SampleRate);
         Assert.Equal(Transport.Playing, engine.View.Transport);
-        // The library's file is not the machine's.
-        Assert.False(File.Exists(library.SettingsPath));
+        // The library's file is not the machine's: it only remembers the open playlist.
+        Assert.DoesNotContain("outputMode", File.ReadAllText(library.SettingsPath), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

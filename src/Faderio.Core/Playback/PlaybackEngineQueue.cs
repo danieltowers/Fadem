@@ -19,6 +19,7 @@ public sealed partial class PlaybackEngine
             {
                 _queueVersion++;
                 RescheduleCurrentBoundary();
+                SaveOpenPlaylist();
                 Publish();
             }
             return (IReadOnlyList<QueueRow>)added;
@@ -47,16 +48,17 @@ public sealed partial class PlaybackEngine
     }
 
     /// <summary>Writes the queue in its visible order (under shuffle, the play order) as a UTF-8
-    /// playlist at <paramref name="path"/> (<see cref="M3UPlaylist.Write"/>). The queue itself is
-    /// never saved; this makes a new playlist from it. The rows are taken under the lock and the
-    /// file is written off it. Total: the outcome is a notice either way.</summary>
+    /// playlist at <paramref name="path"/> (<see cref="M3UPlaylist.Write"/>): the export primitive.
+    /// A row still sounding from the playlist open before is in no playlist, so not in this. The
+    /// rows are taken under the lock and the file is written off it. Total: the outcome is a
+    /// notice either way.</summary>
     public void SaveAsPlaylist(string path)
     {
         ThrowIfDisposed();
         var tracks = Run(() =>
         {
             ObserveClock();
-            return _queue.Entries.Select(e => e.Track).ToList();
+            return _queue.Entries.Where(e => !_passing.Contains(e)).Select(e => e.Track).ToList();
         });
         string notice;
         try
@@ -138,6 +140,7 @@ public sealed partial class PlaybackEngine
             }
             _queueVersion++;
             Publish();
+            SaveOpenPlaylist();
         });
     }
 
@@ -163,10 +166,12 @@ public sealed partial class PlaybackEngine
                 return;
             }
             var moving = EntriesOf(ids);
+            moving.ExceptWith(_passing); // a passing row stays at the top, in no playlist
             // Dropped before one of the moving rows, they land before the next row that stays.
             var anchor = entries.Skip(beforeIndex).FirstOrDefault(e => !moving.Contains(e));
             var order = entries.Where(e => !moving.Contains(e)).ToList();
             order.InsertRange(anchor is null ? order.Count : order.IndexOf(anchor), entries.Where(moving.Contains));
+            order = order.Where(_passing.Contains).Concat(order.Where(e => !_passing.Contains(e))).ToList();
             if (order.SequenceEqual(entries))
             {
                 return;
@@ -176,10 +181,11 @@ public sealed partial class PlaybackEngine
             {
                 // Unshuffled, the visible order is the original order.
                 _originalOrder.Clear();
-                _originalOrder.AddRange(order);
+                _originalOrder.AddRange(order.Where(e => !_passing.Contains(e)));
             }
             RescheduleCurrentBoundary();
             _queueVersion++;
+            SaveOpenPlaylist();
             Publish();
         });
     }
@@ -238,6 +244,7 @@ public sealed partial class PlaybackEngine
                 StopOutput();
             }
             EmptyQueue();
+            SaveOpenPlaylist();
             Publish();
         });
     }
@@ -248,6 +255,7 @@ public sealed partial class PlaybackEngine
         _queue.Clear();
         _originalOrder.Clear();
         _unreadable.Clear();
+        _passing.Clear();
         _queueVersion++;
     }
 
@@ -295,7 +303,9 @@ public sealed partial class PlaybackEngine
         });
     }
 
-    private void RestoreOriginalOrder() => _queue.Reorder(_originalOrder);
+    /// <summary>The passing rows stay at the top: they were never in the original order.</summary>
+    private void RestoreOriginalOrder() =>
+        _queue.Reorder(_queue.Entries.Where(_passing.Contains).Concat(_originalOrder).ToList());
 
     private int IndexOf(MixerVoice voice) =>
         _voiceEntry.TryGetValue(voice, out var entry) ? _queue.IndexOf(entry.Id) : -1;

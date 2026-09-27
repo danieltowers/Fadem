@@ -221,14 +221,16 @@ public sealed partial class PlaybackEngine
             var index = IndexOf(attended);
             var playhead = View.Attended?.Playhead ?? Playhead.Zero;
             int? Back(int i) => _queue.IndexBefore(i, _settings.Repeat);
-            var previous = playhead.TotalSeconds > 3 ? null : OpenFirstReadable(Back(index), Back, retryMarked: false);
+            var previous = playhead.TotalSeconds > 3
+                ? null
+                : OpenFirstReadable(Back(index), Back, retryMarked: false, intoPassing: true);
             if (previous is null && !attended.IsFinished)
             {
                 Seek(Playhead.Zero);
                 return;
             }
             // The previous row, or the last track's tail, which has no source left to seek.
-            var target = previous ?? OpenFirstReadable(index, _ => null, retryMarked: true);
+            var target = previous ?? OpenFirstReadable(index, _ => null, retryMarked: true, intoPassing: true);
             CutAllVoices();
             if (target is null)
             {

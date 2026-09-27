@@ -43,6 +43,11 @@ public sealed record PlayerSettings
     /// <summary>Repeat, off by default.</summary>
     public RepeatMode Repeat { get; init; } = RepeatMode.Off;
 
+    /// <summary>The playlist open when this library was last used, which the next launch opens
+    /// (D20); null before any has been. The engine keeps it: <c>ChangeSettings</c> keeps the one
+    /// in force (playlists issue 01).</summary>
+    public string? LastPlaylist { get; init; }
+
     /// <summary>These settings as the engine keeps them: the current schema, N brought into
     /// range, and a choice no version knows replaced by its default. A hand-edited file
     /// and a caller alike get the same settings back.</summary>

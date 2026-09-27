@@ -76,8 +76,9 @@ public sealed class LibraryTests : IDisposable
 
         Assert.Equal($"Saved {adjacency.Name}.", Assert.Single(sink.Notices));
         Assert.Equal(new[] { ".faderio" }, Directory.GetFileSystemEntries(folder).Select(Path.GetFileName));
+        // settings.json remembers the Untitled the rows made (playlists issue 01).
         Assert.Equal(
-            new[] { "playlists", "transitions.json" },
+            new[] { "playlists", "settings.json", "transitions.json" },
             Directory.GetFileSystemEntries(Path.Combine(folder, ".faderio")).Select(Path.GetFileName).Order());
     }
 

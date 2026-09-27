@@ -12,15 +12,24 @@ public sealed partial class PlaybackEngine
     /// settings become that library's, its shuffle and repeat among them, in force before anything
     /// enters the queue (library issue 04). Nothing crosses from the one before (ADR 0011). A folder
     /// that cannot be opened leaves no library open: a notice says why, authoring is refused
-    /// and playback is allowed. One that opens is remembered for the next launch.</summary>
+    /// and playback is allowed. One that opens is remembered for the next launch. The playlist
+    /// left is written, and deleted if it is an empty Untitled; the new library's last open
+    /// playlist opens, or a new Untitled (playlists issue 01, D20).</summary>
     public void OpenLibrary(string folder)
     {
         ThrowIfDisposed();
         var library = Library.Open(folder); // the disk, outside the lock
-        Complete(Run(() =>
+        Loaded(Run(() =>
         {
             ObserveClock();
             var cancelled = EndAddRun(cancelled: true, notify: true);
+            lock (_saveGate)
+            {
+                WritePendingUnderGate(RaiseNotice); // the playlist left, in the library left
+            }
+            DeleteIfEmptyUntitled();
+            _openPlaylist = null;
+            _rememberTried = null;
             ReleasePreview();
             ResetForRestart();
             StopOutput();
@@ -38,8 +47,9 @@ public sealed partial class PlaybackEngine
             {
                 RaiseNotice(unremembered);
             }
+            var opened = OpenLastPlaylist();
             Publish();
-            return cancelled;
+            return opened with { Cancelled = [.. cancelled, .. opened.Cancelled] };
         }));
     }
 

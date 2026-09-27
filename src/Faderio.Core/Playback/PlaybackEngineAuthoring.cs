@@ -298,7 +298,12 @@ public sealed partial class PlaybackEngine
             return;
         }
         var index = _queue.IndexOf(entry.Id);
-        var nextIndex = index < 0 ? null : _queue.IndexAfter(index, _settings.Repeat);
+        var nextIndex = index < 0
+            ? null
+            : PlaybackQueue.Walk(_queue.IndexAfter(index, _settings.Repeat), RowAfter)
+                .Where(i => !_passing.Contains(_queue.Entries[i])) // never stepped into
+                .Select(i => (int?)i)
+                .FirstOrDefault();
         var incomingPath = nextIndex is { } n ? _queue.Entries[n].Track.FilePath : null;
         if (incomingPath is not null && incomingPath != adjacency.Incoming.FilePath)
         {

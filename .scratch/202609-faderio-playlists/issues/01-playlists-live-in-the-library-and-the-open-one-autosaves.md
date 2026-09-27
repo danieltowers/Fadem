@@ -1,6 +1,6 @@
 # 01: Playlists live in the library and the open one autosaves
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: —
 
 Decided in [D14, D15, D16 (join), D17, D20](../../202609-faderio-interim-improvements/decisions.md),
@@ -44,16 +44,16 @@ ADR 0011. Amends ADR 0003's "there is no replace the queue".
 
 ## Acceptance
 
-- [ ] Add three files with no playlist open → `Untitled.m3u8` exists with three rows before the
+- [x] Add three files with no playlist open → `Untitled.m3u8` exists with three rows before the
       user does anything else.
-- [ ] Move a row → the file's order changes.
-- [ ] Open playlist B while A's row 2 plays → row 2 keeps playing; the next boundary is
+- [x] Move a row → the file's order changes.
+- [x] Open playlist B while A's row 2 plays → row 2 keeps playing; the next boundary is
       row 2 → B's row 0 and plays the authored transition for that pair if one exists.
-- [ ] Rename A → C: the file is renamed and A's overrides answer to C.
-- [ ] Delete the open playlist while playing → playback continues; the first remaining
+- [x] Rename A → C: the file is renamed and A's overrides answer to C.
+- [x] Delete the open playlist while playing → playback continues; the first remaining
       playlist is open.
-- [ ] Quit with an empty Untitled 3 open → the file is gone on relaunch.
-- [ ] Under shuffle, the file keeps the unshuffled order.
+- [x] Quit with an empty Untitled 3 open → the file is gone on relaunch.
+- [x] Under shuffle, the file keeps the unshuffled order.
 
 ## Tests
 
@@ -65,3 +65,62 @@ ADR 0011. Amends ADR 0003's "there is no replace the queue".
 - None (no shell change; issues 02 and 03 cover it).
 
 ## Comments
+
+- Built 2026-09-27 in `PlaybackEnginePlaylists.cs`, with `PlaylistFolder` (names, listing,
+  refusals, "first free Untitled") in Persistence. `OpenPlaylist` returns `Task<AddReport>`: the
+  rows load through the add pipeline as one job, off the lock, so a missing entry is a
+  rejection in the run's one notice, as `Add` has it. Its entries are not "named", so a playlist
+  inside one is not followed. `ITransitionStore` gains `RenamePlaylist` **and
+  `RemovePlaylist`** (delete needs it too).
+- **The join (builder note).** The sounding rows (outgoing, attended, current, in that order)
+  stay at the top of the queue as **passing rows**: in `_passing`, never in `_originalOrder`,
+  so never written and never exported. `OpenFirstReadable` does not step *into* a passing row
+  (a repeat-one loop, a repeat-all wrap), except going back (⏮) and landing after device loss.
+  The view's next-adjacency rule skips them too, but a passing row's own next is the new row 0,
+  so the join is an ordinary adjacency, resolved from the store at `ScheduleBoundary`. At the
+  end of every locked section, `DropSilentPassingRows` removes each passing row whose voice is
+  no longer outgoing, attended or current, so no command has to know about them. Stop, Clear
+  and the queue's end drop them at once. Move keeps them at the top.
+- **Shuffle (builder note): no change was needed.** `_originalOrder` already is the playlist's
+  own order. Autosave writes it, so a Move under shuffle changes the queue but not the file, and
+  turning shuffle off returns to the file's order.
+- **Autosave is written off the lock.** A command takes the rows under the lock and writes them
+  after releasing it, like `SaveAsPlaylist`. A `_saveGate` orders the writes (always the latest
+  rows) and every rename, delete and create, so a late write can never recreate a file that was
+  renamed or deleted. An add writes at most every 500 ms and always at its end: a
+  5,000-file folder would otherwise rewrite the whole file 5,000 times. So a crash in the
+  middle of an add loses at most half a second of rows. A write that fails is one notice per
+  playlist until a write succeeds, not one per file.
+- **Loading guard.** While the open playlist's rows are still loading, the file holds rows the
+  queue does not yet have. So an edit during the load is only noted, and written when the load
+  ends. If the load is cut short (CancelAdd, or another playlist opened) and nothing was edited,
+  nothing is written, so the file keeps every entry. One consequence to know: a playlist entry
+  whose file is missing is rejected on open, and the next edit writes the playlist without it.
+- **`LastPlaylist` (deviation, say if wrong).** An **empty Untitled is not remembered** until it
+  gets rows. It is deleted on quit, so the next launch opens the playlist remembered before it
+  rather than a fresh Untitled, and a launch on an empty library writes no settings.json.
+  `ChangeSettings` keeps `LastPlaylist`, as it keeps shuffle and repeat. At launch, a
+  settings file left alone (newer schema) is not overwritten to remember the Untitled.
+  A settings write that fails is told once per playlist opened.
+- **Names:** trimmed; refused if blank, containing a character invalid in a file name, ending in a
+  full stop, a Windows device name (CON, COM1…), or over 255 characters with the extension.
+  Matched ignoring case. A rename to a name another playlist has is refused; a case-only rename
+  works. Success is silent (the sidebar shows it); every refusal is "Not renamed: A. …".
+- **Hygiene** (an open empty Untitled deleted on OpenPlaylist, NewPlaylist, Delete's reopen,
+  OpenLibrary and Dispose) checks the file too: an Untitled whose load was cut short still holds
+  rows and is kept. It is housekeeping, so a failure is silent. NewPlaylist with an empty Untitled
+  open does nothing: that is already the new playlist.
+- Existing tests changed by the new behaviour: three expected the library's settings.json not to
+  exist or to hold no playlist (it now remembers the Untitled once rows arrive), and one expected
+  exactly two notices from an unwritable settings file (the first add now adds "Not saved: the
+  playlist to reopen at launch").
+- Tests: `PlaylistsInTheLibraryTests` (26) and `PlaylistsAcrossLaunchesTests` (4): every
+  acceptance line, add in the background, Move/Remove/Clear, unwritable file, open while stopped,
+  the join with an authored transition that plays and the passing row gone once silent, a
+  passing row never written, a missing entry, six refused names, a case-only rename, delete of
+  the last playlist and of one not open, no library, launch, gone-last-playlist and OpenLibrary.
+- dotnet test: 940 passed, 0 failed (Core 762, App 178) on the last runs. Both `AddTimeBudgetTests`
+  fail intermittently when Core and App run together (1,369 ms and 449 ms against 1,000 and 150).
+  The parent commit does the same: 1 of 3 combined runs failed on each commit (1,910 ms on the parent). Core
+  alone passed 6 of 6. One full run took 31 minutes; no hang was found, and every run since took
+  18–24 s.
