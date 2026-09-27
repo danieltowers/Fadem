@@ -28,9 +28,10 @@ public sealed partial class PlaybackEngine : IDisposable
     private readonly TransitionResolver _resolver;
     private SettingsStore? _settingsStore;
 
-    /// <summary>The machine's settings, where the library that opens is remembered for the next
-    /// launch; null when nothing is to be remembered (the renderer, the tests, a launch with
-    /// <c>--library=</c>).</summary>
+    /// <summary>The machine's settings: the output mode, and where the library that opens is
+    /// remembered for the next launch. Null when there is no such file (the renderer, the tests,
+    /// a launch with <c>--library=</c> alone): nothing is remembered and
+    /// <see cref="ChangeMachineSettings"/> saves nothing.</summary>
     private readonly MachineSettingsStore? _machine;
     private PlayerSettings _settings;
     private readonly Random _rng;
@@ -406,7 +407,12 @@ public sealed partial class PlaybackEngine : IDisposable
             _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null, _finishAt is not null,
             _shuffle, _repeat, Adding, _rate, _unreadable.ToImmutableHashSet(), _settings,
             _queueBase, _preview is null ? null : _mixer.Timeline, _previewOrigin, _preview?.Snap(), _clips.Snap());
-        return snapshot with { Onward = snapshot.OnwardOf(IsAuthoredPair), Library = _library?.View };
+        return snapshot with
+        {
+            Onward = snapshot.OnwardOf(IsAuthoredPair),
+            Library = _library?.View,
+            MachineSettings = _machine?.Settings ?? new MachineSettings(),
+        };
     }
 
     /// <summary>One voice's clock frozen for the view: its reference history and its length. The
@@ -469,6 +475,8 @@ public sealed partial class PlaybackEngine : IDisposable
 
         public LibraryView? Library { get; init; }
 
+        public MachineSettings MachineSettings { get; init; } = new();
+
         /// <param name="emitted">The device's count. The queue's clock is that from
         /// <see cref="QueueBase"/>; while a preview holds the queue, it stops where the queue's
         /// mixer stopped, once the device has played out what it had of the queue. The preview's
@@ -501,6 +509,7 @@ public sealed partial class PlaybackEngine : IDisposable
                 Preview = preview,
                 Clip = clip,
                 Library = Library,
+                MachineSettings = MachineSettings,
             };
         }
 

@@ -6,9 +6,10 @@ using Faderio.Core.Transitions;
 namespace Faderio.Core.Tests;
 
 /// <summary>
-/// Build issue 12: the engine owns settings.json. <c>ChangeSettings</c> saves the file and
-/// applies each value: a changed default crossfade reschedules a boundary whose transition has
-/// not started and never touches one in flight; an output mode waits for the next launch.
+/// Build issue 12: the engine owns the library's settings.json. <c>ChangeSettings</c> saves the
+/// file and applies each value: a changed default crossfade reschedules a boundary whose
+/// transition has not started and never touches one in flight. The output mode is the machine's
+/// (<see cref="MachineSettingsTests"/>).
 /// </summary>
 public sealed class ChangeSettingsTests
 {
@@ -23,7 +24,7 @@ public sealed class ChangeSettingsTests
     public void ChangeSettings_SavesTheFile_AndTheViewCarriesThem()
     {
         using var tc = TestEngine.Create();
-        var chosen = Crossfade(8) with { OutputMode = AudioOutputMode.WaveOut, ReplayGainEnabled = false };
+        var chosen = Crossfade(8) with { ReplayGainEnabled = false };
 
         tc.Engine.ChangeSettings(chosen);
 
@@ -46,22 +47,6 @@ public sealed class ChangeSettingsTests
         using var tc = TestEngine.Create();
         tc.Engine.ChangeSettings(Crossfade(45));
         Assert.Equal(30, tc.View.Settings.DefaultCrossfadeSeconds);
-    }
-
-    [Fact]
-    public void ANewOutputMode_IsSavedForTheNextLaunch_AndTheEngineRateIsUnchanged()
-    {
-        using var tc = TestEngine.Create();
-        var a = TestAudio.WriteToneWav("a.wav", 3, 1000);
-        tc.Play(a);
-        tc.Output.Advance(Rate);
-
-        tc.Engine.ChangeSettings(new PlayerSettings { OutputMode = AudioOutputMode.WasapiExclusive });
-
-        Assert.Equal(AudioOutputMode.WasapiExclusive, new SettingsStore(tc.SettingsPath).Settings.OutputMode);
-        Assert.Equal(Rate, tc.Engine.SampleRate);
-        Assert.Equal(Transport.Playing, tc.View.Transport);
-        Assert.Equal(1.0, tc.Playhead.TotalSeconds, 3);
     }
 
     [Fact]

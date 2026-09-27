@@ -140,6 +140,14 @@ public sealed class PresenterTests
     public void ParseLibraryArgument_TakesTheLastOne(string[] args, string? expected) =>
         Assert.Equal(expected, Presenter.ParseLibraryArgument(args));
 
+    [Theory]
+    [InlineData(new[] { @"--library=C:\Temp\lib" }, null)]
+    [InlineData(new[] { "--machine=" }, null)]
+    [InlineData(new[] { @"--machine=C:\Temp\machine", @"--library=C:\Temp\lib" }, @"C:\Temp\machine")]
+    [InlineData(new[] { @"--MACHINE=C:\a", @"--machine=C:\b" }, @"C:\b")]
+    public void ParseMachineArgument_TakesTheLastOne(string[] args, string? expected) =>
+        Assert.Equal(expected, Presenter.ParseMachineArgument(args));
+
     [Fact]
     public void NoticeLog_MergesARepeatIntoItsFirstEntry_WithACount()
     {

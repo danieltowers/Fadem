@@ -20,32 +20,45 @@ internal static class Program
         // renders however fast the engine publishes (build issue 20).
         Application.Idle += (_, _) => sink.UiThreadIdle();
 
-        var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "faderio");
-        Directory.CreateDirectory(appData);
         // What goes wrong before the window exists is posted like any notice, and shown in order
         // once the form's message loop runs. The output's notices (each fallback step) are posted
         // too, so none is handled under the engine lock while the output reopens.
         Action<string> notify = ((IEngineSink)sink).Notice;
 
-        // The library (library issue 02, D12): --library=<folder>, else the one remembered, else
-        // the user is asked. --library is for smoke runs, so it neither reads nor changes which
-        // library a plain launch opens. Cancelled, the app opens with no library: nothing is
-        // saved, and what is queued still plays.
+        // This machine's files (library issue 03, D11): settings.json, engine-owned, and
+        // window.json, the shell's. In %APPDATA%\faderio, or --machine=<folder> for smoke runs.
+        // --library=<folder> alone keeps none, so a smoke run neither reads nor changes the
+        // user's: the output mode is the default, nothing is remembered and the window opens
+        // centred.
         var libraryArgument = Presenter.ParseLibraryArgument(args);
-        var machine = libraryArgument is null ? new MachineSettingsStore(Path.Combine(appData, "settings.json")) : null;
+        var machineFolder = Presenter.ParseMachineArgument(args) ??
+            (libraryArgument is null
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "faderio")
+                : null);
+        MachineSettingsStore? machine = null;
+        if (machineFolder is not null)
+        {
+            Directory.CreateDirectory(machineFolder);
+            machine = new MachineSettingsStore(Path.Combine(machineFolder, "settings.json"));
+        }
+
+        // The library (library issue 02, D12): --library=<folder>, else the one remembered, else
+        // the user is asked. Cancelled, the app opens with no library: nothing is saved, and
+        // what is queued still plays.
         var launch = LibraryLaunch.Resolve(libraryArgument, machine?.Settings.Library, Directory.Exists);
         var folder = launch.MustAsk ? MainForm.ShowLibraryDialog(owner: null) : launch.Folder;
         var library = folder is null ? null : Library.Open(folder);
 
-        // The engine owns the library and its settings; only the output mode is read here, since
-        // the output is opened before the engine that runs at its rate (ADR 0008).
+        // The engine owns both settings files; only the output mode is read here, since the
+        // output is opened before the engine that runs at its rate (ADR 0008).
         var output = new NAudioAudioOutput(
-            (library?.Settings?.Settings ?? new PlayerSettings()).OutputMode, notify,
+            (machine?.Settings ?? new MachineSettings()).OutputMode, notify,
             Presenter.ParseUnavailableOutputs(args));
         var engine = new PlaybackEngine(output, library, sink, machine: machine);
 
         // The title follows the library and the mode in use; the form renders both.
-        var form = new MainForm(engine, sink, () => output.Mode);
+        var form = new MainForm(engine, sink, () => output.Mode,
+            machineFolder is null ? null : Path.Combine(machineFolder, "window.json"));
         output.ModeChanged += () => form.BeginInvoke(() => form.Render());
         form.Shown += (_, _) =>
         {

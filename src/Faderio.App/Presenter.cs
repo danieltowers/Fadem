@@ -207,13 +207,18 @@ internal static class Presenter
 
     /// <summary>"--library=&lt;folder&gt;": for smoke runs, the library to open instead of the
     /// remembered one, without asking. Null when there is none.</summary>
-    public static string? ParseLibraryArgument(IEnumerable<string> args) =>
-        args.LastOrDefault(a => a.StartsWith(LibraryArgument, StringComparison.OrdinalIgnoreCase)) is { } arg &&
-        arg.Length > LibraryArgument.Length
-            ? arg[LibraryArgument.Length..]
-            : null;
+    public static string? ParseLibraryArgument(IEnumerable<string> args) => ParseFolderArgument(args, "--library=");
 
-    private const string LibraryArgument = "--library=";
+    /// <summary>"--machine=&lt;folder&gt;": for smoke runs, the folder holding this machine's
+    /// settings.json and window.json instead of %APPDATA%\faderio. Null when there is none.</summary>
+    public static string? ParseMachineArgument(IEnumerable<string> args) => ParseFolderArgument(args, "--machine=");
+
+    /// <summary>The last "<paramref name="name"/>&lt;folder&gt;" given, or null.</summary>
+    private static string? ParseFolderArgument(IEnumerable<string> args, string name) =>
+        args.LastOrDefault(a => a.StartsWith(name, StringComparison.OrdinalIgnoreCase)) is { } arg &&
+        arg.Length > name.Length
+            ? arg[name.Length..]
+            : null;
 
     /// <summary>"--unavailable=exclusive,shared": for smoke runs, the output treats these modes
     /// as if their device were taken, so the fallback chain can be seen.</summary>

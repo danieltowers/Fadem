@@ -31,10 +31,16 @@ public sealed class HeadlessFormTests
         public IEngineSink Sink { get; }
         public string SettingsPath => Library.SettingsPath;
 
+        /// <summary>The machine's settings.json: AppData's stand-in, beside the library folder
+        /// rather than in it.</summary>
+        public string MachinePath => Path.Combine(TempDir + "-machine", "settings.json");
+
         /// <param name="inUse">The mode the output opened in, as the NAudio adapter reports it.</param>
-        public Harness(int latency = 0, AudioOutputMode? inUse = AudioOutputMode.WasapiShared)
+        /// <param name="windowFile">The window.json the form keeps its geometry in, or none.</param>
+        public Harness(int latency = 0, AudioOutputMode? inUse = AudioOutputMode.WasapiShared, string? windowFile = null)
         {
             Directory.CreateDirectory(TempDir);
+            Directory.CreateDirectory(TempDir + "-machine");
             Output = new FakeAudioOutput { Latency = latency };
             Library = Library.Open(TempDir);
             Store = Library.Transitions!;
@@ -42,8 +48,11 @@ public sealed class HeadlessFormTests
             Sink = sink;
             // The add worker runs inline, so an add completes on this STA thread and the inline
             // sink never touches a control from another thread.
-            Engine = new PlaybackEngine(Output, Library, sink) { StartAddWorker = work => work() };
-            Form = new MainForm(Engine, sink, () => inUse);
+            Engine = new PlaybackEngine(Output, Library, sink, machine: new MachineSettingsStore(MachinePath))
+            {
+                StartAddWorker = work => work(),
+            };
+            Form = new MainForm(Engine, sink, () => inUse, windowFile);
         }
 
         public void Dispose()
@@ -51,6 +60,7 @@ public sealed class HeadlessFormTests
             Form.Dispose();
             Engine.Dispose();
             try { Directory.Delete(TempDir, recursive: true); } catch (IOException) { }
+            try { Directory.Delete(TempDir + "-machine", recursive: true); } catch (IOException) { }
         }
     }
 
@@ -1315,12 +1325,12 @@ public sealed class HeadlessFormTests
     // ── Settings (build issue 12) ───────────────────────────────────────────────────────
 
     [Fact]
-    public void TheSettingsDialog_OpensOnTheViewsSettings_AndOKSendsTheChoiceInOneCall() => RunSta(() =>
+    public void TheSettingsDialog_OpensOnTheViewsSettings_AndOKSendsEachGroupToItsOwnCommand() => RunSta(() =>
     {
         using var h = new Harness();
+        h.Engine.ChangeMachineSettings(new MachineSettings { OutputMode = AudioOutputMode.WasapiExclusive });
         h.Engine.ChangeSettings(new PlayerSettings
         {
-            OutputMode = AudioOutputMode.WasapiExclusive,
             UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade,
             DefaultCrossfadeSeconds = 8,
         });
@@ -1346,13 +1356,100 @@ public sealed class HeadlessFormTests
         Assert.True(opened);
         var expected = new PlayerSettings
         {
-            OutputMode = AudioOutputMode.WaveOut,
             UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade,
             DefaultCrossfadeSeconds = 12,
             ReplayGainEnabled = false,
         };
         Assert.Equal(expected, h.Engine.View.Settings);
         Assert.Equal(expected, new SettingsStore(h.SettingsPath).Settings); // saved for the next launch
+        Assert.Equal(AudioOutputMode.WaveOut, h.Engine.View.MachineSettings.OutputMode);
+        Assert.Equal(AudioOutputMode.WaveOut, new MachineSettingsStore(h.MachinePath).Settings.OutputMode);
+    });
+
+    [Fact]
+    public void TheSettingsDialog_GroupsThisMachine_AndThisLibrary() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Form.ShowSettings = dialog =>
+        {
+            Assert.Equal("This machine", dialog._machineGroup.Text);
+            Assert.Equal("This library", dialog._libraryGroup.Text);
+            Assert.True(dialog._machineGroup.Contains(dialog._outputMode));
+            Assert.True(dialog._machineGroup.Contains(dialog._nextLaunch));
+            Assert.True(dialog._machineGroup.Contains(dialog._inUse));
+            Assert.True(dialog._libraryGroup.Contains(dialog._hardCut));
+            Assert.True(dialog._libraryGroup.Contains(dialog._crossfade));
+            Assert.True(dialog._libraryGroup.Contains(dialog._seconds));
+            Assert.True(dialog._libraryGroup.Contains(dialog._replayGain));
+            return false;
+        };
+        Click(h.Form._settings);
+    });
+
+    [Fact]
+    public void EditingOnlyTheMachineGroup_CallsChangeMachineSettings_AndLeavesTheLibrarysFile() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var notices = new List<string>();
+        ((PostingSink)h.Sink).Noticed += notices.Add;
+        h.Form.ShowSettings = dialog =>
+        {
+            Assert.False(dialog.MachineChanged || dialog.LibraryChanged); // opening is no change
+            dialog._outputMode.SelectedIndex = dialog._outputMode.FindStringExact("WaveOut");
+            Assert.True(dialog.MachineChanged);
+            Assert.False(dialog.LibraryChanged);
+            return true;
+        };
+
+        Click(h.Form._settings);
+
+        Assert.Equal(AudioOutputMode.WaveOut, new MachineSettingsStore(h.MachinePath).Settings.OutputMode);
+        Assert.False(File.Exists(h.SettingsPath)); // the library's file is untouched
+        Assert.Equal("Saved machine settings.", Assert.Single(notices));
+    });
+
+    [Fact]
+    public void EditingOnlyTheLibraryGroup_CallsChangeSettings_AndLeavesTheMachinesFile() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var machine = File.ReadAllText(h.MachinePath); // the library, remembered as the engine opened
+        var notices = new List<string>();
+        ((PostingSink)h.Sink).Noticed += notices.Add;
+        h.Form.ShowSettings = dialog =>
+        {
+            dialog._crossfade.Checked = true;
+            Assert.True(dialog.LibraryChanged);
+            Assert.False(dialog.MachineChanged);
+            return true;
+        };
+
+        Click(h.Form._settings);
+
+        Assert.Equal(UnauthoredAdjacency.DefaultCrossfade, new SettingsStore(h.SettingsPath).Settings.UnauthoredAdjacency);
+        Assert.Equal(machine, File.ReadAllText(h.MachinePath));
+        Assert.Equal("Saved settings.", Assert.Single(notices));
+    });
+
+    [Fact]
+    public void AGroupChangedAndChangedBack_IsNotSent() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var notices = new List<string>();
+        ((PostingSink)h.Sink).Noticed += notices.Add;
+        h.Form.ShowSettings = dialog =>
+        {
+            dialog._outputMode.SelectedIndex = dialog._outputMode.FindStringExact("WaveOut");
+            dialog._outputMode.SelectedIndex = dialog._outputMode.FindStringExact("WASAPI shared");
+            dialog._replayGain.Checked = false;
+            dialog._replayGain.Checked = true;
+            Assert.False(dialog.MachineChanged || dialog.LibraryChanged);
+            return true;
+        };
+
+        Click(h.Form._settings);
+
+        Assert.Empty(notices);
+        Assert.False(File.Exists(h.SettingsPath));
     });
 
     [Fact]
@@ -1403,6 +1500,7 @@ public sealed class HeadlessFormTests
         Click(h.Form._settings);
 
         Assert.Equal(new PlayerSettings(), h.Engine.View.Settings);
+        Assert.Equal(AudioOutputMode.WasapiShared, h.Engine.View.MachineSettings.OutputMode);
         Assert.False(File.Exists(h.SettingsPath));
     });
 
@@ -1426,7 +1524,7 @@ public sealed class HeadlessFormTests
         AudioOutputMode? inUse, string shown) => RunSta(() =>
     {
         using var h = new Harness(inUse: inUse);
-        h.Engine.ChangeSettings(new PlayerSettings { OutputMode = AudioOutputMode.WasapiExclusive });
+        h.Engine.ChangeMachineSettings(new MachineSettings { OutputMode = AudioOutputMode.WasapiExclusive });
         h.Form.ShowSettings = dialog =>
         {
             Assert.Equal("WASAPI exclusive", dialog._outputMode.Text);
@@ -2158,5 +2256,84 @@ public sealed class HeadlessFormTests
         Assert.NotNull(h.Store.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath));
         Assert.Equal("Second", h.Engine.View.Library!.Name);
         Assert.Null(h.Engine.Transition(adjacency));
+    });
+
+    // ── Library issue 03: the window opens where it was closed ─────────────────────────
+
+    private static void CloseWindow(Harness h)
+    {
+        var closing = new FormClosingEventArgs(CloseReason.UserClosing, cancel: false);
+        typeof(Form).GetMethod("OnFormClosing", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(h.Form, new object[] { closing });
+        Assert.False(closing.Cancel);
+    }
+
+    private static string TempWindowFile() =>
+        Path.Combine(Path.GetTempPath(), "faderio-window", Guid.NewGuid().ToString("N"), "window.json");
+
+    [Fact]
+    public void TheWindow_ClosedSomewhere_OpensThereAtTheNextLaunch() => RunSta(() =>
+    {
+        var file = TempWindowFile();
+        var area = Screen.PrimaryScreen!.WorkingArea;
+        var placed = new Rectangle(area.X + 40, area.Y + 30, 900, 560);
+        using (var first = new Harness(windowFile: file))
+        {
+            Assert.Equal(FormStartPosition.CenterScreen, first.Form.StartPosition); // nothing saved yet
+            first.Form.Bounds = placed;
+            CloseWindow(first);
+        }
+        Assert.True(File.Exists(file));
+
+        using var relaunched = new Harness(windowFile: file);
+
+        Assert.Equal(FormStartPosition.Manual, relaunched.Form.StartPosition);
+        Assert.Equal(placed, relaunched.Form.Bounds);
+        Assert.Equal(FormWindowState.Normal, relaunched.Form.WindowState);
+    });
+
+    [Fact]
+    public void AWindowClosedMaximised_OpensMaximised_OverTheBoundsItHadBefore() => RunSta(() =>
+    {
+        var file = TempWindowFile();
+        var area = Screen.PrimaryScreen!.WorkingArea;
+        new WindowGeometry(area.X + 10, area.Y + 10, 800, 500, Maximised: true).Save(file);
+
+        using var h = new Harness(windowFile: file);
+
+        Assert.Equal(FormWindowState.Maximized, h.Form.WindowState);
+    });
+
+    [Fact]
+    public void AWindowSavedOffEveryScreen_OpensAtTheDefault_Centred() => RunSta(() =>
+    {
+        var file = TempWindowFile();
+        new WindowGeometry(-100_000, -100_000, 900, 560, Maximised: false).Save(file);
+
+        using var h = new Harness(windowFile: file);
+
+        Assert.Equal(FormStartPosition.CenterScreen, h.Form.StartPosition);
+        Assert.Equal(new Size(1040, 600), h.Form.Size);
+    });
+
+    [Fact]
+    public void AnUnreadableWindowFile_OpensAtTheDefault_WithoutANotice() => RunSta(() =>
+    {
+        var file = TempWindowFile();
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        File.WriteAllText(file, "{ not json");
+
+        using var h = new Harness(windowFile: file);
+
+        Assert.Equal(FormStartPosition.CenterScreen, h.Form.StartPosition);
+        Assert.Equal("Ready.", h.Form._status.Text);
+    });
+
+    [Fact]
+    public void WithNoWindowFile_ClosingWritesNothing() => RunSta(() =>
+    {
+        using var h = new Harness();
+        CloseWindow(h);
+        Assert.False(File.Exists(Path.Combine(h.TempDir + "-machine", "window.json")));
     });
 }

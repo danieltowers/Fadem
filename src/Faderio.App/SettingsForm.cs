@@ -3,14 +3,19 @@ using Faderio.Core.Settings;
 namespace Faderio.App;
 
 /// <summary>
-/// The Settings… dialog (build issue 12): the output mode, with a note that it applies at the
-/// next launch and, when it is not the mode in use (a fallback, or a choice waiting for the next
-/// launch), the mode in use beside it; what unauthored boundaries play; and ReplayGain. It opens on the view's settings and hands back
-/// <see cref="Chosen"/>; the caller sends it to the engine in one call on OK. It holds nothing
-/// once closed.
+/// The Settings… dialog (build issue 12), in two groups (library issue 03, D11). "This machine":
+/// the output mode, with a note that it applies at the next launch and, when it is not the mode
+/// in use (a fallback, or a choice waiting for the next launch), the mode in use beside it.
+/// "This library": what unauthored boundaries play, and ReplayGain. It opens on the view's
+/// settings and hands back each group's choice, <see cref="MachineChoice"/> and
+/// <see cref="LibraryChoice"/>; on OK the caller sends each group the user changed to its own
+/// engine command. It holds
+/// nothing once closed.
 /// </summary>
 internal sealed class SettingsForm : Form
 {
+    internal readonly GroupBox _machineGroup;
+    internal readonly GroupBox _libraryGroup;
     internal readonly ComboBox _outputMode;
     internal readonly Label _nextLaunch;
     internal readonly Label _inUse;
@@ -20,6 +25,8 @@ internal sealed class SettingsForm : Form
     internal readonly CheckBox _replayGain;
     internal readonly Button _ok;
     internal readonly Button _cancel;
+    private readonly MachineSettings _shownMachine;
+    private readonly PlayerSettings _shownLibrary;
 
     /// <summary>A mode as the list shows it.</summary>
     private sealed record ModeItem(AudioOutputMode Mode)
@@ -27,10 +34,13 @@ internal sealed class SettingsForm : Form
         public override string ToString() => Presenter.FmtOutputMode(Mode);
     }
 
-    /// <param name="shown">The settings to open on: the view's.</param>
+    /// <param name="machine">This machine's settings to open on: the view's.</param>
+    /// <param name="shown">The library's settings to open on: the view's.</param>
     /// <param name="inUse">The mode the output opened in, or null when none could be.</param>
-    public SettingsForm(PlayerSettings shown, AudioOutputMode? inUse)
+    public SettingsForm(MachineSettings machine, PlayerSettings shown, AudioOutputMode? inUse)
     {
+        _shownMachine = machine;
+        _shownLibrary = shown;
         Text = "Settings";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -43,9 +53,9 @@ internal sealed class SettingsForm : Form
 
         _outputMode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
         _outputMode.Items.AddRange(Enum.GetValues<AudioOutputMode>().Select(m => (object)new ModeItem(m)).ToArray());
-        _outputMode.SelectedIndex = _outputMode.Items.IndexOf(new ModeItem(shown.OutputMode));
+        _outputMode.SelectedIndex = _outputMode.Items.IndexOf(new ModeItem(machine.OutputMode));
         _nextLaunch = new Label { Text = "Applies at the next launch.", AutoSize = true, ForeColor = SystemColors.GrayText };
-        _inUse = new Label { Text = Presenter.FmtModeInUse(shown.OutputMode, inUse), AutoSize = true };
+        _inUse = new Label { Text = Presenter.FmtModeInUse(machine.OutputMode, inUse), AutoSize = true };
 
         // One parent, so the two choices exclude each other; N sits on the crossfade's line.
         _hardCut = new RadioButton { Text = "Hard cut", AutoSize = true, Checked = shown.UnauthoredAdjacency == UnauthoredAdjacency.HardCut };
@@ -81,29 +91,71 @@ internal sealed class SettingsForm : Form
         AcceptButton = _ok;
         CancelButton = _cancel;
 
-        var layout = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Dock = DockStyle.Fill };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        layout.Controls.Add(Caption("Output mode:"), 0, 0);
-        layout.Controls.Add(_outputMode, 1, 0);
-        layout.Controls.Add(_nextLaunch, 1, 1);
-        layout.Controls.Add(_inUse, 1, 2);
-        layout.Controls.Add(Caption("Unauthored boundaries:"), 0, 3);
-        layout.Controls.Add(boundaries, 1, 3);
-        layout.Controls.Add(_replayGain, 1, 4);
-        layout.Controls.Add(buttons, 0, 5);
-        layout.SetColumnSpan(buttons, 2);
+        var machineRows = Rows();
+        machineRows.Controls.Add(Caption("Output mode:"), 0, 0);
+        machineRows.Controls.Add(_outputMode, 1, 0);
+        machineRows.Controls.Add(_nextLaunch, 1, 1);
+        machineRows.Controls.Add(_inUse, 1, 2);
+        _machineGroup = Group("This machine", machineRows);
+
+        var libraryRows = Rows();
+        libraryRows.Controls.Add(Caption("Unauthored boundaries:"), 0, 0);
+        libraryRows.Controls.Add(boundaries, 1, 0);
+        libraryRows.Controls.Add(_replayGain, 1, 1);
+        _libraryGroup = Group("This library", libraryRows);
+
+        var layout = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Dock = DockStyle.Fill };
+        layout.Controls.Add(_machineGroup, 0, 0);
+        layout.Controls.Add(_libraryGroup, 0, 1);
+        layout.Controls.Add(buttons, 0, 2);
         Controls.Add(layout);
     }
 
-    /// <summary>What the dialog says now, whole: one engine call takes it.</summary>
-    public PlayerSettings Chosen => new()
+    /// <summary>Whether the machine group now says other than it opened on: only then does OK
+    /// send it.</summary>
+    public bool MachineChanged => MachineChoice.OutputMode != _shownMachine.OutputMode;
+
+    /// <summary>Whether the library group now says other than it opened on: only then does OK
+    /// send it.</summary>
+    public bool LibraryChanged => LibraryChoice != _shownLibrary;
+
+    /// <summary>What the machine group says now, whole: one engine call takes it.</summary>
+    public MachineSettings MachineChoice => new()
     {
         OutputMode = ((ModeItem)_outputMode.SelectedItem!).Mode,
+    };
+
+    /// <summary>What the library group says now, whole: one engine call takes it.</summary>
+    public PlayerSettings LibraryChoice => new()
+    {
         UnauthoredAdjacency = _crossfade.Checked ? UnauthoredAdjacency.DefaultCrossfade : UnauthoredAdjacency.HardCut,
         DefaultCrossfadeSeconds = (int)_seconds.Value,
         ReplayGainEnabled = _replayGain.Checked,
     };
+
+    /// <summary>A group's rows: a caption, then its controls.</summary>
+    private static TableLayoutPanel Rows()
+    {
+        var rows = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Dock = DockStyle.Fill };
+        rows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        rows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        return rows;
+    }
+
+    private static GroupBox Group(string text, Control rows)
+    {
+        var group = new GroupBox
+        {
+            Text = text,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Dock = DockStyle.Fill,
+            Padding = new Padding(8, 4, 8, 8),
+            Margin = new Padding(0, 0, 0, 8),
+        };
+        group.Controls.Add(rows);
+        return group;
+    }
 
     private static Label Caption(string text) =>
         new() { Text = text, AutoSize = true, Margin = new Padding(0, 6, 12, 0) };

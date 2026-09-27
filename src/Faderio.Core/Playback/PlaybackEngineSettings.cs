@@ -11,16 +11,16 @@ public sealed partial class PlaybackEngine
     /// step is no click, short enough to be heard as at once.</summary>
     private static readonly TimeSpan GainRampDuration = TimeSpan.FromMilliseconds(5);
 
-    /// <summary>Saves the settings and applies each one (build issue 12). A changed default
-    /// crossfade reschedules the pending boundary if its transition has not started; one in
-    /// flight plays out (the audible-time rule), and so does a fade-out point already passed: a
-    /// crossfade switched on in a track's last N seconds leaves its boundary a hard cut. A
-    /// ReplayGain toggle reaches every live voice at once, each ramping to its own tag's gain
-    /// (build issue 13). The output mode is saved for the next launch: the engine rate is fixed
-    /// at launch (ADR 0008).
+    /// <summary>Saves the open library's settings and applies each one (build issue 12). A
+    /// changed default crossfade reschedules the pending boundary if its transition has not
+    /// started; one in flight plays out (the audible-time rule), and so does a fade-out point
+    /// already passed: a crossfade switched on in a track's last N seconds leaves its boundary a
+    /// hard cut. A ReplayGain toggle reaches every live voice at once, each ramping to its own
+    /// tag's gain (build issue 13).
     /// N out of range is brought into it. The outcome is a notice, as for authoring: saved, or
     /// not saved and why, and then nothing changes. With no library open there is nowhere to
-    /// save them, so nothing changes.</summary>
+    /// save them, so nothing changes. Settings the same as those in force are no change and
+    /// no notice.</summary>
     public void ChangeSettings(PlayerSettings settings)
     {
         ThrowIfDisposed();
@@ -59,6 +59,42 @@ public sealed partial class PlaybackEngine
             {
                 RampLiveVoicesToTheirGain();
             }
+            Publish();
+        });
+    }
+
+    /// <summary>Saves this machine's settings (library issue 03, D11). The output mode is
+    /// saved for the next launch: the engine rate is fixed at launch (ADR 0008), so nothing
+    /// changes now. The library to reopen is the engine's to remember, so the one in
+    /// <paramref name="settings"/> is not used. The outcome is a notice, as for
+    /// <see cref="ChangeSettings"/>; settings the same as those saved are no change and no
+    /// notice. With no machine settings file in this run, nothing is saved.</summary>
+    public void ChangeMachineSettings(MachineSettings settings)
+    {
+        ThrowIfDisposed();
+        Run(() =>
+        {
+            var saved = _machine?.Settings ?? new MachineSettings();
+            var next = settings.Normalised() with { Library = saved.Library };
+            if (next == saved)
+            {
+                return;
+            }
+            if (_machine is null)
+            {
+                RaiseNotice("Not saved: machine settings. This run keeps no machine settings file.");
+                return;
+            }
+            try
+            {
+                _machine.Save(next);
+            }
+            catch (Exception e) when (IsStoreWriteFailure(e))
+            {
+                RaiseNotice($"Not saved: machine settings. The machine settings file could not be written: {e.Message}");
+                return;
+            }
+            RaiseNotice("Saved machine settings.");
             Publish();
         });
     }

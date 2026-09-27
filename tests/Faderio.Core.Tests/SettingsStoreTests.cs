@@ -26,7 +26,6 @@ public sealed class SettingsStoreTests : IDisposable
     {
         var store = new SettingsStore(_path);
         Assert.Null(store.LoadNotice);
-        Assert.Equal(AudioOutputMode.WasapiShared, store.Settings.OutputMode);
         Assert.Equal(UnauthoredAdjacency.HardCut, store.Settings.UnauthoredAdjacency);
         Assert.Equal(5, store.Settings.DefaultCrossfadeSeconds);
         Assert.True(store.Settings.ReplayGainEnabled);
@@ -37,7 +36,6 @@ public sealed class SettingsStoreTests : IDisposable
     {
         var settings = new PlayerSettings
         {
-            OutputMode = AudioOutputMode.WasapiExclusive,
             UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade,
             DefaultCrossfadeSeconds = 8,
             ReplayGainEnabled = false,
@@ -57,7 +55,19 @@ public sealed class SettingsStoreTests : IDisposable
         var json = File.ReadAllText(_path);
         Assert.Contains("\"schemaVersion\": 1", json);
         Assert.Contains("\"DefaultCrossfade\"", json);
-        Assert.Contains("\"WasapiShared\"", json);
+        Assert.DoesNotContain("outputMode", json); // the machine's (library issue 03)
+    }
+
+    [Fact]
+    public void AnOutputModeLeftInTheLibrarysFile_IsIgnored_WithoutANotice()
+    {
+        // Written before library issue 03, when the output mode was a player setting.
+        File.WriteAllText(_path, "{\"schemaVersion\": 1, \"outputMode\": \"WaveOut\", \"defaultCrossfadeSeconds\": 9}");
+
+        var store = new SettingsStore(_path);
+
+        Assert.Null(store.LoadNotice);
+        Assert.Equal(new PlayerSettings { DefaultCrossfadeSeconds = 9 }, store.Settings);
     }
 
     [Fact]
@@ -109,7 +119,7 @@ public sealed class SettingsStoreTests : IDisposable
 
     [Theory]
     [InlineData("{\"schemaVersion\": 42, \"defaultCrossfadeSeconds\": 9}")]
-    [InlineData("{\"schemaVersion\": 2, \"outputMode\": \"Asio\"}")] // a mode this version does not know
+    [InlineData("{\"schemaVersion\": 2, \"outputMode\": \"Asio\"}")] // a key this version does not know
     [InlineData("{\"schemaVersion\": 2, \"defaultCrossfadeSeconds\": 7.5}")] // a field that changed shape
     public void ANewerSchema_RaisesANotice_LoadsDefaults_AndLeavesTheFileAlone(string newer)
     {

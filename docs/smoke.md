@@ -16,13 +16,16 @@ Launch the app, take a screenshot, and check each item against it. Report the re
 item in the session's hand-off. Plain arguments are files to queue; `--play` starts them and
 `--edit-first` opens the editor on the first boundary;
 `--unavailable=exclusive,shared` treats those modes as if their device were taken, to force the
-fallback chain; `--library=<folder>` opens that folder as the library without asking, and
-neither reads nor changes the library a plain launch opens. Point it at a fresh temp folder, so
-a smoke run writes nothing into the user's library. The output mode is a setting, chosen in
-**Settings…** and used from the next launch:
+fallback chain; `--library=<folder>` opens that folder as the library without asking;
+`--machine=<folder>` keeps this machine's `settings.json` and `window.json` in that folder
+instead of `%APPDATA%\faderio`. Point both at fresh temp folders, so a smoke run writes nothing
+into the user's library or machine settings. `--library=` without `--machine=` keeps no machine
+files at all: the output mode is the default, nothing is remembered, and the window opens
+centred. The output mode is a machine setting, chosen in **Settings…** and used from the next
+launch, so the items that relaunch pass the same two folders again:
 
 ```
-dotnet run --project src/Faderio.App -- "<outgoing>" "<incoming>" --play --edit-first --library="<temp folder>"
+dotnet run --project src/Faderio.App -- "<outgoing>" "<incoming>" --play --edit-first --library="<temp library>" --machine="<temp machine>"
 ```
 
 `<outgoing>` and `<incoming>` are **absolute paths to two real, promised files**; there are no
@@ -32,8 +35,9 @@ any other file: nothing is queued and the only sign is one line in the status st
 ("Nothing added: … The file does not exist."). The agent generates its own WAVs for the Looks
 half; the Sounds half uses the two tracks of a boundary already in the store
 (`<library>\.faderio\transitions.json` lists them by full path). Everything the app writes for a
-library is under its `.faderio\`; `%APPDATA%\faderio\settings.json` remembers only which library
-a plain launch opens.
+library is under its `.faderio\`. `%APPDATA%\faderio\` holds only what is the machine's:
+`settings.json` (the output mode, and the library a plain launch opens) and `window.json` (where
+the window was closed).
 
 Capture the window with `PrintWindow` rather than a screen grab, so it need not be in front.
 There is no ⏹ button (the engine still stops at launch and when the queue ends). UI Automation
@@ -160,14 +164,22 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       the title names WASAPI shared, not exclusive, and the strip says exclusive was
       unavailable. With `--unavailable=exclusive,shared` the title names WaveOut at 44100 Hz,
       with a notice for each step.
-- [ ] **Settings…** opens a dialog with OK and Cancel showing the three settings: the output
-      mode with "Applies at the next launch." under it; *Hard cut* or *Crossfade for N s*, with
-      N greyed out under *Hard cut*; and ReplayGain. Launched into a fallback as above, it also
-      reads "In use now: WASAPI shared" (or WaveOut) under the mode chosen.
+- [ ] **Settings…** opens a dialog with OK and Cancel showing the three settings in two
+      groups. **This machine**: the output mode with "Applies at the next launch." under it.
+      **This library**: *Hard cut* or *Crossfade for N s*, with N greyed out under *Hard cut*;
+      and ReplayGain. Launched into a fallback as above, it also reads "In use now: WASAPI
+      shared" (or WaveOut) under the mode chosen.
 - [ ] A setting changed and saved with OK is still set after a restart; Cancel keeps nothing.
+      Changing only the output mode says "Saved machine settings."; only a library setting,
+      "Saved settings.".
+- [ ] Crossfade for 12 s in one library, then **Open library…** on a fresh folder: **Settings…**
+      shows *Hard cut* there, and the output mode chosen before. Back to the first library:
+      12 s again.
+- [ ] Resize and move the window, close it, relaunch with the same `--machine=`: it opens in
+      the same place at the same size. Closed maximised, it opens maximised.
 - [ ] Launching with a corrupt `<library>\.faderio\settings.json` shows no
       dialog: the strip says the file was moved aside to `settings.json.corrupt`, and
-      **Settings…** shows the defaults.
+      **Settings…** shows the library's defaults.
 - [ ] Adding the library's longest FLAC (about 26 minutes) shows its full length in the time
       readout, and seeking into its last minute lands there. Length is not proven by the test
       suite; this is where it is checked.

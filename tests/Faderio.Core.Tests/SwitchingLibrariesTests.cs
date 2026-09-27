@@ -179,7 +179,8 @@ public sealed class SwitchingLibrariesTests : IDisposable
     [Fact]
     public void TheMachinesOldSettingsFile_IsReadWithoutANotice_AndRewrittenWithTheLibrary()
     {
-        // Until library issue 01 this file was the player's settings (D13: not migrated).
+        // Until library issue 01 this file was the player's settings (D13: not migrated, not even
+        // its output mode, which is the machine's again since library issue 03).
         File.WriteAllText(MachinePath, """{ "schemaVersion": 1, "outputMode": "WaveOut", "defaultCrossfadeSeconds": 9 }""");
         var machine = new MachineSettingsStore(MachinePath);
         Assert.Null(machine.LoadNotice);
@@ -192,7 +193,8 @@ public sealed class SwitchingLibrariesTests : IDisposable
         Assert.Empty(sink.Notices);
         var json = File.ReadAllText(MachinePath);
         Assert.Contains("\"library\"", json);
-        Assert.DoesNotContain("outputMode", json);
+        Assert.Contains("\"outputMode\": \"WasapiShared\"", json);
+        Assert.DoesNotContain("defaultCrossfadeSeconds", json);
         Assert.Equal(first, new MachineSettingsStore(MachinePath).Settings.Library);
     }
 

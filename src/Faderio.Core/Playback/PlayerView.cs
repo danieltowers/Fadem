@@ -41,8 +41,9 @@ public sealed record VoiceView(QueueRow Row, Playhead Playhead, Length Length)
 /// off, when every row after is marked, and when the queue is empty.
 /// <see cref="CanTransitionNow"/> is whether <c>TransitionNow</c> would act: playing, one voice
 /// heard alone with no handover or finish still in the device, and a next adjacency.
-/// <see cref="Settings"/> are the settings in force, as last saved: the output mode among them is
-/// the one chosen for the next launch, not necessarily the one in use (build issue 12).
+/// <see cref="Settings"/> are the open library's settings in force, as last saved (build issue
+/// 12); <see cref="MachineSettings"/> this machine's, whose output mode is the one chosen for the
+/// next launch, not necessarily the one in use (library issue 03).
 /// </summary>
 public sealed record PlayerView(
     long Version,
@@ -58,6 +59,9 @@ public sealed record PlayerView(
     bool CanTransitionNow = false)
 {
     public PlayerSettings Settings { get; init; } = new();
+
+    /// <summary>This machine's settings, as last saved: defaults when the run keeps none.</summary>
+    public MachineSettings MachineSettings { get; init; } = new();
 
     /// <summary>The preview running in the editor, or null (build issue 16). While it runs the
     /// queue is held: <see cref="Attended"/>, <see cref="Incoming"/> and <see cref="Transport"/>

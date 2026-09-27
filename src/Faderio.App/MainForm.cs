@@ -15,8 +15,9 @@ namespace Faderio.App;
 /// shuffle toggle and a repeat button (build issue 07), a seek bar in milliseconds, the
 /// transition editor, a status strip showing the latest notice and a count that opens this
 /// session's notice list (build issue 09), a Settings… dialog (build issue 12), and the clip
-/// light, which a click clears (build issue 17), and Open library… with the library named in the
-/// title (library issue 02). It renders <see cref="PlayerView"/>s and issues
+/// light, which a click clears (build issue 17), Open library… with the library named in the
+/// title (library issue 02), and the window opening where it was closed (library issue 03). It
+/// renders <see cref="PlayerView"/>s and issues
 /// commands; it holds no engine state between calls (the placement rule in CLAUDE.md). The seek
 /// bar's Maximum is the track length in milliseconds, so no scaling exists to get wrong
 /// (ticket 06).
@@ -25,6 +26,7 @@ internal sealed class MainForm : Form
 {
     private readonly PlaybackEngine _engine;
     private readonly Func<AudioOutputMode?> _outputModeInUse;
+    private readonly string? _windowFile;
 
     internal readonly ListView _queueList;
     internal readonly SeekBar _seek;
@@ -71,10 +73,13 @@ internal sealed class MainForm : Form
 
     /// <param name="outputModeInUse">The mode the output opened in, or null when none could be:
     /// the output adapter's, for the settings dialog.</param>
-    public MainForm(PlaybackEngine engine, PostingSink sink, Func<AudioOutputMode?> outputModeInUse)
+    /// <param name="windowFile">The machine's window.json: where the window opens, and where it
+    /// is written when the window closes. Null keeps no geometry: the window opens centred.</param>
+    public MainForm(PlaybackEngine engine, PostingSink sink, Func<AudioOutputMode?> outputModeInUse, string? windowFile = null)
     {
         _engine = engine;
         _outputModeInUse = outputModeInUse;
+        _windowFile = windowFile;
         ChooseFiles = ShowFilesDialog;
         ChooseFolders = ShowFolderDialog;
         ChoosePlaylists = ShowPlaylistDialog;
@@ -346,10 +351,32 @@ internal sealed class MainForm : Form
             }
             _timer.Stop();
             _tips.Dispose();
+            if (_windowFile is not null)
+            {
+                WindowGeometry.Of(this).Save(_windowFile);
+            }
             _engine.Dispose();
         };
 
+        PlaceWindow();
         Render(_engine.View);
+    }
+
+    /// <summary>Opens the window where it was last closed (library issue 03), if that is still on
+    /// a screen; else at the default size, centred.</summary>
+    private void PlaceWindow()
+    {
+        if (_windowFile is null || WindowGeometry.Load(_windowFile) is not { } placed ||
+            !placed.IsOnScreen(Screen.AllScreens.Select(screen => screen.WorkingArea)))
+        {
+            return;
+        }
+        StartPosition = FormStartPosition.Manual;
+        Bounds = placed.Bounds;
+        if (placed.Maximised)
+        {
+            WindowState = FormWindowState.Maximized;
+        }
     }
 
     // ── Rendering: read, render, forget ─────────────────────────────────────────────────
@@ -594,13 +621,22 @@ internal sealed class MainForm : Form
         return dialog.ShowDialog(owner) == DialogResult.OK ? dialog.SelectedPath : null;
     }
 
-    /// <summary>The dialog opens on the view's settings; OK sends what it says in one call.</summary>
+    /// <summary>The dialog opens on the view's settings; OK sends each group the user changed to
+    /// its own command, one call per group (library issue 03).</summary>
     private void EditSettings()
     {
-        using var dialog = new SettingsForm(_engine.View.Settings, _outputModeInUse());
+        var view = _engine.View;
+        using var dialog = new SettingsForm(view.MachineSettings, view.Settings, _outputModeInUse());
         if (ShowSettings(dialog))
         {
-            _engine.ChangeSettings(dialog.Chosen);
+            if (dialog.MachineChanged)
+            {
+                _engine.ChangeMachineSettings(dialog.MachineChoice);
+            }
+            if (dialog.LibraryChanged)
+            {
+                _engine.ChangeSettings(dialog.LibraryChoice);
+            }
         }
     }
 

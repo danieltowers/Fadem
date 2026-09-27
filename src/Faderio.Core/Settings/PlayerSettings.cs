@@ -1,17 +1,5 @@
 namespace Faderio.Core.Settings;
 
-public enum AudioOutputMode
-{
-    /// <summary>WASAPI shared (default): playback alongside other apps.</summary>
-    WasapiShared,
-
-    /// <summary>WASAPI exclusive (opted in): bit-perfect output, takes the device.</summary>
-    WasapiExclusive,
-
-    /// <summary>WaveOut: the compatibility fallback, and the third mode the slice must prove on.</summary>
-    WaveOut,
-}
-
 /// <summary>What an adjacency nobody authored plays.</summary>
 public enum UnauthoredAdjacency
 {
@@ -23,9 +11,11 @@ public enum UnauthoredAdjacency
 }
 
 /// <summary>
-/// The player's three settings (wayfinder ticket 10), persisted as JSON in the library's
-/// .faderio\settings.json (ADR 0011); missing keys fall back to these built-in defaults. The
-/// output mode takes effect at the next launch (ADR 0008); the others at once.
+/// The library's listening settings (wayfinder ticket 10, D11), persisted as JSON in the
+/// library's .faderio\settings.json (ADR 0011); missing keys fall back to these built-in
+/// defaults. Each takes effect at once. The output mode is the machine's
+/// (<see cref="MachineSettings"/>, library issue 03); a key for it left in an older file is
+/// ignored.
 /// </summary>
 public sealed record PlayerSettings
 {
@@ -34,7 +24,6 @@ public sealed record PlayerSettings
     public const int MaxDefaultCrossfadeSeconds = 30;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
-    public AudioOutputMode OutputMode { get; init; } = AudioOutputMode.WasapiShared;
     public UnauthoredAdjacency UnauthoredAdjacency { get; init; } = UnauthoredAdjacency.HardCut;
 
     /// <summary>N, the default crossfade's length in whole seconds, 1 to 30. It never applies to
@@ -45,12 +34,11 @@ public sealed record PlayerSettings
     public bool ReplayGainEnabled { get; init; } = true;
 
     /// <summary>These settings as the engine keeps them: the current schema, N brought into
-    /// range, and a mode or choice no version knows replaced by its default. A hand-edited file
+    /// range, and a choice no version knows replaced by its default. A hand-edited file
     /// and a caller alike get the same settings back.</summary>
     public PlayerSettings Normalised() => this with
     {
         SchemaVersion = CurrentSchemaVersion,
-        OutputMode = Enum.IsDefined(OutputMode) ? OutputMode : AudioOutputMode.WasapiShared,
         UnauthoredAdjacency = Enum.IsDefined(UnauthoredAdjacency) ? UnauthoredAdjacency : UnauthoredAdjacency.HardCut,
         DefaultCrossfadeSeconds = Math.Clamp(DefaultCrossfadeSeconds, MinDefaultCrossfadeSeconds, MaxDefaultCrossfadeSeconds),
     };
