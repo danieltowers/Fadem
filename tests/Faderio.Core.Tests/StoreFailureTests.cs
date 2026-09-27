@@ -25,7 +25,11 @@ public sealed class StoreFailureTests
 
         public bool Remove(string outgoingPath, string incomingPath) => throw Failure;
 
+        public IReadOnlyList<(string Outgoing, string Incoming)> Pairs() => [];
+
         public TransitionSpec? GetOverride(string playlistName, string outgoingPath, string incomingPath) => null;
+
+        public IReadOnlyList<(string Outgoing, string Incoming)> OverridePairs(string playlistName) => [];
 
         public void UpsertOverride(string playlistName, string outgoingPath, string incomingPath, TransitionSpec partial) =>
             throw Failure;

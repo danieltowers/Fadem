@@ -53,6 +53,11 @@ public sealed class JsonTransitionStore : ITransitionStore
         return true;
     }
 
+    public IReadOnlyList<(string Outgoing, string Incoming)> Pairs() => _model.Transitions.Keys.Select(Unkey).ToList();
+
+    public IReadOnlyList<(string Outgoing, string Incoming)> OverridePairs(string playlistName) =>
+        _model.PlaylistOverrides.TryGetValue(playlistName, out var byPair) ? byPair.Keys.Select(Unkey).ToList() : [];
+
     public TransitionSpec? GetOverride(string playlistName, string outgoingPath, string incomingPath)
     {
         if (!_model.PlaylistOverrides.TryGetValue(playlistName, out var byPair))
@@ -118,6 +123,13 @@ public sealed class JsonTransitionStore : ITransitionStore
 
     internal static string PairKey(string outgoingPath, string incomingPath) =>
         Normalize(outgoingPath) + "|" + Normalize(incomingPath);
+
+    /// <summary>A key back into its two paths. A Windows path holds no '|'.</summary>
+    private static (string Outgoing, string Incoming) Unkey(string key)
+    {
+        var bar = key.IndexOf('|');
+        return (key[..bar], key[(bar + 1)..]);
+    }
 
     internal static string Normalize(string path) => Path.GetFullPath(path);
 

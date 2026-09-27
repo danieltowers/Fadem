@@ -15,7 +15,14 @@ public interface ITransitionStore
 
     bool Remove(string outgoingPath, string incomingPath);
 
+    /// <summary>Every ordered pair with a global transition, as the store names its tracks
+    /// (playlists issue 05).</summary>
+    IReadOnlyList<(string Outgoing, string Incoming)> Pairs();
+
     TransitionSpec? GetOverride(string playlistName, string outgoingPath, string incomingPath);
+
+    /// <summary>Every ordered pair the playlist overrides; none for a playlist with no overrides.</summary>
+    IReadOnlyList<(string Outgoing, string Incoming)> OverridePairs(string playlistName);
 
     void UpsertOverride(string playlistName, string outgoingPath, string incomingPath, TransitionSpec partial);
 

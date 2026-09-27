@@ -439,6 +439,7 @@ public sealed partial class PlaybackEngine : IDisposable
             MachineSettings = _machine?.Settings ?? new MachineSettings(),
             Playlists = _playlists,
             OpenPlaylist = _openPlaylist,
+            StoreVersion = StoreVersionNow(),
         };
     }
 
@@ -508,6 +509,8 @@ public sealed partial class PlaybackEngine : IDisposable
 
         public string? OpenPlaylist { get; init; }
 
+        public long StoreVersion { get; init; }
+
         /// <summary>Rows still sounding from the playlist open before (playlists issue 01): the
         /// queue passes out of them and never steps into one.</summary>
         public ImmutableHashSet<RowId> Passing { get; init; } = [];
@@ -547,6 +550,7 @@ public sealed partial class PlaybackEngine : IDisposable
                 MachineSettings = MachineSettings,
                 Playlists = Playlists,
                 OpenPlaylist = OpenPlaylist,
+                StoreVersion = StoreVersion,
             };
         }
 

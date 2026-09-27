@@ -83,6 +83,12 @@ public sealed record PlayerView(
     /// when none is. A row still sounding from the playlist open before is in <see cref="Queue"/>
     /// until it falls silent, but not in this playlist.</summary>
     public string? OpenPlaylist { get; init; }
+
+    /// <summary>Moves on whenever what <c>AdjacenciesInStore</c> and <c>TracksInStore</c> answer
+    /// may have changed (playlists issue 05): a transition or an override saved or removed, or
+    /// another playlist or library opened. The transition manager asks again only then, since
+    /// the answers probe files.</summary>
+    public long StoreVersion { get; init; }
 }
 
 /// <summary>The open library as the shell sees it: its folder, the folder's leaf name, and

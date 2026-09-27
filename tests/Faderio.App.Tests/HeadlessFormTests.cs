@@ -18,7 +18,7 @@ namespace Faderio.App.Tests;
 /// the fake output and an inline sink. Controls are poked, not pixels: a click is the control's
 /// own click handler, and the assertions are the control values a user would see.
 /// </summary>
-public sealed class HeadlessFormTests
+public sealed partial class HeadlessFormTests
 {
     private sealed class Harness : IDisposable
     {

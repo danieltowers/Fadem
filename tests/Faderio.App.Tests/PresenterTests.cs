@@ -218,4 +218,61 @@ public sealed class PresenterTests
 
     [Fact]
     public void FmtCurve_WithNoCurve_IsTheGlobalOne() => Assert.Equal("(global)", Presenter.FmtCurve((FadeCurveKind?)null));
+
+    // ── The transition manager (playlists issue 05) ─────────────────────────────────────
+
+    private static Track TrackNamed(string path, string title = "", string artist = "") =>
+        new() { FilePath = path, Title = title, Artist = artist };
+
+    [Fact]
+    public void FmtTrack_IsTitleAndArtist_TheTitleAlone_OrThePathOfAFileThatCouldNotBeProbed()
+    {
+        Assert.Equal("Morning — Example Band", Presenter.FmtTrack(TrackNamed(@"C:\m\morning.flac", "Morning", "Example Band")));
+        Assert.Equal("Morning", Presenter.FmtTrack(TrackNamed(@"C:\m\morning.flac", "Morning")));
+        Assert.Equal(@"C:\m\gone.flac", Presenter.FmtTrack(TrackNamed(@"C:\m\gone.flac")));
+    }
+
+    [Fact]
+    public void ManagerRow_PairsEachParameterGlobalThenOverride_WithADashForTheLayerThatSetsNone()
+    {
+        var a = TrackNamed(@"C:\m\a.wav", "A");
+        var b = TrackNamed(@"C:\m\b.wav", "B", "Band");
+        var global = new TransitionSpec
+        {
+            FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(10), FromEnd: false),
+            FadeOutDuration = TimeSpan.FromSeconds(2),
+            FadeInPoint = TimeSpan.Zero,
+            Curve = FadeCurveKind.Linear,
+        };
+        var over = new TransitionSpec { FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(8), FromEnd: true) };
+        var effective = global with { FadeOutPoint = over.FadeOutPoint };
+        var stored = new StoredAdjacency(new Adjacency(b, a), IsOutgoing: false, new TransitionLayers(global, over, effective));
+
+        Assert.Equal(
+            ["←", "B — Band", "10 | 8 from end", "2 | –", "0 | –", "", "Linear | –",
+             "fade-out at 8 s from end for 2 s, fade-in from 0 s over blank, linear", ""],
+            Presenter.ManagerRow(stored));
+    }
+
+    [Fact]
+    public void ManagerRow_MarksAPlaylistOnlyTransition_AndPointsOutgoingWithARightArrow()
+    {
+        var a = TrackNamed(@"C:\m\a.wav", "A");
+        var over = new TransitionSpec { FadeInDuration = TimeSpan.FromSeconds(1) };
+        var stored = new StoredAdjacency(new Adjacency(a, a), IsOutgoing: true, new TransitionLayers(null, over, over));
+
+        var row = Presenter.ManagerRow(stored);
+
+        Assert.Equal("→", row[0]);
+        Assert.Equal("– | 1", row[5]);
+        Assert.Equal("✓", row[8]);
+    }
+
+    [Fact]
+    public void ManagerLegend_SaysHowToReadAPair_OrThatNothingIsSaved()
+    {
+        Assert.Equal("Each value reads global | override in Evening. Double-click a row to open it in the editor.",
+            Presenter.ManagerLegend("Evening", anyTracks: true));
+        Assert.Equal("No transitions are saved in this library yet.", Presenter.ManagerLegend("Evening", anyTracks: false));
+    }
 }

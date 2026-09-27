@@ -65,4 +65,19 @@ public sealed class JsonTransitionStoreOverrideTests : IDisposable
         Assert.Null(store.GetOverride("Mix", @"C:\a.wav", @"C:\b.wav"));
         Assert.False(store.RemoveOverride("Mix", @"C:\a.wav", @"C:\b.wav"));
     }
+
+    [Fact]
+    public void Pairs_AndOverridePairs_NameEveryKeyByItsTwoPaths_AfterAReload()
+    {
+        var store = new JsonTransitionStore(_path);
+        store.Upsert(@"C:\a.wav", @"C:\b.wav", new TransitionSpec { FadeInDuration = TimeSpan.FromSeconds(1) });
+        store.Upsert(@"C:\b.wav", @"C:\a.wav", new TransitionSpec { FadeInDuration = TimeSpan.FromSeconds(1) });
+        store.UpsertOverride("Mix", @"C:\c.wav", @"C:\a.wav", new TransitionSpec { Curve = FadeCurveKind.Linear });
+
+        var reloaded = new JsonTransitionStore(_path);
+
+        Assert.Equal([(@"C:\a.wav", @"C:\b.wav"), (@"C:\b.wav", @"C:\a.wav")], reloaded.Pairs().Order());
+        Assert.Equal([(@"C:\c.wav", @"C:\a.wav")], reloaded.OverridePairs("Mix"));
+        Assert.Empty(reloaded.OverridePairs("Other"));
+    }
 }

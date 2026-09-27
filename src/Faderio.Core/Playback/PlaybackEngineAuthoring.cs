@@ -364,6 +364,7 @@ public sealed partial class PlaybackEngine
     /// <summary>A transition was saved or removed: the rows' authored marks are published again.</summary>
     private void StoreChanged()
     {
+        _storeWritten = true;
         _authoredPairs.Clear();
         Publish();
     }

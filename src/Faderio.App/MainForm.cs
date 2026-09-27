@@ -18,11 +18,12 @@ namespace Faderio.App;
 /// session's notice list (build issue 09), a Settings… dialog (build issue 12), and the clip
 /// light, which a click clears (build issue 17), Open library… with the library named in the
 /// title (library issue 02), the window opening where it was closed (library issue 03), and the
-/// playlist sidebar on the left (playlists issue 02), and the open playlist named above the queue
-/// and in the title (playlists issue 03). It renders <see cref="PlayerView"/>s and
-/// issues commands; it holds no engine state between calls (the placement rule in CLAUDE.md). The
-/// seek bar's Maximum is the track length in milliseconds, so no scaling exists to get wrong
-/// (ticket 06).
+/// playlist sidebar on the left (playlists issue 02), the open playlist named above the queue
+/// and in the title (playlists issue 03), and Transitions…, which opens the transition manager,
+/// as the queue's menu does on a row's track (playlists issue 05). It renders
+/// <see cref="PlayerView"/>s and issues commands; it holds no engine state between calls (the
+/// placement rule in CLAUDE.md). The seek bar's Maximum is the track length in milliseconds, so
+/// no scaling exists to get wrong (ticket 06).
 /// </summary>
 internal sealed class MainForm : Form
 {
@@ -39,6 +40,7 @@ internal sealed class MainForm : Form
     internal readonly Button _addFolder;
     internal readonly Button _importPlaylist;
     internal readonly Button _exportPlaylist;
+    internal readonly Button _openTransitions;
     internal readonly Button _settings;
     internal readonly Button _openLibrary;
     internal readonly Button _prev;
@@ -59,6 +61,7 @@ internal sealed class MainForm : Form
     internal readonly ToolStripMenuItem _editNext;
     internal readonly ToolStripMenuItem _editPrevious;
     internal readonly ToolStripMenuItem _editSelf;
+    internal readonly ToolStripMenuItem _transitionsForTrack;
     internal readonly ToolStripMenuItem _removeRows;
     internal readonly ToolStripMenuItem _clearQueue;
     internal readonly Panel _dropLine;
@@ -72,6 +75,7 @@ internal sealed class MainForm : Form
     /// messages, not engine state (build issue 09).</summary>
     private readonly NoticeLog _notices = new();
     internal NoticeListForm? _noticeList;
+    internal TransitionManagerForm? _manager;
 
     private long _shownQueue = -1;
 
@@ -93,14 +97,8 @@ internal sealed class MainForm : Form
         AskUnsavedEdits = ShowUnsavedDialog;
         ShowSettings = dialog => dialog.ShowDialog(this) == DialogResult.OK;
         StartDrag = data => _queueList!.DoDragDrop(data, DragDropEffects.Move);
-        ShowNoticeList = list =>
-        {
-            if (!list.Visible)
-            {
-                list.Show(this);
-            }
-            list.Activate();
-        };
+        ShowNoticeList = ShowModeless;
+        ShowTransitionManager = ShowModeless;
 
         Text = "faderio";
         // The sidebar's 200 px on top of what the queue and the editor need: at the least width the
@@ -121,11 +119,12 @@ internal sealed class MainForm : Form
         _addFolder = new Button { Text = "Add folder…", Width = 90, Height = 28, Margin = new Padding(0, 8, 4, 0) };
         _importPlaylist = new Button { Text = "Import playlist…", Width = 112, Height = 28, Margin = new Padding(0, 8, 4, 0) };
         _exportPlaylist = new Button { Text = "Export playlist…", Width = 112, Height = 28, Margin = new Padding(0, 8, 4, 0) };
+        _openTransitions = new Button { Text = "Transitions…", Width = 96, Height = 28, Margin = new Padding(16, 8, 4, 0) };
         _openLibrary = new Button { Text = "Open library…", Width = 100, Height = 28, Margin = new Padding(16, 8, 4, 0) };
         _settings = new Button { Text = "Settings…", Width = 90, Height = 28, Margin = new Padding(0, 8, 4, 0) };
         // The queue's own commands get a row of their own, so the seek bar keeps its travel.
         var queueBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36, WrapContents = false };
-        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _importPlaylist, _exportPlaylist, _openLibrary, _settings });
+        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _importPlaylist, _exportPlaylist, _openTransitions, _openLibrary, _settings });
         var symbols = new Font("Segoe UI Symbol", 9f);
         _prev = new Button { Text = "⏮", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
@@ -236,11 +235,12 @@ internal sealed class MainForm : Form
         _editNext = new ToolStripMenuItem("Edit transition: this → next");
         _editPrevious = new ToolStripMenuItem("Edit transition: previous → this");
         _editSelf = new ToolStripMenuItem("Edit transition: this → this");
+        _transitionsForTrack = new ToolStripMenuItem("Transitions for this track…");
         _removeRows = new ToolStripMenuItem("Remove") { ShortcutKeyDisplayString = "Del" };
         _clearQueue = new ToolStripMenuItem("Clear queue");
         var menu = new ContextMenuStrip
         {
-            Items = { _editNext, _editPrevious, _editSelf, new ToolStripSeparator(), _removeRows, _clearQueue },
+            Items = { _editNext, _editPrevious, _editSelf, _transitionsForTrack, new ToolStripSeparator(), _removeRows, _clearQueue },
         };
         menu.Opening += (_, _) =>
         {
@@ -248,12 +248,14 @@ internal sealed class MainForm : Form
             _editNext.Enabled = adjacencies.Next is not null;
             _editPrevious.Enabled = adjacencies.Previous is not null;
             _editSelf.Available = adjacencies.Self is not null; // shown while repeat-one is on
+            _transitionsForTrack.Enabled = _queueList.SelectedItems.Count == 1;
             _removeRows.Enabled = _queueList.SelectedItems.Count > 0;
             _clearQueue.Enabled = _queueList.Items.Count > 0;
         };
         _editNext.Click += (_, _) => EditSelected(t => t.Next);
         _editPrevious.Click += (_, _) => EditSelected(t => t.Previous);
         _editSelf.Click += (_, _) => EditSelected(t => t.Self);
+        _transitionsForTrack.Click += (_, _) => OpenTransitions();
         _removeRows.Click += (_, _) => RemoveSelected();
         _clearQueue.Click += (_, _) => ClearQueue();
         _queueList.KeyDown += (_, e) =>
@@ -333,6 +335,7 @@ internal sealed class MainForm : Form
         _addFolder.Click += (_, _) => AddChosen(ChooseFolders);
         _importPlaylist.Click += (_, _) => ImportPlaylists();
         _exportPlaylist.Click += (_, _) => ExportPlaylist();
+        _openTransitions.Click += (_, _) => OpenTransitions();
         _openLibrary.Click += (_, _) => OpenLibrary();
         _settings.Click += (_, _) => EditSettings();
         _cancelAdd.Click += (_, _) => _engine.CancelAdd();
@@ -479,6 +482,7 @@ internal sealed class MainForm : Form
         _editor.Refresh(view);
         _playlists.Render(view);
         _playlistName.Render(view);
+        _manager?.Render(view);
     }
 
     /// <summary>The clip light: dark, or lit red with the count and the latest cause. Set only when
@@ -563,6 +567,44 @@ internal sealed class MainForm : Form
 
     /// <summary>Shows a list window. A test replaces it, since a headless form shows no window.</summary>
     internal Action<Form> ShowNoticeList { get; set; }
+
+    /// <summary>Shows the transition manager. A test replaces it, as <see cref="ShowNoticeList"/>.</summary>
+    internal Action<Form> ShowTransitionManager { get; set; }
+
+    /// <summary>Shows a window of this one's that stays open beside it, and brings it forward.</summary>
+    private void ShowModeless(Form window)
+    {
+        if (!window.Visible)
+        {
+            window.Show(this);
+        }
+        window.Activate();
+    }
+
+    /// <summary>Opens the transition manager (playlists issue 05) on the selected row's track, from
+    /// Transitions… and from the queue's menu; on the store's first track when no one row is
+    /// selected, or its track is in no transition. One manager, reused.</summary>
+    private void OpenTransitions()
+    {
+        if (_manager is null || _manager.IsDisposed)
+        {
+            _manager = new TransitionManagerForm(_engine, EditFromManager);
+        }
+        var row = SingleSelectedRow();
+        _manager.Open(_engine.View.Queue.FirstOrDefault(r => r.Id == row)?.Track);
+        ShowTransitionManager(_manager);
+    }
+
+    /// <summary>A double-click in the manager: the editor opens on that adjacency, in its mode,
+    /// and this window comes forward to show it.</summary>
+    private void EditFromManager(Adjacency adjacency)
+    {
+        Edit(adjacency);
+        if (Visible)
+        {
+            Activate();
+        }
+    }
 
     /// <summary>Opens this session's notice list on the latest notice; one list, reused. The
     /// list hides when the user closes it, but a close from elsewhere disposes it.</summary>

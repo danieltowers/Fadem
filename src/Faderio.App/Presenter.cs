@@ -77,25 +77,67 @@ internal static class Presenter
     /// <summary>The editor's heading line when the open playlist plays something other than the
     /// global transition (playlists issue 04): each parameter of the effective transition, a blank
     /// one as "blank".</summary>
-    public static string FmtEffective(string playlist, TransitionSpec? effective)
+    public static string FmtEffective(string playlist, TransitionSpec? effective) =>
+        effective is null ? $"{playlist} plays no transition here." : $"{playlist} plays: {FmtTransition(effective)}.";
+
+    /// <summary>Each parameter of a transition in a phrase, a blank one as "blank": the editor's
+    /// heading line and the manager's Effective column.</summary>
+    public static string FmtTransition(TransitionSpec spec)
     {
-        if (effective is null)
-        {
-            return $"{playlist} plays no transition here.";
-        }
         static string Part(TimeSpan? seconds) => seconds is null ? "blank" : $"{FmtSeconds(seconds)} s";
-        var fromEnd = effective.FadeOutPoint?.FromEnd == true ? " from end" : "";
+        var fromEnd = spec.FadeOutPoint?.FromEnd == true ? " from end" : "";
         var parts = new List<string>
         {
-            $"fade-out at {Part(effective.FadeOutPoint?.Position)}{fromEnd} for {Part(effective.FadeOutDuration)}",
-            $"fade-in from {Part(effective.FadeInPoint?.Position)} over {Part(effective.FadeInDuration)}",
+            $"fade-out at {Part(spec.FadeOutPoint?.Position)}{fromEnd} for {Part(spec.FadeOutDuration)}",
+            $"fade-in from {Part(spec.FadeInPoint?.Position)} over {Part(spec.FadeInDuration)}",
         };
-        if (effective.Curve is { } curve)
+        if (spec.Curve is { } curve)
         {
             parts.Add(FmtCurve(curve).ToLowerInvariant());
         }
-        return $"{playlist} plays: {string.Join(", ", parts)}.";
+        return string.Join(", ", parts);
     }
+
+    /// <summary>A track as the transition manager names it (playlists issue 05): "title — artist",
+    /// the title alone with no artist, and the path when its file could not be probed.</summary>
+    public static string FmtTrack(Track track) =>
+        string.IsNullOrEmpty(track.Title) ? track.FilePath
+        : string.IsNullOrEmpty(track.Artist) ? track.Title
+        : $"{track.Title} — {track.Artist}";
+
+    /// <summary>The manager's cells for one adjacency: the direction from the picked track, the
+    /// other track, a "global | override" pair for each parameter and the curve, the effective
+    /// transition and the playlist-only mark.</summary>
+    public static IReadOnlyList<string> ManagerRow(StoredAdjacency stored)
+    {
+        var (global, over) = (stored.Layers.Global, stored.Layers.Override);
+        return
+        [
+            stored.IsOutgoing ? "→" : "←",
+            FmtTrack(stored.Other),
+            FmtLayerPair(FmtPoint(global?.FadeOutPoint), FmtPoint(over?.FadeOutPoint)),
+            FmtLayerPair(FmtSeconds(global?.FadeOutDuration), FmtSeconds(over?.FadeOutDuration)),
+            FmtLayerPair(FmtPoint(global?.FadeInPoint), FmtPoint(over?.FadeInPoint)),
+            FmtLayerPair(FmtSeconds(global?.FadeInDuration), FmtSeconds(over?.FadeInDuration)),
+            FmtLayerPair(global?.Curve is { } g ? FmtCurve(g) : "", over?.Curve is { } o ? FmtCurve(o) : ""),
+            stored.Layers.Effective is { } effective ? FmtTransition(effective) : "",
+            stored.PlaylistOnly ? "✓" : "",
+        ];
+    }
+
+    /// <summary>"global | override", "–" for the layer that does not set it; blank when neither does.</summary>
+    public static string FmtLayerPair(string global, string over) =>
+        global.Length == 0 && over.Length == 0 ? "" : $"{(global.Length == 0 ? "–" : global)} | {(over.Length == 0 ? "–" : over)}";
+
+    /// <summary>A stored point in seconds, "from end" when measured from the end; blank when unset.</summary>
+    public static string FmtPoint(FadePointSpec? point) =>
+        point is null ? "" : FmtSeconds(point.Point) + (point.FromEnd ? " from end" : "");
+
+    /// <summary>The line above the manager's grid: how to read a pair, or that the store is empty.</summary>
+    public static string ManagerLegend(string? playlist, bool anyTracks) =>
+        !anyTracks ? "No transitions are saved in this library yet."
+        : playlist is null ? "Each value reads global | override. Double-click a row to open it in the editor."
+        : $"Each value reads global | override in {playlist}. Double-click a row to open it in the editor.";
 
     /// <summary>The file name the render dialog suggests: "outgoing - incoming boundary.wav".</summary>
     public static string RenderFileName(Adjacency adjacency) =>

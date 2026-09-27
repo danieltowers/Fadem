@@ -117,29 +117,54 @@ public sealed partial class PlaybackEngine
                 RaiseNotice($"Not previewed: {adjacency.Name}. " + string.Join(" ", refusals.Select(r => r.Reason)));
                 return (IReadOnlyList<Refusal>)refusals;
             }
-            if (OpenForPreview(adjacency.Outgoing) is not { } outgoing)
-            {
-                return [];
-            }
-            if (OpenForPreview(adjacency.Incoming) is not { } incoming)
-            {
-                outgoing.Dispose();
-                return [];
-            }
-            if (_preview is not null)
-            {
-                // Preview again: the device plays on into the new preview.
-                _previewOrigin += _previewMixer.Timeline;
-                ReleasePreview();
-            }
-            else
-            {
-                HoldQueue();
-            }
-            StartPreview(adjacency, global, playlistOverride, outgoing, incoming);
-            Publish();
+            PlayPreview(adjacency, global, playlistOverride);
             return [];
         });
+    }
+
+    /// <summary>Plays the adjacency's transition as the store holds it now, as
+    /// <see cref="Preview"/> plays a draft: the transition manager's two buttons (playlists issue
+    /// 05, D24). <see cref="TransitionLayer.Playlist"/> plays what the open playlist plays, its
+    /// override over the global; <see cref="TransitionLayer.Global"/> plays the global transition
+    /// alone, as a playlist with no override of it plays it. A stored transition was checked when
+    /// it was saved, so nothing is refused: it plays as the queue would play it.</summary>
+    public void PreviewStored(Adjacency adjacency, TransitionLayer layer)
+    {
+        ThrowIfDisposed();
+        Run(() =>
+        {
+            ObserveClock();
+            var global = _store?.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath) is { IsBlank: false } g ? g : null;
+            PlayPreview(adjacency, global, layer == TransitionLayer.Playlist ? StoredOverride(adjacency) : null);
+        });
+    }
+
+    /// <summary>Opens both tracks, holds the queue, or restarts a running preview, and starts the
+    /// preview of <paramref name="global"/> under <paramref name="playlistOverride"/>. An unreadable
+    /// track is a notice, and nothing is held.</summary>
+    private void PlayPreview(Adjacency adjacency, TransitionSpec? global, TransitionSpec? playlistOverride)
+    {
+        if (OpenForPreview(adjacency.Outgoing) is not { } outgoing)
+        {
+            return;
+        }
+        if (OpenForPreview(adjacency.Incoming) is not { } incoming)
+        {
+            outgoing.Dispose();
+            return;
+        }
+        if (_preview is not null)
+        {
+            // Preview again: the device plays on into the new preview.
+            _previewOrigin += _previewMixer.Timeline;
+            ReleasePreview();
+        }
+        else
+        {
+            HoldQueue();
+        }
+        StartPreview(adjacency, global, playlistOverride, outgoing, incoming);
+        Publish();
     }
 
     /// <summary>Ends the preview. A queue held playing stays paused where it was held.</summary>

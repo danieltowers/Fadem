@@ -106,6 +106,15 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       "Saved *a* → *b* in *name*." and a grey line under the selector names what the playlist
       plays. **Remove override** says "Removed the override of …" and the line goes. Switching
       mode with unsaved edits asks Save / Discard / Cancel; the next ✎ opens in the last mode.
+- [ ] **Transitions…**, between **Export playlist…** and **Open library…**, opens a separate
+      "faderio — transitions" window on the selected row's track (else the first track with a
+      transition), listing the boundary authored during the run: ← or →, the other track, then
+      each parameter and the curve as "global | override", "–" where a layer sets none, the
+      effective transition and a playlist-only ✓. A value saved in the editor while it is open
+      appears in it. Each row has **Preview** and **Preview global**; either starts a preview,
+      its line ("Pre-roll · outgoing 0:05") beside **Stop preview**, which ends it. A double-click
+      on a row opens it in the editor, in the editor's mode. The queue's right-click menu has
+      "Transitions for this track…", opening it on that row's track. Esc and the close box hide it.
 - [ ] **Remove transition** says "Removed …" in the strip and leaves the fields filled; Save
       puts the transition back. **Revert** reloads what is stored.
 - [ ] Pressing capture writes a number into the field, and it is the number the time readout
@@ -236,6 +245,8 @@ sharp percussive transient; the realism check is the authored boundary from the 
       point while the incoming track plays and press **Preview again**: the new point is heard.
       The queue stays paused where it was; Play resumes it there.
 - [ ] Preview on WASAPI exclusive plays: there is no second output to fail.
+- [ ] In **Transitions…**, on a boundary whose open playlist overrides the fade-out point, **Preview**
+      fades at the override's point and **Preview global** at the global's.
 - [ ] Run the same capture-and-listen on WASAPI shared, WASAPI exclusive and WaveOut; the
       fade lands in the same place on all three.
 - [ ] Delete the playing row; the next one starts cleanly from its beginning.
