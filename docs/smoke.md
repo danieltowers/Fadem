@@ -16,11 +16,13 @@ Launch the app, take a screenshot, and check each item against it. Report the re
 item in the session's hand-off. Plain arguments are files to queue; `--play` starts them and
 `--edit-first` opens the editor on the first boundary;
 `--unavailable=exclusive,shared` treats those modes as if their device were taken, to force the
-fallback chain. The output mode is a setting, chosen in **Settings…** and used from the next
-launch:
+fallback chain; `--library=<folder>` opens that folder as the library without asking, and
+neither reads nor changes the library a plain launch opens. Point it at a fresh temp folder, so
+a smoke run writes nothing into the user's library. The output mode is a setting, chosen in
+**Settings…** and used from the next launch:
 
 ```
-dotnet run --project src/Faderio.App -- "<outgoing>" "<incoming>" --play --edit-first
+dotnet run --project src/Faderio.App -- "<outgoing>" "<incoming>" --play --edit-first --library="<temp folder>"
 ```
 
 `<outgoing>` and `<incoming>` are **absolute paths to two real, promised files**; there are no
@@ -29,9 +31,9 @@ resolves there, not where you typed the command. A path that does not exist is r
 any other file: nothing is queued and the only sign is one line in the status strip
 ("Nothing added: … The file does not exist."). The agent generates its own WAVs for the Looks
 half; the Sounds half uses the two tracks of a boundary already in the store
-(`%APPDATA%\faderio\.faderio\transitions.json` lists them by full path). Until the library can
-be chosen (library issue 02), the app opens `%APPDATA%\faderio` as its library, so everything it
-writes is under `.faderio\` there.
+(`<library>\.faderio\transitions.json` lists them by full path). Everything the app writes for a
+library is under its `.faderio\`; `%APPDATA%\faderio\settings.json` remembers only which library
+a plain launch opens.
 
 Capture the window with `PrintWindow` rather than a screen grab, so it need not be in front.
 There is no ⏹ button (the engine still stops at launch and when the queue ends). UI Automation
@@ -43,6 +45,10 @@ queue's ✎ button is different: the list answers a click where the real cursor 
 posted click says, so move the cursor onto the cell (`SetCursorPos`) before posting the click.
 
 - [ ] The window opens without an error dialog.
+- [ ] The title reads "faderio — *temp folder's name* · WASAPI shared at 44100 Hz" (or the mode
+      in use), and nothing asked for a folder. **Open library…** sits between **Save as
+      playlist…** and **Settings…**; choosing another folder in it empties the queue and the
+      editor and puts that folder's name in the title.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
 - [ ] The transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, then −5 s, the seek bar, +5 s and the time; no ⏹.
 - [ ] At launch the first row carries the marker, dimmed (a greyer yellow than while playing).
@@ -141,7 +147,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       long cause is cut short without pushing the notice count off; its tooltip has it whole.
       Clicking it turns it dark again. (A track tagged well above 0 dB, with ReplayGain on,
       lights it.)
-- [ ] Launching with a corrupt `%APPDATA%\faderio\.faderio\transitions.json` (back it up first) shows
+- [ ] Launching with a corrupt `<library>\.faderio\transitions.json` shows
       no dialog: the strip says the file was moved aside to `transitions.json.corrupt`.
 - [ ] A queued file renamed before the track ahead of it starts is marked when that track starts:
       "⚠" before its row number, the row greyed, and a tooltip saying it is unreadable. The
@@ -159,7 +165,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       N greyed out under *Hard cut*; and ReplayGain. Launched into a fallback as above, it also
       reads "In use now: WASAPI shared" (or WaveOut) under the mode chosen.
 - [ ] A setting changed and saved with OK is still set after a restart; Cancel keeps nothing.
-- [ ] Launching with a corrupt `%APPDATA%\faderio\.faderio\settings.json` (back it up first) shows no
+- [ ] Launching with a corrupt `<library>\.faderio\settings.json` shows no
       dialog: the strip says the file was moved aside to `settings.json.corrupt`, and
       **Settings…** shows the defaults.
 - [ ] Adding the library's longest FLAC (about 26 minutes) shows its full length in the time

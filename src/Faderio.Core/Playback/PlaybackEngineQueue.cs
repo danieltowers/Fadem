@@ -237,12 +237,18 @@ public sealed partial class PlaybackEngine
             {
                 StopOutput();
             }
-            _queue.Clear();
-            _originalOrder.Clear();
-            _unreadable.Clear();
-            _queueVersion++;
+            EmptyQueue();
             Publish();
         });
+    }
+
+    /// <summary>Every row goes, with what was kept about them. The voices are the caller's.</summary>
+    private void EmptyQueue()
+    {
+        _queue.Clear();
+        _originalOrder.Clear();
+        _unreadable.Clear();
+        _queueVersion++;
     }
 
     /// <summary>Shuffle's original order is recorded in <see cref="Append"/>, the one place rows

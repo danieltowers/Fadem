@@ -27,19 +27,26 @@ internal static class Program
         // too, so none is handled under the engine lock while the output reopens.
         Action<string> notify = ((IEngineSink)sink).Notice;
 
-        // Until the user chooses a library (library issue 02), the AppData folder is opened as one.
-        var library = Library.Open(appData);
+        // The library (library issue 02, D12): --library=<folder>, else the one remembered, else
+        // the user is asked. --library is for smoke runs, so it neither reads nor changes which
+        // library a plain launch opens. Cancelled, the app opens with no library: nothing is
+        // saved, and what is queued still plays.
+        var libraryArgument = Presenter.ParseLibraryArgument(args);
+        var machine = libraryArgument is null ? new MachineSettingsStore(Path.Combine(appData, "settings.json")) : null;
+        var launch = LibraryLaunch.Resolve(libraryArgument, machine?.Settings.Library, Directory.Exists);
+        var folder = launch.MustAsk ? MainForm.ShowLibraryDialog(owner: null) : launch.Folder;
+        var library = folder is null ? null : Library.Open(folder);
 
         // The engine owns the library and its settings; only the output mode is read here, since
         // the output is opened before the engine that runs at its rate (ADR 0008).
         var output = new NAudioAudioOutput(
-            (library.Settings?.Settings ?? new PlayerSettings()).OutputMode, notify,
+            (library?.Settings?.Settings ?? new PlayerSettings()).OutputMode, notify,
             Presenter.ParseUnavailableOutputs(args));
-        var engine = new PlaybackEngine(output, library, sink);
+        var engine = new PlaybackEngine(output, library, sink, machine: machine);
 
+        // The title follows the library and the mode in use; the form renders both.
         var form = new MainForm(engine, sink, () => output.Mode);
-        form.Text = Presenter.Title(output.Mode, engine.SampleRate);
-        output.ModeChanged += () => form.BeginInvoke(() => form.Text = Presenter.Title(output.Mode, engine.SampleRate));
+        output.ModeChanged += () => form.BeginInvoke(() => form.Render());
         form.Shown += (_, _) =>
         {
             // Plain arguments are files to queue (drop them on the executable); --play starts

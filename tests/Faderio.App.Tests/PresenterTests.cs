@@ -115,11 +115,30 @@ public sealed class PresenterTests
     [Fact]
     public void Title_NamesTheModeInUse_OrThatThereIsNone()
     {
-        Assert.Equal("faderio — WASAPI shared at 48000 Hz", Presenter.Title(AudioOutputMode.WasapiShared, 48000));
-        Assert.Equal("faderio — WASAPI exclusive at 44100 Hz", Presenter.Title(AudioOutputMode.WasapiExclusive, 44100));
-        Assert.Equal("faderio — WaveOut at 44100 Hz", Presenter.Title(AudioOutputMode.WaveOut, 44100));
-        Assert.Equal("faderio — no audio output", Presenter.Title(null, 44100));
+        var music = new LibraryView(@"C:\Music", "Music", IsAvailable: true);
+        Assert.Equal("faderio — Music · WASAPI shared at 48000 Hz", Presenter.Title(music, AudioOutputMode.WasapiShared, 48000));
+        Assert.Equal("faderio — Music · WASAPI exclusive at 44100 Hz", Presenter.Title(music, AudioOutputMode.WasapiExclusive, 44100));
+        Assert.Equal("faderio — Music · WaveOut at 44100 Hz", Presenter.Title(music, AudioOutputMode.WaveOut, 44100));
+        Assert.Equal("faderio — Music · no audio output", Presenter.Title(music, null, 44100));
     }
+
+    [Fact]
+    public void Title_NamesTheLibrary_OrThatThereIsNone()
+    {
+        Assert.Equal("faderio — no library · WaveOut at 44100 Hz", Presenter.Title(null, AudioOutputMode.WaveOut, 44100));
+        Assert.Equal(
+            "faderio — Locked (could not be opened) · WaveOut at 44100 Hz",
+            Presenter.Title(new LibraryView(@"D:\Locked", "Locked", IsAvailable: false), AudioOutputMode.WaveOut, 44100));
+    }
+
+    [Theory]
+    [InlineData(new string[0], null)]
+    [InlineData(new[] { "a.wav", "--play" }, null)]
+    [InlineData(new[] { "--library=" }, null)]
+    [InlineData(new[] { @"--library=C:\Temp\lib one" }, @"C:\Temp\lib one")]
+    [InlineData(new[] { @"--LIBRARY=C:\a", @"--library=C:\b" }, @"C:\b")]
+    public void ParseLibraryArgument_TakesTheLastOne(string[] args, string? expected) =>
+        Assert.Equal(expected, Presenter.ParseLibraryArgument(args));
 
     [Fact]
     public void NoticeLog_MergesARepeatIntoItsFirstEntry_WithACount()

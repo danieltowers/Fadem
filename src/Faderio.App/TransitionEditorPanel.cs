@@ -94,7 +94,7 @@ internal sealed class TransitionEditorPanel : Panel
 
         _title = new Label
         {
-            Text = "No boundary selected",
+            Text = NoAdjacency,
             Dock = DockStyle.Top,
             Height = 44,
             Font = new Font(Font, FontStyle.Bold),
@@ -324,7 +324,23 @@ internal sealed class TransitionEditorPanel : Panel
     {
         _adjacency = adjacency;
         _title.Text = adjacency.Name;
-        var spec = _engine.Transition(adjacency);
+        Fill(_engine.Transition(adjacency), editing: true);
+    }
+
+    /// <summary>Empties the editor, as at launch: on switching library (library issue 02), where
+    /// the adjacency open belongs to the library left. Unsaved edits are the caller's to settle
+    /// first, through <see cref="ConfirmLeave"/>.</summary>
+    public void Close()
+    {
+        _adjacency = null;
+        _title.Text = NoAdjacency;
+        Fill(null, editing: false);
+    }
+
+    private const string NoAdjacency = "No boundary selected";
+
+    private void Fill(TransitionSpec? spec, bool editing)
+    {
         _loading = true;
         _fadeOutFromEnd.Checked = spec?.FadeOutPoint?.FromEnd ?? false;
         ShowCurve(spec?.Curve ?? FadeCurveKind.EqualPower);
@@ -338,7 +354,7 @@ internal sealed class TransitionEditorPanel : Panel
         ShowReasons([]);
         foreach (var control in new Control[] { _fadeOutFromEnd, _curve, _save, _revert, _remove, _render, _preview })
         {
-            control.Enabled = true;
+            control.Enabled = editing;
         }
         ShowNudges();
     }

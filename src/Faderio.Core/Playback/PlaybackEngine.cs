@@ -20,12 +20,18 @@ public sealed partial class PlaybackEngine : IDisposable
 
     /// <summary>The open library's transition store, or null when there is none: no library, or
     /// one that could not be opened. Authoring is then refused with a notice, and every
-    /// adjacency plays as unauthored (ADR 0011).</summary>
-    private readonly ITransitionStore? _store;
-    private readonly Library? _library;
+    /// adjacency plays as unauthored (ADR 0011). <see cref="OpenLibrary"/> swaps it, with the
+    /// library and its settings.</summary>
+    private ITransitionStore? _store;
+    private Library? _library;
     private readonly IEngineSink _sink;
     private readonly TransitionResolver _resolver;
-    private readonly SettingsStore? _settingsStore;
+    private SettingsStore? _settingsStore;
+
+    /// <summary>The machine's settings, where the library that opens is remembered for the next
+    /// launch; null when nothing is to be remembered (the renderer, the tests, a launch with
+    /// <c>--library=</c>).</summary>
+    private readonly MachineSettingsStore? _machine;
     private PlayerSettings _settings;
     private readonly Random _rng;
     private readonly object _sync = new();
@@ -99,14 +105,21 @@ public sealed partial class PlaybackEngine : IDisposable
         IEngineSink sink,
         SettingsStore? settings = null,
         Random? rng = null)
-        : this(output, store, sink, settings, null, rng)
+        : this(output, store, sink, settings, null, null, rng)
     {
     }
 
     /// <summary>An engine on an opened library (ADR 0011): its stores, or none when it could not
-    /// be opened. What went wrong opening it is raised as notices.</summary>
-    public PlaybackEngine(IAudioOutput output, Library library, IEngineSink sink, Random? rng = null)
-        : this(output, library.Transitions, sink, library.Settings, library, rng)
+    /// be opened, or when no library was chosen (null). What went wrong opening it is raised as
+    /// notices. Given the machine's settings, a library that opens is remembered there for the
+    /// next launch (library issue 02).</summary>
+    public PlaybackEngine(
+        IAudioOutput output,
+        Library? library,
+        IEngineSink sink,
+        Random? rng = null,
+        MachineSettingsStore? machine = null)
+        : this(output, library?.Transitions, sink, library?.Settings, library, machine, rng)
     {
     }
 
@@ -116,6 +129,7 @@ public sealed partial class PlaybackEngine : IDisposable
         IEngineSink sink,
         SettingsStore? settings,
         Library? library,
+        MachineSettingsStore? machine,
         Random? rng)
     {
         _output = output;
@@ -123,6 +137,7 @@ public sealed partial class PlaybackEngine : IDisposable
         _library = library;
         _sink = sink;
         _settingsStore = settings;
+        _machine = machine;
         _settings = settings?.Settings ?? new PlayerSettings();
         _resolver = new TransitionResolver(_settings);
         _rng = rng ?? new Random();
@@ -141,7 +156,16 @@ public sealed partial class PlaybackEngine : IDisposable
         _output.Initialise(new EngineFrameSource(this));
 
         // Nothing holds the lock yet, so the stores' trouble opening is told straight away.
-        var notices = library?.Notices ?? (settings?.LoadNotice is { } notice ? [notice] : []);
+        var notices = new List<string>();
+        if (machine?.LoadNotice is { } machineNotice)
+        {
+            notices.Add(machineNotice);
+        }
+        notices.AddRange(library?.Notices ?? (settings?.LoadNotice is { } notice ? [notice] : []));
+        if (Remember(library) is { } unremembered)
+        {
+            notices.Add(unremembered);
+        }
         foreach (var opening in notices)
         {
             _sink.Notice(opening);

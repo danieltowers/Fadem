@@ -276,7 +276,8 @@ public sealed partial class PlaybackEngine
     public RenderReport RenderBoundary(Adjacency adjacency, string wavPath)
     {
         ThrowIfDisposed();
-        return Renderer.RenderBoundary(adjacency, _store, wavPath);
+        var store = Run(() => _store); // the library open now; rendering takes no lock
+        return Renderer.RenderBoundary(adjacency, store, wavPath);
     }
 
     /// <summary>What a file write can throw, as <see cref="SaveAsPlaylist"/> catches it.</summary>

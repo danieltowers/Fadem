@@ -2072,4 +2072,91 @@ public sealed class HeadlessFormTests
         Assert.Equal(ToolStripItemPlacement.Main, h.Form._clip.Placement);
         Assert.True(h.Form._clip.Bounds.Right <= h.Form._clip.Owner.DisplayRectangle.Right);
     });
+
+    // ── The library (library issue 02) ──────────────────────────────────────────────────
+
+    [Fact]
+    public void TheTitle_NamesTheOpenLibrary_AndTheModeInUse() => RunSta(() =>
+    {
+        using var h = new Harness();
+
+        Assert.Equal($"faderio — {h.Library.Name} · WASAPI shared at {h.Engine.SampleRate} Hz", h.Form.Text);
+    });
+
+    [Fact]
+    public void OpenLibrary_SendsThePickedFolder_AndTheTitleAndQueueFollow() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        var second = Path.Combine(h.TempDir, "Second library");
+        Directory.CreateDirectory(second);
+        h.Form.EditTransitionAt(0);
+        h.Form.ChooseLibrary = () => second;
+
+        Click(h.Form._openLibrary);
+
+        Assert.Equal("Second library", h.Engine.View.Library!.Name);
+        Assert.StartsWith("faderio — Second library · ", h.Form.Text);
+        Assert.Empty(h.Form._queueList.Items);
+        Assert.Null(h.Form._editor.Adjacency); // what it had open was the other library's
+        Assert.Equal("No boundary selected", h.Form._editor._title.Text);
+        Assert.False(h.Form._editor._save.Enabled);
+    });
+
+    [Fact]
+    public void OpenLibrary_Cancelled_ChangesNothing() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        var before = h.Engine.View.Library;
+        h.Form.ChooseLibrary = () => null;
+
+        Click(h.Form._openLibrary);
+
+        Assert.Equal(before, h.Engine.View.Library);
+        Assert.Equal(3, h.Form._queueList.Items.Count);
+    });
+
+    [Fact]
+    public void OpenLibrary_WithUnsavedEdits_AsksFirst_AndCancelStays() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+        h.Form._editor._fadeOutPoint.Text = "2";
+        var before = h.Engine.View.Library;
+        var asked = 0;
+        h.Form.AskUnsavedEdits = _ =>
+        {
+            asked++;
+            return UnsavedEdits.Cancel;
+        };
+        h.Form.ChooseLibrary = () => throw new InvalidOperationException("Cancel must not go on to ask for a folder");
+
+        Click(h.Form._openLibrary);
+
+        Assert.Equal(1, asked);
+        Assert.Equal(before, h.Engine.View.Library);
+        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
+    });
+
+    [Fact]
+    public void OpenLibrary_WithUnsavedEdits_SavesThemInTheLibraryLeft() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        h.Form.EditTransitionAt(0);
+        var adjacency = h.Form._editor.Adjacency!;
+        Fill(h.Form._editor, "1.5", "0.5", "0", "0.5");
+        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Save;
+        var second = Path.Combine(h.TempDir, "Second");
+        Directory.CreateDirectory(second);
+        h.Form.ChooseLibrary = () => second;
+
+        Click(h.Form._openLibrary);
+
+        Assert.NotNull(h.Store.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath));
+        Assert.Equal("Second", h.Engine.View.Library!.Name);
+        Assert.Null(h.Engine.Transition(adjacency));
+    });
 }

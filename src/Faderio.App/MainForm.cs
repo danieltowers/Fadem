@@ -15,7 +15,8 @@ namespace Faderio.App;
 /// shuffle toggle and a repeat button (build issue 07), a seek bar in milliseconds, the
 /// transition editor, a status strip showing the latest notice and a count that opens this
 /// session's notice list (build issue 09), a Settings… dialog (build issue 12), and the clip
-/// light, which a click clears (build issue 17). It renders <see cref="PlayerView"/>s and issues
+/// light, which a click clears (build issue 17), and Open library… with the library named in the
+/// title (library issue 02). It renders <see cref="PlayerView"/>s and issues
 /// commands; it holds no engine state between calls (the placement rule in CLAUDE.md). The seek
 /// bar's Maximum is the track length in milliseconds, so no scaling exists to get wrong
 /// (ticket 06).
@@ -35,6 +36,7 @@ internal sealed class MainForm : Form
     internal readonly Button _openPlaylist;
     internal readonly Button _saveAsPlaylist;
     internal readonly Button _settings;
+    internal readonly Button _openLibrary;
     internal readonly Button _prev;
     internal readonly Button _playPause;
     internal readonly Button _next;
@@ -78,6 +80,7 @@ internal sealed class MainForm : Form
         ChoosePlaylists = ShowPlaylistDialog;
         ChoosePlaylistSavePath = ShowSavePlaylistDialog;
         ConfirmClear = ShowClearDialog;
+        ChooseLibrary = () => ShowLibraryDialog(this);
         AskUnsavedEdits = ShowUnsavedDialog;
         ShowSettings = dialog => dialog.ShowDialog(this) == DialogResult.OK;
         StartDrag = data => _queueList!.DoDragDrop(data, DragDropEffects.Move);
@@ -107,10 +110,11 @@ internal sealed class MainForm : Form
         _addFolder = new Button { Text = "Add folder…", Width = 90, Height = 28, Margin = new Padding(0, 8, 4, 0) };
         _openPlaylist = new Button { Text = "Open playlist…", Width = 104, Height = 28, Margin = new Padding(0, 8, 4, 0) };
         _saveAsPlaylist = new Button { Text = "Save as playlist…", Width = 116, Height = 28, Margin = new Padding(0, 8, 4, 0) };
-        _settings = new Button { Text = "Settings…", Width = 90, Height = 28, Margin = new Padding(16, 8, 4, 0) };
+        _openLibrary = new Button { Text = "Open library…", Width = 100, Height = 28, Margin = new Padding(16, 8, 4, 0) };
+        _settings = new Button { Text = "Settings…", Width = 90, Height = 28, Margin = new Padding(0, 8, 4, 0) };
         // The queue's own commands get a row of their own, so the seek bar keeps its travel.
         var queueBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36, WrapContents = false };
-        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _openPlaylist, _saveAsPlaylist, _settings });
+        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _openPlaylist, _saveAsPlaylist, _openLibrary, _settings });
         var symbols = new Font("Segoe UI Symbol", 9f);
         _prev = new Button { Text = "⏮", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
@@ -308,6 +312,7 @@ internal sealed class MainForm : Form
         _addFolder.Click += (_, _) => AddChosen(ChooseFolders);
         _openPlaylist.Click += (_, _) => AddChosen(ChoosePlaylists);
         _saveAsPlaylist.Click += (_, _) => SaveAsPlaylist();
+        _openLibrary.Click += (_, _) => OpenLibrary();
         _settings.Click += (_, _) => EditSettings();
         _cancelAdd.Click += (_, _) => _engine.CancelAdd();
         _status.Click += (_, _) => OpenNotices();
@@ -356,6 +361,11 @@ internal sealed class MainForm : Form
         if (IsDisposed)
         {
             return;
+        }
+        var title = Presenter.Title(view.Library, _outputModeInUse(), _engine.SampleRate);
+        if (Text != title)
+        {
+            Text = title;
         }
         _playPause.Text = Presenter.PlayPauseGlyph(view.Transport);
         _transitionNow.Enabled = view.CanTransitionNow;
@@ -554,6 +564,35 @@ internal sealed class MainForm : Form
     /// <summary>Shows the settings dialog and says whether the user pressed OK. A test replaces
     /// it, since a headless form cannot show a dialog.</summary>
     internal Func<SettingsForm, bool> ShowSettings { get; set; }
+
+    /// <summary>The folder picked in the Open library dialog, or null. A test replaces it, since a
+    /// headless form cannot show a dialog.</summary>
+    internal Func<string?> ChooseLibrary { get; set; }
+
+    /// <summary>Switches library (library issue 02): unsaved edits are settled first, then one
+    /// call. The editor empties, since what it had open belongs to the library left.</summary>
+    private void OpenLibrary()
+    {
+        if (!_editor.ConfirmLeave() || ChooseLibrary() is not { } folder)
+        {
+            return;
+        }
+        _editor.Close();
+        _engine.OpenLibrary(folder);
+    }
+
+    /// <summary>Asks for a library folder, starting in Music (D12): at the first launch, before
+    /// this window exists, and from Open library…. Null when cancelled.</summary>
+    internal static string? ShowLibraryDialog(IWin32Window? owner)
+    {
+        using var dialog = new FolderBrowserDialog
+        {
+            Description = "Choose a library folder: faderio keeps its transitions and settings in it",
+            UseDescriptionForTitle = true,
+            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic),
+        };
+        return dialog.ShowDialog(owner) == DialogResult.OK ? dialog.SelectedPath : null;
+    }
 
     /// <summary>The dialog opens on the view's settings; OK sends what it says in one call.</summary>
     private void EditSettings()

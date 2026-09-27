@@ -191,9 +191,29 @@ internal static class Presenter
     public static string FmtModeInUse(AudioOutputMode chosen, AudioOutputMode? inUse) =>
         inUse == chosen ? "" : $"In use now: {(inUse is { } mode ? FmtOutputMode(mode) : "no audio output")}";
 
-    /// <summary>The window title names the mode actually in use, not the one asked for.</summary>
-    public static string Title(AudioOutputMode? inUse, int sampleRate) =>
-        inUse is { } mode ? $"faderio — {FmtOutputMode(mode)} at {sampleRate} Hz" : "faderio — no audio output";
+    /// <summary>The window title: the open library (library issue 02), then the output mode
+    /// actually in use, not the one asked for.</summary>
+    public static string Title(LibraryView? library, AudioOutputMode? inUse, int sampleRate)
+    {
+        var name = library switch
+        {
+            null => "no library",
+            { IsAvailable: false } => $"{library.Name} (could not be opened)",
+            _ => library.Name,
+        };
+        var output = inUse is { } mode ? $"{FmtOutputMode(mode)} at {sampleRate} Hz" : "no audio output";
+        return $"faderio — {name} · {output}";
+    }
+
+    /// <summary>"--library=&lt;folder&gt;": for smoke runs, the library to open instead of the
+    /// remembered one, without asking. Null when there is none.</summary>
+    public static string? ParseLibraryArgument(IEnumerable<string> args) =>
+        args.LastOrDefault(a => a.StartsWith(LibraryArgument, StringComparison.OrdinalIgnoreCase)) is { } arg &&
+        arg.Length > LibraryArgument.Length
+            ? arg[LibraryArgument.Length..]
+            : null;
+
+    private const string LibraryArgument = "--library=";
 
     /// <summary>"--unavailable=exclusive,shared": for smoke runs, the output treats these modes
     /// as if their device were taken, so the fallback chain can be seen.</summary>
