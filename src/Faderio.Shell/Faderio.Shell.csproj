@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- What both hosts share: standalone faderio (net8.0-windows) and the MusicBee plugin
+         (net48, ADR 0012). The seed of the shared shell library; for now it holds the output. -->
+    <TargetFrameworks>net8.0-windows;net48</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Faderio.Core\Faderio.Core.csproj" />
+  </ItemGroup>
+
+</Project>

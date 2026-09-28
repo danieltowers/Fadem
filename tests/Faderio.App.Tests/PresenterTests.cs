@@ -1,9 +1,9 @@
 using Faderio.App;
-using Faderio.App.Audio;
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;
 using Faderio.Core.Queue;
 using Faderio.Core.Settings;
+using Faderio.Shell.Audio;
 
 using Point = Faderio.Core.Domain.Point;
 

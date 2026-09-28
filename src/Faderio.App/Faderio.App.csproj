@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Faderio.Core\Faderio.Core.csproj" />
+    <ProjectReference Include="..\Faderio.Shell\Faderio.Shell.csproj" />
   </ItemGroup>
 
   <ItemGroup>

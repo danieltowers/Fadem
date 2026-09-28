@@ -3,6 +3,7 @@ using Faderio.Core.Domain;
 using Faderio.Core.Playback;
 using Faderio.Core.Queue;
 using Faderio.Core.Settings;
+using Faderio.Shell.Audio;
 
 using Point = Faderio.Core.Domain.Point;
 
@@ -309,18 +310,11 @@ internal static class Presenter
 
     public static string ShuffleTip(bool shuffle) => shuffle ? "Shuffle: on" : "Shuffle: off";
 
-    public static string FmtOutputMode(AudioOutputMode mode) => mode switch
-    {
-        AudioOutputMode.WasapiExclusive => "WASAPI exclusive",
-        AudioOutputMode.WaveOut => "WaveOut",
-        _ => "WASAPI shared",
-    };
-
     /// <summary>The settings dialog's note beside the chosen output mode: the mode in use, when it
     /// is not the one chosen (a fallback at launch, or a choice waiting for the next launch).
     /// Blank otherwise.</summary>
     public static string FmtModeInUse(AudioOutputMode chosen, AudioOutputMode? inUse) =>
-        inUse == chosen ? "" : $"In use now: {(inUse is { } mode ? FmtOutputMode(mode) : "no audio output")}";
+        inUse == chosen ? "" : $"In use now: {(inUse is { } mode ? OutputModeNames.Of(mode) : "no audio output")}";
 
     /// <summary>The window title: the open playlist in front (playlists issue 03), then the open
     /// library (library issue 02), then the output mode actually in use, not the one asked for.</summary>
@@ -332,7 +326,7 @@ internal static class Presenter
             { IsAvailable: false } => $"{library.Name} (could not be opened)",
             _ => library.Name,
         };
-        var output = inUse is { } mode ? $"{FmtOutputMode(mode)} at {sampleRate} Hz" : "no audio output";
+        var output = inUse is { } mode ? $"{OutputModeNames.Of(mode)} at {sampleRate} Hz" : "no audio output";
         var title = $"faderio — {name} · {output}";
         return playlist is null ? title : $"{playlist} — {title}";
     }

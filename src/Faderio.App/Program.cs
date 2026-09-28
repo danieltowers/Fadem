@@ -1,7 +1,7 @@
-using Faderio.App.Audio;
 using Faderio.Core.Persistence;
 using Faderio.Core.Playback;
 using Faderio.Core.Settings;
+using Faderio.Shell.Audio;
 
 namespace Faderio.App;
 

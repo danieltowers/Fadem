@@ -3,7 +3,7 @@ using Faderio.Core.Settings;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
-namespace Faderio.App.Audio;
+namespace Faderio.Shell.Audio;
 
 /// <summary>
 /// The production binding of the output seam: WASAPI shared at 100 ms, WASAPI exclusive at
@@ -254,8 +254,8 @@ public sealed class NAudioAudioOutput : IAudioOutput
     private void NoticeFallback(AudioOutputMode failed, Exception e)
     {
         var chain = Fallbacks(failed);
-        var next = chain.Count > 1 ? $"trying {Presenter.FmtOutputMode(chain[1])}" : "no audio output could be opened";
-        _notify($"{Presenter.FmtOutputMode(failed)} unavailable ({e.Message}); {next}.");
+        var next = chain.Count > 1 ? $"trying {OutputModeNames.Of(chain[1])}" : "no audio output could be opened";
+        _notify($"{OutputModeNames.Of(failed)} unavailable ({e.Message}); {next}.");
     }
 
     private Frames MeasureHeard()
@@ -275,7 +275,7 @@ public sealed class NAudioAudioOutput : IAudioOutput
                 {
                     frames = frames * SampleRate / format.SampleRate;
                 }
-                return new Frames(Math.Clamp(frames, 0, rendered));
+                return new Frames(Math.Min(Math.Max(frames, 0), rendered));
             }
             catch (Exception)
             {

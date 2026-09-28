@@ -1,4 +1,5 @@
 using Faderio.Core.Settings;
+using Faderio.Shell.Audio;
 
 namespace Faderio.App;
 
@@ -33,7 +34,7 @@ internal sealed class SettingsForm : Form
     /// <summary>A mode as the list shows it.</summary>
     private sealed record ModeItem(AudioOutputMode Mode)
     {
-        public override string ToString() => Presenter.FmtOutputMode(Mode);
+        public override string ToString() => OutputModeNames.Of(Mode);
     }
 
     /// <param name="machine">This machine's settings to open on: the view's.</param>
