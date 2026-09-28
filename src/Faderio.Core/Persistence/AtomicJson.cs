@@ -23,7 +23,7 @@ public static class AtomicJson
                 JsonSerializer.Serialize(stream, value, options);
             }
 
-            File.Move(tempPath, path, overwrite: true);
+            FileSystemCompat.MoveReplacing(tempPath, path);
         }
         catch
         {

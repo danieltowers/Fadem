@@ -409,9 +409,9 @@ public class RealInputMatrixTests
         decoded.Position = length - 2000; // inside the tone, which ends 1080 frames before the end
         var tail = new float[2000 * 2];
         Assert.Equal(2000, decoded.Read(tail, 0, 2000));
-        Assert.Contains(tail[..(900 * 2)], s => Math.Abs(s) > 0.1);          // the tone
-        Assert.Contains(tail[(1000 * 2)..(1471 * 2)], s => s != 0f);         // the encoder's padding, decoded
-        Assert.All(tail[(1471 * 2)..], s => Assert.Equal(0f, s));            // then D of silence
+        Assert.Contains(tail.AsSpan()[..(900 * 2)].ToArray(), s => Math.Abs(s) > 0.1);   // the tone
+        Assert.Contains(tail.AsSpan()[(1000 * 2)..(1471 * 2)].ToArray(), s => s != 0f);  // the encoder's padding, decoded
+        Assert.All(tail.AsSpan()[(1471 * 2)..].ToArray(), s => Assert.Equal(0f, s));     // then D of silence
         Assert.Equal(length, decoded.Position);
     }
 
@@ -426,7 +426,7 @@ public class RealInputMatrixTests
         var bytes = File.ReadAllBytes(fixture);
         var path = Path.Combine(TestAudio.Dir, $"cut-{Guid.NewGuid():N}.mp3");
         Directory.CreateDirectory(TestAudio.Dir);
-        File.WriteAllBytes(path, bytes[..^(8 * 1024)]);
+        File.WriteAllBytes(path, bytes.AsSpan()[..^(8 * 1024)].ToArray());
 
         Assert.Null(AudioProbe.Probe(path, out var probed));
         Assert.Equal(88200, probed!.Frames);

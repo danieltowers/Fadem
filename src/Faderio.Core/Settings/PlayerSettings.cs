@@ -60,9 +60,9 @@ public sealed record PlayerSettings
     public PlayerSettings Normalised() => this with
     {
         SchemaVersion = CurrentSchemaVersion,
-        UnauthoredAdjacency = Enum.IsDefined(UnauthoredAdjacency) ? UnauthoredAdjacency : UnauthoredAdjacency.HardCut,
-        DefaultCrossfadeSeconds = Math.Clamp(DefaultCrossfadeSeconds, MinDefaultCrossfadeSeconds, MaxDefaultCrossfadeSeconds),
-        BlankDurationSeconds = Math.Clamp(BlankDurationSeconds, MinBlankDurationSeconds, MaxBlankDurationSeconds),
-        Repeat = Enum.IsDefined(Repeat) ? Repeat : RepeatMode.Off,
+        UnauthoredAdjacency = Compat.IsDefined(UnauthoredAdjacency) ? UnauthoredAdjacency : UnauthoredAdjacency.HardCut,
+        DefaultCrossfadeSeconds = Compat.Clamp(DefaultCrossfadeSeconds, MinDefaultCrossfadeSeconds, MaxDefaultCrossfadeSeconds),
+        BlankDurationSeconds = Compat.Clamp(BlankDurationSeconds, MinBlankDurationSeconds, MaxBlankDurationSeconds),
+        Repeat = Compat.IsDefined(Repeat) ? Repeat : RepeatMode.Off,
     };
 }

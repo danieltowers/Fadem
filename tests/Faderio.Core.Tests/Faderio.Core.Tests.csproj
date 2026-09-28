@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <!-- net48 x86 is the MusicBee plugin's runtime (phase 5, ADR 0012): the promise is proven
+         there too. -->
+    <TargetFrameworks>net8.0;net48</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
@@ -28,6 +30,27 @@
 
   <ItemGroup>
     <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- net48 x86 compiles the promise and the file formats only, until the whole suite follows
+       ("Core multi-targeted in full"). A test left out here is excluded, never skipped. Tests
+       built on ChildProcess stay net8.0-only: it starts children through dotnet. -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PlatformTarget>x86</PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <Compile Remove="**\*.cs" />
+    <Compile Include="PluginRuntimeTests.cs" />
+    <!-- helpers -->
+    <Compile Include="CraftedMp3.cs;FakeAudioOutput.cs;TestAudio.cs;TestEngine.cs;TestTemp.cs" />
+    <!-- the promise -->
+    <Compile Include="RealInputMatrixTests.cs;FadeEngineAccuracyTests.cs" />
+    <!-- atomic writes, the store, the settings files and the folder scan -->
+    <Compile Include="AtomicWriteTests.cs;FileFormatTests.cs;FolderScanTests.cs" />
+    <Compile Include="JsonTransitionStoreTests.cs;SettingsStoreTests.cs;MachineSettingsTests.cs;StoreFailureTests.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' != 'net48'">
+    <Compile Remove="PluginRuntimeTests.cs" />
   </ItemGroup>
 
 </Project>

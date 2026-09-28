@@ -33,6 +33,9 @@ Frames never cross the shell seam: externally `Playhead`, `Point`, `Length` and 
 - Run `dotnet test` before every commit and **state the result in the commit message**
   (count passed, count failed, or "no test project yet"). Not a hook, by decision: the suite
   renders real audio and a slow hook gets bypassed.
+- Core's tests run twice, on **net8.0** and on **net48 x86** (the MusicBee plugin's runtime,
+  ADR 0012). The commit message states the net8.0 and net48 x86 counts separately. A net48 test
+  that cannot compile yet is excluded in the test project, never skipped.
 - A session that touches the shell runs the **Looks** half of `docs/smoke.md` before its
   commit and reports item by item. The **Sounds** half is the user's; never claim it.
 - A research investigation that measures the engine leaves a **permanent test** behind, not a

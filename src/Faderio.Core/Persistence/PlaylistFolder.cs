@@ -9,7 +9,7 @@ namespace Faderio.Core.Persistence;
 /// Listing the folder is listing the playlists. Names compare as Windows compares file names,
 /// ignoring case. External edits of the folder are the user's problem: nothing here watches it.
 /// </summary>
-internal static partial class PlaylistFolder
+internal static class PlaylistFolder
 {
     public const string Extension = ".m3u8";
 
@@ -57,7 +57,7 @@ internal static partial class PlaylistFolder
         {
             return $"\"{name}\" cannot name a playlist: a file name cannot end with a full stop.";
         }
-        if (ReservedName().IsMatch(name))
+        if (ReservedName.IsMatch(name))
         {
             return $"\"{name}\" cannot name a playlist: Windows reserves that name.";
         }
@@ -70,7 +70,7 @@ internal static partial class PlaylistFolder
 
     /// <summary>Whether <paramref name="name"/> is one the engine gave: "Untitled" or "Untitled N".
     /// An open one with no rows is deleted on switch and quit (D15).</summary>
-    public static bool IsUntitled(string name) => UntitledName().IsMatch(name);
+    public static bool IsUntitled(string name) => UntitledName.IsMatch(name);
 
     /// <summary>"Untitled", or else "Untitled N" for the first N from 2 that no playlist has.</summary>
     public static string FirstFreeUntitled(IEnumerable<string> existing) => FirstFree(Untitled, existing);
@@ -93,9 +93,9 @@ internal static partial class PlaylistFolder
         }
     }
 
-    [GeneratedRegex(@"^Untitled( [2-9]| [1-9][0-9]+)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
-    private static partial Regex UntitledName();
+    private static readonly Regex UntitledName =
+        new(@"^Untitled( [2-9]| [1-9][0-9]+)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    [GeneratedRegex(@"^(CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
-    private static partial Regex ReservedName();
+    private static readonly Regex ReservedName =
+        new(@"^(CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 }

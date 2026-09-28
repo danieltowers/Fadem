@@ -118,7 +118,7 @@ internal sealed class FlacTrackReader : FlacReader
         get => _seeking ? base.Position : _positionBytes;
         set
         {
-            var target = Math.Clamp(value - value % BlockAlign, 0, Length) / BlockAlign;
+            var target = Compat.Clamp(value - value % BlockAlign, 0, Length) / BlockAlign;
             var frame = FrameHolding(target);
             _seeking = true;
             try
@@ -381,8 +381,8 @@ internal sealed class FlacTrackReader : FlacReader
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            var wanted = (int)Math.Clamp(End + Zeros - Position, 0, count);
-            var real = (int)Math.Clamp(End - Position, 0, wanted);
+            var wanted = (int)Compat.Clamp(End + Zeros - Position, 0, count);
+            var real = (int)Compat.Clamp(End - Position, 0, wanted);
             Inner.Position = Position;
             var read = Inner.ReadAtLeast(buffer.AsSpan(offset, real), real, throwOnEndOfStream: false);
             if (read < real)

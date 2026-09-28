@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "transitions": {
+    "C:\\Music\\Example Band \u2020 Second Album\\01 Long Opener.flac|C:\\Music\\\u2B50\uFE0F Favourites\\02 Short Interlude.mp3": {
+      "FadeOutPoint": {
+        "Position": "00:00:12.3000000",
+        "FromEnd": true
+      },
+      "FadeInPoint": {
+        "Position": "00:00:04.5070000",
+        "FromEnd": false
+      },
+      "FadeOutDuration": "00:00:02.5000000",
+      "FadeInDuration": "00:00:01.7500001",
+      "Curve": "Linear"
+    }
+  },
+  "playlistOverrides": {
+    "Mix \u2020 \u2B50\uFE0F": {
+      "C:\\Music\\Example Band \u2020 Second Album\\01 Long Opener.flac|C:\\Music\\\u2B50\uFE0F Favourites\\02 Short Interlude.mp3": {
+        "FadeOutDuration": "00:00:08"
+      }
+    }
+  }
+}

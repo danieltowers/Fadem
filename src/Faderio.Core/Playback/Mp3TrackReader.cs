@@ -60,7 +60,7 @@ internal sealed class Mp3TrackReader : WaveStream
     public override long Position
     {
         get => _position * BlockAlign;
-        set => Seek(Math.Clamp(value / BlockAlign, 0, _frames));
+        set => Seek(Compat.Clamp(value / BlockAlign, 0, _frames));
     }
 
     private long ReaderFrames => _reader.Length / BlockAlign;
@@ -79,7 +79,7 @@ internal sealed class Mp3TrackReader : WaveStream
         // where no decoder reaches. LAME always pads by 576 or more; this is for other encoders,
         // and keeps the length the one the probe issued. A decoder that stops before its last
         // frame (a cut file) is not padded: the track ends there, with its notice (ADR 0010).
-        var decodable = Math.Clamp(_silentFrom - _position, 0, frames);
+        var decodable = Compat.Clamp(_silentFrom - _position, 0, frames);
         var wanted = (int)decodable * BlockAlign;
         var read = 0;
         while (read < wanted)

@@ -39,7 +39,7 @@ public sealed record MachineSettings
     public MachineSettings Normalised() => this with
     {
         SchemaVersion = CurrentSchemaVersion,
-        OutputMode = SchemaVersion >= 2 && Enum.IsDefined(OutputMode) ? OutputMode : AudioOutputMode.WasapiShared,
+        OutputMode = SchemaVersion >= 2 && Compat.IsDefined(OutputMode) ? OutputMode : AudioOutputMode.WasapiShared,
         Library = string.IsNullOrWhiteSpace(Library) ? null : Library,
     };
 }

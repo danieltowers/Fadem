@@ -13,8 +13,6 @@ namespace Faderio.Core.Playback;
 /// </summary>
 internal static class FolderContents
 {
-    private static readonly EnumerationOptions Listing = new() { IgnoreInaccessible = false };
-
     public static IReadOnlyList<string> List(string folder)
     {
         var paths = new List<string>();
@@ -28,13 +26,13 @@ internal static class FolderContents
         List<DirectoryInfo> subfolders;
         try
         {
-            files = folder.EnumerateFiles("*", Listing)
+            files = FileSystemCompat.VisibleFiles(folder)
                 .Where(f => SupportedAudio.IsPromisedExtension(f.Name))
                 .OrderBy(f => f.Name, NaturalOrder.Instance)
                 .Select(f => f.FullName)
                 .ToList();
-            subfolders = folder.EnumerateDirectories("*", Listing)
-                .Where(d => d.LinkTarget is null)
+            subfolders = FileSystemCompat.VisibleFolders(folder)
+                .Where(d => !FileSystemCompat.IsLink(d))
                 .OrderBy(d => d.Name, NaturalOrder.Instance)
                 .ToList();
         }
@@ -74,8 +72,8 @@ internal sealed class NaturalOrder : IComparer<string>
         {
             var a = Run(x, ref i);
             var b = Run(y, ref j);
-            var digits = char.IsAsciiDigit(a[0]);
-            var order = digits && char.IsAsciiDigit(b[0])
+            var digits = Compat.IsAsciiDigit(a[0]);
+            var order = digits && Compat.IsAsciiDigit(b[0])
                 ? CompareNumbers(a, b)
                 : Text.Compare(a, b, CompareOptions.IgnoreCase);
             if (order != 0)
@@ -91,8 +89,8 @@ internal sealed class NaturalOrder : IComparer<string>
     private static ReadOnlySpan<char> Run(string s, ref int at)
     {
         var start = at;
-        var digits = char.IsAsciiDigit(s[at]);
-        while (at < s.Length && char.IsAsciiDigit(s[at]) == digits)
+        var digits = Compat.IsAsciiDigit(s[at]);
+        while (at < s.Length && Compat.IsAsciiDigit(s[at]) == digits)
         {
             at++;
         }

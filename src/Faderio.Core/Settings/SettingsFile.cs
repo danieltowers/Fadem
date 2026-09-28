@@ -114,7 +114,7 @@ public abstract class SettingsFile<T> where T : class, new()
         var name = Path.GetFileName(_path);
         try
         {
-            File.Move(_path, _path + ".corrupt", overwrite: true);
+            FileSystemCompat.MoveReplacing(_path, _path + ".corrupt");
         }
         catch (Exception e) when (IsFileFailure(e))
         {

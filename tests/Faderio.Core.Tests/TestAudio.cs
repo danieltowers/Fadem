@@ -195,13 +195,14 @@ public static class TestAudio
 
     private static double Dot(ReadOnlySpan<float> a, ReadOnlySpan<float> b)
     {
-        var width = System.Numerics.Vector<float>.Count;
+        var va = System.Runtime.InteropServices.MemoryMarshal.Cast<float, System.Numerics.Vector<float>>(a);
+        var vb = System.Runtime.InteropServices.MemoryMarshal.Cast<float, System.Numerics.Vector<float>>(b.Slice(0, a.Length));
         var acc = System.Numerics.Vector<float>.Zero;
-        var i = 0;
-        for (; i + width <= a.Length; i += width)
+        for (var v = 0; v < va.Length; v++)
         {
-            acc += new System.Numerics.Vector<float>(a.Slice(i, width)) * new System.Numerics.Vector<float>(b.Slice(i, width));
+            acc += va[v] * vb[v];
         }
+        var i = va.Length * System.Numerics.Vector<float>.Count;
         double sum = System.Numerics.Vector.Dot(acc, System.Numerics.Vector<float>.One);
         for (; i < a.Length; i++)
         {

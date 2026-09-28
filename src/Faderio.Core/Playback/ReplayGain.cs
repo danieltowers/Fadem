@@ -9,7 +9,7 @@ public static class ReplayGain
 {
     public const double ClampLimitDb = 12.0;
 
-    public static double ClampDb(double gainDb) => Math.Clamp(gainDb, -ClampLimitDb, ClampLimitDb);
+    public static double ClampDb(double gainDb) => Compat.Clamp(gainDb, -ClampLimitDb, ClampLimitDb);
 
     public static double DbToMultiplier(double gainDb) => Math.Pow(10, gainDb / 20.0);
 
@@ -22,7 +22,8 @@ public static class ReplayGain
             return null;
         }
         var text = tagValue.Trim().Replace("dB", "", StringComparison.OrdinalIgnoreCase).Trim();
-        return double.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, out var db)
+        return double.TryParse(text, System.Globalization.NumberStyles.Float | System.Globalization.NumberStyles.AllowThousands,
+                System.Globalization.CultureInfo.InvariantCulture, out var db)
             ? db
             : null;
     }

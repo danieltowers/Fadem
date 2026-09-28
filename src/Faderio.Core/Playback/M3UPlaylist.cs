@@ -19,8 +19,7 @@ internal static class M3UPlaylist
     /// <summary>The system's ANSI code page, which is what an old <c>.m3u</c> was written in.</summary>
     private static readonly Lazy<Encoding> SystemCodePage = new(() =>
     {
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        return Encoding.GetEncoding(0);
+        return CodePages.SystemAnsi();
     });
 
     /// <summary>Whether <paramref name="path"/> names a playlist <c>Add</c> opens, in any case.</summary>
@@ -55,7 +54,7 @@ internal static class M3UPlaylist
     {
         try
         {
-            return Path.GetFullPath(entry, folder);
+            return Compat.GetFullPath(entry, folder);
         }
         catch (ArgumentException)
         {
@@ -124,7 +123,7 @@ internal static class M3UPlaylist
                 writer.WriteLine("#EXTM3U");
                 writeEntries(writer);
             }
-            File.Move(temp, path, overwrite: true);
+            FileSystemCompat.MoveReplacing(temp, path);
         }
         catch
         {

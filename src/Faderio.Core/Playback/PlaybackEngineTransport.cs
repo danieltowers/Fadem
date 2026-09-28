@@ -290,7 +290,7 @@ public sealed partial class PlaybackEngine
         }
 
         var total = voice.Source.TotalFrames;
-        var frames = Math.Clamp(target.Frames(_rate), 0, Math.Max(total - 1, 0));
+        var frames = Compat.Clamp(target.Frames(_rate), 0, Math.Max(total - 1, 0));
         voice.Source.Position = frames;
         voice.NoteSeek(_mixer.Timeline, voice.Source.Position);
 

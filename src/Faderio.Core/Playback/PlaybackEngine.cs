@@ -468,7 +468,7 @@ public sealed partial class PlaybackEngine : IDisposable
                     break;
                 }
             }
-            return Math.Clamp(position, 0, Math.Max(LengthFrames, 0));
+            return Compat.Clamp(position, 0, Math.Max(LengthFrames, 0));
         }
     }
 

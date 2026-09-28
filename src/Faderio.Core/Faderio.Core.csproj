@@ -1,7 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <!-- net48 is the MusicBee plugin's runtime (phase 5, ADR 0012). Not netstandard2.0: the MP3
+         reader ships only in the full NAudio package. -->
+    <TargetFrameworks>net8.0;net48</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -11,10 +13,25 @@
     <InternalsVisibleTo Include="Faderio.App.Tests" />
   </ItemGroup>
 
+  <!-- Each target compiles its own Compat folder: the stand-ins net48 needs, and what net8.0
+       already has. -->
+  <ItemGroup Condition="'$(TargetFramework)' != 'net48'">
+    <Compile Remove="Compat/Net48/**" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <Compile Remove="Compat/Net8/**" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="BunLabs.NAudio.Flac" Version="2.0.1" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
+    <PackageReference Include="System.Memory" Version="4.5.5" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
 </Project>

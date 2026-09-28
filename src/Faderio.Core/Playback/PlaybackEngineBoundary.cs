@@ -154,7 +154,7 @@ public sealed partial class PlaybackEngine
         TransitionMixer mixer, ITrackSource source, Track track, long timelineStart, TransitionSpawn? spawn,
         long? from = null)
     {
-        var sourceStart = Math.Clamp(
+        var sourceStart = Compat.Clamp(
             from ?? (spawn is null ? 0 : Frames(spawn.FadeInPoint)), 0, Math.Max(source.TotalFrames - 1, 0));
         var fadeInFrames = spawn is null ? 0 : Math.Max(0, Frames(spawn.FadeInDuration));
         var voice = mixer.AddVoice(
@@ -295,7 +295,7 @@ public sealed partial class PlaybackEngine
             trigger = timelineOf(total);
             return true;
         }
-        var point = Math.Clamp(Frames(transition.FadeOutPoint), 0, total);
+        var point = Compat.Clamp(Frames(transition.FadeOutPoint), 0, total);
         if (point < referencePosition)
         {
             return false; // the fade-out point lies behind us; do not force it after a seek
@@ -340,7 +340,7 @@ public sealed partial class PlaybackEngine
         var spawn = new TransitionSpawn(transition.FadeInPoint, transition.FadeInDuration, transition.Curve);
         var now = _mixer.Timeline;
         // The resolver has shortened the fade to the track's end; this only absorbs rounding.
-        var fadeFrames = Math.Clamp(Frames(transition.FadeOutDuration), 0, total - decodePosition);
+        var fadeFrames = Compat.Clamp(Frames(transition.FadeOutDuration), 0, total - decodePosition);
         if (fadeFrames == 0)
         {
             CutAllVoices(); // the non-overlapping shape: the outgoing track stops now

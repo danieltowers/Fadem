@@ -23,7 +23,7 @@ public sealed class Library
 
     private Library(string folder)
     {
-        Folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
+        Folder = Compat.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
         var leaf = Path.GetFileName(Folder);
         Name = leaf.Length > 0 ? leaf : Folder; // a drive's root has no leaf
         StoreFolder = Path.Combine(Folder, StoreFolderName);
@@ -117,7 +117,7 @@ public sealed class Library
         {
             try
             {
-                File.Move(path, path + ".corrupt", overwrite: true);
+                FileSystemCompat.MoveReplacing(path, path + ".corrupt");
             }
             catch (Exception moveFailure) when (moveFailure is IOException or UnauthorizedAccessException)
             {

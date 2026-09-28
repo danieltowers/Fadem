@@ -87,7 +87,7 @@ internal sealed class WaveStreamTrackSource : ITrackSource
         get => _stream.Position / _stream.BlockAlign;
         set
         {
-            var clamped = Math.Clamp(value, 0, Math.Max(TotalFrames - 1, 0));
+            var clamped = Compat.Clamp(value, 0, Math.Max(TotalFrames - 1, 0));
             _stream.Position = clamped * _stream.BlockAlign;
         }
     }
@@ -122,7 +122,7 @@ internal sealed class WaveStreamTrackSource : ITrackSource
         var subFormat = format switch
         {
             WaveFormatExtensible extensible => extensible.SubFormat,
-            WaveFormatExtraData extra when extra.ExtraData.Length >= 22 => new Guid(extra.ExtraData.AsSpan(6, 16)),
+            WaveFormatExtraData extra when extra.ExtraData.Length >= 22 => Compat.GuidFrom(extra.ExtraData.AsSpan(6, 16)),
             _ => Guid.Empty,
         };
         return subFormat == SubtypeIeeeFloat ? WaveFormatEncoding.IeeeFloat : WaveFormatEncoding.Pcm;

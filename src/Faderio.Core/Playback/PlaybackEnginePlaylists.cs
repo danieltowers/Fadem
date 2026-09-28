@@ -470,7 +470,7 @@ public sealed partial class PlaybackEngine
             _editedWhileLoading = true;
             return;
         }
-        if (throttled && Stopwatch.GetElapsedTime(_saveTakenAt) < AddSaveInterval)
+        if (throttled && Compat.ElapsedSince(_saveTakenAt) < AddSaveInterval)
         {
             _saveDeferred = true;
             return;
