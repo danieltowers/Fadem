@@ -1,6 +1,6 @@
 # Spec — faderio v3 phase 3: the playlists build's loose ends
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: [playlists](../202609-faderio-phase-2-playlists/spec.md)
 
 ## Problem
