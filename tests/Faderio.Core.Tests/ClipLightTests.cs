@@ -135,7 +135,7 @@ public sealed class ClipLightTests
     [Fact]
     public void AHardStepResampledTo48kHz_OvershootsFullScale_AndIsAClip()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "faderio-engine", Guid.NewGuid().ToString("N"));
+        var dir = Path.Combine(TestTemp.Root, "engine", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var output = new FakeAudioOutput { SampleRate = 48000, Latency = 24000 };
         using var engine = new PlaybackEngine(

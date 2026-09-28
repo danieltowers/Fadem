@@ -46,7 +46,7 @@ public sealed class PlaybackEngineSettingsTests
     {
         // ADR 0008: a 48 kHz device makes a 48 kHz engine. A 48 kHz file then plays without
         // resampling, and a second of it is 48000 rendered frames.
-        var dir = Path.Combine(Path.GetTempPath(), "faderio-engine", Guid.NewGuid().ToString("N"));
+        var dir = Path.Combine(TestTemp.Root, "engine", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var output = new FakeAudioOutput { SampleRate = 48000 };
         var sink = new Faderio.Core.Playback.RecordingSink();

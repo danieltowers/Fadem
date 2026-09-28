@@ -22,7 +22,7 @@ public sealed partial class HeadlessFormTests
 {
     private sealed class Harness : IDisposable
     {
-        public string TempDir { get; } = Path.Combine(Path.GetTempPath(), "faderio-app", Guid.NewGuid().ToString("N"));
+        public string TempDir { get; } = Path.Combine(TestTemp.Root, "app", Guid.NewGuid().ToString("N"));
         public Library Library { get; }
         public FakeAudioOutput Output { get; }
         public JsonTransitionStore Store { get; }
@@ -2420,7 +2420,7 @@ public sealed partial class HeadlessFormTests
     }
 
     private static string TempWindowFile() =>
-        Path.Combine(Path.GetTempPath(), "faderio-window", Guid.NewGuid().ToString("N"), "window.json");
+        Path.Combine(TestTemp.Root, "window", Guid.NewGuid().ToString("N"), "window.json");
 
     [Fact]
     public void TheWindow_ClosedSomewhere_OpensThereAtTheNextLaunch() => RunSta(() =>

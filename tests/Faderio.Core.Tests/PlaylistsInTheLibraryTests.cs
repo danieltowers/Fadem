@@ -397,7 +397,7 @@ public sealed class PlaylistsInTheLibraryTests
 /// with row 0 attended at 0:00, and an empty Untitled does not outlive a quit.</summary>
 public sealed class PlaylistsAcrossLaunchesTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "faderio-pl01", Guid.NewGuid().ToString("N"));
+    private readonly string _root = Path.Combine(TestTemp.Root, "pl01", Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {

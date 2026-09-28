@@ -51,7 +51,7 @@ public sealed class TestEngine : IDisposable
     public static TestEngine Create(
         PlayerSettings? settings = null, int? rngSeed = null, int latency = 0, bool backgroundAdd = false)
     {
-        var dir = Path.Combine(Path.GetTempPath(), "faderio-engine", Guid.NewGuid().ToString("N"));
+        var dir = Path.Combine(TestTemp.Root, "engine", Guid.NewGuid().ToString("N"));
         return new TestEngine(
             dir, settings, rngSeed is null ? null : new Random(rngSeed.Value), latency,
             backgroundAdd);

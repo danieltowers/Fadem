@@ -1,4 +1,5 @@
 using Faderio.App;
+using Faderio.Core.Tests;
 
 namespace Faderio.App.Tests;
 
@@ -8,7 +9,7 @@ namespace Faderio.App.Tests;
 /// </summary>
 public sealed class ColumnLayoutTests : IDisposable
 {
-    private readonly string _dir = Path.Combine(Path.GetTempPath(), "faderio-columns", Guid.NewGuid().ToString("N"));
+    private readonly string _dir = Path.Combine(TestTemp.Root, "columns", Guid.NewGuid().ToString("N"));
 
     private string FilePath => Path.Combine(_dir, ColumnLayout.FileName);
 

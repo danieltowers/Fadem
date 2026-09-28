@@ -14,7 +14,7 @@ namespace Faderio.Core.Tests;
 /// </summary>
 public sealed class ShuffleAndRepeatRememberedTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "faderio-remembered", Guid.NewGuid().ToString("N"));
+    private readonly string _root = Path.Combine(TestTemp.Root, "remembered", Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {

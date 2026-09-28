@@ -13,7 +13,7 @@ namespace Faderio.Core.Tests;
 public sealed class SwitchingLibrariesTests : IDisposable
 {
     private const int Rate = 44100;
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "faderio-switch", Guid.NewGuid().ToString("N"));
+    private readonly string _root = Path.Combine(TestTemp.Root, "switch", Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {

@@ -52,7 +52,7 @@ public sealed class ChangeSettingsTests
     [Fact]
     public void ACorruptSettingsFile_IsANotice_AndDefaultsLoad()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "faderio-engine", Guid.NewGuid().ToString("N"));
+        var dir = Path.Combine(TestTemp.Root, "engine", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, "settings.json");
         File.WriteAllText(path, "{ not json");

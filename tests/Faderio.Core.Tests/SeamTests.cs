@@ -233,7 +233,7 @@ public sealed class SeamTests
     [Fact]
     public void SinkHandlers_RunOutsideTheLock_AndMayReenter()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "faderio-engine", Guid.NewGuid().ToString("N"));
+        var dir = Path.Combine(TestTemp.Root, "engine", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var output = new FakeAudioOutput();
         PlaybackEngine? engine = null;

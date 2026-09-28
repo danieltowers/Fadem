@@ -15,7 +15,7 @@ public sealed class StoppingTheDeviceTests : IDisposable
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(5);
 
-    private readonly string _dir = Path.Combine(Path.GetTempPath(), "faderio-engine", Guid.NewGuid().ToString("N"));
+    private readonly string _dir = Path.Combine(TestTemp.Root, "engine", Guid.NewGuid().ToString("N"));
     private readonly JoiningAudioOutput _output = new();
     private readonly PlaybackEngine _engine;
 

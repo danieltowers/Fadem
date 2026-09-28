@@ -11,7 +11,7 @@ public sealed class JsonTransitionStoreOverrideTests : IDisposable
 
     public JsonTransitionStoreOverrideTests()
     {
-        _dir = Path.Combine(Path.GetTempPath(), "faderio-store-ovr", Guid.NewGuid().ToString("N"));
+        _dir = Path.Combine(TestTemp.Root, "store-ovr", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_dir);
         _path = Library.Open(_dir).TransitionsPath; // where a library keeps it
     }

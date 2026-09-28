@@ -9,7 +9,7 @@ public static class TestAudio
     public const int SampleRate = 44100;
 
     public static string Dir { get; } =
-        Path.Combine(Path.GetTempPath(), "faderio-tests", Guid.NewGuid().ToString("N"));
+        Path.Combine(TestTemp.Root, "audio", Guid.NewGuid().ToString("N"));
 
     private static int _fileCounter;
 

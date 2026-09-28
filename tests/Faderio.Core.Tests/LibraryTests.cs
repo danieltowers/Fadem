@@ -29,7 +29,7 @@ public sealed class LibraryTests : IDisposable
 
     private string EmptyFolder(string name = "My Library")
     {
-        var folder = Path.Combine(Path.GetTempPath(), "faderio-library", Guid.NewGuid().ToString("N"), name);
+        var folder = Path.Combine(TestTemp.Root, "library", Guid.NewGuid().ToString("N"), name);
         Directory.CreateDirectory(folder);
         _folders.Add(Path.GetDirectoryName(folder)!);
         return folder;

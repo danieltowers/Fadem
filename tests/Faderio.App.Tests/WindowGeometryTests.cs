@@ -1,4 +1,5 @@
 using Faderio.App;
+using Faderio.Core.Tests;
 
 namespace Faderio.App.Tests;
 
@@ -10,7 +11,7 @@ public sealed class WindowGeometryTests : IDisposable
 {
     private static readonly Rectangle[] OneScreen = { new(0, 0, 1920, 1040) };
     private static readonly Rectangle[] TwoScreens = { new(0, 0, 1920, 1040), new(1920, 0, 2560, 1400) };
-    private readonly string _dir = Path.Combine(Path.GetTempPath(), "faderio-geometry", Guid.NewGuid().ToString("N"));
+    private readonly string _dir = Path.Combine(TestTemp.Root, "geometry", Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {

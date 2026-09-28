@@ -64,7 +64,7 @@ public sealed class AddTimeBudgetTests(ITestOutputHelper output)
     public void AFlacWithEightMegabytesOfCoverArt_AddsWithin150Milliseconds_AndKeepsItsLength()
     {
         var plain = FixturePath("tone-44100-16-2.flac");
-        var heavy = Path.Combine(Path.GetTempPath(), $"faderio-cover-{Guid.NewGuid():N}.flac");
+        var heavy = Path.Combine(TestTemp.Root, $"cover-{Guid.NewGuid():N}.flac");
         File.WriteAllBytes(heavy, WithPicture(File.ReadAllBytes(plain), 8 * 1024 * 1024));
         using var tc = TestEngine.Create();
         var expected = tc.Engine.Add([plain]).Result.Added.Single().Track.Length; // also the warm-up

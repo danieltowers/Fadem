@@ -12,7 +12,7 @@ public sealed class JsonTransitionStoreTests : IDisposable
 
     public JsonTransitionStoreTests()
     {
-        _dir = Path.Combine(Path.GetTempPath(), "faderio-store", Guid.NewGuid().ToString("N"));
+        _dir = Path.Combine(TestTemp.Root, "store", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_dir);
         _path = Library.Open(_dir).TransitionsPath; // where a library keeps it
     }

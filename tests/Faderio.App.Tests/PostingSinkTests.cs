@@ -13,7 +13,7 @@ namespace Faderio.App.Tests;
 /// </summary>
 public sealed class PostingSinkTests : IDisposable
 {
-    private readonly string _tempDir = Path.Combine(Path.GetTempPath(), "faderio-sink", Guid.NewGuid().ToString("N"));
+    private readonly string _tempDir = Path.Combine(TestTemp.Root, "sink", Guid.NewGuid().ToString("N"));
 
     /// <summary>A UI thread that has not yet got round to its queue: posts wait until drained.</summary>
     private sealed class BusyContext : SynchronizationContext
