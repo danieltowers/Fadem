@@ -47,7 +47,9 @@ public sealed class FakeAudioOutput : IAudioOutput
     /// <summary>Failed and not yet reopened: a lost device does not play.</summary>
     public bool Lost { get; private set; }
 
-    private bool _stoppedRaised;
+    /// <summary>Disposed, as the engine does on its own disposal: the device is released.</summary>
+    public bool Disposed { get; private set; }
+
     public event Action<Exception?>? Stopped;
 
     public void Initialise(IFrameSource source) => Source = source;
@@ -127,9 +129,9 @@ public sealed class FakeAudioOutput : IAudioOutput
 
     public void Dispose()
     {
-        if (!_stoppedRaised)
+        if (!Disposed)
         {
-            _stoppedRaised = true;
+            Disposed = true;
             Stopped?.Invoke(null);
         }
     }

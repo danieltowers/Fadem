@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- A MusicBee plugin of type General (phase 5, ADR 0012): MusicBee is 32-bit .NET Framework
+         4.8, and loads Plugins\mb_*.dll, looking for the class MusicBeePlugin.Plugin. -->
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>x86</PlatformTarget>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>mb_faderio</AssemblyName>
+    <RootNamespace>Faderio.MusicBee</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Faderio.Core\Faderio.Core.csproj" />
+    <ProjectReference Include="..\Faderio.Shell\Faderio.Shell.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Faderio.MusicBee.Tests" />
+  </ItemGroup>
+
+  <!-- What is copied into MusicBee's Plugins folder: the plugin beside a private faderio\ folder
+       of everything it depends on, which its assembly-resolve handler loads (it has no binding
+       redirects of its own). -->
+  <Target Name="PluginLayout" AfterTargets="Build">
+    <ItemGroup>
+      <PluginDependency Include="$(OutDir)*.dll" Exclude="$(OutDir)$(TargetFileName)" />
+    </ItemGroup>
+    <RemoveDir Directories="$(OutDir)plugin" />
+    <Copy SourceFiles="$(OutDir)$(TargetFileName)" DestinationFolder="$(OutDir)plugin" />
+    <Copy SourceFiles="@(PluginDependency)" DestinationFolder="$(OutDir)plugin\faderio" />
+  </Target>
+
+</Project>
