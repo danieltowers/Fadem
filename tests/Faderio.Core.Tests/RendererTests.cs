@@ -98,6 +98,49 @@ public sealed class RendererTests
     }
 
     [Fact]
+    public void TheEngine_RendersAnUnauthoredBoundary_WithItsLibrarysDefaultCrossfade()
+    {
+        using var tc = TestEngine.Create(new Settings.PlayerSettings
+        {
+            UnauthoredAdjacency = Settings.UnauthoredAdjacency.DefaultCrossfade,
+            DefaultCrossfadeSeconds = 1,
+        });
+        var a = TestAudio.WriteDcWav("a.wav", 4, 0.4);
+        var b = TestAudio.WriteDcWav("b.wav", 4, 0.2);
+        var adjacency = new Adjacency(tc.TrackOf(a), tc.TrackOf(b));
+        var wav = Path.Combine(tc.TempDir, "crossfade.wav");
+
+        var report = tc.Engine.RenderBoundary(adjacency, wav);
+
+        // One second from 3.0 s, not a hard cut at A's end.
+        Assert.Equal(3000, report.FadeOutPointInFile.Milliseconds);
+        var (left, _) = ReadLeft(wav);
+        Assert.Equal(0.4, left[(int)(2.5 * 44100)], 3); // before the fade
+        Assert.InRange(left[(int)(3.9 * 44100)], 0.2, 0.3); // A nearly gone, B nearly in
+        Assert.Equal(0.2, left[(int)(4.5 * 44100)], 3); // B alone
+    }
+
+    [Theory]
+    [InlineData(Faderio.Core.Queue.RepeatMode.One, false)]
+    [InlineData(Faderio.Core.Queue.RepeatMode.All, true)]
+    public void ARender_GoesIntoTheIncomingTrack_WhateverTheLibrarysRepeatAndShuffle(
+        Faderio.Core.Queue.RepeatMode repeat, bool shuffle)
+    {
+        using var tc = TestEngine.Create(new Settings.PlayerSettings { Repeat = repeat, Shuffle = shuffle }, rngSeed: 3);
+        var a = TestAudio.WriteDcWav("a.wav", 2, 0.4);
+        var b = TestAudio.WriteDcWav("b.wav", 2, 0.2);
+        var adjacency = new Adjacency(tc.TrackOf(a), tc.TrackOf(b));
+        var wav = Path.Combine(tc.TempDir, "repeat.wav");
+
+        var report = tc.Engine.RenderBoundary(adjacency, wav);
+
+        Assert.Equal(2000, report.FadeOutPointInFile.Milliseconds); // a hard cut at A's end
+        var (left, _) = ReadLeft(wav);
+        Assert.Equal(0.4, left[(int)(1.5 * 44100)], 3);
+        Assert.Equal(0.2, left[(int)(2.5 * 44100)], 3); // B, not A again
+    }
+
+    [Fact]
     public void AnEngineWithNoLibrary_RendersTheBoundaryUnauthored()
     {
         using var tc = TestEngine.Create();
