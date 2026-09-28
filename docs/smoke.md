@@ -356,6 +356,26 @@ of the session whose process is MusicBee's), which a generated tone of amplitude
 - [ ] **Tools** ends with **faderio**, whose submenu reads **Play**, **Stop**.
 - [ ] With the settings file naming a library whose open playlist holds two generated tones,
       **Play** starts faderio: the meter shows the tone. **Stop** ends it: the meter reads 0.
+- [ ] **The device is free while faderio is stopped** (phase 5 issue 06). The probe below, run
+      from a PowerShell 7 outside MusicBee, initialises an exclusive `WasapiOut` on the default
+      device and closes it again. With the plugin loaded it reads "exclusive: opened and closed"
+      before faderio has ever played, and again after **Play** then **Stop**; for each of the
+      three output modes in the settings file, with a MusicBee restart between them. This is
+      the check, not listening. Held by another process it reads "refused (…)": 0x8889000A,
+      or "Not implemented" on the DragonFly, which answers that way while an exclusive stream
+      is open, faderio's own included.
+      Never run it while faderio plays: an exclusive stream evicts a shared one, so faderio
+      would lose its device mid-play and say so, as it would under any exclusive-mode app.
+
+      ```powershell
+      $lib = "$env:USERPROFILE\.nuget\packages"
+      Add-Type -Path "$lib\naudio.core\2.2.1\lib\netstandard2.0\NAudio.Core.dll"
+      Add-Type -Path "$lib\naudio.wasapi\2.2.1\lib\netstandard2.0\NAudio.Wasapi.dll"
+      $out = [NAudio.Wave.WasapiOut]::new([NAudio.CoreAudioApi.AudioClientShareMode]::Exclusive, 50)
+      try { $out.Init([NAudio.Wave.SilenceProvider]::new([NAudio.Wave.WaveFormat]::new(44100, 16, 2))); "exclusive: opened and closed" }
+      catch { "exclusive: refused ($($_.Exception.GetBaseException().Message))" }
+      finally { $out.Dispose() }
+      ```
 - [ ] **Edit → Edit Preferences → Plugins** lists faderio with a **Configure…** button, which
       opens faderio's dialog, owned by MusicBee's main window. It shows the settings file's
       library folder and its output mode by name ("WASAPI shared"), with "Applies when MusicBee

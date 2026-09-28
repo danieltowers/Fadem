@@ -251,6 +251,7 @@ is authored in standalone faderio.
 | 04 | [Choosing the library and output mode in MusicBee](issues/04-choosing-the-library-and-output-mode-in-musicbee.md) | 03 |
 | 05 | [The spike's verdict](issues/05-the-spikes-verdict.md) (the user's) | 03, 04, 06 |
 | 06 | [The plugin lets go of the device while stopped](issues/06-the-plugin-lets-go-of-the-device-while-stopped.md) (found in 03) | 03 |
+| 07 | [An authored fade-out is reported as the track ending early](issues/07-an-authored-fade-out-is-reported-as-the-track-ending-early.md) (the engine's, found in 06) | — |
 
 ## Out of Scope
 

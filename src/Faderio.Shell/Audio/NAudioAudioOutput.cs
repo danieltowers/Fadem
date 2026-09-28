@@ -20,6 +20,14 @@ namespace Faderio.Shell.Audio;
 /// device does not run at: shared mode through Windows (NAudio 2.2.1 asks WASAPI for
 /// <c>AUTOCONVERTPCM</c>, confirmed on a 48 kHz device), exclusive mode through NAudio's
 /// resampler, WaveOut through the Windows mixer.</para>
+/// <para>A guest in another player's process lets go of the device while stopped (phase 5
+/// issue 06, decision A): with <c>releaseWhileStopped</c> the player is closed at launch once
+/// the rate is known, closed after every stop, and opened again at <see cref="Play"/>, from the
+/// mode asked for down the same chain, at the engine's rate. A stop from the render thread lets
+/// go on the player's own <c>PlaybackStopped</c>, off that thread; a Play that follows a Stop in
+/// one command keeps the player it opened. When no mode opens at Play, that is reported as a
+/// device loss, off the call, so the next Play reopens with the engine's notice. Standalone
+/// faderio keeps the device between plays.</para>
 /// </summary>
 public sealed class NAudioAudioOutput : IAudioOutput
 {
@@ -32,6 +40,9 @@ public sealed class NAudioAudioOutput : IAudioOutput
     private readonly AudioOutputMode _asked;
     private readonly Action<string> _notify;
     private readonly IReadOnlyCollection<AudioOutputMode> _unavailable;
+    private readonly bool _releaseWhileStopped;
+    private readonly Func<AudioOutputMode, IWavePlayer> _createPlayer;
+    private readonly SynchronizationContext? _context;
     private readonly BoundFeed _feed;
     private IWavePlayer? _player;
     private CountingSource? _counting;
@@ -43,18 +54,42 @@ public sealed class NAudioAudioOutput : IAudioOutput
 
     /// <param name="unavailable">Modes to treat as if their device were taken: for smoke runs
     /// of the fallback chain.</param>
+    /// <param name="releaseWhileStopped">Let go of the device whenever playback is stopped, and
+    /// open it again at <see cref="Play"/>: the MusicBee plugin's way, so MusicBee's own player
+    /// has the device back after faderio's Stop, in exclusive mode too.</param>
     public NAudioAudioOutput(
-        AudioOutputMode mode, Action<string> notify, IReadOnlyCollection<AudioOutputMode>? unavailable = null)
+        AudioOutputMode mode,
+        Action<string> notify,
+        IReadOnlyCollection<AudioOutputMode>? unavailable = null,
+        bool releaseWhileStopped = false)
+        : this(mode, notify, unavailable, releaseWhileStopped, CreatePlayer)
+    {
+    }
+
+    /// <summary>For tests: <paramref name="createPlayer"/> stands in for NAudio's players.</summary>
+    internal NAudioAudioOutput(
+        AudioOutputMode mode,
+        Action<string> notify,
+        IReadOnlyCollection<AudioOutputMode>? unavailable,
+        bool releaseWhileStopped,
+        Func<AudioOutputMode, IWavePlayer> createPlayer)
     {
         _asked = mode;
         _notify = notify;
         _unavailable = unavailable ?? Array.Empty<AudioOutputMode>();
+        _releaseWhileStopped = releaseWhileStopped;
+        _createPlayer = createPlayer;
+        _context = SynchronizationContext.Current; // where NAudio's players post their stop
         _feed = new BoundFeed();
         if (OpenFirstAvailable(mode, engineRate: null) is { } opened)
         {
             Mode = opened.Mode;
         }
         SampleRate = _feed.Format.SampleRate; // the rate the player was opened for
+        if (_releaseWhileStopped)
+        {
+            ClosePlayer(); // the rate is known; the device is opened again at Play
+        }
     }
 
     /// <summary>The modes tried in turn when the one asked for cannot be opened, at launch and on
@@ -94,7 +129,7 @@ public sealed class NAudioAudioOutput : IAudioOutput
         }
         _counting = new CountingSource(source, this);
         _feed.Inner = new FloatToBytesWaveProvider(new FrameSourceSampleProvider(_counting));
-        if (_player is null)
+        if (Mode is null)
         {
             // Nothing opened at launch: the engine treats it as a lost device, and Play reopens.
             Stopped?.Invoke(new InvalidOperationException("no audio output could be opened"));
@@ -103,13 +138,13 @@ public sealed class NAudioAudioOutput : IAudioOutput
 
     public void Play()
     {
-        if (_player is null)
+        if (_player is null && !OpenForPlay())
         {
             return;
         }
         _counting?.ClearStop();
         _state = Transport.Playing;
-        _player.Play();
+        _player!.Play();
     }
 
     public void Pause()
@@ -124,7 +159,9 @@ public sealed class NAudioAudioOutput : IAudioOutput
 
     /// <summary>Stops and resets the emitted count. The engine calls this from inside a render
     /// when playback ends on its own; stopping the player from its own thread would deadlock,
-    /// so in that case the source signals end-of-stream and the player stops itself.</summary>
+    /// so in that case the source signals end-of-stream and the player stops itself. An output
+    /// that lets go while stopped closes the player here, or, from the render thread, on the
+    /// player's own <c>PlaybackStopped</c>.</summary>
     public void Stop()
     {
         _state = Transport.Stopped;
@@ -141,6 +178,10 @@ public sealed class NAudioAudioOutput : IAudioOutput
         else
         {
             _player.Stop();
+            if (_releaseWhileStopped)
+            {
+                ClosePlayer();
+            }
         }
     }
 
@@ -169,10 +210,60 @@ public sealed class NAudioAudioOutput : IAudioOutput
 
     public void Dispose() => ClosePlayer();
 
+    /// <summary>Opens the device for a Play while none is open, which only an output that lets
+    /// go while stopped leaves so: from the mode asked for, since the device MusicBee's player
+    /// held at launch may be free now. When no mode opens, the failure is reported as a player
+    /// that fails after starting reports it, off this call: the engine parks where the listener
+    /// was, with a notice, and its next Play reopens.</summary>
+    private bool OpenForPlay()
+    {
+        if (!_releaseWhileStopped || Mode is null)
+        {
+            return false;
+        }
+        var inUse = Mode;
+        if (OpenFirstAvailable(_asked, SampleRate) is { } opened)
+        {
+            if (opened.Mode != inUse)
+            {
+                Mode = opened.Mode;
+                ModeChanged?.Invoke();
+            }
+            return true;
+        }
+        // As a player that started and then failed: playing until its failure lands.
+        _state = Transport.Playing;
+        Post(() => Fail(new InvalidOperationException("no audio output could be opened")));
+        return false;
+    }
+
+    /// <summary>The device failed: what was heard is held, and the engine is told.</summary>
+    private void Fail(Exception error)
+    {
+        _heardAtFailure = MeasureHeard().Count;
+        _state = Transport.Stopped;
+        Stopped?.Invoke(error);
+    }
+
+    /// <summary>Runs <paramref name="action"/> off the calling thread, where NAudio's players
+    /// deliver their stop: the UI thread when there is one, a pool thread otherwise.</summary>
+    private void Post(Action action)
+    {
+        if (_context is null)
+        {
+            ThreadPool.QueueUserWorkItem(_ => action());
+        }
+        else
+        {
+            _context.Post(_ => action(), null);
+        }
+    }
+
     private void ClosePlayer()
     {
-        var player = _player;
-        _player = null; // its last PlaybackStopped is no longer this output's
+        // Its last PlaybackStopped is no longer this output's; closed once, from whichever thread
+        // gets there first (Stop on the UI thread, or the render thread's own stop).
+        var player = Interlocked.Exchange(ref _player, null);
         try
         {
             player?.Dispose();
@@ -221,7 +312,7 @@ public sealed class NAudioAudioOutput : IAudioOutput
         {
             throw new InvalidOperationException("the device is in use (--unavailable)");
         }
-        var player = CreatePlayer(mode, out var latencyMs);
+        var player = _createPlayer(mode);
         try
         {
             player.Init(_feed);
@@ -245,9 +336,14 @@ public sealed class NAudioAudioOutput : IAudioOutput
                 _heardAtFailure = MeasureHeard().Count;
                 _state = Transport.Stopped;
             }
+            else if (_releaseWhileStopped && _state == Transport.Stopped)
+            {
+                // The stream ended on a stop asked for from the render thread: let go now, off it.
+                ClosePlayer();
+            }
             Stopped?.Invoke(args.Exception);
         };
-        _latencyMs = latencyMs;
+        _latencyMs = LatencyOf(mode);
         return player;
     }
 
@@ -285,21 +381,19 @@ public sealed class NAudioAudioOutput : IAudioOutput
         return new Frames(Math.Max(0, rendered - (long)_latencyMs * SampleRate / 1000));
     }
 
-    private static IWavePlayer CreatePlayer(AudioOutputMode mode, out int latencyMs)
+    private static IWavePlayer CreatePlayer(AudioOutputMode mode) => mode switch
     {
-        switch (mode)
-        {
-            case AudioOutputMode.WasapiExclusive:
-                latencyMs = ExclusiveLatencyMs;
-                return new WasapiOut(AudioClientShareMode.Exclusive, ExclusiveLatencyMs);
-            case AudioOutputMode.WaveOut:
-                latencyMs = WaveOutLatencyMs;
-                return new WaveOutEvent { DesiredLatency = WaveOutLatencyMs };
-            default:
-                latencyMs = SharedLatencyMs;
-                return new WasapiOut(AudioClientShareMode.Shared, SharedLatencyMs);
-        }
-    }
+        AudioOutputMode.WasapiExclusive => new WasapiOut(AudioClientShareMode.Exclusive, ExclusiveLatencyMs),
+        AudioOutputMode.WaveOut => new WaveOutEvent { DesiredLatency = WaveOutLatencyMs },
+        _ => new WasapiOut(AudioClientShareMode.Shared, SharedLatencyMs),
+    };
+
+    private static int LatencyOf(AudioOutputMode mode) => mode switch
+    {
+        AudioOutputMode.WasapiExclusive => ExclusiveLatencyMs,
+        AudioOutputMode.WaveOut => WaveOutLatencyMs,
+        _ => SharedLatencyMs,
+    };
 
     /// <summary>The current default device's mix rate; throws when there is no device.</summary>
     private static int QueryMixRate()

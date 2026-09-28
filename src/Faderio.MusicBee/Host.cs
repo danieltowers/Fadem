@@ -34,9 +34,11 @@ internal sealed class Host : IDisposable
         var library = folder is null ? null : Library.Open(folder);
 
         // Only the output mode is read here: the output opens before the engine that runs at its
-        // rate (ADR 0008).
+        // rate (ADR 0008). A guest in MusicBee's process lets go of the device while stopped, so
+        // MusicBee's own player has it back after faderio's Stop (issue 06, decision A).
         var mode = machine.Settings.OutputMode;
-        var output = outputs?.Invoke(mode, sink.Notice) ?? new NAudioAudioOutput(mode, sink.Notice);
+        var output = outputs?.Invoke(mode, sink.Notice)
+                     ?? new NAudioAudioOutput(mode, sink.Notice, releaseWhileStopped: true);
         Engine = new PlaybackEngine(output, library, sink, machine: machine);
     }
 

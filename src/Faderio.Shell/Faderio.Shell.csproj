@@ -12,4 +12,9 @@
     <ProjectReference Include="..\Faderio.Core\Faderio.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The output's player factory: the plugin's tests stand a fake player in for NAudio's. -->
+    <InternalsVisibleTo Include="Faderio.MusicBee.Tests" />
+  </ItemGroup>
+
 </Project>

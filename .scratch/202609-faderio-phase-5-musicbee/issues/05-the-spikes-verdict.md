@@ -44,3 +44,18 @@ Then the outcome is recorded.
 - [ ] The user has run each Sounds item and reported it.
 - [ ] ADR 0012's status, `CONTEXT.md`, the brief and (on a pass) the staged issues match the
       outcome.
+
+## Comments
+
+- **The agent's half, 2026-09-28.** 03, 04 and 06 are resolved, and the MusicBee Looks half
+  passes on the build of issue 06 (its comments list each item). The Sounds half is yours.
+  - The plugin is installed in the portable MusicBee, its settings naming the smoke library
+    `faderio-smoke\library` (two tones, a 2 s
+    crossfade at 6 s) in WASAPI shared. Point it at a real library in Configure… for the ear.
+  - For exclusive: choose it in Configure…, Save, restart MusicBee. Expect at every start
+    "WASAPI exclusive unavailable (Not implemented); trying WASAPI shared." (the device is
+    held at that moment; see 06). Play still opens exclusive: with the DragonFly the probe
+    was refused while faderio played, and opened again after Stop.
+  - Expect one notice per crossfade, "… ends N s before its header claims." That is the
+    engine's, [issue 07](07-an-authored-fade-out-is-reported-as-the-track-ending-early.md),
+    not the plugin's. Weigh both notices at the verdict.
