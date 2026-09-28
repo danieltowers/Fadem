@@ -249,7 +249,8 @@ is authored in standalone faderio.
 | 02 | [The audio output moves into a shared library](issues/02-the-audio-output-moves-into-a-shared-library.md) | 01 |
 | 03 | [The plugin plays the open playlist inside MusicBee](issues/03-the-plugin-plays-the-open-playlist-inside-musicbee.md) | 01, 02 |
 | 04 | [Choosing the library and output mode in MusicBee](issues/04-choosing-the-library-and-output-mode-in-musicbee.md) | 03 |
-| 05 | [The spike's verdict](issues/05-the-spikes-verdict.md) (the user's) | 03, 04 |
+| 05 | [The spike's verdict](issues/05-the-spikes-verdict.md) (the user's) | 03, 04, 06 |
+| 06 | [The plugin lets go of the device while stopped](issues/06-the-plugin-lets-go-of-the-device-while-stopped.md) (found in 03) | 03 |
 
 ## Out of Scope
 

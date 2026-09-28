@@ -1,7 +1,7 @@
 # 05: The spike's verdict
 
 Status: ready-for-human
-Blocked by: 03, 04
+Blocked by: 03, 04, 06
 
 Part of the [MusicBee spike](../spec.md). This ticket answers the [brief](../brief.md).
 

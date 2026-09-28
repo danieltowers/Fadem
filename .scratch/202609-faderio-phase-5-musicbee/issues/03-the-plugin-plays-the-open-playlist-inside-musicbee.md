@@ -129,6 +129,6 @@ The MusicBee API interface file is vendored at the minimum revision that has eve
     ever plays. That breaks the spec's "lets go of the device when stopped" and user story 21.
   - In shared mode, faderio holds an idle stream. That blocks MusicBee only if MusicBee itself
     opens the device exclusively.
-  - This ticket's criteria do not cover it, and nothing here changes the output. It needs its
-    own issue: most likely the output releasing the device while stopped, for the plugin or for
-    both hosts.
+  - This ticket's criteria do not cover it, and nothing here changes the output. Written up as
+    [issue 06](06-the-plugin-lets-go-of-the-device-while-stopped.md), which now blocks the
+    verdict.
