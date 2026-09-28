@@ -85,6 +85,42 @@ public sealed class PlaylistOverridesTests
     }
 
     [Fact]
+    public void ARender_PlaysTheOverrideInItsPlaylist_AndTheGlobalInAnother()
+    {
+        var (tc, a, b) = InPAndQ("render");
+        using var _ = tc;
+        var adjacency = tc.AdjacencyOf(a, b);
+        tc.Engine.Author(adjacency, Crossfade(2));
+        Assert.Empty(tc.Engine.AuthorOverride(adjacency, FadeOutAt(1.5)));
+
+        var inP = tc.Engine.RenderBoundary(adjacency, Path.Combine(tc.TempDir, "p.wav"));
+        tc.Engine.OpenPlaylist("Q").Wait();
+        var inQ = tc.Engine.RenderBoundary(adjacency, Path.Combine(tc.TempDir, "q.wav"));
+
+        // The pre-roll reaches back to A's start, so the fade-out point is where it sits in A.
+        Assert.Equal(1500, inP.FadeOutPointInFile.Milliseconds);
+        Assert.Equal(2000, inQ.FadeOutPointInFile.Milliseconds);
+        Assert.Equal(Crossfade(2), tc.Store.Get(a, b)); // the render wrote nothing
+        Assert.Equal(FadeOutAt(1.5), tc.Store.GetOverride("P", a, b));
+    }
+
+    [Fact]
+    public void APlaylistOnlyTransition_RendersInItsPlaylist_AndAsUnauthoredElsewhere()
+    {
+        var (tc, a, b) = InPAndQ("render-only");
+        using var _ = tc;
+        var adjacency = tc.AdjacencyOf(a, b);
+        Assert.Empty(tc.Engine.AuthorOverride(adjacency, Crossfade(1.5)));
+
+        var inP = tc.Engine.RenderBoundary(adjacency, Path.Combine(tc.TempDir, "p.wav"));
+        tc.Engine.OpenPlaylist("Q").Wait();
+        var inQ = tc.Engine.RenderBoundary(adjacency, Path.Combine(tc.TempDir, "q.wav"));
+
+        Assert.Equal(1500, inP.FadeOutPointInFile.Milliseconds);
+        Assert.Equal(3000, inQ.FadeOutPointInFile.Milliseconds); // a hard cut at A's end
+    }
+
+    [Fact]
     public void AnOverrideOfTheFadeInDurationOnly_LeavesTheRestToTheGlobal_AndFollowsItsLaterEdits()
     {
         var (tc, a, b) = InPAndQ("follow");

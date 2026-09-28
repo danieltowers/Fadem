@@ -437,15 +437,16 @@ public sealed partial class PlaybackEngine
         ? $"The library {library.Name} could not be opened ({reason})."
         : "No library is open.";
 
-    /// <summary>Renders the adjacency's boundary to a WAV file as the open library has it, its
-    /// transitions and its settings: the editor's Render button (ticket 06). With no library it
-    /// renders as unauthored.</summary>
+    /// <summary>Renders the adjacency's boundary to a WAV file as the open library and playlist
+    /// have it: the global transition with the open playlist's override over it, under the
+    /// library's settings. The editor's Render button (ticket 06). With no library it renders as
+    /// unauthored.</summary>
     public RenderReport RenderBoundary(Adjacency adjacency, string wavPath)
     {
         ThrowIfDisposed();
-        // The library open now, and its settings; rendering takes no lock.
-        var (store, settings) = Run(() => (_store, _settings));
-        return Renderer.RenderBoundary(adjacency, store, wavPath, settings: settings);
+        // The library and playlist open now, and the settings; rendering takes no lock.
+        var (store, settings, playlist) = Run(() => (_store, _settings, _openPlaylist));
+        return Renderer.RenderBoundary(adjacency, store, wavPath, settings: settings, playlist: playlist);
     }
 
     /// <summary>What a file write can throw, as <see cref="SaveAsPlaylist"/> catches it.</summary>

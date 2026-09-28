@@ -18,17 +18,55 @@ public sealed record RenderReport(string Path, Length Rendered, Length FadeOutPo
 /// so an unauthored boundary renders as it plays, with the default crossfade when opted in, and
 /// blank durations and ReplayGain as set. Shuffle and repeat are the transport's, not the
 /// boundary's: a render always goes from the outgoing track into the incoming one. With no
-/// settings passed, their defaults.
+/// settings passed, their defaults. Given a playlist, the boundary renders as that playlist plays
+/// it: its override laid over the global transition, parameter by parameter.
 /// </summary>
 public static class Renderer
 {
+    /// <summary>The store as one playlist plays it, read-only: each pair's transition is the
+    /// global one with the playlist's override laid over it, and there are no overrides beside
+    /// it. The render's engine opens no playlist of its own, so it never touches the playlists or
+    /// their overrides; this is how it hears one.</summary>
+    private sealed class AsPlayedIn(ITransitionStore store, string playlist) : ITransitionStore
+    {
+        public TransitionSpec? Get(string outgoingPath, string incomingPath) =>
+            TransitionResolver.Merge(store.Get(outgoingPath, incomingPath), store.GetOverride(playlist, outgoingPath, incomingPath));
+
+        public IReadOnlyList<(string Outgoing, string Incoming)> Pairs() =>
+            store.Pairs().Concat(store.OverridePairs(playlist)).Distinct().ToList();
+
+        public TransitionSpec? GetOverride(string playlistName, string outgoingPath, string incomingPath) => null;
+
+        public IReadOnlyList<(string Outgoing, string Incoming)> OverridePairs(string playlistName) => [];
+
+        public void Upsert(string outgoingPath, string incomingPath, TransitionSpec spec) => throw ReadOnly();
+
+        public bool Remove(string outgoingPath, string incomingPath) => throw ReadOnly();
+
+        public void UpsertOverride(string playlistName, string outgoingPath, string incomingPath, TransitionSpec partial) =>
+            throw ReadOnly();
+
+        public bool RemoveOverride(string playlistName, string outgoingPath, string incomingPath) => throw ReadOnly();
+
+        public void RenamePlaylist(string oldName, string newName) => throw ReadOnly();
+
+        public void RemovePlaylist(string playlistName) => throw ReadOnly();
+
+        private static InvalidOperationException ReadOnly() => new("A render never writes the store.");
+    }
+
     public static readonly TimeSpan DefaultPreRoll = TimeSpan.FromSeconds(5);
     public static readonly TimeSpan DefaultTail = TimeSpan.FromSeconds(5);
 
     public static RenderReport RenderBoundary(
         Adjacency adjacency, ITransitionStore? store, string wavPath,
-        TimeSpan? preRoll = null, TimeSpan? tail = null, int sampleRate = 44100, PlayerSettings? settings = null)
+        TimeSpan? preRoll = null, TimeSpan? tail = null, int sampleRate = 44100, PlayerSettings? settings = null,
+        string? playlist = null)
     {
+        if (store is not null && playlist is not null)
+        {
+            store = new AsPlayedIn(store, playlist);
+        }
         settings = (settings ?? new PlayerSettings()).Normalised() with { Shuffle = false, Repeat = RepeatMode.Off };
         var pre = preRoll ?? DefaultPreRoll;
         var after = tail ?? DefaultTail;
