@@ -30,10 +30,16 @@ public partial class Plugin
 
     public Plugin()
     {
+        ShowSettings = dialog => dialog.ShowDialog(new Window(_api.MB_GetWindowHandle())) == DialogResult.OK;
     }
 
     /// <summary>For tests: the output each start opens, in place of the device.</summary>
-    internal Plugin(Func<AudioOutputMode, Action<string>, IAudioOutput> outputs) => _outputs = outputs;
+    internal Plugin(Func<AudioOutputMode, Action<string>, IAudioOutput> outputs)
+        : this() => _outputs = outputs;
+
+    /// <summary>Shows the settings dialog, owned by MusicBee's main window, and says whether the
+    /// user pressed OK. A test replaces it, since a headless plugin cannot show a dialog.</summary>
+    internal Func<SettingsDialog, bool> ShowSettings { get; set; }
 
     /// <summary>The engine and its output, once started; null before, after <see cref="Close"/>,
     /// and when it could not be started.</summary>
@@ -80,12 +86,17 @@ public partial class Plugin
         return _about;
     }
 
-    /// <summary>No settings dialog yet (issue 04): the settings file is written by hand.</summary>
-    public bool Configure(IntPtr panelHandle) => false;
-
-    public void SaveSettings()
+    /// <summary>MusicBee's plugin preferences, faderio's Configure (issue 04). With no panel asked
+    /// for, MusicBee lends none, and the plugin shows its own dialog. True: handled, so MusicBee
+    /// shows nothing of its own. What OK chose waits for <see cref="SaveSettings"/>.</summary>
+    public bool Configure(IntPtr panelHandle)
     {
+        Ready()?.Configure(ShowSettings);
+        return true;
     }
+
+    /// <summary>MusicBee's preferences are saved or applied: what the dialog chose is sent.</summary>
+    public void SaveSettings() => _host?.SaveSettings();
 
     public void Close(PluginCloseReason reason) => End();
 

@@ -21,12 +21,13 @@ internal sealed class MessageBoxes
     public void Show(string message) => _ui.Post(ShowNow, message);
 
     private void ShowNow(object? message) =>
-        MessageBox.Show(new Owner(_owner()), (string)message!, "faderio", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        MessageBox.Show(new Window(_owner()), (string)message!, "faderio", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+}
 
-    private sealed class Owner : IWin32Window
-    {
-        public Owner(IntPtr handle) => Handle = handle;
+/// <summary>A window by its handle, to own a box or a dialog: MusicBee's main window.</summary>
+internal sealed class Window : IWin32Window
+{
+    public Window(IntPtr handle) => Handle = handle;
 
-        public IntPtr Handle { get; }
-    }
+    public IntPtr Handle { get; }
 }

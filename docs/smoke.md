@@ -324,9 +324,11 @@ start it. A plugin that failed to load is recorded as disabled in MusicBee's
 `mb_faderio.dll` so it is found as new.
 
 **Its settings** are `AppData\faderio\settings.json`, in MusicBee's persistent storage folder
-(the portable MusicBee's `AppData`), never standalone faderio's. Until the settings dialog
-(issue 04), write it by hand, with the library a standalone faderio library whose open
-playlist holds the tracks to play:
+(the portable MusicBee's `AppData`), never standalone faderio's. faderio's dialog sets them:
+**Edit → Edit Preferences → Plugins**, faderio's **Configure…**. What its OK chose is sent when
+Preferences' **Save** or **Apply** is pressed. To start a run from a known state, write the file
+by hand, with the library a standalone faderio library whose open playlist holds the tracks to
+play:
 
 ```json
 { "schemaVersion": 2, "outputMode": "WasapiShared", "library": "C:\path\to\library" }
@@ -335,12 +337,16 @@ playlist holds the tracks to play:
 ### Looks — the agent runs this
 
 MusicBee draws its own window, so UI Automation sees neither its menus nor its transport.
-Its main menu opens from a posted click on the "MusicBee ⌄" title, at (75, 19) in window
+Its main menu opens from a posted click on the "MusicBee ⌄" title, at (60, 19) in window
 coordinates, with the window raised topmost. Walk it with posted arrow keys to the newest
 dropdown (class `WindowsForms10.Window.20808…`): Tools is the fifth item, and faderio the last
 item of Tools (Up from the first). Read each dropdown from a `PrintWindow` capture. A click
-right after launch often does nothing: try again. There is no faderio view: whether faderio
-is sounding is read from MusicBee's audio session meter (`AudioMeterInformation.MasterPeakValue`
+right after launch often does nothing: try again. The menu also closes between posted keys
+while another app has the foreground, so a run beside the user's own work may not reach it.
+Edit is the second item, and Edit Preferences the last of Edit. MusicBee shows faderio's dialog
+controls to UI Automation as panes: find the folder box by its window class (`…EDIT…`) and set
+it with `WM_SETTEXT`, the mode list with `CB_SETCURSEL`, and press buttons with a posted
+`BM_CLICK`. There is no faderio view: whether faderio is sounding is read from MusicBee's audio session meter (`AudioMeterInformation.MasterPeakValue`
 of the session whose process is MusicBee's), which a generated tone of amplitude 0.3 shows as
 0.300.
 
@@ -350,6 +356,17 @@ of the session whose process is MusicBee's), which a generated tone of amplitude
 - [ ] **Tools** ends with **faderio**, whose submenu reads **Play**, **Stop**.
 - [ ] With the settings file naming a library whose open playlist holds two generated tones,
       **Play** starts faderio: the meter shows the tone. **Stop** ends it: the meter reads 0.
+- [ ] **Edit → Edit Preferences → Plugins** lists faderio with a **Configure…** button, which
+      opens faderio's dialog, owned by MusicBee's main window. It shows the settings file's
+      library folder and its output mode by name ("WASAPI shared"), with "Applies when MusicBee
+      next starts."
+- [ ] Choosing another library folder and **WaveOut**, then OK and Preferences' **Save**,
+      writes both to the settings file and shows "Saved machine settings.". After MusicBee is
+      restarted, the dialog opens on them. Cancel, or closing Preferences unsaved, changes
+      nothing.
+- [ ] A folder that does not exist, typed and saved, shows "The library … could not be opened
+      (the folder does not exist)…" in a box owned by MusicBee, and the settings file keeps the
+      library before it. A relative path is refused by the dialog itself, which stays open.
 - [ ] With `Plugins\faderio\` removed, MusicBee starts, and a message box owned by it reads
       "faderio could not start: Could not load file or assembly 'Faderio.Core…'". Put the
       folder back.
@@ -360,5 +377,6 @@ of the session whose process is MusicBee's), which a generated tone of amplitude
       playlist: the two players never sound at once.
 - [ ] An authored crossfade in the open playlist is heard as in standalone faderio.
 - [ ] After faderio's **Stop**, MusicBee's own player plays again straight away, on WASAPI
-      shared and on WASAPI exclusive (the plugin's `outputMode`).
+      shared and on WASAPI exclusive (the output mode in faderio's Configure… dialog, then
+      a MusicBee restart).
 - [ ] Playback survives MusicBee's other plugins being enabled.

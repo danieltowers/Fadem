@@ -15,7 +15,7 @@ namespace Faderio.MusicBee.Tests;
 /// own store in TestTemp. What is asserted is what comes out: the calls made to MusicBee, the
 /// frames the output pulls, and the message boxes posted to MusicBee's UI thread.
 /// </summary>
-public sealed class PluginTests : IDisposable
+public sealed partial class PluginTests : IDisposable
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(10);
 
@@ -173,12 +173,14 @@ public sealed class PluginTests : IDisposable
 
     /// <summary>Two tones in the library's open playlist, with a crossfade authored between them,
     /// through Core's own store: as standalone faderio would have left it.</summary>
-    private (string A, string B) AuthorLibrary()
+    private (string A, string B) AuthorLibrary() => AuthorLibrary(LibraryFolder, "musicbee", 440, 660);
+
+    private static (string A, string B) AuthorLibrary(string folder, string name, int hzA, int hzB)
     {
-        Directory.CreateDirectory(LibraryFolder);
-        var a = TestAudio.WriteToneWav("musicbee-a.wav", 4, 440);
-        var b = TestAudio.WriteToneWav("musicbee-b.wav", 4, 660);
-        var library = Library.Open(LibraryFolder);
+        Directory.CreateDirectory(folder);
+        var a = TestAudio.WriteToneWav($"{name}-a.wav", 4, hzA);
+        var b = TestAudio.WriteToneWav($"{name}-b.wav", 4, hzB);
+        var library = Library.Open(folder);
         using (var authoring = new PlaybackEngine(new FakeAudioOutput(), library, new RecordingSink()))
         {
             authoring.Add(new[] { a, b }).Wait();
@@ -187,31 +189,39 @@ public sealed class PluginTests : IDisposable
         return (a, b);
     }
 
-    /// <summary>The plugin's settings file, as issue 04's dialog will write it.</summary>
-    private void ChooseLibrary(string folder)
+    /// <summary>The plugin's settings file, as its dialog leaves it.</summary>
+    private void ChooseLibrary(string folder, AudioOutputMode mode = AudioOutputMode.WasapiShared)
     {
-        var settings = Path.Combine(_musicBee.StoragePath, "faderio", "settings.json");
-        Directory.CreateDirectory(Path.GetDirectoryName(settings)!);
-        new MachineSettingsStore(settings).Save(new MachineSettings { Library = folder });
+        Directory.CreateDirectory(Path.GetDirectoryName(SettingsFile)!);
+        new MachineSettingsStore(SettingsFile).Save(new MachineSettings { Library = folder, OutputMode = mode });
     }
 
+    /// <summary>The plugin's own machine settings, in MusicBee's persistent storage.</summary>
+    private string SettingsFile => Path.Combine(_musicBee.StoragePath, "faderio", "settings.json");
+
     /// <summary>MusicBee loads the plugin: on its UI thread, whose context the plugin posts to.</summary>
-    private void Start()
+    private void Start() => Start(_plugin);
+
+    private void Start(Plugin plugin)
     {
         SynchronizationContext.SetSynchronizationContext(_ui);
-        var about = _musicBee.Initialise(_plugin);
+        var about = _musicBee.Initialise(plugin);
         Assert.Equal(PluginType.General, about.Type);
     }
 
     /// <summary>Waits for the open playlist to finish loading, as a listener would before
     /// choosing Play: its rows are read in the background.</summary>
-    private PlayerView Launched()
+    private PlayerView Launched() => Launched(_plugin, LibraryFolder);
+
+    /// <summary>Waits for <paramref name="folder"/>'s open playlist to load in
+    /// <paramref name="plugin"/>.</summary>
+    private static PlayerView Launched(Plugin plugin, string folder)
     {
         var deadline = DateTime.UtcNow + Patience;
         while (true)
         {
-            var view = _plugin.Host!.Engine.View;
-            if (view.Adding is null && view.Queue.Count > 0)
+            var view = plugin.Host!.Engine.View;
+            if (view.Library?.Path == folder && view.Adding is null && view.Queue.Count > 0)
             {
                 return view;
             }
