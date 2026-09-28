@@ -6,17 +6,18 @@ namespace Faderio.Core.Transitions;
 /// <summary>
 /// Pure resolution: adjacency + store contents + settings → effective transition parameters.
 /// Directionality is pinned here: the caller supplies an already-ordered (outgoing, incoming)
-/// pair; A→B and B→A are distinct lookups. An authored transition's blank durations are a fixed
-/// built-in 5 s, never the default crossfade's N: a global setting never alters an authored
-/// transition (build issue 12). An unauthored adjacency resolves to a hard cut, or to the default
-/// crossfade when opted in.
+/// pair; A→B and B→A are distinct lookups. An authored transition's blank durations play the
+/// library's blank duration setting, never the default crossfade's N, which is for unauthored
+/// adjacencies alone (build issue 12). Only a blank is read from settings: a value the user put in
+/// a transition is never altered by one. An unauthored adjacency resolves to a hard cut, or to the
+/// default crossfade when opted in.
 /// </summary>
 internal sealed class TransitionResolver
 {
-    /// <summary>What a blank authored duration resolves to.</summary>
-    public static readonly TimeSpan BlankAuthoredDuration = TimeSpan.FromSeconds(5);
-
     public PlayerSettings Settings { get; set; }
+
+    /// <summary>What a blank authored duration resolves to: the blank duration setting.</summary>
+    public TimeSpan BlankDuration => TimeSpan.FromSeconds(Settings.BlankDurationSeconds);
 
     public TransitionResolver(PlayerSettings settings) => Settings = settings;
 
@@ -107,9 +108,9 @@ internal sealed class TransitionResolver
         };
     }
 
-    private static TimeSpan ClampDuration(TimeSpan? duration)
+    private TimeSpan ClampDuration(TimeSpan? duration)
     {
-        var d = duration ?? BlankAuthoredDuration;
+        var d = duration ?? BlankDuration;
         return d < TimeSpan.Zero ? TimeSpan.Zero : d;
     }
 

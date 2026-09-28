@@ -26,6 +26,8 @@ public sealed record PlayerSettings
     public const int CurrentSchemaVersion = 1;
     public const int MinDefaultCrossfadeSeconds = 1;
     public const int MaxDefaultCrossfadeSeconds = 30;
+    public const int MinBlankDurationSeconds = 0;
+    public const int MaxBlankDurationSeconds = 30;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public UnauthoredAdjacency UnauthoredAdjacency { get; init; } = UnauthoredAdjacency.HardCut;
@@ -33,6 +35,10 @@ public sealed record PlayerSettings
     /// <summary>N, the default crossfade's length in whole seconds, 1 to 30. It never applies to
     /// an authored transition, even one with blank durations.</summary>
     public int DefaultCrossfadeSeconds { get; init; } = 5;
+
+    /// <summary>What an authored transition's blank fade-out or fade-in duration plays, in whole
+    /// seconds, 0 to 30. It applies only to a duration left blank; one typed in is kept.</summary>
+    public int BlankDurationSeconds { get; init; } = 5;
 
     /// <summary>ReplayGain track gain applied with symmetric clamping. On by default.</summary>
     public bool ReplayGainEnabled { get; init; } = true;
@@ -48,14 +54,15 @@ public sealed record PlayerSettings
     /// in force (playlists issue 01).</summary>
     public string? LastPlaylist { get; init; }
 
-    /// <summary>These settings as the engine keeps them: the current schema, N brought into
-    /// range, and a choice no version knows replaced by its default. A hand-edited file
+    /// <summary>These settings as the engine keeps them: the current schema, N and the blank
+    /// duration brought into range, and a choice no version knows replaced by its default. A hand-edited file
     /// and a caller alike get the same settings back.</summary>
     public PlayerSettings Normalised() => this with
     {
         SchemaVersion = CurrentSchemaVersion,
         UnauthoredAdjacency = Enum.IsDefined(UnauthoredAdjacency) ? UnauthoredAdjacency : UnauthoredAdjacency.HardCut,
         DefaultCrossfadeSeconds = Math.Clamp(DefaultCrossfadeSeconds, MinDefaultCrossfadeSeconds, MaxDefaultCrossfadeSeconds),
+        BlankDurationSeconds = Math.Clamp(BlankDurationSeconds, MinBlankDurationSeconds, MaxBlankDurationSeconds),
         Repeat = Enum.IsDefined(Repeat) ? Repeat : RepeatMode.Off,
     };
 }

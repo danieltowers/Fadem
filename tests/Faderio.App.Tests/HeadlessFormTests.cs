@@ -1482,6 +1482,41 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
+    public void TheBlankDuration_IsSetInSettings_KeptThroughOtherChanges_AndTheEditorsGreyFollows() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var editor = h.Form._editor;
+        EditingAlphaToBeta(h);
+        Assert.Equal("5", editor._fadeOutDuration.PlaceholderText);
+
+        h.Form.ShowSettings = dialog =>
+        {
+            Assert.Equal(5, dialog._blankSeconds.Value);
+            Assert.True(dialog._blankSeconds.Enabled); // under Hard cut too: it is not N
+            dialog._blankSeconds.Value = 8;
+            return true;
+        };
+        Click(h.Form._settings);
+
+        Assert.Equal(8, h.Engine.View.Settings.BlankDurationSeconds);
+        Assert.Equal(8, new SettingsStore(h.SettingsPath).Settings.BlankDurationSeconds);
+        Assert.Equal("8", editor._fadeOutDuration.PlaceholderText);
+        Assert.Equal("8", editor._fadeInDuration.PlaceholderText);
+
+        // Another library setting saved later keeps the blank duration.
+        h.Form.ShowSettings = dialog =>
+        {
+            Assert.Equal(8, dialog._blankSeconds.Value);
+            dialog._replayGain.Checked = false;
+            return true;
+        };
+        Click(h.Form._settings);
+
+        Assert.Equal(8, h.Engine.View.Settings.BlankDurationSeconds);
+        Assert.False(h.Engine.View.Settings.ReplayGainEnabled);
+    });
+
+    [Fact]
     public void TheSettingsDialog_GroupsThisMachine_AndThisLibrary() => RunSta(() =>
     {
         using var h = new Harness();
@@ -1495,6 +1530,7 @@ public sealed partial class HeadlessFormTests
             Assert.True(dialog._libraryGroup.Contains(dialog._hardCut));
             Assert.True(dialog._libraryGroup.Contains(dialog._crossfade));
             Assert.True(dialog._libraryGroup.Contains(dialog._seconds));
+            Assert.True(dialog._libraryGroup.Contains(dialog._blankSeconds));
             Assert.True(dialog._libraryGroup.Contains(dialog._replayGain));
             return false;
         };

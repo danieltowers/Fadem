@@ -82,8 +82,15 @@ Switching from outgoing to incoming instantly, with no fade on either side.
 **Default crossfade**:
 What an unauthored adjacency plays when the user opts in: one crossfade of the same length at
 every boundary nobody authored. It never applies to an authored transition, even one with blank
-durations.
+durations: those play the **blank duration**.
 _Avoid_: Auto-crossfade, global transition, fallback transition
+
+**Blank duration**:
+What an authored transition's fade-out or fade-in duration plays when it is left blank: a
+library setting, 5 s unless changed. It fills a blank only; a duration the user typed is kept. In
+a playlist override, a blank duration falls through to the global transition's first, as every
+omitted parameter does.
+_Avoid_: Default fade, default crossfade
 
 **Transition now**:
 The user action of starting the current adjacency's transition immediately, instead of at its

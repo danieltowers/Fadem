@@ -938,6 +938,7 @@ internal sealed class MainForm : Form
             if (dialog.LibraryChanged)
             {
                 _engine.ChangeSettings(dialog.LibraryChoice);
+                _editor.ShowLayers(); // what a blank duration plays may have changed
             }
         }
     }

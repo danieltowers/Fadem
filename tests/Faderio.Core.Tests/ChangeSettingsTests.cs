@@ -169,8 +169,54 @@ public sealed class ChangeSettingsTests
         tc.Engine.ChangeSettings(Crossfade(1));
         tc.Output.Advance(At(4));
 
-        // The built-in 5 s from 1.0 s: half way at 3.5 s. N = 1 would have ended it at 2.0 s.
+        // The blank duration's 5 s from 1.0 s: half way at 3.5 s. N = 1 would have ended it at 2.0 s.
         Assert.InRange(tc.Rendered.ToneAmplitude(1000, At(3.5)) / 0.4, 0.6, 0.8);
         Assert.InRange(tc.Rendered.ToneAmplitude(2000, At(3.5)) / 0.4, 0.6, 0.8);
+    }
+
+    [Fact]
+    public void ChangingTheBlankDuration_ReschedulesAPendingAuthoredTransition_WithBlankDurations()
+    {
+        using var tc = TestEngine.Create();
+        var a = TestAudio.WriteToneWav("a.wav", 8, 1000);
+        var b = TestAudio.WriteToneWav("b.wav", 8, 2000);
+        tc.Add(a, b);
+        tc.Engine.Author(tc.AdjacencyOf(a, b), new TransitionSpec { FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1), FromEnd: false) });
+        tc.Engine.Play();
+        tc.Output.Advance(At(0.5));
+
+        tc.Engine.ChangeSettings(new PlayerSettings { BlankDurationSeconds = 2 });
+        tc.Output.Advance(At(3));
+
+        // Two seconds from 1.0 s: half way at 2.0 s. The old five would be a fifth of the way.
+        Assert.InRange(tc.Rendered.ToneAmplitude(1000, At(2)) / 0.4, 0.6, 0.8);
+        Assert.InRange(tc.Rendered.ToneAmplitude(2000, At(2)) / 0.4, 0.6, 0.8);
+    }
+
+    [Fact]
+    public void TheEditorsAnswer_CarriesWhatABlankDurationPlays_AsTheSettingsSayNow()
+    {
+        using var tc = TestEngine.Create();
+        var a = TestAudio.WriteToneWav("a.wav", 4, 1000);
+        var b = TestAudio.WriteToneWav("b.wav", 4, 2000);
+        tc.Add(a, b);
+        var adjacency = tc.AdjacencyOf(a, b);
+        Assert.Equal(TimeSpan.FromSeconds(5), tc.Engine.Transition(adjacency).BlankFadeOutDuration(TransitionLayer.Global));
+
+        tc.Engine.ChangeSettings(new PlayerSettings { BlankDurationSeconds = 8 });
+
+        Assert.Equal(TimeSpan.FromSeconds(8), tc.Engine.Transition(adjacency).BlankFadeOutDuration(TransitionLayer.Global));
+        Assert.Equal(TimeSpan.FromSeconds(8), tc.Engine.Transition(adjacency).BlankFadeInDuration(TransitionLayer.Playlist));
+    }
+
+    [Theory]
+    [InlineData(45, 30)]
+    [InlineData(-3, 0)]
+    [InlineData(0, 0)]
+    public void AnOutOfRangeBlankDuration_IsBroughtIntoRange(int chosen, int kept)
+    {
+        using var tc = TestEngine.Create();
+        tc.Engine.ChangeSettings(new PlayerSettings { BlankDurationSeconds = chosen });
+        Assert.Equal(kept, tc.View.Settings.BlankDurationSeconds);
     }
 }

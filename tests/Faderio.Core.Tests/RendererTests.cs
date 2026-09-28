@@ -80,6 +80,24 @@ public sealed class RendererTests
     }
 
     [Fact]
+    public void TheEngine_RendersBlankDurations_AsItsLibrarysSettingSays()
+    {
+        using var tc = TestEngine.Create(new Settings.PlayerSettings { BlankDurationSeconds = 1 });
+        var a = TestAudio.WriteDcWav("a.wav", 4, 0.4);
+        var b = TestAudio.WriteDcWav("b.wav", 4, 0.2);
+        tc.Store.Upsert(a, b, new TransitionSpec { FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1.5), FromEnd: false) });
+        var adjacency = new Adjacency(tc.TrackOf(a), tc.TrackOf(b));
+        var wav = Path.Combine(tc.TempDir, "blank.wav");
+
+        var report = tc.Engine.RenderBoundary(adjacency, wav);
+
+        // Both one-second fades are over by 2.5 s: B alone. Five seconds would still be fading A.
+        Assert.Equal(1500, report.FadeOutPointInFile.Milliseconds);
+        var (left, _) = ReadLeft(wav);
+        Assert.Equal(0.2, left[(int)(2.7 * 44100)], 3);
+    }
+
+    [Fact]
     public void AnEngineWithNoLibrary_RendersTheBoundaryUnauthored()
     {
         using var tc = TestEngine.Create();

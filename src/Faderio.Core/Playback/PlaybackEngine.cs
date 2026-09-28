@@ -108,6 +108,12 @@ public sealed partial class PlaybackEngine : IDisposable
     {
     }
 
+    /// <summary>The renderer's engine: a store, and settings held in memory only, never saved.</summary>
+    internal PlaybackEngine(IAudioOutput output, ITransitionStore? store, IEngineSink sink, PlayerSettings settings)
+        : this(output, store, sink, null, null, null, null, settings)
+    {
+    }
+
     /// <summary>An engine on an opened library (ADR 0011): its stores, or none when it could not
     /// be opened, or when no library was chosen (null). What went wrong opening it is raised as
     /// notices. Given the machine's settings, a library that opens is remembered there for the
@@ -129,7 +135,8 @@ public sealed partial class PlaybackEngine : IDisposable
         SettingsStore? settings,
         Library? library,
         MachineSettingsStore? machine,
-        Random? rng)
+        Random? rng,
+        PlayerSettings? initial = null)
     {
         _output = output;
         _store = store;
@@ -137,7 +144,7 @@ public sealed partial class PlaybackEngine : IDisposable
         _sink = sink;
         _settingsStore = settings;
         _machine = machine;
-        _settings = settings?.Settings ?? new PlayerSettings();
+        _settings = initial ?? settings?.Settings ?? new PlayerSettings();
         _resolver = new TransitionResolver(_settings);
         _rng = rng ?? new Random();
         _rate = output.SampleRate;

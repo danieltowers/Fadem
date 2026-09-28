@@ -12,7 +12,8 @@ public sealed record RenderReport(string Path, Length Rendered, Length FadeOutPo
 /// <see cref="WavFileAudioOutput"/>: pre-roll of the outgoing track, the transition, and a tail
 /// of the incoming track past its fade-in point. One button in the editor, no options (ticket 06):
 /// this is the artifact the user listens to without launching the app, and the input to the
-/// slice's measured assertion.
+/// slice's measured assertion. Rendered with the settings' defaults, except for what a blank
+/// authored duration plays, which the caller passes as its library has it.
 /// </summary>
 public static class Renderer
 {
@@ -21,14 +22,16 @@ public static class Renderer
 
     public static RenderReport RenderBoundary(
         Adjacency adjacency, ITransitionStore? store, string wavPath,
-        TimeSpan? preRoll = null, TimeSpan? tail = null, int sampleRate = 44100)
+        TimeSpan? preRoll = null, TimeSpan? tail = null, int sampleRate = 44100, int? blankDurationSeconds = null)
     {
+        var settings = new Settings.PlayerSettings();
+        settings = settings with { BlankDurationSeconds = blankDurationSeconds ?? settings.BlankDurationSeconds };
         var pre = preRoll ?? DefaultPreRoll;
         var after = tail ?? DefaultTail;
 
         using var output = new WavFileAudioOutput(wavPath, sampleRate);
         var sink = new RecordingSink();
-        using var engine = new PlaybackEngine(output, store, sink);
+        using var engine = new PlaybackEngine(output, store, sink, settings.Normalised());
 
         var report = engine.Add(new[] { adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath }).GetAwaiter().GetResult();
         if (report.Rejected.Count > 0)
@@ -39,7 +42,7 @@ public static class Renderer
         var incomingRow = report.Added[1];
 
         // Where the outgoing track starts fading, resolved the way the engine resolves it.
-        var resolver = new TransitionResolver(new Settings.PlayerSettings());
+        var resolver = new TransitionResolver(settings.Normalised());
         var effective = resolver.Resolve(
             store?.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath), null,
             outgoingRow.Track.Length.TimeSpan, incomingRow.Track.Length.TimeSpan);

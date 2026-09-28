@@ -130,7 +130,10 @@ public sealed partial class PlaybackEngine
         {
             var global = _store?.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
             var playlistOverride = StoredOverride(adjacency);
-            return new TransitionLayers(global, playlistOverride, TransitionResolver.Merge(global, playlistOverride));
+            return new TransitionLayers(global, playlistOverride, TransitionResolver.Merge(global, playlistOverride))
+            {
+                BlankDuration = _resolver.BlankDuration,
+            };
         });
     }
 
@@ -439,8 +442,9 @@ public sealed partial class PlaybackEngine
     public RenderReport RenderBoundary(Adjacency adjacency, string wavPath)
     {
         ThrowIfDisposed();
-        var store = Run(() => _store); // the library open now; rendering takes no lock
-        return Renderer.RenderBoundary(adjacency, store, wavPath);
+        // The library open now, and what its blank durations play; rendering takes no lock.
+        var (store, blank) = Run(() => (_store, _settings.BlankDurationSeconds));
+        return Renderer.RenderBoundary(adjacency, store, wavPath, blankDurationSeconds: blank);
     }
 
     /// <summary>What a file write can throw, as <see cref="SaveAsPlaylist"/> catches it.</summary>

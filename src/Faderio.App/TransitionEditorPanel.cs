@@ -504,7 +504,9 @@ internal sealed class TransitionEditorPanel : Panel
         ShowNudges();
     }
 
-    private void ShowLayers()
+    /// <summary>Reads the open adjacency's layers again: after a save or removal here, and after
+    /// the library's settings change, which set what a blank duration plays.</summary>
+    internal void ShowLayers()
     {
         if (_adjacency is not null)
         {

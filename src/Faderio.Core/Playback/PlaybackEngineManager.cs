@@ -80,7 +80,10 @@ public sealed partial class PlaybackEngine
                 var global = store.Get(p.Outgoing, p.Incoming);
                 var playlistOverride = OverrideOf(p.Outgoing, p.Incoming) is { IsEmpty: false } o ? o : null;
                 return (p.Outgoing, p.Incoming, Layers: new TransitionLayers(
-                    global, playlistOverride, TransitionResolver.Merge(global, playlistOverride)));
+                    global, playlistOverride, TransitionResolver.Merge(global, playlistOverride))
+                {
+                    BlankDuration = _resolver.BlankDuration,
+                });
             })
             .Where(p => p.Layers.Global is { IsBlank: false } || p.Layers.Override is not null)
             .ToList();

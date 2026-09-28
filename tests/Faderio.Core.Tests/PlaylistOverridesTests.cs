@@ -266,7 +266,7 @@ public sealed class PlaylistOverridesTests
     }
 
     [Fact]
-    public void ABlankDuration_PlaysTheGlobalsInThePlaylistLayer_AndFiveSecondsOtherwise()
+    public void ABlankDuration_PlaysTheGlobalsInThePlaylistLayer_AndTheBlankDurationOtherwise()
     {
         var global = Crossfade(1) with { FadeOutDuration = Seconds(2), FadeInDuration = Seconds(3) };
         var withDurations = new TransitionLayers(global, null, global);
@@ -274,11 +274,15 @@ public sealed class PlaylistOverridesTests
 
         Assert.Equal(Seconds(2), withDurations.BlankFadeOutDuration(TransitionLayer.Playlist));
         Assert.Equal(Seconds(3), withDurations.BlankFadeInDuration(TransitionLayer.Playlist));
-        // The global layer's own blank never falls through to anything but the fixed default.
+        // The global layer's own blank never falls through to anything but the blank duration,
+        // five seconds where the engine gave none.
         Assert.Equal(Seconds(5), withDurations.BlankFadeOutDuration(TransitionLayer.Global));
         Assert.Equal(Seconds(5), withDurations.BlankFadeInDuration(TransitionLayer.Global));
         Assert.Equal(Seconds(5), blankGlobal.BlankFadeOutDuration(TransitionLayer.Playlist));
         Assert.Equal(Seconds(5), TransitionLayers.None.BlankFadeInDuration(TransitionLayer.Playlist));
+        var eight = blankGlobal with { BlankDuration = Seconds(8) };
+        Assert.Equal(Seconds(8), eight.BlankFadeOutDuration(TransitionLayer.Playlist));
+        Assert.Equal(Seconds(8), eight.BlankFadeInDuration(TransitionLayer.Global));
     }
 
     [Fact]

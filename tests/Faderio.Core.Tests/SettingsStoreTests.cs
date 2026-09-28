@@ -89,6 +89,16 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Equal(loaded, new SettingsStore(_path).Settings.DefaultCrossfadeSeconds);
     }
 
+    [Theory]
+    [InlineData(31, 30)]
+    [InlineData(-1, 0)]
+    [InlineData(8, 8)]
+    public void TheBlankDuration_IsReadAndBroughtIntoRange(int written, int loaded)
+    {
+        File.WriteAllText(_path, $"{{\"blankDurationSeconds\": {written}}}");
+        Assert.Equal(loaded, new SettingsStore(_path).Settings.BlankDurationSeconds);
+    }
+
     [Fact]
     public void ACorruptFile_IsMovedAside_WithANotice_AndDefaultsLoad()
     {

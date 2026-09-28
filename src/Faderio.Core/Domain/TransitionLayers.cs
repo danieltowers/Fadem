@@ -1,5 +1,3 @@
-using Faderio.Core.Transitions;
-
 namespace Faderio.Core.Domain;
 
 /// <summary>Which layer of an adjacency's transition the editor writes: the global transition, or
@@ -20,16 +18,19 @@ public sealed record TransitionLayers(TransitionSpec? Global, TransitionSpec? Ov
 {
     public static TransitionLayers None { get; } = new(null, null, null);
 
+    /// <summary>What a blank authored duration plays: the library's blank duration setting, as the
+    /// engine read it when it answered. Five seconds, the setting's default, where none was read.</summary>
+    public TimeSpan BlankDuration { get; init; } = TimeSpan.FromSeconds(new Settings.PlayerSettings().BlankDurationSeconds);
+
     /// <summary>The open playlist plays something other than the global transition.</summary>
     public bool Differ => Effective != Global;
 
     /// <summary>What a blank fade-out duration plays when <paramref name="layer"/> is saved: in the
-    /// playlist layer the global transition's, where it sets one; else the fixed default for a blank
-    /// authored duration (build issue 12).</summary>
+    /// playlist layer the global transition's, where it sets one; else <see cref="BlankDuration"/>.</summary>
     public TimeSpan BlankFadeOutDuration(TransitionLayer layer) =>
-        (layer == TransitionLayer.Playlist ? Global?.FadeOutDuration : null) ?? TransitionResolver.BlankAuthoredDuration;
+        (layer == TransitionLayer.Playlist ? Global?.FadeOutDuration : null) ?? BlankDuration;
 
     /// <summary>What a blank fade-in duration plays: as <see cref="BlankFadeOutDuration"/>.</summary>
     public TimeSpan BlankFadeInDuration(TransitionLayer layer) =>
-        (layer == TransitionLayer.Playlist ? Global?.FadeInDuration : null) ?? TransitionResolver.BlankAuthoredDuration;
+        (layer == TransitionLayer.Playlist ? Global?.FadeInDuration : null) ?? BlankDuration;
 }

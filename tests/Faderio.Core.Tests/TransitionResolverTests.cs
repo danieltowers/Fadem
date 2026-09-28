@@ -8,11 +8,13 @@ public class TransitionResolverTests
 {
     private static PlayerSettings Settings(
         UnauthoredAdjacency behaviour = UnauthoredAdjacency.HardCut,
-        int defaultCrossfadeSeconds = 5) =>
+        int defaultCrossfadeSeconds = 5,
+        int blankDurationSeconds = 5) =>
         new()
         {
             UnauthoredAdjacency = behaviour,
             DefaultCrossfadeSeconds = defaultCrossfadeSeconds,
+            BlankDurationSeconds = blankDurationSeconds,
         };
 
     [Fact]
@@ -52,19 +54,43 @@ public class TransitionResolverTests
     }
 
     [Theory]
-    [InlineData(UnauthoredAdjacency.HardCut, 5)]
-    [InlineData(UnauthoredAdjacency.DefaultCrossfade, 12)]
-    [InlineData(UnauthoredAdjacency.DefaultCrossfade, 1)]
-    public void ABlankAuthoredDuration_IsAFixedFiveSeconds_WhateverTheDefaultCrossfade(
-        UnauthoredAdjacency behaviour, int n)
+    [InlineData(UnauthoredAdjacency.HardCut, 5, 5)]
+    [InlineData(UnauthoredAdjacency.DefaultCrossfade, 12, 5)]
+    [InlineData(UnauthoredAdjacency.DefaultCrossfade, 1, 8)]
+    [InlineData(UnauthoredAdjacency.HardCut, 5, 0)]
+    public void ABlankAuthoredDuration_PlaysTheBlankDurationSetting_NeverTheDefaultCrossfade(
+        UnauthoredAdjacency behaviour, int n, int blank)
     {
-        // A global setting never alters an authored transition (build issue 12).
-        var resolver = new TransitionResolver(Settings(behaviour, n));
+        // The default crossfade's N is for unauthored adjacencies alone (build issue 12).
+        var resolver = new TransitionResolver(Settings(behaviour, n, blank));
         var spec = new TransitionSpec { FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(20), FromEnd: false) };
         var result = resolver.Resolve(spec, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
         Assert.Equal(TimeSpan.FromSeconds(20), result.FadeOutPoint);
-        Assert.Equal(TimeSpan.FromSeconds(5), result.FadeOutDuration);
-        Assert.Equal(TimeSpan.FromSeconds(5), result.FadeInDuration);
+        Assert.Equal(TimeSpan.FromSeconds(blank), result.FadeOutDuration);
+        Assert.Equal(TimeSpan.FromSeconds(blank), result.FadeInDuration);
+    }
+
+    [Fact]
+    public void ADurationTypedIn_IsKept_WhateverTheBlankDurationSetting()
+    {
+        var resolver = new TransitionResolver(Settings(blankDurationSeconds: 8));
+        var spec = new TransitionSpec
+        {
+            FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(20), FromEnd: false),
+            FadeOutDuration = TimeSpan.FromSeconds(2),
+        };
+        var result = resolver.Resolve(spec, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
+        Assert.Equal(TimeSpan.FromSeconds(2), result.FadeOutDuration);
+        Assert.Equal(TimeSpan.FromSeconds(8), result.FadeInDuration); // left blank
+    }
+
+    [Fact]
+    public void ABlankFadeOutPoint_StartsOneBlankDurationBeforeTheEnd()
+    {
+        var resolver = new TransitionResolver(Settings(blankDurationSeconds: 3));
+        var spec = new TransitionSpec { Curve = FadeCurveKind.Linear };
+        var result = resolver.Resolve(spec, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+        Assert.Equal(TimeSpan.FromSeconds(7), result.FadeOutPoint);
     }
 
     [Fact]

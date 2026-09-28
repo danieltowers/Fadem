@@ -111,9 +111,11 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       and the **Fade curve** list are visible without scrolling at the default window size.
 - [ ] Save, Revert, Remove transition and Render are visible and enabled once the editor is
       open on an adjacency.
-- [ ] With the editor open, an empty duration box shows in grey what it plays if left blank: 5
-      in Global, and in This playlist the global's duration, or 5 where the global sets none.
-      Typing over it shows the typed value in black.
+- [ ] With the editor open, an empty duration box shows in grey what it plays if left blank:
+      the **Blank fade durations** setting (5 by default) in Global, and in This playlist the
+      global's duration, or that setting where the global sets none. Typing over it shows the
+      typed value in black. Change the setting in **Settings…** with the editor open: the grey
+      value follows at once.
 - [ ] With no boundary open (at launch, and after **Open library…**), the editor reads "No
       boundary selected" and every field, **From end**, the curve, ● Global and ○ This playlist
       are greyed out. Opening a boundary makes them live.
@@ -216,10 +218,10 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       the title names WASAPI shared, not exclusive, and the strip says exclusive was
       unavailable. With `--unavailable=exclusive,shared` the title names WaveOut at 44100 Hz,
       with a notice for each step.
-- [ ] **Settings…** opens a dialog with OK and Cancel showing the three settings in two
+- [ ] **Settings…** opens a dialog with OK and Cancel showing the four settings in two
       groups. **This machine**: the output mode with "Applies at the next launch." under it.
       **This library**: *Hard cut* or *Crossfade for N s*, with N greyed out under *Hard cut*;
-      and ReplayGain. Launched into a fallback as above, it also reads "In use now: WASAPI
+      **Blank fade durations** in seconds (0 to 30, live under either choice); and ReplayGain. Launched into a fallback as above, it also reads "In use now: WASAPI
       shared" (or WaveOut) under the mode chosen.
 - [ ] A setting changed and saved with OK is still set after a restart; Cancel keeps nothing.
       Changing only the output mode says "Saved machine settings."; only a library setting,

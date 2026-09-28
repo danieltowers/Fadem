@@ -6,7 +6,8 @@ namespace Faderio.App;
 /// The Settings… dialog (build issue 12), in two groups (library issue 03, D11). "This machine":
 /// the output mode, with a note that it applies at the next launch and, when it is not the mode
 /// in use (a fallback, or a choice waiting for the next launch), the mode in use beside it.
-/// "This library": what unauthored boundaries play, and ReplayGain. It opens on the view's
+/// "This library": what unauthored boundaries play, what a transition's blank fade duration plays,
+/// and ReplayGain. It opens on the view's
 /// settings and hands back each group's choice, <see cref="MachineChoice"/> and
 /// <see cref="LibraryChoice"/>; on OK the caller sends each group the user changed to its own
 /// engine command. It holds
@@ -22,6 +23,7 @@ internal sealed class SettingsForm : Form
     internal readonly RadioButton _hardCut;
     internal readonly RadioButton _crossfade;
     internal readonly NumericUpDown _seconds;
+    internal readonly NumericUpDown _blankSeconds;
     internal readonly CheckBox _replayGain;
     internal readonly Button _ok;
     internal readonly Button _cancel;
@@ -76,6 +78,19 @@ internal sealed class SettingsForm : Form
         });
         boundaries.SetFlowBreak(_hardCut, true);
 
+        _blankSeconds = new NumericUpDown
+        {
+            Minimum = PlayerSettings.MinBlankDurationSeconds,
+            Maximum = PlayerSettings.MaxBlankDurationSeconds,
+            Value = shown.BlankDurationSeconds,
+            Width = 48,
+        };
+        var blank = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
+        blank.Controls.AddRange(new Control[]
+        {
+            _blankSeconds, new Label { Text = "s", AutoSize = true, Margin = new Padding(0, 6, 0, 0) },
+        });
+
         _replayGain = new CheckBox { Text = "Apply ReplayGain track gain", AutoSize = true, Checked = shown.ReplayGainEnabled };
 
         _ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Width = 80 };
@@ -101,7 +116,9 @@ internal sealed class SettingsForm : Form
         var libraryRows = Rows();
         libraryRows.Controls.Add(Caption("Unauthored boundaries:"), 0, 0);
         libraryRows.Controls.Add(boundaries, 1, 0);
-        libraryRows.Controls.Add(_replayGain, 1, 1);
+        libraryRows.Controls.Add(Caption("Blank fade durations:"), 0, 1);
+        libraryRows.Controls.Add(blank, 1, 1);
+        libraryRows.Controls.Add(_replayGain, 1, 2);
         _libraryGroup = Group("This library", libraryRows);
 
         var layout = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Dock = DockStyle.Fill };
@@ -130,6 +147,7 @@ internal sealed class SettingsForm : Form
     {
         UnauthoredAdjacency = _crossfade.Checked ? UnauthoredAdjacency.DefaultCrossfade : UnauthoredAdjacency.HardCut,
         DefaultCrossfadeSeconds = (int)_seconds.Value,
+        BlankDurationSeconds = (int)_blankSeconds.Value,
         ReplayGainEnabled = _replayGain.Checked,
     };
 
