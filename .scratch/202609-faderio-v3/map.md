@@ -197,5 +197,7 @@ Beyond this map's destination; returns only if the destination is redrawn.
 - **Playlist manager** and the per-playlist override authoring UI — v2 Phase 3.
 - **Cross-platform support.** NAudio pins this to Windows, by decision.
 - **MusicBee plugin interop.** Abandoned in the prototype era; the engine has to be ours.
+  Driving MusicBee's player stays out. A plugin that hosts faderio's own engine is proposed in
+  [ADR 0012](../../docs/adr/0012-the-musicbee-plugin-hosts-the-engine.md) (phase 5).
 - **Metadata editing or tagging tools.**
 - **Sidecar transition files.** Rejected in v2's ADR 0002; the store stays player-owned.

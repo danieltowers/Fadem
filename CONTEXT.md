@@ -22,7 +22,7 @@ _Avoid_: Workspace, collection, instance, profile
 A named, ordered sequence of tracks belonging to a library. Its name is how the user refers
 to it and how its overrides are found. Exactly one playlist is **open** at a time; edits to
 the open playlist are kept without the user asking.
-_Avoid_: Album, set
+_Avoid_: Album, set, enhanced playlist
 
 **Queue**:
 The runtime playback sequence — what the player will play next. The queue mirrors the open
