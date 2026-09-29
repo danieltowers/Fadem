@@ -1,6 +1,6 @@
 # 07: An authored fade-out is reported as the track ending early
 
-Status: needs-triage
+Status: resolved
 Blocked by: none
 
 Part of the [MusicBee spike](../spec.md). Found in the MusicBee smoke of
@@ -25,10 +25,10 @@ below, which is red on `a7770f2` and is not committed because of that. The fix s
 
 ## Acceptance criteria
 
-- [ ] An outgoing voice ended by its fade completing raises no early-end notice, at any engine
+- [x] An outgoing voice ended by its fade completing raises no early-end notice, at any engine
       rate; a track that really ends short still does.
-- [ ] The test below, or its equivalent, is in `Faderio.Core.Tests` and green.
-- [ ] The commit states net8.0 and net48 x86 counts.
+- [x] The test below, or its equivalent, is in `Faderio.Core.Tests` and green.
+- [x] The commit states net8.0 and net48 x86 counts.
 
 ## The test
 
@@ -77,3 +77,14 @@ public sealed class FadeOutEndTests
     }
 }
 ```
+
+## Comments
+
+**2026-09-29, resolved.** The mixer ends a voice for two reasons, its source running dry or its
+fade-out completing, and the queue's `OnVoiceEnded` could not tell them apart; the preview's
+handler already could, with an inline comparison. `MixerVoice.FadedOutBy(timeline)` is now the
+one predicate, used by the mixer's clip detection and by both voice-ended handlers, and the
+queue handler skips `NoticeEarlyEnd` for a voice that had faded out (a decode error still
+notices). The test above is committed as `FadeOutEndTests`, compiled on net8.0 and net48 x86;
+red on both without the fix ("2.0 s" and "1.9 s"), green with it. A track that really ends short
+is still covered by the existing early-end tests.

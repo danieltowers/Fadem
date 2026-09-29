@@ -323,7 +323,7 @@ public sealed partial class PlaybackEngine
         {
             run.IncomingEndedAt = endTimeline;
         }
-        if (voice.DecodeError is not null || voice.FadeOutStart is not { } fade || endTimeline < fade + voice.FadeOutFrames)
+        if (voice.DecodeError is not null || !voice.FadedOutBy(endTimeline))
         {
             NoticeEarlyEnd(delivered, run.TrackOf(voice), voice.DecodeError);
         }

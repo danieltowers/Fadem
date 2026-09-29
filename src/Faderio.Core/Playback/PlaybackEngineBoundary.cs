@@ -366,7 +366,8 @@ public sealed partial class PlaybackEngine
         {
             return; // removed deliberately (skip/seek/stop)
         }
-        if (entry is not null)
+        // A voice that ended by its fade-out completing fell silent as authored, not early.
+        if (entry is not null && (voice.DecodeError is not null || !voice.FadedOutBy(endTimeline)))
         {
             NoticeEarlyEnd(delivered, entry.Track, voice.DecodeError);
         }

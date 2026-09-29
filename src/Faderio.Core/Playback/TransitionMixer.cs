@@ -109,6 +109,10 @@ internal sealed class MixerVoice
     internal void SilenceFrom(long timeline) => BeginFadeOut(timeline, 0, FadeCurveKind.Linear);
 
     internal void CancelFadeOut() => FadeOutStart = null;
+
+    /// <summary>The fade-out has completed by <paramref name="timeline"/>: the voice is silent
+    /// there as planned. A voice that ends faded out has not ended early (ADR 0010).</summary>
+    internal bool FadedOutBy(long timeline) => FadeOutStart is { } fade && timeline >= fade + FadeOutFrames;
 }
 
 /// <summary>Handle for a scheduled timeline event; cancellable before it fires.</summary>
@@ -305,7 +309,7 @@ internal sealed class TransitionMixer : ISampleProvider
                     {
                         buffer[target + c] += (float)(_scratch[source0 + c] * gain);
                     }
-                    if (detecting && !FadedOut(voice, timeline))
+                    if (detecting && !voice.FadedOutBy(timeline))
                     {
                         _clips.Sounds(runStart + f, voice);
                     }
@@ -338,10 +342,6 @@ internal sealed class TransitionMixer : ISampleProvider
         }
         return count;
     }
-
-    /// <summary>The voice's fade-out has completed by the timeline frame: it is silent there.</summary>
-    private static bool FadedOut(MixerVoice voice, long timeline) =>
-        voice.FadeOutStart is { } fadeOut && timeline >= fadeOut + voice.FadeOutFrames;
 
     private void End(MixerVoice voice, long endTimeline)
     {

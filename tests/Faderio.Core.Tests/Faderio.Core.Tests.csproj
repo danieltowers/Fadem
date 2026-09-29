@@ -44,7 +44,7 @@
     <!-- helpers -->
     <Compile Include="CraftedMp3.cs;FakeAudioOutput.cs;TestAudio.cs;TestEngine.cs;TestTemp.cs" />
     <!-- the promise -->
-    <Compile Include="RealInputMatrixTests.cs;FadeEngineAccuracyTests.cs" />
+    <Compile Include="RealInputMatrixTests.cs;FadeEngineAccuracyTests.cs;FadeOutEndTests.cs" />
     <!-- atomic writes, the store, the settings files and the folder scan -->
     <Compile Include="AtomicWriteTests.cs;FileFormatTests.cs;FolderScanTests.cs" />
     <Compile Include="JsonTransitionStoreTests.cs;SettingsStoreTests.cs;MachineSettingsTests.cs;StoreFailureTests.cs" />
