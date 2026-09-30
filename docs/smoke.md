@@ -396,7 +396,9 @@ of the session whose process is MusicBee's), which a generated tone of amplitude
 - [ ] With MusicBee playing a track, **Tools → faderio → Play** stops it and plays the open
       playlist: the two players never sound at once.
 - [ ] An authored crossfade in the open playlist is heard as in standalone faderio.
-- [ ] After faderio's **Stop**, MusicBee's own player plays again straight away, on WASAPI
-      shared and on WASAPI exclusive (the output mode in faderio's Configure… dialog, then
-      a MusicBee restart).
+- [ ] After faderio's **Stop**, MusicBee's own player plays again straight away on WASAPI
+      shared, and within a few seconds on WASAPI exclusive (the output mode in faderio's
+      Configure… dialog, then a MusicBee restart). In exclusive, MusicBee's "unable to start
+      playback" on a start made at once after Stop is the known limit accepted at the spike's
+      verdict (ADR 0012); a second try plays.
 - [ ] Playback survives MusicBee's other plugins being enabled.

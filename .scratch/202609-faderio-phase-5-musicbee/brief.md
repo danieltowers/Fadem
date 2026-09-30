@@ -13,8 +13,8 @@ API docs here: https://getmusicbee.com/help/api/
 ## The answer (grilled 2026-09-28)
 
 **Not through MusicBee's own player; yes if the plugin plays with faderio's engine.** Recorded
-as [ADR 0012](../../docs/adr/0012-the-musicbee-plugin-hosts-the-engine.md), `proposed` until
-the spike below passes.
+as [ADR 0012](../../docs/adr/0012-the-musicbee-plugin-hosts-the-engine.md), `accepted` since
+the spike below passed on 2026-09-30 (the result is at the end).
 
 ### What MusicBee's plugin API allows
 
@@ -165,3 +165,39 @@ all pass, ADR 0012 is accepted, **Host** enters the glossary, and the issues bel
 - Stable track identity against auto-organise.
 - Drag-and-drop from MusicBee's track list.
 - Formats MusicBee plays that faderio does not promise.
+
+---
+
+## The spike's result (2026-09-30)
+
+**Yes.** All four points hold, and ADR 0012 is accepted. **Host** is in `CONTEXT.md`.
+
+1. **Loading.** `Faderio.Core` and its dependencies load on net48 x86 inside the portable
+   MusicBee 3.6.9403, from the plugin's private folder through the assembly-resolve handler,
+   beside Theater Mode, SkipToNearEnd and DummyTrackController. ILRepack was not needed.
+2. **The library.** The plugin opens the faderio library its settings name, chosen in MusicBee's
+   Preferences, and keeps its own machine settings in MusicBee's storage.
+3. **Playing and letting go.** The user heard the authored crossfade as in standalone faderio,
+   in WASAPI shared and exclusive. faderio's Play stops MusicBee's player. The plugin lets go
+   of the device while stopped (issue 06).
+   - Shared: MusicBee's own player plays straight after faderio's Stop.
+   - Exclusive: the device is free about 0.2 to 0.3 s after Stop, but MusicBee's own player
+     shows "unable to start playback" if started at once. It plays a few seconds later or on a
+     second try. Accepted by the user as a known limit.
+4. **The promise.** Core's promise tests pass on net48 x86 every commit: 290 there, 855 on
+   net8.0, at `c8f260b`.
+
+**Left open, carried into the staged issues** (mostly [issue 13](issues/13-the-output-device-setting.md)):
+
+- With exclusive chosen, MusicBee's start shows "WASAPI exclusive unavailable (Not
+  implemented); trying WASAPI shared." every time. Play opens exclusive anyway.
+- A Play made while MusicBee's own player was playing fell back to shared once, with the same
+  notice. Cause not confirmed.
+- After a device loss, the next Play opens in the mode in use, not the mode asked for.
+- The plugin has nowhere to show which output mode is in use.
+
+The spike also found and fixed an engine fault standalone faderio shared: an authored fade-out
+read as the track ending early (issue 07).
+
+The later issues are staged as 08 to 15 in [issues/](issues/), each `needs-triage`: they need
+their own spec before an agent builds them.

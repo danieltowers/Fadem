@@ -1,6 +1,6 @@
 # 05: The spike's verdict
 
-Status: ready-for-human
+Status: resolved
 Blocked by: 03, 04, 06
 
 Part of the [MusicBee spike](../spec.md). This ticket answers the [brief](../brief.md).
@@ -41,8 +41,8 @@ Then the outcome is recorded.
 
 ## Acceptance criteria
 
-- [ ] The user has run each Sounds item and reported it.
-- [ ] ADR 0012's status, `CONTEXT.md`, the brief and (on a pass) the staged issues match the
+- [x] The user has run each Sounds item and reported it.
+- [x] ADR 0012's status, `CONTEXT.md`, the brief and (on a pass) the staged issues match the
       outcome.
 
 ## Comments
@@ -93,3 +93,10 @@ Then the outcome is recorded.
   - ⬜ **Other plugins enabled:** Theater Mode, SkipToNearEnd and DummyTrackController were
     enabled throughout (DummyTrackController logged track changes during the run). The user
     has not yet been asked to confirm this item.
+- **The verdict, 2026-09-30: pass.** The user passed all four Sounds items.
+  - The exclusive item passes with a known limit: MusicBee's own player needs a few seconds,
+    or a second try, after faderio's Stop. The spec's "straight away" is met in shared only.
+  - The other-plugins item passes on Theater Mode, SkipToNearEnd and DummyTrackController
+    having been enabled through every round.
+  - Recorded: ADR 0012 `accepted`, **Host** in `CONTEXT.md`, the result in the brief, the
+    limit in `docs/smoke.md`, and issues 08 to 15 staged, each blocked by this one.

@@ -253,6 +253,19 @@ is authored in standalone faderio.
 | 06 | [The plugin lets go of the device while stopped](issues/06-the-plugin-lets-go-of-the-device-while-stopped.md) (found in 03) | 03 |
 | 07 | [An authored fade-out is reported as the track ending early](issues/07-an-authored-fade-out-is-reported-as-the-track-ending-early.md) (the engine's, found in 06) | — |
 
+Staged at the verdict (2026-09-30, pass), each `needs-triage` until it has its own spec:
+
+| # | Issue | Blocked by |
+|---|---|---|
+| 08 | [Core's whole suite on net48](issues/08-cores-whole-suite-on-net48.md) | 05 |
+| 09 | [The shared WinForms library](issues/09-the-shared-winforms-library.md) | 05 |
+| 10 | [The plugin view: playlists, queue and transport](issues/10-the-plugin-view.md) | 05, 09 |
+| 11 | [The transition editor and preview in MusicBee](issues/11-the-transition-editor-and-preview-in-musicbee.md) | 05, 09, 10 |
+| 12 | [The transition manager in MusicBee](issues/12-the-transition-manager-in-musicbee.md) | 05, 09, 10 |
+| 13 | [The output device setting](issues/13-the-output-device-setting.md) | 05 |
+| 14 | [Adding MusicBee's selection to the open playlist](issues/14-adding-musicbees-selection-to-the-open-playlist.md) | 05, 10 |
+| 15 | [One library holder at a time](issues/15-one-library-holder-at-a-time.md) | 05 |
+
 ## Out of Scope
 
 - Everything after the spike, each a later issue:

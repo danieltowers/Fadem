@@ -18,6 +18,11 @@ transitions and its listening settings live inside it, and its tracks may live a
 disk. Opening a different library is opening a different world; nothing carries across.
 _Avoid_: Workspace, collection, instance, profile
 
+**Host**:
+The program playing a library: faderio itself, or MusicBee through the plugin. Both hosts run
+the same engine on the same library folder; each keeps its own machine settings.
+_Avoid_: Frontend, client, player (MusicBee's player never plays a library)
+
 **Playlist**:
 A named, ordered sequence of tracks belonging to a library. Its name is how the user refers
 to it and how its overrides are found. Exactly one playlist is **open** at a time; edits to

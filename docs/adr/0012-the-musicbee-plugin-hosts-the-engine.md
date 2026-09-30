@@ -1,6 +1,6 @@
 # The MusicBee plugin hosts faderio's engine; MusicBee's player never plays a faderio playlist
 
-Status: proposed (accepted when the phase 5 spike passes)
+Status: accepted (2026-09-30, the phase 5 spike passed)
 
 faderio gains a second host: a MusicBee plugin that authors, previews and plays transitions
 inside MusicBee. MusicBee's player cannot play an authored transition, so the plugin plays with
@@ -49,3 +49,7 @@ The promise would then have to be proven on two engines.
   standalone-only.
 - While faderio plays in MusicBee, MusicBee's now-playing, play counts, scrobbling and media
   keys do not see it.
+- The plugin lets go of the device while stopped, so MusicBee's own player has it back. In
+  WASAPI exclusive the handover is not instant on MusicBee's side: its player fails if started
+  at once after faderio's Stop and plays a few seconds later, though the device is free within
+  about 0.3 s. Accepted at the spike's verdict as a known limit.
