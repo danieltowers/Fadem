@@ -182,7 +182,9 @@ public sealed record AddReport(IReadOnlyList<QueueRow> Added, IReadOnlyList<Reje
         var rejected = Rejected.Count;
         var tracks = added == 1 ? "1 track" : $"{added} tracks";
         var cancelled = Cancelled ? "Add cancelled. " : "";
-        var reasons = string.Join("; ", Rejected.Select(r => $"{System.IO.Path.GetFileName(r.Path)}: {r.Detail}"));
+        // A rejected entry need not be a path at all (an M3U line with a NUL in it, say), and
+        // net48's Path.GetFileName throws on one: the name is taken as net8.0 takes it.
+        var reasons = string.Join("; ", Rejected.Select(r => $"{Compat.FileName(r.Path)}: {r.Detail}"));
         var head = added == 0
             ? (rejected == 1 ? "Nothing added: the file was rejected" : $"Nothing added: all {rejected} files were rejected")
             : $"Added {tracks}; rejected {rejected}";

@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -184,7 +185,7 @@ public sealed class LibraryTests : IDisposable
     [Fact]
     public void AReadOnlyFolder_OpensUnavailable_WithANotice_AndTheQueueStillPlays()
     {
-        if (!OperatingSystem.IsWindows())
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             return;
         }

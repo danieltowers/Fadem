@@ -12,7 +12,7 @@ public sealed class TestTempTests
         var parent = Path.Combine(TestTemp.Root, "sweep", Guid.NewGuid().ToString("N"));
         var running = Path.Combine(parent, TestTemp.RunName(Process.GetCurrentProcess()));
         var gone = Path.Combine(parent, $"{int.MaxValue}-0"); // no process has this id
-        var reused = Path.Combine(parent, $"{Environment.ProcessId}-1"); // this id, another start
+        var reused = Path.Combine(parent, $"{Process.GetCurrentProcess().Id}-1"); // this id, another start
         var older = Path.Combine(parent, Guid.NewGuid().ToString("N")); // as runs were named before
         foreach (var folder in new[] { running, gone, reused, older })
         {

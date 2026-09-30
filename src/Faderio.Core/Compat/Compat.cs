@@ -54,6 +54,14 @@ internal static class Compat
     /// <summary>As <c>new Guid(ReadOnlySpan&lt;byte&gt;)</c>.</summary>
     public static Guid GuidFrom(ReadOnlySpan<byte> bytes) => new(bytes.ToArray());
 
+    /// <summary>As net8.0's <c>Path.GetFileName</c>: whatever follows the last separator, of any
+    /// string. net48's throws on a character that cannot be in a path.</summary>
+    public static string FileName(string path)
+    {
+        var cut = path.LastIndexOfAny(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar, Path.VolumeSeparatorChar });
+        return cut < 0 ? path : path.Substring(cut + 1);
+    }
+
     /// <summary>As <c>Path.TrimEndingDirectorySeparator</c>: one trailing separator goes, unless
     /// the path is a root.</summary>
     public static string TrimEndingDirectorySeparator(string path) =>

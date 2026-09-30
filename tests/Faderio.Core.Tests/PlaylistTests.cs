@@ -142,7 +142,7 @@ public sealed class PlaylistTests
             "#EXTINF:100,Artist A - One", one,
             "#EXTINF:13,Two", two,
             "#EXTINF:3,untitled", untitled,
-        }, text.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
+        }, text.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries));
         Assert.Equal("Saved 3 tracks to queue.m3u8.", Assert.Single(tc.Notices));
     }
 
@@ -150,8 +150,7 @@ public sealed class PlaylistTests
     public void AnM3uThatIsNotUtf8_IsReadInTheSystemCodePage_AndOneThatIs_AsUtf8()
     {
         using var tc = TestEngine.Create();
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        var system = Encoding.GetEncoding(0);
+        var system = CodePages.SystemAnsi();
         var cafe = Wav(tc.TempDir, @"Café Example\Song.wav");
         var dagger = Wav(tc.TempDir, @"Example Band † Live\Long Song.wav");
         var ansi = Path.Combine(tc.TempDir, "ansi.m3u");

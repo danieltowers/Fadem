@@ -32,25 +32,20 @@
     <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!-- net48 x86 compiles the promise and the file formats only, until the whole suite follows
-       ("Core multi-targeted in full"). A test left out here is excluded, never skipped. Tests
-       built on ChildProcess stay net8.0-only: it starts children through dotnet. -->
+  <!-- net48 x86 runs the whole suite (phase 5 issue 08). A test that cannot run there is
+       excluded by project item with its reason, never skipped. -->
   <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
-    <Compile Remove="**\*.cs" />
-    <Compile Include="PluginRuntimeTests.cs" />
-    <!-- helpers -->
-    <Compile Include="CraftedMp3.cs;FakeAudioOutput.cs;TestAudio.cs;TestEngine.cs;TestTemp.cs" />
-    <!-- the promise -->
-    <Compile Include="RealInputMatrixTests.cs;FadeEngineAccuracyTests.cs;FadeOutEndTests.cs" />
-    <!-- atomic writes, the store, the settings files and the folder scan -->
-    <Compile Include="AtomicWriteTests.cs;FileFormatTests.cs;FolderScanTests.cs" />
-    <Compile Include="JsonTransitionStoreTests.cs;SettingsStoreTests.cs;MachineSettingsTests.cs;StoreFailureTests.cs" />
+    <!-- ChildProcess starts this assembly as a child through dotnet, which a net48 test binary
+         cannot do; the tests built on it (a decoder that can kill its process) stay net8.0. -->
+    <Compile Remove="ChildProcess.cs;FlacFrameTableTests.cs;TruncatedFlacTests.cs" />
   </ItemGroup>
-  <ItemGroup Condition="'$(TargetFramework)' != 'net48'">
-    <Compile Remove="PluginRuntimeTests.cs" />
+  <!-- PluginRuntimeTests proves the net48 build itself; Compat holds what the tests use that
+       net48 lacks, as Core's Compat/Net48 does for the engine. -->
+  <ItemGroup Condition="'$(TargetFramework)' != 'net48'">
+    <Compile Remove="PluginRuntimeTests.cs;Compat/**" />
   </ItemGroup>
 
 </Project>

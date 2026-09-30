@@ -1,6 +1,6 @@
 # 08: Core's whole suite on net48
 
-Status: needs-triage
+Status: resolved
 Blocked by: 05
 
 Phase 5, after the [MusicBee spike](../spec.md) passed ([brief](../brief.md), ADR 0012). Staged
@@ -21,6 +21,26 @@ Known from the spike:
 
 ## Acceptance criteria
 
-- [ ] Every Core test runs on net48 x86, or is excluded by project item with the reason beside it.
-- [ ] No net48 test is red or skipped.
-- [ ] The commit states net8.0 and net48 x86 counts.
+- [x] Every Core test runs on net48 x86, or is excluded by project item with the reason beside it.
+- [x] No net48 test is red or skipped.
+- [x] The commit states net8.0 and net48 x86 counts.
+
+## Comments
+
+- **Resolved 2026-09-30.** The net48 target now compiles everything and removes three files
+  with the reason beside them: `ChildProcess.cs`, `FlacFrameTableTests.cs` and
+  `TruncatedFlacTests.cs`, 50 tests that run a decoder in a child started through `dotnet`.
+  Nothing is skipped. 806 tests run on net48 x86 against 855 on net8.0 (855 − 50 + the one
+  net48-only `PluginRuntimeTests`).
+  - Seven call sites read the same on both targets now (`TestCompat.GetRelativePath`,
+    `RuntimeInformation` for the OS check, `CodePages.SystemAnsi()`, a `Process` id, and
+    plain overloads of `Split`, `IndexOf`), and a `Compat/Net48Polyfills.cs` in the test
+    project supplies `SupportedOSPlatformAttribute`. Core's own stand-ins reach the tests
+    through `InternalsVisibleTo`.
+  - **Two runtime differences found, one the engine's.** `Path.GetFileName` throws on net48
+    for a string that cannot be a path, and the add report's summary called it on a rejected
+    M3U entry: `Compat.FileName` now takes the name as net8.0 does, and the existing test
+    `AnEntryThatIsNotAPath_IsARejection_AndTheOthersLoad` is the permanent proof, red on
+    net48 before. The other was the manager test's own `.Order()` of paths, where "-"
+    against "." sorts differently under ICU and NLS: ordinal now.
+- **Counts:** Core net8.0 855, Core net48 x86 806, App 274, MusicBee net48 x86 24; 0 failed.

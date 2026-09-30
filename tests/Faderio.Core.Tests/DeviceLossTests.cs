@@ -167,7 +167,7 @@ public sealed class DeviceLossTests
 
         Assert.Equal(Transport.Playing, tc.View.Transport);
         Assert.Equal(44100, tc.Engine.SampleRate);
-        Assert.Contains(tc.Notices, n => n.Contains("48000") && n.Contains("restart", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(tc.Notices, n => n.Contains("48000") && n.IndexOf("restart", StringComparison.OrdinalIgnoreCase) >= 0);
     }
 
     [Fact]

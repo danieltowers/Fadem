@@ -217,7 +217,8 @@ public sealed class TransitionManagerTests
         Assert.True(listed[0].Adjacency.Incoming.Gone); // a → elsewhere: the incoming side
         Assert.All(listed, s => Assert.False((s.IsOutgoing ? s.Adjacency.Outgoing : s.Adjacency.Incoming).Gone));
         var tracks = tc.Engine.TracksInStore();
-        Assert.Equal([elsewhere, gone], tracks.Where(t => t.Gone).Select(t => t.FilePath).Order());
+        // Ordinal: culture order of "-" against "." differs between net8.0 (ICU) and net48 (NLS).
+        Assert.Equal([elsewhere, gone], tracks.Where(t => t.Gone).Select(t => t.FilePath).OrderBy(p => p, StringComparer.Ordinal));
         Assert.DoesNotContain(tc.View.Queue, r => r.Track.Gone);
     }
 

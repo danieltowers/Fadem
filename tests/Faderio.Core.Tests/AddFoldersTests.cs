@@ -40,7 +40,7 @@ public sealed class AddFoldersTests
     }
 
     private static string[] Queued(TestEngine tc, string root) =>
-        tc.View.Queue.Select(r => Path.GetRelativePath(root, r.Track.FilePath)).ToArray();
+        tc.View.Queue.Select(r => TestCompat.GetRelativePath(root, r.Track.FilePath)).ToArray();
 
     [Fact]
     public void AFolderOfNestedAlbums_AddsEveryPromisedFile_Recursively_InNaturalPathOrder()
