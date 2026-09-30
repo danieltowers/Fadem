@@ -1,6 +1,6 @@
 # 03: The plugin plays the open playlist inside MusicBee
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01, 02
 
 Part of the [MusicBee spike](../spec.md). The tracer bullet: the thinnest path to "does faderio
