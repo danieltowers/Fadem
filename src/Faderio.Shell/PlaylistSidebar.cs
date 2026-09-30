@@ -1,6 +1,6 @@
 using Faderio.Core.Playback;
 
-namespace Faderio.App;
+namespace Faderio.Shell;
 
 /// <summary>
 /// The playlist sidebar (playlists issue 02, D16, D17): the library's playlists, the open one

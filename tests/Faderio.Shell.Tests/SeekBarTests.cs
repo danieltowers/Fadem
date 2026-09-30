@@ -1,8 +1,8 @@
 using System.Reflection;
-using Faderio.App;
+using Faderio.Shell;
 using Faderio.Core.Domain;
 
-namespace Faderio.App.Tests;
+namespace Faderio.Shell.Tests;
 
 /// <summary>Interim transport issue 04: the seek bar's own behaviour, off any form. Mouse and key
 /// events are raised through the control's own handlers, as a user's would be.</summary>
@@ -90,7 +90,7 @@ public sealed class SeekBarTests
         Raise(bar, "OnKeyDown", new KeyEventArgs(Keys.Left));
         Raise(bar, "OnKeyDown", new KeyEventArgs(Keys.Left));
         Raise(bar, "OnKeyUp", new KeyEventArgs(Keys.Left));
-        Assert.Equal(0, seeks[^1].Milliseconds); // clamped at the start
+        Assert.Equal(0, seeks[seeks.Count - 1].Milliseconds); // clamped at the start
     }
 
     [Fact]

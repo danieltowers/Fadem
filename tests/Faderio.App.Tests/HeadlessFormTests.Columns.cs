@@ -1,4 +1,5 @@
 using System.Reflection;
+using Faderio.Shell;
 using Faderio.App;
 using Faderio.Core.Persistence;
 using Faderio.Core.Tests;

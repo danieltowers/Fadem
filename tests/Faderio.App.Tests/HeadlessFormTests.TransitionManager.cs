@@ -1,3 +1,4 @@
+using Faderio.Shell;
 using Faderio.App;
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;

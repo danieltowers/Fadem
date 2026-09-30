@@ -1,6 +1,6 @@
 using Faderio.Core.Domain;
 
-namespace Faderio.App;
+namespace Faderio.Shell;
 
 /// <summary>
 /// The seek bar (interim transport issue 04). A click anywhere on the travel seeks there; a drag
@@ -59,14 +59,14 @@ internal sealed class SeekBar : Control
     internal Playhead PlayheadAt(int x)
     {
         var travel = Math.Max(1, Width - 2 * Inset);
-        var fraction = Math.Clamp((x - Inset) / (double)travel, 0, 1);
+        var fraction = Math.Min(1, Math.Max(0, (x - Inset) / (double)travel));
         return Playhead.FromMilliseconds((int)Math.Round(fraction * (_length?.Milliseconds ?? 0)));
     }
 
     private int XOf(Playhead playhead)
     {
         var length = _length?.Milliseconds ?? 0;
-        var fraction = length > 0 ? Math.Clamp(playhead.Milliseconds / (double)length, 0, 1) : 0;
+        var fraction = length > 0 ? Math.Min(1, Math.Max(0, playhead.Milliseconds / (double)length)) : 0;
         return Inset + (int)Math.Round(fraction * (Width - 2 * Inset));
     }
 

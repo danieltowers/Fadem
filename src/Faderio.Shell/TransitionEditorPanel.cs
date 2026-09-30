@@ -3,7 +3,7 @@ using Faderio.Core.Playback;
 
 using Point = Faderio.Core.Domain.Point;
 
-namespace Faderio.App;
+namespace Faderio.Shell;
 
 /// <summary>What to do with unsaved edits on leaving the editor (build issue 15).</summary>
 internal enum UnsavedEdits
@@ -280,7 +280,7 @@ internal sealed class TransitionEditorPanel : Panel
     /// <summary>The curves the list offers: with "(global)" first in playlist mode.</summary>
     private void ListCurves()
     {
-        IEnumerable<FadeCurveKind?> curves = Enum.GetValues<FadeCurveKind>().Select(c => (FadeCurveKind?)c);
+        IEnumerable<FadeCurveKind?> curves = ShellCompat.Values<FadeCurveKind>().Select(c => (FadeCurveKind?)c);
         if (Layer == TransitionLayer.Playlist)
         {
             curves = curves.Prepend(null);
@@ -365,7 +365,7 @@ internal sealed class TransitionEditorPanel : Panel
         {
             return;
         }
-        var step = TimeSpan.FromSeconds(coarse ? 1 : 0.1) * Math.Sign(direction);
+        var step = TimeSpan.FromSeconds((coarse ? 1 : 0.1) * Math.Sign(direction));
         var moved = _engine.Nudge(fadeOut ? _adjacency.Outgoing : _adjacency.Incoming, point, step);
         if (fadeOut)
         {
@@ -397,7 +397,7 @@ internal sealed class TransitionEditorPanel : Panel
     }
 
     /// <summary>An empty box showing the global value, in playlist mode.</summary>
-    private static bool ShowsPlaceholder(TextBox box) => box.Text.Length == 0 && box.PlaceholderText.Length > 0;
+    private static bool ShowsPlaceholder(TextBox box) => box.Text.Length == 0 && Placeholders.Get(box).Length > 0;
 
     /// <summary>The nudge buttons live while an adjacency is open and their field shows a point,
     /// its own or the global one as a placeholder; never on a gone adjacency.</summary>
@@ -493,10 +493,10 @@ internal sealed class TransitionEditorPanel : Panel
     {
         var global = Layer == TransitionLayer.Playlist ? layers.Global : null;
         var open = _adjacency is not null;
-        _fadeOutPoint.PlaceholderText = Presenter.FmtSeconds(global?.FadeOutPoint?.Point);
-        _fadeOutDuration.PlaceholderText = open ? Presenter.FmtSeconds(layers.BlankFadeOutDuration(Layer)) : "";
-        _fadeInPoint.PlaceholderText = Presenter.FmtSeconds(global?.FadeInPoint?.Point);
-        _fadeInDuration.PlaceholderText = open ? Presenter.FmtSeconds(layers.BlankFadeInDuration(Layer)) : "";
+        Placeholders.Set(_fadeOutPoint, Presenter.FmtSeconds(global?.FadeOutPoint?.Point));
+        Placeholders.Set(_fadeOutDuration, open ? Presenter.FmtSeconds(layers.BlankFadeOutDuration(Layer)) : "");
+        Placeholders.Set(_fadeInPoint, Presenter.FmtSeconds(global?.FadeInPoint?.Point));
+        Placeholders.Set(_fadeInDuration, open ? Presenter.FmtSeconds(layers.BlankFadeInDuration(Layer)) : "");
         var playlist = _engine.View.OpenPlaylist;
         var differ = _adjacency is not null && playlist is not null && layers.Differ;
         _effective.Text = differ ? Presenter.FmtEffective(playlist!, layers.Effective) : "";

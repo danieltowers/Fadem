@@ -1,4 +1,4 @@
-namespace Faderio.App;
+namespace Faderio.Shell;
 
 /// <summary>One line of the session's notice list: a message, how many times it was delivered,
 /// and when it first was.</summary>

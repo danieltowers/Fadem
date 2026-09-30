@@ -1,3 +1,4 @@
+using Faderio.Shell;
 using Faderio.Core.Persistence;
 using Faderio.Core.Playback;
 using Faderio.Core.Settings;

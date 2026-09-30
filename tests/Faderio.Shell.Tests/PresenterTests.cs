@@ -1,4 +1,4 @@
-using Faderio.App;
+using Faderio.Shell;
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;
 using Faderio.Core.Queue;
@@ -7,7 +7,7 @@ using Faderio.Shell.Audio;
 
 using Point = Faderio.Core.Domain.Point;
 
-namespace Faderio.App.Tests;
+namespace Faderio.Shell.Tests;
 
 /// <summary>Seam S4 (ADR 0002): the shell's logic with no WinForms in it.</summary>
 public sealed class PresenterTests
@@ -325,12 +325,12 @@ public sealed class PresenterTests
 
         Assert.Equal(
             ["", "Closing Song", "Example Band", "First Album", "1:05", "44.1 kHz / 16-bit", "−7.2 dB", @"D:\Music\Example Band\First Album\03 Closing Song.flac"],
-            Enum.GetValues<QueueColumn>().Select(c => Presenter.QueueCell(c, track)));
+            ShellCompat.Values<QueueColumn>().Select(c => Presenter.QueueCell(c, track)));
         Assert.Equal("03 Closing Song.flac", Presenter.QueueCell(QueueColumn.Title, track with { Title = "" }));
     }
 
     [Fact]
     public void ColumnHeading_NamesEachColumn() =>
         Assert.Equal(["#", "Title", "Artist", "Album", "Length", "Format", "Replay gain", "Path"],
-            Enum.GetValues<QueueColumn>().Select(Presenter.ColumnHeading));
+            ShellCompat.Values<QueueColumn>().Select(Presenter.ColumnHeading));
 }

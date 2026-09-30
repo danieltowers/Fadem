@@ -1,3 +1,5 @@
+using Faderio.Shell;
+
 namespace Faderio.App;
 
 /// <summary>

@@ -7,7 +7,7 @@ using Faderio.Shell.Audio;
 
 using Point = Faderio.Core.Domain.Point;
 
-namespace Faderio.App;
+namespace Faderio.Shell;
 
 /// <summary>What a typed seconds field says: unset, a point, or an error the user must fix.
 /// v2 returned null for "", "abc" and "-5" alike and silently saved nothing.</summary>
@@ -343,7 +343,7 @@ internal static class Presenter
     private static string? ParseFolderArgument(IEnumerable<string> args, string name) =>
         args.LastOrDefault(a => a.StartsWith(name, StringComparison.OrdinalIgnoreCase)) is { } arg &&
         arg.Length > name.Length
-            ? arg[name.Length..]
+            ? arg.Substring(name.Length)
             : null;
 
     /// <summary>"--unavailable=exclusive,shared": for smoke runs, the output treats these modes
@@ -355,7 +355,7 @@ internal static class Presenter
         {
             if (arg.StartsWith("--unavailable=", StringComparison.OrdinalIgnoreCase))
             {
-                modes.AddRange(arg["--unavailable=".Length..].Split(',').Select(ParseMode));
+                modes.AddRange(arg.Substring("--unavailable=".Length).Split(',').Select(ParseMode));
             }
         }
         return modes;

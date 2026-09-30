@@ -1,7 +1,7 @@
-using Faderio.App;
+using Faderio.Shell;
 using Faderio.Core.Tests;
 
-namespace Faderio.App.Tests;
+namespace Faderio.Shell.Tests;
 
 /// <summary>
 /// Playlists issue 06: the queue's column layout is the shell's, per library. # is always shown and
@@ -24,7 +24,7 @@ public sealed class ColumnLayoutTests : IDisposable
     public void TheDefault_ShowsTheFour()
     {
         Assert.Equal([QueueColumn.Number, QueueColumn.Title, QueueColumn.Artist, QueueColumn.Length], Shown(ColumnLayout.Default));
-        Assert.Equal(Enum.GetValues<QueueColumn>(), ColumnLayout.Default.Columns.Select(c => c.Column));
+        Assert.Equal(ShellCompat.Values<QueueColumn>(), ColumnLayout.Default.Columns.Select(c => c.Column));
     }
 
     [Fact]
@@ -105,6 +105,6 @@ public sealed class ColumnLayoutTests : IDisposable
         Assert.Equal([QueueColumn.Number, QueueColumn.Path, QueueColumn.Title], Shown(loaded));
         Assert.Equal(500, loaded[QueueColumn.Path].Width); // the first naming wins
         Assert.Equal(ColumnLayout.Default[QueueColumn.Title].Width, loaded[QueueColumn.Title].Width); // 0 is no width
-        Assert.Equal(Enum.GetValues<QueueColumn>().Length, loaded.Columns.Count);
+        Assert.Equal(ShellCompat.Values<QueueColumn>().Length, loaded.Columns.Count);
     }
 }

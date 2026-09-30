@@ -1,7 +1,7 @@
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;
 
-namespace Faderio.App;
+namespace Faderio.Shell;
 
 /// <summary>
 /// The transition manager (playlists issue 05, D24): every adjacency one track is in, with the

@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 using Faderio.Core.Persistence;
 using Faderio.Core.Playback;
 
-namespace Faderio.App;
+namespace Faderio.Shell;
 
 /// <summary>The queue's columns a user can show (playlists issue 06, D25). The row button at the
 /// far right is not one of them.</summary>
@@ -89,8 +89,8 @@ internal sealed class ColumnLayout
         var moving = this[column];
         var rest = Columns.Where(c => c.Column != column).ToList();
         var shown = rest.Where(c => c.Visible).ToList();
-        var index = Math.Clamp(shownIndex, 1, shown.Count);
-        var at = index < shown.Count ? rest.IndexOf(shown[index]) : rest.IndexOf(shown[^1]) + 1;
+        var index = ShellCompat.Clamp(shownIndex, 1, shown.Count);
+        var at = index < shown.Count ? rest.IndexOf(shown[index]) : rest.IndexOf(shown[shown.Count - 1]) + 1;
         rest.Insert(at, moving);
         return new(rest);
     }
@@ -140,11 +140,11 @@ internal sealed class ColumnLayout
         var defaults = DefaultColumns.ToDictionary(c => c.Column, c => c.Width);
         var seen = new HashSet<QueueColumn>();
         var result = new List<ColumnSetting>();
-        foreach (var c in columns.Where(c => Enum.IsDefined(c.Column) && seen.Add(c.Column)))
+        foreach (var c in columns.Where(c => ShellCompat.IsDefined(c.Column) && seen.Add(c.Column)))
         {
             result.Add(c with { Width = c.Width is >= MinWidth and <= MaxWidth ? c.Width : defaults[c.Column] });
         }
-        foreach (var missing in Enum.GetValues<QueueColumn>().Where(seen.Add))
+        foreach (var missing in ShellCompat.Values<QueueColumn>().Where(seen.Add))
         {
             result.Add(new(missing, false, defaults[missing]));
         }
