@@ -165,35 +165,11 @@ public sealed class ReleasingTheDeviceTests : IDisposable
 
     // ── The mode at each open (issue 13) ─────────────────────────────────────────────────
 
-    /// <summary>MusicBee's player lets go of the device a moment after it is told to stop: the
-    /// mode asked for is retried before the chain falls back.</summary>
+    /// <summary>A mode the device refuses falls back at once, with its notice: there is no retry.
+    /// Inside MusicBee a refusal lasts as long as its own player's stream (issue 13's Sounds
+    /// half), so waiting only delayed the fallback.</summary>
     [Fact]
-    public void Play_RetriesTheModeAskedFor_WhileMusicBeesPlayerLetsGo()
-    {
-        var engine = Compose(AudioOutputMode.WasapiExclusive);
-        var a = TestAudio.WriteDcWav("a.wav", 30, 0.5);
-        engine.Add(new[] { a }).Result.Added.Single();
-        _refused.Add(AudioOutputMode.WasapiExclusive);
-        var refusals = 0;
-        _onRefusal = () =>
-        {
-            if (++refusals == 3)
-            {
-                _refused.Clear(); // free about 100 ms after Player_Stop returned
-            }
-        };
-
-        engine.Play();
-
-        var player = Assert.Single(_players);
-        Assert.True(Renders(player), "The render thread never read after Play.");
-        Assert.Equal(AudioOutputMode.WasapiExclusive, _output!.Mode);
-        Assert.Equal(3, refusals);
-        Assert.Empty(_outputNotices);
-    }
-
-    [Fact]
-    public void Play_FallsBack_OnceTheRetryIsSpent()
+    public void Play_FallsBackAtOnce_WhenTheModeAskedForIsRefused()
     {
         var engine = Compose(AudioOutputMode.WasapiExclusive);
         var a = TestAudio.WriteDcWav("a.wav", 30, 0.5);
@@ -208,8 +184,8 @@ public sealed class ReleasingTheDeviceTests : IDisposable
         var player = Assert.Single(_players);
         Assert.True(Renders(player), "The render thread never read after Play.");
         Assert.Equal(AudioOutputMode.WasapiShared, _output!.Mode);
-        Assert.InRange(refusals, 2, 20);
-        Assert.InRange(DateTime.UtcNow - started, NAudioAudioOutput.AskedModeRetry, TimeSpan.FromSeconds(4));
+        Assert.Equal(1, refusals);
+        Assert.InRange(DateTime.UtcNow - started, TimeSpan.Zero, TimeSpan.FromMilliseconds(250));
         Assert.Equal("WASAPI exclusive unavailable (the device is in use); trying WASAPI shared.", Assert.Single(_outputNotices));
     }
 

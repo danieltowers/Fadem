@@ -528,8 +528,9 @@ which a background run cannot give.
       verdict (ADR 0012); a second try plays.
 - [ ] Playback survives MusicBee's other plugins being enabled.
 - [ ] **▶ while MusicBee's own player plays, in WASAPI exclusive** (phase 5 issue 13): faderio
-      stops MusicBee's player and opens exclusive, with no "WASAPI exclusive unavailable …
-      trying WASAPI shared." in the strip. The output retries the mode asked for while
-      MusicBee's player lets go of the device.
+      stops MusicBee's player and plays, shared, with "WASAPI exclusive unavailable (Not
+      implemented); trying WASAPI shared." in the strip: the known limit (ADR 0012). Once
+      MusicBee's own player has played, its stream refuses an exclusive open from the same
+      process for the rest of the session. Before it has played, ▶ opens exclusive.
 - [ ] **A device chosen in Configure…** is heard on that device at the next **▶** from stopped,
       with no restart.

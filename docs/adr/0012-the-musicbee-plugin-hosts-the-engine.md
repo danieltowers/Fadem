@@ -53,3 +53,10 @@ The promise would then have to be proven on two engines.
   WASAPI exclusive the handover is not instant on MusicBee's side: its player fails if started
   at once after faderio's Stop and plays a few seconds later, though the device is free within
   about 0.3 s. Accepted at the spike's verdict as a known limit.
+- The reverse is wider (phase 5 issue 13's Sounds half, 2026-10-01): once MusicBee's own
+  player has played in a session, BASS keeps its shared WASAPI stream initialised in the
+  process, and a WASAPI exclusive open from that process is refused ("Not implemented") for as
+  long as it exists, 45 s and more after the player stopped. faderio then plays shared with
+  its notice. An exclusive open from another process evicts the stream and the next ▶ opens
+  exclusive, which nothing in the plugin can do. So in exclusive mode faderio opens exclusive
+  until MusicBee's player is first used; shared mode, the default, is unaffected.

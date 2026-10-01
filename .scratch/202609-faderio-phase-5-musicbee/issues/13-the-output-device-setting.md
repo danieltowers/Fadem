@@ -162,4 +162,21 @@ measurements). Each wants a decision here:
     machine with no device at all gets one notice and no chain, in both hosts; `Device` names
     the device resolved even when no mode then opened. MusicBee on WASAPI output was not
     smoked: its names are expected to be the endpoints' own, as BASS reports them.
-
+- **The Sounds half, 2026-10-01, the user listening and the agent measuring.** ▶ over
+  MusicBee's own player in exclusive: heard MusicBee stop and faderio play, but with "WASAPI
+  exclusive unavailable (Not implemented); trying WASAPI shared." in the strip, three rounds
+  out of three. The retry did not help, and measuring showed why:
+  - MusicBee's output is WASAPI (Shared) with "Primary Sound Driver" (not DirectSound, as the
+    Looks half had assumed from the name).
+  - From outside MusicBee's process an exclusive open succeeds even while MusicBee plays.
+  - Inside it, faderio's exclusive open was refused 0, 0.5, 1, 2, 4, 8, 20 and 45 s after
+    MusicBee's player was stopped by a media command.
+  - After one exclusive open from another process, the next ▶ opened exclusive.
+  So BASS keeps its shared stream initialised in MusicBee's process after a stop, and a WASAPI
+  exclusive open from the same process is refused for as long as it exists. The 300 ms retry
+  addressed a release delay that does not exist; the user chose to remove it, so a refused
+  mode falls back at once again (`Play_FallsBackAtOnce_WhenTheModeAskedForIsRefused` replaces
+  the two retry tests). Recorded in ADR 0012's known limits and the smoke's Sounds item: in
+  exclusive, faderio opens exclusive until MusicBee's own player is first used in the session.
+  Shared, the default, is unaffected. The chosen device and the manager's preview are still to
+  be heard.

@@ -29,10 +29,10 @@ namespace Faderio.Shell.Audio;
 /// faderio keeps the device between plays.</para>
 /// <para>Such an output opens nothing at launch: it asks the device for its mix rate (WaveOut:
 /// 44.1 kHz) and <see cref="Mode"/> reads the mode asked for until a Play says otherwise, so a
-/// device another player holds at MusicBee's start raises no untrue notice (phase 5 issue 13).
-/// At every open it retries the mode asked for a short while before falling back, since
-/// MusicBee's own player lets go of the device a moment after it is told to stop, and it
-/// reopens after a device loss from the mode asked for too.</para>
+/// device another player holds at MusicBee's start raises no untrue notice (phase 5 issue 13),
+/// and it reopens after a device loss from the mode asked for too. A mode the device refuses
+/// falls back at once: inside MusicBee, exclusive is refused for as long as its own player's
+/// stream exists, which no retry outlasts (issue 13's Sounds half).</para>
 /// <para>The device (issue 13) is named at each open by <c>device</c>, null for the default; one
 /// not there falls to the default with a notice, and is tried again at the next open.
 /// <see cref="Device"/> names the one in use.</para>
@@ -44,14 +44,6 @@ public sealed class NAudioAudioOutput : IAudioOutput
     public const int WaveOutLatencyMs = 150;
     private const int WaveOutRate = 44100;
     private const int Channels = 2; // the engine renders stereo
-
-    /// <summary>How long an output that lets go while stopped keeps trying the mode asked for
-    /// before falling back: MusicBee's player releases the device a moment after
-    /// <c>Player_Stop</c> returns.</summary>
-    internal static readonly TimeSpan AskedModeRetry = TimeSpan.FromMilliseconds(300);
-
-    /// <summary>The pause between those tries.</summary>
-    internal static readonly TimeSpan AskedModeRetryStep = TimeSpan.FromMilliseconds(50);
 
     private readonly AudioOutputMode _asked;
     private readonly Action<string> _notify;
@@ -357,12 +349,12 @@ public sealed class NAudioAudioOutput : IAudioOutput
     }
 
     /// <summary>Opens the first mode down the chain from <paramref name="from"/> that the device
-    /// allows, with a notice for each that fails; an output that lets go while stopped retries
-    /// the first mode for <see cref="AskedModeRetry"/> before falling back. The feed runs at
-    /// <paramref name="engineRate"/>, or at launch at the device's own rate. Returns the mode
-    /// opened and the device's rate: the format an exclusive stream actually opened at, a shared
-    /// device's mix rate, or on WaveOut, which cannot be asked, the feed's. Null when none opens.
-    /// </summary>
+    /// allows, with a notice for each that fails. (No retry: a refusal inside MusicBee's process
+    /// lasts as long as its own player's stream, phase 5 issue 13's Sounds half found.) The feed
+    /// runs at <paramref name="engineRate"/>, or at launch at the device's own rate. Returns the
+    /// mode opened and the device's rate: the format an exclusive stream actually opened at, a
+    /// shared device's mix rate, or on WaveOut, which cannot be asked, the feed's. Null when none
+    /// opens.</summary>
     private (AudioOutputMode Mode, int DeviceRate)? OpenFirstAvailable(AudioOutputMode from, int? engineRate)
     {
         var device = ResolveDevice();
@@ -370,35 +362,23 @@ public sealed class NAudioAudioOutput : IAudioOutput
         {
             return null;
         }
-        var chain = Fallbacks(from);
-        for (var i = 0; i < chain.Count; i++)
+        foreach (var candidate in Fallbacks(from))
         {
-            var candidate = chain[i];
-            var deadline = i == 0 && _releaseWhileStopped ? DateTime.UtcNow + AskedModeRetry : DateTime.UtcNow;
-            while (true)
+            try
             {
-                try
+                var deviceRate = RateOf(device, candidate, engineRate);
+                _feed.Format = WaveFormat.CreateIeeeFloatWaveFormat(engineRate ?? deviceRate, Channels);
+                _player = Open(device, candidate);
+                _playerDevice = device;
+                if (candidate == AudioOutputMode.WasapiExclusive && _player is WasapiOut exclusive)
                 {
-                    var deviceRate = RateOf(device, candidate, engineRate);
-                    _feed.Format = WaveFormat.CreateIeeeFloatWaveFormat(engineRate ?? deviceRate, Channels);
-                    _player = Open(device, candidate);
-                    _playerDevice = device;
-                    if (candidate == AudioOutputMode.WasapiExclusive && _player is WasapiOut exclusive)
-                    {
-                        deviceRate = exclusive.OutputWaveFormat.SampleRate;
-                    }
-                    return (candidate, deviceRate);
+                    deviceRate = exclusive.OutputWaveFormat.SampleRate;
                 }
-                catch (Exception e)
-                {
-                    if (DateTime.UtcNow < deadline)
-                    {
-                        Thread.Sleep(AskedModeRetryStep);
-                        continue;
-                    }
-                    NoticeFallback(candidate, e);
-                    break;
-                }
+                return (candidate, deviceRate);
+            }
+            catch (Exception e)
+            {
+                NoticeFallback(candidate, e);
             }
         }
         device.Dispose();
