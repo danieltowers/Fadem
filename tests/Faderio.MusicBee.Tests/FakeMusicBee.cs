@@ -36,7 +36,17 @@ internal sealed class FakeMusicBee
             active = ActiveDevice;
             return true;
         };
+        _api.Library_QueryFilesEx = (string query, out string[] files) =>
+        {
+            Calls.Add($"Library_QueryFilesEx {query}");
+            files = Selection!;
+            return Selection is not null;
+        };
     }
+
+    /// <summary>The tracks selected in MusicBee's main panel, as <c>domain=SelectedFiles</c>
+    /// answers them; null when MusicBee cannot say (the query answers false).</summary>
+    public string[]? Selection { get; set; } = Array.Empty<string>();
 
     /// <summary>What MusicBee's own preferences list as output devices, and the active one:
     /// "Primary Sound Driver" when it follows Windows' on DirectSound, as MusicBee says.</summary>
@@ -75,6 +85,9 @@ internal sealed class FakeMusicBee
     /// <summary>Clicks Tools → faderio → <paramref name="command"/>.</summary>
     public void Choose(string command) =>
         Menus["mnuTools/faderio"].DropDownItems.Cast<ToolStripItem>().Single(i => i.Text == command).PerformClick();
+
+    /// <summary>Right-clicks the main panel's selection and chooses the plugin's item there.</summary>
+    public void ChooseOnTheSelection(string item) => Menus[$"context.Main/{item}"].PerformClick();
 
     private ToolStripItem AddMenuItem(string menuPath, string hotkeyDescription, EventHandler handler)
     {

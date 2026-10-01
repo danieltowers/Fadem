@@ -458,6 +458,16 @@ which a background run cannot give.
       store says: …" as its tooltip, and the picker marks it the same way; double-clicked, the
       editor says it is missing and can be removed, not changed, and **Remove transition**
       takes the row out of the manager. Esc and the close box hide the manager.
+- [ ] **MusicBee's selection added** (phase 5 issue 14). A right-click on a track in
+      MusicBee's main panel (a posted left click to select it, then a posted right click; the
+      menu is a top-level `…Window.20808…` window, the item last in it) shows **Add to
+      faderio's open playlist** at the end of MusicBee's context menu. On a promised track it
+      appends that track to the view's queue and to the open playlist's `.m3u8`, with no
+      notice; on a track MusicBee lists but whose file is gone (an album on a
+      drive that is not there) the strip reads "Nothing added: the file was rejected — …:
+      The file does not exist. …" with a **1 notice** link and no box. Neither player starts
+      or stops: added while MusicBee's own player plays, MusicBee keeps playing and faderio's
+      ▶ and "0:00 / -0:00" stay as they were. Restore the playlist file after.
 - [ ] **Edit → Edit Preferences → Plugins** lists faderio with a **Configure…** button, which
       opens faderio's dialog, owned by MusicBee's main window. It shows the settings file's
       library folder, its output mode by name ("WASAPI shared") and its output device (phase 5

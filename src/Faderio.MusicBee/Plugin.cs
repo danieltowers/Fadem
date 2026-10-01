@@ -9,8 +9,9 @@ namespace MusicBeePlugin;
 /// <summary>
 /// The class MusicBee loads (phase 5 issue 03): a second shell on faderio's engine. It plays the
 /// open playlist of the library its settings name, through its own output, from its view in a
-/// panel MusicBee makes (issue 10) or from a Tools → faderio menu. MusicBee's player never plays
-/// it: a start stops MusicBee's first.
+/// panel MusicBee makes (issue 10) or from a Tools → faderio menu, and adds MusicBee's selected
+/// tracks to that playlist from the main panel's context menu (issue 14). MusicBee's player
+/// never plays it: a start stops MusicBee's first.
 /// <para>The engine's dependencies load from a private folder through a handler that
 /// <see cref="Initialise"/> registers. MusicBee loads every type in this assembly before calling
 /// it, so no type here may need Core to load: none derives from a Core type, implements a Core
@@ -85,6 +86,8 @@ public partial class Plugin
             menu.DropDownItems.Add("Play", null, OnPlay);
             menu.DropDownItems.Add("Stop", null, OnStop);
         }
+        // On the main panel's track menu: MusicBee's selection into faderio's open playlist.
+        _api.MB_AddMenuItem("context.Main/Add to faderio's open playlist", null, OnAddSelection);
 
         try
         {
@@ -216,6 +219,17 @@ public partial class Plugin
     }
 
     private void OnStop(object? sender, EventArgs e) => Ready()?.Stop();
+
+    /// <summary>MusicBee's selected tracks, in its order, to the open playlist: one engine call,
+    /// which probes each and reports the rejections together. Nothing selected is nothing to
+    /// add; neither player is started or stopped.</summary>
+    private void OnAddSelection(object? sender, EventArgs e)
+    {
+        if (Ready() is { } host && _api.Library_QueryFilesEx("domain=SelectedFiles", out var files) && files is { Length: > 0 })
+        {
+            host.Add(files);
+        }
+    }
 
     private Host? Ready()
     {

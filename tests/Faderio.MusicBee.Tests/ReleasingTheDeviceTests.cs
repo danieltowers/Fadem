@@ -231,7 +231,7 @@ public sealed class ReleasingTheDeviceTests : IDisposable
         _refused.Clear();
         fallen.Fail(new InvalidOperationException("Exception from HRESULT: 0x88890004"));
         Assert.True(SpinWait.SpinUntil(() => fallen.PlaybackState == PlaybackState.Stopped, Patience), "The player never failed.");
-        Assert.True(_ui!.Drain() > 0, "The failure was never posted.");
+        Posted("The failure was never posted.");
         Assert.Contains(_sink.Notices, n => n.StartsWith("Audio output lost (Exception from HRESULT: 0x88890004)."));
 
         engine.Play();
@@ -314,7 +314,7 @@ public sealed class ReleasingTheDeviceTests : IDisposable
         Assert.True(playing.Disposed, "The queue's player is still held while the preview plays.");
         Assert.False(preview.Disposed);
 
-        Assert.True(_ui!.Drain() > 0, "The old player's stop was never posted.");
+        Posted("The old player's stop was never posted.");
 
         Assert.False(preview.Disposed, "The old player's stop closed the preview's player.");
         Assert.True(Renders(preview), "The preview's player stopped rendering.");
@@ -329,7 +329,7 @@ public sealed class ReleasingTheDeviceTests : IDisposable
         Assert.True(SpinWait.SpinUntil(() => player.PlaybackState == PlaybackState.Stopped, Patience), "The stream never ended.");
 
         engine.Play(); // before the UI thread has run the posted stop
-        Assert.True(_ui!.Drain() > 0, "The stop was never posted.");
+        Posted("The stop was never posted.");
 
         Assert.False(player.Disposed, "The posted stop closed the player Play restarted.");
         Assert.Single(_players);
@@ -351,7 +351,7 @@ public sealed class ReleasingTheDeviceTests : IDisposable
 
         Assert.Contains("WaveOut unavailable (the device is in use); no audio output could be opened.", _outputNotices);
         Assert.Empty(_players); // nothing opened
-        Assert.True(_ui!.Drain() > 0, "The failure was never reported.");
+        Posted("The failure was never reported.");
         Assert.Contains(_sink.Notices, n => n.StartsWith("Audio output lost (no audio output could be opened)."));
         Assert.Equal(Transport.Paused, engine.View.Transport);
 
@@ -481,12 +481,23 @@ public sealed class ReleasingTheDeviceTests : IDisposable
         SynchronizationContext.SetSynchronizationContext(_before);
     }
 
+    /// <summary>Waits for the player's thread to post its stop or failure, which it does after
+    /// its state changes, and runs the post on this thread.</summary>
+    private void Posted(string orElse)
+    {
+        Assert.True(SpinWait.SpinUntil(() => _ui!.Pending > 0, Patience), orElse);
+        _ui!.Drain();
+    }
+
     /// <summary>MusicBee's UI thread: what the players post runs when the test drains it.</summary>
     private sealed class UiThread : SynchronizationContext
     {
         private readonly ConcurrentQueue<(SendOrPostCallback Callback, object? State)> _posts = new();
 
         public override void Post(SendOrPostCallback d, object? state) => _posts.Enqueue((d, state));
+
+        /// <summary>Posts queued and not yet run.</summary>
+        public int Pending => _posts.Count;
 
         /// <summary>Runs every post so far, on the calling thread; returns how many.</summary>
         public int Drain()

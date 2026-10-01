@@ -75,13 +75,13 @@ public sealed partial class PluginTests : IDisposable
     }
 
     [Fact]
-    public void Initialise_AddsToolsFaderioWithPlayAndStop()
+    public void Initialise_AddsToolsFaderioWithPlayAndStop_AndTheContextItem()
     {
         ChooseLibrary(LibraryFolder);
 
         Start();
 
-        Assert.Equal(new[] { "MB_AddMenuItem mnuTools/faderio" }, _musicBee.Calls);
+        Assert.Equal(new[] { "MB_AddMenuItem mnuTools/faderio", "MB_AddMenuItem context.Main/Add to faderio's open playlist" }, _musicBee.Calls);
         Assert.Equal(new[] { "Play", "Stop" },
             _musicBee.Menus["mnuTools/faderio"].DropDownItems.Cast<System.Windows.Forms.ToolStripItem>().Select(i => i.Text));
     }
@@ -229,17 +229,24 @@ public sealed partial class PluginTests : IDisposable
 
     /// <summary>Waits for <paramref name="folder"/>'s open playlist to load in
     /// <paramref name="plugin"/>.</summary>
-    private static PlayerView Launched(Plugin plugin, string folder)
+    private static PlayerView Launched(Plugin plugin, string folder) => Eventually(
+        () => plugin.Host!.Engine.View,
+        view => view.Library?.Path == folder && view.Adding is null && view.Queue.Count > 0,
+        "The open playlist never loaded.");
+
+    /// <summary>Polls <paramref name="read"/> until <paramref name="ready"/>, within
+    /// <see cref="Patience"/>: the engine's loads and adds run in the background.</summary>
+    private static T Eventually<T>(Func<T> read, Func<T, bool> ready, string orElse)
     {
         var deadline = DateTime.UtcNow + Patience;
         while (true)
         {
-            var view = plugin.Host!.Engine.View;
-            if (view.Library?.Path == folder && view.Adding is null && view.Queue.Count > 0)
+            var value = read();
+            if (ready(value))
             {
-                return view;
+                return value;
             }
-            Assert.True(DateTime.UtcNow < deadline, "The open playlist never loaded.");
+            Assert.True(DateTime.UtcNow < deadline, orElse);
             Thread.Sleep(10);
         }
     }

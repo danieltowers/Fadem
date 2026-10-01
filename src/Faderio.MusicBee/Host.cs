@@ -112,6 +112,10 @@ internal sealed class Host : IDisposable
 
     public void Stop() => Engine.Stop();
 
+    /// <summary>Queues <paramref name="files"/> at the end of the open playlist, in order, probing
+    /// each off the UI thread; the run's rejections come as one notice (phase 5 issue 14).</summary>
+    public void Add(IEnumerable<string> files) => _ = Engine.Add(files);
+
     /// <summary>The UI thread has run out of messages: a render published since the last is posted.</summary>
     public void UiThreadIdle() => _sink.UiThreadIdle();
 
