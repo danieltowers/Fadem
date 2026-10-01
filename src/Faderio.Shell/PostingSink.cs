@@ -1,6 +1,6 @@
 using Faderio.Core.Playback;
 
-namespace Faderio.App;
+namespace Faderio.Shell;
 
 /// <summary>
 /// The production <see cref="IEngineSink"/>: marshals every publication to the UI thread through
@@ -19,7 +19,7 @@ namespace Faderio.App;
 /// timer renders meanwhile. Notices are all delivered, in order, each after the views published
 /// before it.
 /// </remarks>
-public sealed class PostingSink : IEngineSink
+internal sealed class PostingSink : IEngineSink
 {
     private readonly SynchronizationContext? _context;
 

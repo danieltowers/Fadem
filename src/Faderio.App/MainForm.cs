@@ -539,9 +539,7 @@ internal sealed class MainForm : Form
             var row = view.Queue[i];
             var item = _queueList.Items[i];
             // Render runs on every tick: each row's look is set only when it changes (build issue 20).
-            var back = !row.IsCurrent ? SystemColors.Window
-                : view.Transport == Transport.Stopped ? RestingMarker
-                : SystemColors.Info;
+            var back = RowMarks.BackOf(row.IsCurrent, view.Transport);
             var fore = row.IsUnreadable ? SystemColors.GrayText : SystemColors.WindowText;
             // Each cell is styled on its own, for the editor button's: bold while its adjacency
             // is authored, grey and plain while it is not.
@@ -1022,13 +1020,6 @@ internal sealed class MainForm : Form
     /// The task is for the launch arguments, which must wait for the rows before --play.</summary>
     internal Task AddPaths(IEnumerable<string> paths) => _engine.Add(paths);
 
-    /// <summary>The attended row's mark while nothing sounds (interim transport 03): the sounding
-    /// mark's hue, halfway to the window's grey, so it reads as the same mark, at rest.</summary>
-    internal static readonly Color RestingMarker = Color.FromArgb(
-        (SystemColors.Info.R + SystemColors.Control.R) / 2,
-        (SystemColors.Info.G + SystemColors.Control.G) / 2,
-        (SystemColors.Info.B + SystemColors.Control.B) / 2);
-
     internal static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
 
     /// <summary>The queue's last column: each row's editor button (interim transport 07), after
@@ -1294,15 +1285,4 @@ internal sealed class MainForm : Form
         };
         return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
     }
-}
-
-/// <summary>A status label that takes the strip's spare width and asks for none of its own. Sized
-/// to its text, a long notice would push the notice count and the add's Cancel off the strip.
-/// </summary>
-internal sealed class SpringLabel : ToolStripStatusLabel
-{
-    public SpringLabel(string text) : base(text) => Spring = true;
-
-    public override Size GetPreferredSize(Size constrainingSize) =>
-        base.GetPreferredSize(constrainingSize) with { Width = 0 };
 }

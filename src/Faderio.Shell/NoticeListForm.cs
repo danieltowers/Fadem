@@ -1,6 +1,5 @@
-using Faderio.Shell;
 
-namespace Faderio.App;
+namespace Faderio.Shell;
 
 /// <summary>
 /// This session's notices (build issue 09), opened from the status strip. A list of every
@@ -105,4 +104,15 @@ internal sealed class NoticeListForm : Form
         var others = _list.Columns.Cast<ColumnHeader>().Where(c => c != _message).Sum(c => c.Width);
         _message.Width = Math.Max(120, _list.ClientSize.Width - others);
     }
+}
+
+/// <summary>A status label that takes the strip's spare width and asks for none of its own. Sized
+/// to its text, a long notice would push the notice count and the add's Cancel off the strip.
+/// </summary>
+internal sealed class SpringLabel : ToolStripStatusLabel
+{
+    public SpringLabel(string text) : base(text) => Spring = true;
+
+    public override Size GetPreferredSize(Size constrainingSize) =>
+        base.GetPreferredSize(constrainingSize) with { Width = 0 };
 }

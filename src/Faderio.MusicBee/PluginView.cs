@@ -1,0 +1,486 @@
+using System.Drawing;
+using System.Windows.Forms;
+using Faderio.Core.Domain;
+using Faderio.Core.Playback;
+using Faderio.Core.Queue;
+using Faderio.Core.Settings;
+using Faderio.Shell;
+
+namespace Faderio.MusicBee;
+
+/// <summary>
+/// faderio's view inside MusicBee (phase 5 issue 10), the plugin's own, composed from the shared
+/// controls: the playlist sidebar on the left, the open playlist's queue in the centre, the
+/// attended track named above the transport, the transport with faderio's own Stop, and a strip
+/// at the bottom with the latest notice, a count that opens the session's notice list, and the
+/// library and output mode this host plays with. It renders <see cref="PlayerView"/>s and issues
+/// commands; it holds no engine state between calls and computes nothing from engine values
+/// (the placement rule in CLAUDE.md). Starting sound stops MusicBee's player first, as the Tools
+/// menu's Play does: never two players at once, nor two on one device.
+/// <para>MusicBee makes and disposes the panel this sits in; the engine outlives it, so the
+/// notice log is the composition's, handed in, and only rendered here.</para>
+/// </summary>
+internal sealed class PluginView : UserControl
+{
+    private readonly PlaybackEngine _engine;
+    private readonly NoticeLog _notices;
+    private readonly Func<AudioOutputMode?> _outputModeInUse;
+    private readonly Action _stopMusicBeesPlayer;
+    private readonly System.Windows.Forms.Timer _timer;
+    private readonly ToolTip _tips;
+
+    internal readonly PlaylistSidebar _playlists;
+    internal readonly ListView _queueList;
+    internal readonly Label _attendedTrack;
+    internal readonly Button _prev;
+    internal readonly Button _playPause;
+    internal readonly Button _stop;
+    internal readonly Button _next;
+    internal readonly Button _transitionNow;
+    internal readonly CheckBox _shuffle;
+    internal readonly CheckBox _repeat;
+    internal readonly Button _back5;
+    internal readonly Button _forward5;
+    internal readonly SeekBar _seek;
+    internal readonly Label _time;
+    internal readonly ToolStripStatusLabel _status;
+    internal readonly ToolStripStatusLabel _noticeCount;
+    internal readonly ToolStripStatusLabel _host;
+    internal readonly ToolStripMenuItem _removeRows;
+    internal readonly ToolStripMenuItem _clearQueue;
+    internal NoticeListForm? _noticeList;
+
+    private long _shownQueue = -1;
+
+    /// <summary>The queue's columns, fixed: the App's layout, menu and drag can follow when a
+    /// later issue needs them.</summary>
+    private static readonly QueueColumn[] Columns = [QueueColumn.Number, QueueColumn.Title, QueueColumn.Artist, QueueColumn.Length];
+
+    /// <param name="notices">The session's notices, the composition's: it outlives this view.</param>
+    /// <param name="outputModeInUse">The mode the output opened in, or null when none could be.</param>
+    /// <param name="stopMusicBeesPlayer">MusicBee's <c>Player_Stop</c>, called before faderio starts to sound.</param>
+    public PluginView(PlaybackEngine engine, NoticeLog notices, Func<AudioOutputMode?> outputModeInUse, Action stopMusicBeesPlayer)
+    {
+        _engine = engine;
+        _notices = notices;
+        _outputModeInUse = outputModeInUse;
+        _stopMusicBeesPlayer = stopMusicBeesPlayer;
+        ConfirmClear = ShowClearDialog;
+        ShowNoticeList = ShowModeless;
+
+        Dock = DockStyle.Fill;
+
+        _status = new SpringLabel("Ready.") { TextAlign = ContentAlignment.MiddleLeft };
+        _noticeCount = new ToolStripStatusLabel { Available = false, IsLink = true, ToolTipText = "Show this session's notices" };
+        // Where MusicBee's window has no title of faderio's: the library and the mode in use. Cut
+        // short in a narrow panel, whole in its tooltip.
+        _host = new ToolStripStatusLabel { ForeColor = SystemColors.GrayText, Margin = new Padding(8, 3, 0, 2), AutoSize = false, TextAlign = ContentAlignment.MiddleLeft };
+        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _host }, ShowItemToolTips = true, SizingGrip = false };
+
+        var symbols = new Font("Segoe UI Symbol", 9f);
+        // Sized so the seven fit MusicBee's sidebar as shipped (284 px) on one row; narrower, the
+        // row wraps.
+        _prev = new Button { Text = "⏮", Font = symbols, Width = 34, Height = 28, Margin = new Padding(4, 6, 1, 4) };
+        _playPause = new Button { Text = "▶", Font = symbols, Width = 34, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        // Stop is this host's: a guest in MusicBee's process lets go of the device while stopped.
+        _stop = new Button { Text = "⏹", Font = symbols, Width = 34, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        _next = new Button { Text = "⏭", Font = symbols, Width = 34, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        _transitionNow = new Button { Text = "⤳", Font = new Font("Segoe UI Symbol", 13f), Width = 34, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        _shuffle = new CheckBox { Text = "🔀", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 38, Height = 28, Margin = new Padding(8, 6, 1, 4) };
+        _repeat = new CheckBox { Text = "🔁", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 38, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        _back5 = new Button { Text = "−5 s", Width = 48, Height = 28, Enabled = false };
+        _forward5 = new Button { Text = "+5 s", Width = 48, Height = 28, Enabled = false };
+        _tips = new ToolTip();
+        _tips.SetToolTip(_stop, "Stop, and let go of the audio device");
+        _tips.SetToolTip(_transitionNow, "Transition now");
+        _tips.SetToolTip(_back5, "Back 5 seconds");
+        _tips.SetToolTip(_forward5, "Forward 5 seconds");
+        _seek = new SeekBar();
+        _time = new Label { Text = "0:00 / -0:00", TextAlign = ContentAlignment.MiddleLeft, AutoSize = false, Dock = DockStyle.Fill };
+        _attendedTrack = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = 26,
+            Font = new Font(Font.FontFamily, 11f),
+            Padding = new Padding(6, 4, 6, 0),
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoEllipsis = true,
+            UseMnemonic = false,
+        };
+        // Two rows, so the transport fits a sidebar as well as the main panel: the buttons, then
+        // the seek bar between its jumps with the readout. A table, not anchors: the seek bar
+        // takes whatever width is left at any panel size.
+        var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = true };
+        buttons.Controls.AddRange(new Control[] { _prev, _playPause, _stop, _next, _transitionNow, _shuffle, _repeat });
+        var seekRow = new TableLayoutPanel { Dock = DockStyle.Top, Height = 38, ColumnCount = 4, RowCount = 1 };
+        seekRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        seekRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        seekRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        seekRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
+        _back5.Margin = new Padding(4, 4, 0, 4);
+        _forward5.Margin = new Padding(0, 4, 2, 4);
+        _seek.Margin = new Padding(6, 2, 6, 4);
+        _seek.Dock = DockStyle.Fill;
+        seekRow.Controls.Add(_back5, 0, 0);
+        seekRow.Controls.Add(_seek, 1, 0);
+        seekRow.Controls.Add(_forward5, 2, 0);
+        seekRow.Controls.Add(_time, 3, 0);
+
+        _queueList = new ListView
+        {
+            Dock = DockStyle.Fill,
+            View = View.Details,
+            FullRowSelect = true,
+            MultiSelect = true,
+            HideSelection = false,
+            ShowItemToolTips = true,
+        };
+        foreach (var column in Columns)
+        {
+            var header = _queueList.Columns.Add(Presenter.ColumnHeading(column), WidthOf(column));
+            header.TextAlign = column == QueueColumn.Length ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        }
+        _queueList.Resize += (_, _) => FitTitle();
+        _removeRows = new ToolStripMenuItem("Remove") { ShortcutKeyDisplayString = "Del" };
+        _clearQueue = new ToolStripMenuItem("Clear queue");
+        var menu = new ContextMenuStrip { Items = { _removeRows, _clearQueue } };
+        menu.Opening += (_, _) =>
+        {
+            _removeRows.Enabled = _queueList.SelectedItems.Count > 0;
+            _clearQueue.Enabled = _queueList.Items.Count > 0;
+        };
+        _removeRows.Click += (_, _) => RemoveSelected();
+        _clearQueue.Click += (_, _) => ClearQueue();
+        _queueList.ContextMenuStrip = menu;
+        _queueList.KeyDown += (_, e) =>
+        {
+            if (e.Modifiers != Keys.None)
+            {
+                return;
+            }
+            if (e.KeyCode == Keys.Delete)
+            {
+                RemoveSelected();
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.Enter && _queueList.SelectedIndices.Count == 1)
+            {
+                PlayRowAt(_queueList.SelectedIndices[0]);
+                e.Handled = true;
+            }
+        };
+        _queueList.MouseDoubleClick += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left && _queueList.HitTest(e.Location).Item is { } item)
+            {
+                PlayRowAt(item.Index);
+            }
+        };
+
+        _playlists = new PlaylistSidebar(engine, () => true); // no editor here to leave
+
+        // Docking order: the playlists and the strip first, the transport rows next, the list last.
+        Controls.Add(_queueList);
+        Controls.Add(_playlists);
+        Controls.Add(statusStrip);
+        Controls.Add(seekRow);
+        Controls.Add(buttons);
+        Controls.Add(_attendedTrack);
+        Resize += (_, _) => FitWidth();
+        FitWidth();
+
+        _status.Click += (_, _) => OpenNotices();
+        _noticeCount.Click += (_, _) => OpenNotices();
+        _playPause.Click += (_, _) => TogglePlayPause();
+        _stop.Click += (_, _) => _engine.Stop();
+        _prev.Click += (_, _) => _engine.Previous();
+        _next.Click += (_, _) => _engine.Next();
+        _transitionNow.Click += (_, _) => _engine.TransitionNow();
+        // The press asks for the state after the one the view holds now, not the one last shown.
+        _shuffle.Click += (_, _) => _engine.SetShuffle(!_engine.View.Shuffle);
+        _repeat.Click += (_, _) => _engine.SetRepeat(Presenter.NextRepeat(_engine.View.Repeat));
+        _seek.SeekRequested += SeekTo;
+        _back5.Click += (_, _) => _engine.SeekBy(TimeSpan.FromSeconds(-5));
+        _forward5.Click += (_, _) => _engine.SeekBy(TimeSpan.FromSeconds(5));
+
+        // The playhead moves between publications: the seek bar and the readout follow it on a
+        // timer, as standalone faderio's do.
+        _timer = new System.Windows.Forms.Timer { Interval = 100 };
+        _timer.Tick += (_, _) => Render(_engine.View);
+        _timer.Start();
+        Disposed += (_, _) =>
+        {
+            _timer.Dispose();
+            _tips.Dispose();
+            _noticeList?.Dispose();
+        };
+
+        ShowNotices();
+        Render(_engine.View);
+    }
+
+    // ── Rendering: read, render, forget ─────────────────────────────────────────────────
+
+    internal void Render() => Render(_engine.View);
+
+    internal void Render(PlayerView view)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+        _playPause.Text = Presenter.PlayPauseGlyph(view.Transport);
+        _transitionNow.Enabled = view.CanTransitionNow;
+        _shuffle.Checked = view.Shuffle;
+        _repeat.Checked = view.Repeat != RepeatMode.Off;
+        _repeat.Text = Presenter.RepeatGlyph(view.Repeat);
+        ShowTip(_shuffle, Presenter.ShuffleTip(view.Shuffle));
+        ShowTip(_repeat, Presenter.RepeatTip(view.Repeat));
+
+        if (view.QueueVersion != _shownQueue)
+        {
+            RebuildRows(view);
+            _shownQueue = view.QueueVersion;
+        }
+        for (var i = 0; i < _queueList.Items.Count && i < view.Queue.Count; i++)
+        {
+            var row = view.Queue[i];
+            var item = _queueList.Items[i];
+            // Render runs on every tick: each row's look is set only when it changes.
+            var back = RowMarks.BackOf(row.IsCurrent, view.Transport);
+            var fore = row.IsUnreadable ? SystemColors.GrayText : SystemColors.WindowText;
+            foreach (ListViewItem.ListViewSubItem cell in item.SubItems)
+            {
+                if (cell.BackColor != back)
+                {
+                    cell.BackColor = back;
+                }
+                if (cell.ForeColor != fore)
+                {
+                    cell.ForeColor = fore;
+                }
+            }
+            var label = Presenter.RowLabel(i + 1, row.IsUnreadable);
+            if (item.Text != label)
+            {
+                item.Text = label;
+                item.ToolTipText = Presenter.RowTip(row.IsUnreadable);
+            }
+        }
+
+        var attended = view.Attended;
+        _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length);
+        _back5.Enabled = _forward5.Enabled = _seek.Enabled;
+        _time.Text = Presenter.TimeReadout(attended, held: view.Preview is not null);
+        var attendedTrack = Presenter.FmtAttendedTrack(attended);
+        if (_attendedTrack.Text != attendedTrack)
+        {
+            _attendedTrack.Text = attendedTrack;
+        }
+        var host = Presenter.FmtHost(view.Library, _outputModeInUse(), _engine.SampleRate);
+        if (_host.Text != host)
+        {
+            _host.Text = host;
+            _host.ToolTipText = host;
+            FitWidth();
+        }
+
+        _playlists.Render(view);
+    }
+
+    /// <summary>The strip shows the log's latest notice and how many the log holds; the list,
+    /// if open, every one. Called by the composition as each notice is delivered, and once at
+    /// construction for those delivered before this view existed.</summary>
+    internal void ShowNotices()
+    {
+        if (IsDisposed || _notices.Latest is not { } latest)
+        {
+            return;
+        }
+        _status.Text = Presenter.FmtNotice(latest);
+        _status.ToolTipText = _status.Text; // in full, where the strip clips it
+        _noticeCount.Text = Presenter.FmtNoticeCount(_notices.Entries.Count);
+        _noticeCount.Available = true;
+        if (_noticeList is { IsDisposed: false } list)
+        {
+            list.ShowEntries(_notices, selectLatest: false);
+        }
+    }
+
+    /// <summary>Render runs on every tick, and resetting a tip that is showing would close it.</summary>
+    private void ShowTip(Control control, string tip)
+    {
+        if (_tips.GetToolTip(control) != tip)
+        {
+            _tips.SetToolTip(control, tip);
+        }
+    }
+
+    /// <summary>Rows the list already shows in the same places are kept and only the new ones
+    /// made, as the App's list does: a background add publishes once per file.</summary>
+    private void RebuildRows(PlayerView view)
+    {
+        var selected = _queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToHashSet();
+        _queueList.BeginUpdate();
+        var kept = 0;
+        while (kept < _queueList.Items.Count && kept < view.Queue.Count && RowOf(_queueList.Items[kept]) == view.Queue[kept].Id)
+        {
+            kept++;
+        }
+        while (_queueList.Items.Count > kept)
+        {
+            _queueList.Items.RemoveAt(_queueList.Items.Count - 1);
+        }
+        foreach (var row in view.Queue.Skip(kept))
+        {
+            var item = new ListViewItem((++kept).ToString()) { Tag = row.Id, UseItemStyleForSubItems = false };
+            foreach (var column in Columns.Skip(1))
+            {
+                item.SubItems.Add(Presenter.QueueCell(column, row.Track));
+            }
+            _queueList.Items.Add(item);
+            item.Selected = selected.Contains(row.Id);
+        }
+        _queueList.EndUpdate();
+    }
+
+    /// <summary>Below this width the panel is a sidebar: the playlists go above the queue, not
+    /// beside it, so the queue keeps its columns.</summary>
+    internal const int NarrowWidth = 560;
+
+    /// <summary>Lays the view out for its width: the playlists beside the queue in a main panel,
+    /// above it in a sidebar; the host line at its own width, or half the strip's when that is
+    /// less, so the notice keeps the rest.</summary>
+    private void FitWidth()
+    {
+        var narrow = ClientSize.Width < NarrowWidth;
+        var dock = narrow ? DockStyle.Top : DockStyle.Left;
+        if (_playlists.Dock != dock)
+        {
+            _playlists.Dock = dock;
+            if (narrow)
+            {
+                _playlists.Height = 110;
+            }
+            else
+            {
+                _playlists.Width = 200;
+            }
+        }
+        var preferred = TextRenderer.MeasureText(_host.Text, _host.Font).Width + 8;
+        _host.Width = Math.Max(0, Math.Min(preferred, ClientSize.Width / 2));
+    }
+
+    private static int WidthOf(QueueColumn column) => column switch
+    {
+        QueueColumn.Number => 40,
+        QueueColumn.Title => 240,
+        QueueColumn.Artist => 140,
+        _ => 60,
+    };
+
+    private const int MinTitleWidth = 100;
+    private const int MinArtistWidth = 60;
+
+    /// <summary>The title takes what the other columns leave, and where that would squeeze it
+    /// below its least, Artist gives way to its floor, as the App's columns do: in a sidebar the
+    /// list keeps its columns rather than scrolling sideways.</summary>
+    private void FitTitle()
+    {
+        var (number, title, artist, length) = (_queueList.Columns[0], _queueList.Columns[1], _queueList.Columns[2], _queueList.Columns[3]);
+        var free = _queueList.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - number.Width - length.Width;
+        var artistWidth = Math.Max(MinArtistWidth, Math.Min(WidthOf(QueueColumn.Artist), free - MinTitleWidth));
+        if (artist.Width != artistWidth)
+        {
+            artist.Width = artistWidth;
+        }
+        var titleWidth = Math.Max(MinTitleWidth, free - artistWidth);
+        if (title.Width != titleWidth)
+        {
+            title.Width = titleWidth;
+        }
+    }
+
+    private static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
+
+    // ── Commands: one intent, one engine call ───────────────────────────────────────────
+
+    /// <summary>▶ from stopped or paused starts sound, so MusicBee's player is stopped first;
+    /// ⏸ starts nothing and leaves it alone.</summary>
+    private void TogglePlayPause()
+    {
+        if (_engine.View.Transport != Transport.Playing)
+        {
+            _stopMusicBeesPlayer();
+        }
+        _engine.TogglePlayPause(_queueList.SelectedItems.Count == 1 ? RowOf(_queueList.SelectedItems[0]) : null);
+    }
+
+    /// <summary>A row's double-click, or Enter on it: that row plays, after MusicBee's player stops.</summary>
+    internal void PlayRowAt(int index)
+    {
+        if (index < 0 || index >= _queueList.Items.Count)
+        {
+            return;
+        }
+        _stopMusicBeesPlayer();
+        _engine.PlayRow(RowOf(_queueList.Items[index]));
+    }
+
+    internal void SeekTo(Playhead playhead) => _engine.Seek(playhead);
+
+    /// <summary>The selected rows go in one call; what that does to playback is the engine's.</summary>
+    private void RemoveSelected() =>
+        _engine.Remove(_queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToList());
+
+    /// <summary>There is no undo, so a queue of more than one row asks first.</summary>
+    private void ClearQueue()
+    {
+        var count = _engine.View.Queue.Count;
+        if (count > 1 && !ConfirmClear(count))
+        {
+            return;
+        }
+        _engine.Clear();
+    }
+
+    /// <summary>Whether the user confirms clearing a queue of this many rows. A test replaces
+    /// it, since a headless view cannot show a dialog.</summary>
+    internal Func<int, bool> ConfirmClear { get; set; }
+
+    private bool ShowClearDialog(int count) =>
+        MessageBox.Show(
+            FindForm(),
+            $"Remove all {count} rows from the queue? This cannot be undone.",
+            "Clear queue",
+            MessageBoxButtons.OKCancel,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2) == DialogResult.OK;
+
+    /// <summary>Shows the notice list beside MusicBee's window. A test replaces it.</summary>
+    internal Action<Form> ShowNoticeList { get; set; }
+
+    private void ShowModeless(Form window)
+    {
+        if (!window.Visible)
+        {
+            window.Show(FindForm());
+        }
+        window.Activate();
+    }
+
+    /// <summary>Opens this session's notice list on the latest notice; one list, reused.</summary>
+    private void OpenNotices()
+    {
+        if (_notices.Latest is null)
+        {
+            return;
+        }
+        if (_noticeList is null || _noticeList.IsDisposed)
+        {
+            _noticeList = new NoticeListForm();
+        }
+        _noticeList.ShowEntries(_notices, selectLatest: true);
+        ShowNoticeList(_noticeList);
+    }
+}

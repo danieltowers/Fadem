@@ -29,7 +29,7 @@
     <InternalsVisibleTo Include="faderio" /> <!-- the App: its assembly is named faderio -->
     <InternalsVisibleTo Include="Faderio.App.Tests" />
     <InternalsVisibleTo Include="Faderio.Shell.Tests" />
-    <InternalsVisibleTo Include="Faderio.MusicBee" />
+    <InternalsVisibleTo Include="mb_faderio" /> <!-- the plugin: named to MusicBee's convention -->
     <!-- The output's player factory: the plugin's tests stand a fake player in for NAudio's. -->
     <InternalsVisibleTo Include="Faderio.MusicBee.Tests" />
   </ItemGroup>

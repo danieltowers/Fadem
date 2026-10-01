@@ -1,9 +1,9 @@
-using Faderio.App;
+using Faderio.Shell;
 using Faderio.Core.Playback;
 using Faderio.Core.Tests;
 using Faderio.Core.Transitions;
 
-namespace Faderio.App.Tests;
+namespace Faderio.Shell.Tests;
 
 /// <summary>
 /// The production sink against a UI thread that is busy: publications pile up behind it, as a
@@ -26,8 +26,9 @@ public sealed class PostingSinkTests : IDisposable
 
         public void Drain()
         {
-            while (_queue.TryDequeue(out var post))
+            while (_queue.Count > 0)
             {
+                var post = _queue.Dequeue();
                 post.Callback(post.State);
             }
         }

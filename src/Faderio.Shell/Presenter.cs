@@ -316,9 +316,19 @@ internal static class Presenter
     public static string FmtModeInUse(AudioOutputMode chosen, AudioOutputMode? inUse) =>
         inUse == chosen ? "" : $"In use now: {(inUse is { } mode ? OutputModeNames.Of(mode) : "no audio output")}";
 
-    /// <summary>The window title: the open playlist in front (playlists issue 03), then the open
-    /// library (library issue 02), then the output mode actually in use, not the one asked for.</summary>
+    /// <summary>The window title: the open playlist in front (playlists issue 03), then
+    /// <see cref="FmtHost"/>: the open library and the output mode in use.</summary>
     public static string Title(string? playlist, LibraryView? library, AudioOutputMode? inUse, int sampleRate)
+    {
+        var title = $"faderio — {FmtHost(library, inUse, sampleRate)}";
+        return playlist is null ? title : $"{playlist} — {title}";
+    }
+
+    /// <summary>What this host plays with: the open library (library issue 02), then the output
+    /// mode actually in use, not the one asked for, at its rate. The App's title carries it; the
+    /// plugin's strip shows it, since MusicBee's window has no title of faderio's (phase 5 issue
+    /// 10).</summary>
+    public static string FmtHost(LibraryView? library, AudioOutputMode? inUse, int sampleRate)
     {
         var name = library switch
         {
@@ -327,8 +337,7 @@ internal static class Presenter
             _ => library.Name,
         };
         var output = inUse is { } mode ? $"{OutputModeNames.Of(mode)} at {sampleRate} Hz" : "no audio output";
-        var title = $"faderio — {name} · {output}";
-        return playlist is null ? title : $"{playlist} — {title}";
+        return $"{name} · {output}";
     }
 
     /// <summary>"--library=&lt;folder&gt;": for smoke runs, the library to open instead of the

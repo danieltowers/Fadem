@@ -123,6 +123,17 @@ public sealed class PresenterTests
     }
 
     [Fact]
+    public void FmtHost_IsTheLibraryAndTheModeInUse_AsTheTitleCarriesThem()
+    {
+        var music = new LibraryView(@"C:\Music", "Music", IsAvailable: true);
+        Assert.Equal("Music · WASAPI shared at 48000 Hz", Presenter.FmtHost(music, AudioOutputMode.WasapiShared, 48000));
+        Assert.Equal("no library · no audio output", Presenter.FmtHost(null, null, 44100));
+        Assert.Equal(
+            "Locked (could not be opened) · WaveOut at 44100 Hz",
+            Presenter.FmtHost(new LibraryView(@"D:\Locked", "Locked", IsAvailable: false), AudioOutputMode.WaveOut, 44100));
+    }
+
+    [Fact]
     public void Title_PutsTheOpenPlaylistInFront()
     {
         var music = new LibraryView(@"C:\Music", "Music", IsAvailable: true);

@@ -99,6 +99,7 @@ public sealed partial class PluginTests
 
         Configure(typed: gone);
         _plugin.SaveSettings();
+        _ui.Pump();
 
         var message = Assert.Single(_ui.Messages);
         Assert.Contains("gone", message);
@@ -116,6 +117,7 @@ public sealed partial class PluginTests
     {
         ChooseLibrary(LibraryFolder);
         Start();
+        _ui.Pump();
         Assert.Contains("does not exist", Assert.Single(_ui.Messages));
         var (a, b) = AuthorLibrary(); // the drive is back
 
@@ -146,6 +148,7 @@ public sealed partial class PluginTests
         var view = _plugin.Host!.Engine.View;
         Assert.Equal(LibraryFolder, view.Library!.Path);
         Assert.Equal(AudioOutputMode.WasapiShared, view.MachineSettings.OutputMode);
+        _ui.Pump();
         Assert.Empty(_ui.Messages);
     }
 

@@ -21,7 +21,7 @@ internal sealed class FakeMusicBee
         _api.InterfaceVersion = Plugin.MinInterfaceVersion;
         _api.ApiRevision = Plugin.MinApiRevision;
         _api.Setting_GetPersistentStoragePath = () => StoragePath;
-        _api.MB_GetWindowHandle = () => IntPtr.Zero;
+        _api.MB_GetWindowHandle = () => MainWindow;
         _api.MB_AddMenuItem = AddMenuItem;
         _api.Player_Stop = () =>
         {
@@ -32,6 +32,9 @@ internal sealed class FakeMusicBee
     }
 
     public string StoragePath { get; }
+
+    /// <summary>MusicBee's main window: none, unless a test stands a form in for it.</summary>
+    public IntPtr MainWindow { get; set; } = IntPtr.Zero;
 
     public List<string> Calls { get; } = new();
 
@@ -74,11 +77,15 @@ internal sealed class FakeMusicBee
 }
 
 /// <summary>MusicBee's UI thread as the plugin posts to it: each post is kept, not run, so a
-/// message box's text is read without one being shown.</summary>
+/// message box's text is read without one being shown. <see cref="Pump"/> runs what is queued,
+/// as MusicBee's message loop would, and the boxes those posts post are then kept in turn.</summary>
 internal sealed class RecordingContext : SynchronizationContext
 {
+    private readonly Queue<(SendOrPostCallback Callback, object? State)> _queue = new();
+
     public List<object?> Posted { get; } = new();
 
+    /// <summary>The message boxes posted, in order: the text each carries as its post's state.</summary>
     public IReadOnlyList<string> Messages
     {
         get
@@ -95,8 +102,31 @@ internal sealed class RecordingContext : SynchronizationContext
         lock (Posted)
         {
             Posted.Add(state);
+            _queue.Enqueue((d, state));
         }
     }
 
     public override void Send(SendOrPostCallback d, object? state) => Post(d, state);
+
+    /// <summary>Runs every post queued, those queued while running included, on the calling
+    /// thread. A message box's post is not run: its text stays in <see cref="Messages"/>.</summary>
+    public void Pump()
+    {
+        while (true)
+        {
+            (SendOrPostCallback Callback, object? State) post;
+            lock (Posted)
+            {
+                if (_queue.Count == 0)
+                {
+                    return;
+                }
+                post = _queue.Dequeue();
+            }
+            if (post.State is not string)
+            {
+                post.Callback(post.State);
+            }
+        }
+    }
 }

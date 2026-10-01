@@ -65,6 +65,27 @@ public sealed class ReleasingTheDeviceTests : IDisposable
         Assert.Empty(_sink.Notices);
     }
 
+    /// <summary>The view's ⏹ after a pause and a resume (phase 5 issue 10): a Stop is a stop,
+    /// with nothing attended, however the queue was playing before it.</summary>
+    [Fact]
+    public void Stop_AfterAPauseAndAResume_LeavesNothingAttended()
+    {
+        var engine = Compose(uiThread: true);
+        var first = PlayOneRow(engine, seconds: 30);
+        engine.Pause();
+        engine.Play();
+        var resumed = _players[_players.Count - 1];
+        Assert.True(Renders(resumed), "The render thread never read after the resume.");
+
+        Assert.True(Returns(engine.Stop), "Stop froze.");
+        _ui!.Drain();
+
+        Assert.Equal(Transport.Stopped, engine.View.Transport);
+        Assert.Null(engine.View.Attended);
+        Assert.True(resumed.Disposed, "The device is still held after Stop.");
+        Assert.Empty(_sink.Notices);
+    }
+
     [Fact]
     public void TheQueueRunningOut_LetsGoOfTheDevice_FromTheRenderThread_WithoutDeadlocking()
     {

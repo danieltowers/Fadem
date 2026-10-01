@@ -60,6 +60,7 @@ public sealed partial class PluginTests : IDisposable
         Assert.Equal(new LibraryView(LibraryFolder, "library", IsAvailable: true), view.Library);
         Assert.Equal("Untitled", view.OpenPlaylist);
         Assert.Equal(new[] { a, b }, view.Queue.Select(r => r.Track.FilePath));
+        _ui.Pump();
         Assert.Empty(_ui.Messages);
     }
 
@@ -149,6 +150,7 @@ public sealed partial class PluginTests : IDisposable
     public void NoLibraryChosen_IsAMessage_AndPlayPlaysNothing()
     {
         Start();
+        _ui.Pump();
 
         Assert.Contains(_ui.Messages, m => m.StartsWith("No faderio library is chosen", StringComparison.Ordinal));
         _musicBee.Choose("Play");
@@ -162,6 +164,7 @@ public sealed partial class PluginTests : IDisposable
         ChooseLibrary(Path.Combine(_dir, "gone"));
 
         Start();
+        _ui.Pump();
 
         var message = Assert.Single(_ui.Messages);
         Assert.Contains("gone", message);
@@ -200,13 +203,14 @@ public sealed partial class PluginTests : IDisposable
     private string SettingsFile => Path.Combine(_musicBee.StoragePath, "faderio", "settings.json");
 
     /// <summary>MusicBee loads the plugin: on its UI thread, whose context the plugin posts to.</summary>
-    private void Start() => Start(_plugin);
+    private PluginInfo Start() => Start(_plugin);
 
-    private void Start(Plugin plugin)
+    private PluginInfo Start(Plugin plugin)
     {
         SynchronizationContext.SetSynchronizationContext(_ui);
         var about = _musicBee.Initialise(plugin);
-        Assert.Equal(PluginType.General, about.Type);
+        Assert.Equal(PluginType.PanelView, about.Type);
+        return about;
     }
 
     /// <summary>Waits for the open playlist to finish loading, as a listener would before

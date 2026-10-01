@@ -1183,9 +1183,9 @@ public sealed partial class HeadlessFormTests
         h.Form.Render();
         Color[] Backs() => h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.BackColor).ToArray();
 
-        Assert.NotEqual(SystemColors.Window, MainForm.RestingMarker);
-        Assert.NotEqual(SystemColors.Info, MainForm.RestingMarker);
-        Assert.Equal(new[] { MainForm.RestingMarker, SystemColors.Window }, Backs()); // at launch
+        Assert.NotEqual(SystemColors.Window, RowMarks.Resting);
+        Assert.NotEqual(SystemColors.Info, RowMarks.Resting);
+        Assert.Equal(new[] { RowMarks.Resting, SystemColors.Window }, Backs()); // at launch
 
         h.Form.PlayRowAt(1);
         h.Form.Render();
@@ -1199,7 +1199,7 @@ public sealed partial class HeadlessFormTests
         h.Output.Advance(44100 * 2); // the queue runs out
         h.Form.Render();
         Assert.Equal(Transport.Stopped, h.Engine.View.Transport);
-        Assert.Equal(new[] { MainForm.RestingMarker, SystemColors.Window }, Backs());
+        Assert.Equal(new[] { RowMarks.Resting, SystemColors.Window }, Backs());
     });
 
     [Fact]

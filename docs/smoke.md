@@ -346,9 +346,21 @@ while another app has the foreground, so a run beside the user's own work may no
 Edit is the second item, and Edit Preferences the last of Edit. MusicBee shows faderio's dialog
 controls to UI Automation as panes: find the folder box by its window class (`…EDIT…`) and set
 it with `WM_SETTEXT`, the mode list with `CB_SETCURSEL`, and press buttons with a posted
-`BM_CLICK`. There is no faderio view: whether faderio is sounding is read from MusicBee's audio session meter (`AudioMeterInformation.MasterPeakValue`
-of the session whose process is MusicBee's), which a generated tone of amplitude 0.3 shows as
-0.300.
+`BM_CLICK`. Whether faderio is sounding is read from MusicBee's audio session meter
+(`AudioMeterInformation.MasterPeakValue` of the session whose process is MusicBee's), which a
+generated tone of amplitude 0.3 shows as 0.300.
+
+**The panel** (phase 5 issue 10). faderio is a panel element: **View → Arrange Panels** lists
+it under *available elements*, and ticking it puts it in the right sidebar; **Save** shows it
+at once. MusicBee records it in `MusicBee3Settings.ini` as element `-61061107,0,0` in the
+`LC_…` list of the panel it sits in, so with MusicBee closed it can be moved by hand, say from
+`LC_RightSidebar` to `LC_RightMainPanel`. A drag in the dialog does not take posted mouse
+messages. The view's controls are ordinary WinForms controls, so UI Automation sees them: find
+the transport buttons by their window class (`…BUTTON…`) and their order on the row, not by
+their glyph names, which UIA matches loosely (a lookup for ⏹ once returned the play button);
+click them with a posted `BM_CLICK`. The two lists are `…SysListView32…`: the playlists above
+the queue in a sidebar, beside it in a main panel. A playlist's rename needs keyboard focus,
+which a background run cannot give.
 
 - [ ] Installed as above, MusicBee starts with no error dialog, and after it is closed its
       `MusicBee3Settings.ini` lists `mb_faderio.dll` named "faderio", enabled, beside the
@@ -356,6 +368,27 @@ of the session whose process is MusicBee's), which a generated tone of amplitude
 - [ ] **Tools** ends with **faderio**, whose submenu reads **Play**, **Stop**.
 - [ ] With the settings file naming a library whose open playlist holds two generated tones,
       **Play** starts faderio: the meter shows the tone. **Stop** ends it: the meter reads 0.
+- [ ] **The view** (phase 5 issue 10), placed as above and present after a restart: under a
+      "faderio" header, the transport row ⏮ ▶ ⏹ ⏭ ⤳ 🔀 🔁, then −5 s, the seek bar, +5 s and
+      "0:00 / -0:00"; **Playlists** listing the library's playlists with the open one bold on
+      yellow; the queue with #, Title, Artist and Length and row 1 marked at rest; the strip
+      reading "Ready." and, at its right, "library · WASAPI shared at 48000 Hz". In the
+      sidebar as shipped (284 px) the seven buttons fit one row, the playlists sit above the
+      queue, no column is off the edge, and the host line is cut short with its whole text as
+      its tooltip.
+- [ ] **▶** plays: the meter shows the tone, the track's name appears above the transport, the
+      button reads ⏸, the readout and the thumb move, row 1 is marked. **⏸** pauses (meter 0,
+      ▶ again); **▶** resumes; **⏹** stops: meter 0, the name blank, "0:00 / -0:00", the thumb
+      at the start, row 1 at rest.
+- [ ] **⏭** moves to row 2 from its start; **+5 s** and **−5 s** jump; a click in the middle
+      of the seek bar lands at half the track; **⏮** past 3 s restarts the track.
+- [ ] A double-click on a row plays that row from its start.
+- [ ] A click on another playlist opens it: it goes bold, the queue shows its rows.
+- [ ] A notice shows in the strip, not in a box: with faderio playing shared, an exclusive
+      stream opened from outside (the probe below, with `Play()` before `Dispose()`) evicts it,
+      and the strip reads "Audio output lost (Ex…" with a **1 notice** link; no message box
+      appears. The link opens "faderio — notices", listing the time, the notice and the count,
+      with the selected notice in full below. **▶** plays again after.
 - [ ] **The device is free while faderio is stopped** (phase 5 issue 06). The probe below, run
       from a PowerShell 7 outside MusicBee, initialises an exclusive `WasapiOut` on the default
       device and closes it again. With the plugin loaded it reads "exclusive: opened and closed"
@@ -394,7 +427,8 @@ of the session whose process is MusicBee's), which a generated tone of amplitude
 ### Sounds — the user runs this
 
 - [ ] With MusicBee playing a track, **Tools → faderio → Play** stops it and plays the open
-      playlist: the two players never sound at once.
+      playlist: the two players never sound at once. So do the view's **▶** and a row's
+      double-click (phase 5 issue 10).
 - [ ] An authored crossfade in the open playlist is heard as in standalone faderio.
 - [ ] After faderio's **Stop**, MusicBee's own player plays again straight away on WASAPI
       shared, and within a few seconds on WASAPI exclusive (the output mode in faderio's
