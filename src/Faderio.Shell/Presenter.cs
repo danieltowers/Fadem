@@ -325,10 +325,10 @@ internal static class Presenter
     }
 
     /// <summary>What this host plays with: the open library (library issue 02), then the output
-    /// mode actually in use, not the one asked for, at its rate. The App's title carries it; the
-    /// plugin's strip shows it, since MusicBee's window has no title of faderio's (phase 5 issue
-    /// 10).</summary>
-    public static string FmtHost(LibraryView? library, AudioOutputMode? inUse, int sampleRate)
+    /// mode actually in use, not the one asked for, at its rate, and on which device when the
+    /// host names one (phase 5 issue 13). The App's title carries it; the plugin's strip shows
+    /// it, since MusicBee's window has no title of faderio's (phase 5 issue 10).</summary>
+    public static string FmtHost(LibraryView? library, AudioOutputMode? inUse, int sampleRate, string? device = null)
     {
         var name = library switch
         {
@@ -337,6 +337,10 @@ internal static class Presenter
             _ => library.Name,
         };
         var output = inUse is { } mode ? $"{OutputModeNames.Of(mode)} at {sampleRate} Hz" : "no audio output";
+        if (inUse is not null && device is not null)
+        {
+            output += $" on {device}";
+        }
         return $"{name} · {output}";
     }
 

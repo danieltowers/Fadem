@@ -34,10 +34,20 @@ public sealed partial class PluginTests : IDisposable
     private readonly Plugin _plugin;
     private readonly SynchronizationContext? _before = SynchronizationContext.Current;
 
+    /// <summary>This machine's output devices, as the settings dialog lists them.</summary>
+    private readonly List<string> _devices = new() { "Speakers (Test)", "DAC" };
+
+    /// <summary>What the output would open at each open: the device the plugin asks for.</summary>
+    private Func<string?>? _deviceAsked;
+
     public PluginTests()
     {
         _musicBee = new FakeMusicBee(Path.Combine(_dir, "MusicBee storage"));
-        _plugin = new Plugin((_, _) => _output);
+        _plugin = new Plugin((_, device, _) =>
+        {
+            _deviceAsked = device;
+            return _output;
+        }, () => _devices);
     }
 
     private string LibraryFolder => Path.Combine(_dir, "library");
@@ -193,10 +203,10 @@ public sealed partial class PluginTests : IDisposable
     }
 
     /// <summary>The plugin's settings file, as its dialog leaves it.</summary>
-    private void ChooseLibrary(string folder, AudioOutputMode mode = AudioOutputMode.WasapiShared)
+    private void ChooseLibrary(string folder, AudioOutputMode mode = AudioOutputMode.WasapiShared, string? device = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(SettingsFile)!);
-        new MachineSettingsStore(SettingsFile).Save(new MachineSettings { Library = folder, OutputMode = mode });
+        new MachineSettingsStore(SettingsFile).Save(new MachineSettings { Library = folder, OutputMode = mode, OutputDevice = device });
     }
 
     /// <summary>The plugin's own machine settings, in MusicBee's persistent storage.</summary>

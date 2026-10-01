@@ -23,6 +23,13 @@ The program playing a library: faderio itself, or MusicBee through the plugin. B
 the same engine on the same library folder; each keeps its own machine settings.
 _Avoid_: Frontend, client, player (MusicBee's player never plays a library)
 
+**Output device**:
+The sound device a host's output opens, named as Windows names it. A host's **default** device
+is what it opens with none chosen: Windows' default for faderio, **MusicBee's device** (what
+MusicBee's own player plays on, followed as it changes) for the plugin. A chosen device that is
+**not found** falls to the default with a notice, and is tried again at the next open.
+_Avoid_: Endpoint (NAudio's word), sound card, DAC (one kind of device)
+
 **Playlist**:
 A named, ordered sequence of tracks belonging to a library. Its name is how the user refers
 to it and how its overrides are found. Exactly one playlist is **open** at a time; edits to

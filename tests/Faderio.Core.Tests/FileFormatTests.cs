@@ -134,6 +134,7 @@ public sealed class FileFormatTests : IDisposable
     {
         OutputMode = AudioOutputMode.WasapiExclusive,
         Library = @"C:\Music\⭐️ Favourites",
+        OutputDevice = "Speakers (C-Media(R) Audio)",
     };
 
     [Fact]

@@ -15,6 +15,7 @@ namespace Faderio.MusicBee.Tests;
 /// through the output's player factory, with a player that stops the way WASAPI's does: its
 /// Stop joins its render thread, a stream that ends stops it from that thread, and its stop is
 /// delivered where it was made, either posted to the UI thread or raised on the render thread.
+/// The devices are faked too (phase 5 issue 13): named, found or not, each opening those players.
 /// </summary>
 public sealed class ReleasingTheDeviceTests : IDisposable
 {
@@ -30,18 +31,50 @@ public sealed class ReleasingTheDeviceTests : IDisposable
     private NAudioAudioOutput? _output;
     private PlaybackEngine? _engine;
 
+    /// <summary>The devices present, the first the default; and which modes are refused.</summary>
+    private readonly List<string> _present = new() { "Speakers", "DAC" };
+    private readonly HashSet<AudioOutputMode> _refused = new();
+    private string? _chosen;
+
     // ── Letting go ───────────────────────────────────────────────────────────────────────
 
+    /// <summary>Issue 13: nothing is opened at launch, so a device another player holds then
+    /// raises no notice; the rate is asked for, and the mode asked for is the one named.</summary>
     [Fact]
-    public void AtLaunch_TheDeviceIsOpenedForItsRate_ThenLetGo()
+    public void AtLaunch_NothingIsOpened_TheRateIsAsked_AndTheModeAskedForIsNamed()
+    {
+        _refused.Add(AudioOutputMode.WasapiExclusive); // held by MusicBee's own player at its start
+        Compose(AudioOutputMode.WasapiExclusive);
+
+        Assert.Empty(_players);
+        Assert.Equal(48000, _output!.SampleRate); // the fake devices' mix rate
+        Assert.Equal(AudioOutputMode.WasapiExclusive, _output.Mode);
+        Assert.Equal("Speakers", _output.Device);
+        Assert.Empty(_outputNotices);
+        Assert.Empty(_sink.Notices);
+    }
+
+    [Fact]
+    public void AtLaunch_WaveOutAskedFor_Runs_At44100_WithoutAskingTheDevice()
     {
         Compose();
 
-        var launch = Assert.Single(_players);
-        Assert.True(launch.Disposed, "The device is still held after launch.");
+        Assert.Empty(_players);
         Assert.Equal(44100, _output!.SampleRate);
         Assert.Equal(AudioOutputMode.WaveOut, _output.Mode);
-        Assert.Empty(_sink.Notices); // a closed player at launch is not a lost device
+        Assert.Empty(_outputNotices);
+    }
+
+    [Fact]
+    public void AtLaunch_WithNoDeviceAtAll_TheEngineIsToldNothingOpened()
+    {
+        _present.Clear();
+        Compose();
+
+        Assert.Null(_output!.Mode);
+        Assert.Null(_output.Device);
+        Assert.Contains("No audio output device was found; no audio output could be opened.", _outputNotices);
+        Assert.Contains(_sink.Notices, n => n.StartsWith("Audio output lost (no audio output could be opened)."));
     }
 
     [Fact]
@@ -57,7 +90,7 @@ public sealed class ReleasingTheDeviceTests : IDisposable
 
         engine.Play();
 
-        var second = Assert.Single(_players.Skip(2));
+        var second = Assert.Single(_players.Skip(1));
         Assert.True(Renders(second), "The render thread never read after Play.");
         Assert.False(second.Disposed);
         Assert.Equal(Transport.Playing, engine.View.Transport);
@@ -97,7 +130,7 @@ public sealed class ReleasingTheDeviceTests : IDisposable
 
         engine.Play(); // the queue from its start: a fresh player
 
-        var again = Assert.Single(_players.Skip(2));
+        var again = Assert.Single(_players.Skip(1));
         Assert.True(Renders(again), "The render thread never read after Play.");
     }
 
@@ -125,9 +158,142 @@ public sealed class ReleasingTheDeviceTests : IDisposable
         Assert.True(Returns(engine.Stop), "Stop froze.");
         engine.Play();
 
-        Assert.Single(_players);
+        Assert.Single(_players); // opened at launch, kept
         Assert.False(player.Disposed);
         Assert.True(Renders(player), "The render thread never read after Play.");
+    }
+
+    // ── The mode at each open (issue 13) ─────────────────────────────────────────────────
+
+    /// <summary>MusicBee's player lets go of the device a moment after it is told to stop: the
+    /// mode asked for is retried before the chain falls back.</summary>
+    [Fact]
+    public void Play_RetriesTheModeAskedFor_WhileMusicBeesPlayerLetsGo()
+    {
+        var engine = Compose(AudioOutputMode.WasapiExclusive);
+        var a = TestAudio.WriteDcWav("a.wav", 30, 0.5);
+        engine.Add(new[] { a }).Result.Added.Single();
+        _refused.Add(AudioOutputMode.WasapiExclusive);
+        var refusals = 0;
+        _onRefusal = () =>
+        {
+            if (++refusals == 3)
+            {
+                _refused.Clear(); // free about 100 ms after Player_Stop returned
+            }
+        };
+
+        engine.Play();
+
+        var player = Assert.Single(_players);
+        Assert.True(Renders(player), "The render thread never read after Play.");
+        Assert.Equal(AudioOutputMode.WasapiExclusive, _output!.Mode);
+        Assert.Equal(3, refusals);
+        Assert.Empty(_outputNotices);
+    }
+
+    [Fact]
+    public void Play_FallsBack_OnceTheRetryIsSpent()
+    {
+        var engine = Compose(AudioOutputMode.WasapiExclusive);
+        var a = TestAudio.WriteDcWav("a.wav", 30, 0.5);
+        engine.Add(new[] { a }).Result.Added.Single();
+        _refused.Add(AudioOutputMode.WasapiExclusive);
+        var refusals = 0;
+        _onRefusal = () => refusals++;
+
+        var started = DateTime.UtcNow;
+        engine.Play();
+
+        var player = Assert.Single(_players);
+        Assert.True(Renders(player), "The render thread never read after Play.");
+        Assert.Equal(AudioOutputMode.WasapiShared, _output!.Mode);
+        Assert.InRange(refusals, 2, 20);
+        Assert.InRange(DateTime.UtcNow - started, NAudioAudioOutput.AskedModeRetry, TimeSpan.FromSeconds(4));
+        Assert.Equal("WASAPI exclusive unavailable (the device is in use); trying WASAPI shared.", Assert.Single(_outputNotices));
+    }
+
+    /// <summary>After a device loss the next Play reopens from the mode asked for, not the one
+    /// a fallback left in use.</summary>
+    [Fact]
+    public void Reopen_AfterADeviceLoss_OpensFromTheModeAskedFor()
+    {
+        var engine = Compose(AudioOutputMode.WasapiExclusive, uiThread: true);
+        var a = TestAudio.WriteDcWav("a.wav", 30, 0.5);
+        engine.Add(new[] { a }).Result.Added.Single();
+        _refused.Add(AudioOutputMode.WasapiExclusive);
+        engine.Play();
+        var fallen = Assert.Single(_players);
+        Assert.True(Renders(fallen), "The render thread never read after Play.");
+        Assert.Equal(AudioOutputMode.WasapiShared, _output!.Mode);
+        _outputNotices.Clear();
+
+        _refused.Clear();
+        fallen.Fail(new InvalidOperationException("Exception from HRESULT: 0x88890004"));
+        Assert.True(SpinWait.SpinUntil(() => fallen.PlaybackState == PlaybackState.Stopped, Patience), "The player never failed.");
+        Assert.True(_ui!.Drain() > 0, "The failure was never posted.");
+        Assert.Contains(_sink.Notices, n => n.StartsWith("Audio output lost (Exception from HRESULT: 0x88890004)."));
+
+        engine.Play();
+
+        var reopened = Assert.Single(_players.Skip(1));
+        Assert.True(Renders(reopened), "The render thread never read after the reopen.");
+        Assert.Equal(AudioOutputMode.WasapiExclusive, _output.Mode);
+        Assert.Empty(_outputNotices);
+    }
+
+    // ── The device (issue 13) ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void TheDeviceChosen_IsOpened_AndNamed()
+    {
+        _chosen = "DAC";
+        var engine = Compose(AudioOutputMode.WasapiShared);
+        Assert.Equal("DAC", _output!.Device);
+
+        var player = PlayOneRow(engine, seconds: 30);
+
+        Assert.Equal("DAC", player.Device);
+        Assert.Equal("DAC", _output.Device);
+        Assert.Empty(_outputNotices);
+    }
+
+    [Fact]
+    public void TheDeviceChosen_IsAskedForAtEachOpen_SoAChangeAppliesAtTheNextPlay()
+    {
+        var engine = Compose(AudioOutputMode.WasapiShared);
+        var first = PlayOneRow(engine, seconds: 30);
+        Assert.Equal("Speakers", first.Device);
+        Assert.True(Returns(engine.Stop), "Stop froze.");
+
+        _chosen = "DAC";
+        engine.Play();
+
+        var second = Assert.Single(_players.Skip(1));
+        Assert.Equal("DAC", second.Device);
+        Assert.Equal("DAC", _output!.Device);
+    }
+
+    [Fact]
+    public void ADeviceNotThere_FallsToTheDefault_WithANotice_AndIsTriedAgainAtTheNextOpen()
+    {
+        _chosen = "Headphones";
+        var engine = Compose(AudioOutputMode.WasapiShared);
+        Assert.Equal("Speakers", _output!.Device);
+        Assert.Equal("Output device \"Headphones\" was not found; using the default device.", Assert.Single(_outputNotices));
+
+        var first = PlayOneRow(engine, seconds: 30);
+        Assert.Equal("Speakers", first.Device);
+        Assert.Equal(2, _outputNotices.Count);
+        Assert.True(Returns(engine.Stop), "Stop froze.");
+
+        _present.Add("Headphones"); // plugged in again
+        engine.Play();
+
+        var second = Assert.Single(_players.Skip(1));
+        Assert.Equal("Headphones", second.Device);
+        Assert.Equal("Headphones", _output.Device);
+        Assert.Equal(2, _outputNotices.Count);
     }
 
     // ── A stop that arrives after the next Play ──────────────────────────────────────────
@@ -139,12 +305,12 @@ public sealed class ReleasingTheDeviceTests : IDisposable
     {
         var engine = Compose(uiThread: true);
         var (a, b) = PlayTwoRows(engine);
-        var playing = _players[1];
+        var playing = _players[0];
         engine.Pause();
 
         Assert.True(Returns(() => engine.Preview(AdjacencyOf(engine, a, b), Fade())), "Preview froze.");
 
-        var preview = Assert.Single(_players.Skip(2));
+        var preview = Assert.Single(_players.Skip(1));
         Assert.True(playing.Disposed, "The queue's player is still held while the preview plays.");
         Assert.False(preview.Disposed);
 
@@ -166,7 +332,7 @@ public sealed class ReleasingTheDeviceTests : IDisposable
         Assert.True(_ui!.Drain() > 0, "The stop was never posted.");
 
         Assert.False(player.Disposed, "The posted stop closed the player Play restarted.");
-        Assert.Equal(2, _players.Count);
+        Assert.Single(_players);
         Assert.True(Renders(player), "The restarted player stopped rendering.");
         Assert.Equal(Transport.Playing, engine.View.Transport);
     }
@@ -184,7 +350,7 @@ public sealed class ReleasingTheDeviceTests : IDisposable
         engine.Play();
 
         Assert.Contains("WaveOut unavailable (the device is in use); no audio output could be opened.", _outputNotices);
-        Assert.Single(_players); // nothing opened
+        Assert.Empty(_players); // nothing opened
         Assert.True(_ui!.Drain() > 0, "The failure was never reported.");
         Assert.Contains(_sink.Notices, n => n.StartsWith("Audio output lost (no audio output could be opened)."));
         Assert.Equal(Transport.Paused, engine.View.Transport);
@@ -193,12 +359,12 @@ public sealed class ReleasingTheDeviceTests : IDisposable
 
         Assert.Contains(_sink.Notices, n => n.StartsWith("No audio output device to play on (no audio output could be opened)."));
         Assert.Equal(Transport.Paused, engine.View.Transport);
-        Assert.Single(_players);
+        Assert.Empty(_players);
 
         _deviceInUse = false;
         engine.Play();
 
-        var opened = Assert.Single(_players.Skip(1));
+        var opened = Assert.Single(_players);
         Assert.True(Renders(opened), "The render thread never read once the device was free.");
         Assert.Equal(Transport.Playing, engine.View.Transport);
     }
@@ -208,25 +374,49 @@ public sealed class ReleasingTheDeviceTests : IDisposable
     /// <summary>The output as the plugin composes it, on a fake player, and the engine on it.
     /// With <paramref name="uiThread"/> the players post their stop to a UI thread the test
     /// drains; without one they raise it on their render thread.</summary>
-    private PlaybackEngine Compose(bool releaseWhileStopped = true, bool uiThread = false)
+    private PlaybackEngine Compose(bool releaseWhileStopped = true, bool uiThread = false) =>
+        Compose(AudioOutputMode.WaveOut, releaseWhileStopped, uiThread);
+
+    private PlaybackEngine Compose(AudioOutputMode mode, bool releaseWhileStopped = true, bool uiThread = false)
     {
         Directory.CreateDirectory(_dir);
         _ui = uiThread ? new UiThread() : null;
         SynchronizationContext.SetSynchronizationContext(_ui);
-        _output = new NAudioAudioOutput(AudioOutputMode.WaveOut, _outputNotices.Add, null, releaseWhileStopped, CreatePlayer);
+        _output = new NAudioAudioOutput(mode, _outputNotices.Add, null, releaseWhileStopped, () => _chosen, new FakeDevices(this));
         _engine = new PlaybackEngine(_output, new JsonTransitionStore(Path.Combine(_dir, "transitions.json")), _sink);
         return _engine;
     }
 
-    private IWavePlayer CreatePlayer(AudioOutputMode mode)
+    /// <summary>Called on each refusal of a mode, before the output retries or falls back.</summary>
+    private Action? _onRefusal;
+
+    private IWavePlayer CreatePlayer(string device, AudioOutputMode mode)
     {
-        if (_deviceInUse)
+        if (_deviceInUse || _refused.Contains(mode))
         {
+            _onRefusal?.Invoke();
             throw new InvalidOperationException("the device is in use");
         }
-        var player = new JoiningPlayer();
+        var player = new JoiningPlayer { Device = device };
         _players.Add(player);
         return player;
+    }
+
+    /// <summary>The machine's devices as the test says: <see cref="_present"/>, the first the
+    /// default, all at 48 kHz, each opening a <see cref="JoiningPlayer"/>.</summary>
+    private sealed class FakeDevices : IOutputDevices
+    {
+        private readonly ReleasingTheDeviceTests _test;
+
+        public FakeDevices(ReleasingTheDeviceTests test) => _test = test;
+
+        public IReadOnlyList<string> Names() => _test._present.ToList();
+
+        public OutputDevice? Find(string? name)
+        {
+            var found = name is null ? _test._present.FirstOrDefault() : _test._present.FirstOrDefault(n => n == name);
+            return found is null ? null : new OutputDevice(found, () => 48000, mode => _test.CreatePlayer(found, mode));
+        }
     }
 
     /// <summary>Plays one DC track and returns the player Play opened, rendering.</summary>
@@ -328,7 +518,16 @@ public sealed class ReleasingTheDeviceTests : IDisposable
 
         public bool Disposed { get; private set; }
 
+        /// <summary>The device this player was opened on.</summary>
+        public string? Device { get; set; }
+
         public long Blocks => Interlocked.Read(ref _blocks);
+
+        private volatile Exception? _failure;
+
+        /// <summary>The device fails under the player, as an unplugged one does: the render
+        /// thread ends with the error, delivered as a stop would be.</summary>
+        public void Fail(Exception error) => _failure = error;
 
         public float Volume { get; set; } = 1f;
 
@@ -384,6 +583,11 @@ public sealed class ReleasingTheDeviceTests : IDisposable
             {
                 while (_state != PlaybackState.Stopped)
                 {
+                    if (_failure is { } failure)
+                    {
+                        _state = PlaybackState.Stopped;
+                        throw failure;
+                    }
                     if (_state == PlaybackState.Playing)
                     {
                         if (_provider!.Read(buffer, 0, buffer.Length) == 0)

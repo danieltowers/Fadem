@@ -1,6 +1,5 @@
 using Faderio.Core.Playback;
 using Faderio.Core.Settings;
-using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
 namespace Faderio.Shell.Audio;
@@ -28,6 +27,15 @@ namespace Faderio.Shell.Audio;
 /// one command keeps the player it opened. When no mode opens at Play, that is reported as a
 /// device loss, off the call, so the next Play reopens with the engine's notice. Standalone
 /// faderio keeps the device between plays.</para>
+/// <para>Such an output opens nothing at launch: it asks the device for its mix rate (WaveOut:
+/// 44.1 kHz) and <see cref="Mode"/> reads the mode asked for until a Play says otherwise, so a
+/// device another player holds at MusicBee's start raises no untrue notice (phase 5 issue 13).
+/// At every open it retries the mode asked for a short while before falling back, since
+/// MusicBee's own player lets go of the device a moment after it is told to stop, and it
+/// reopens after a device loss from the mode asked for too.</para>
+/// <para>The device (issue 13) is named at each open by <c>device</c>, null for the default; one
+/// not there falls to the default with a notice, and is tried again at the next open.
+/// <see cref="Device"/> names the one in use.</para>
 /// </summary>
 public sealed class NAudioAudioOutput : IAudioOutput
 {
@@ -37,14 +45,24 @@ public sealed class NAudioAudioOutput : IAudioOutput
     private const int WaveOutRate = 44100;
     private const int Channels = 2; // the engine renders stereo
 
+    /// <summary>How long an output that lets go while stopped keeps trying the mode asked for
+    /// before falling back: MusicBee's player releases the device a moment after
+    /// <c>Player_Stop</c> returns.</summary>
+    internal static readonly TimeSpan AskedModeRetry = TimeSpan.FromMilliseconds(300);
+
+    /// <summary>The pause between those tries.</summary>
+    internal static readonly TimeSpan AskedModeRetryStep = TimeSpan.FromMilliseconds(50);
+
     private readonly AudioOutputMode _asked;
     private readonly Action<string> _notify;
     private readonly IReadOnlyCollection<AudioOutputMode> _unavailable;
     private readonly bool _releaseWhileStopped;
-    private readonly Func<AudioOutputMode, IWavePlayer> _createPlayer;
+    private readonly Func<string?> _deviceName;
+    private readonly IOutputDevices _devices;
     private readonly SynchronizationContext? _context;
     private readonly BoundFeed _feed;
     private IWavePlayer? _player;
+    private OutputDevice? _playerDevice; // the device the player is on, closed with it
     private CountingSource? _counting;
     private int _latencyMs;
     private volatile Transport _state = Transport.Stopped;
@@ -57,39 +75,51 @@ public sealed class NAudioAudioOutput : IAudioOutput
     /// <param name="releaseWhileStopped">Let go of the device whenever playback is stopped, and
     /// open it again at <see cref="Play"/>: the MusicBee plugin's way, so MusicBee's own player
     /// has the device back after faderio's Stop, in exclusive mode too.</param>
+    /// <param name="device">The device to open, by its name in Windows, asked at each open;
+    /// null, or none given, for the default device.</param>
     public NAudioAudioOutput(
         AudioOutputMode mode,
         Action<string> notify,
         IReadOnlyCollection<AudioOutputMode>? unavailable = null,
-        bool releaseWhileStopped = false)
-        : this(mode, notify, unavailable, releaseWhileStopped, CreatePlayer)
+        bool releaseWhileStopped = false,
+        Func<string?>? device = null)
+        : this(mode, notify, unavailable, releaseWhileStopped, device, OutputDevices.Installed)
     {
     }
 
-    /// <summary>For tests: <paramref name="createPlayer"/> stands in for NAudio's players.</summary>
+    /// <summary>For tests: <paramref name="devices"/> stands in for this machine's, with its own
+    /// players.</summary>
     internal NAudioAudioOutput(
         AudioOutputMode mode,
         Action<string> notify,
         IReadOnlyCollection<AudioOutputMode>? unavailable,
         bool releaseWhileStopped,
-        Func<AudioOutputMode, IWavePlayer> createPlayer)
+        Func<string?>? device,
+        IOutputDevices devices)
     {
         _asked = mode;
         _notify = notify;
         _unavailable = unavailable ?? Array.Empty<AudioOutputMode>();
         _releaseWhileStopped = releaseWhileStopped;
-        _createPlayer = createPlayer;
+        _deviceName = device ?? (() => null);
+        _devices = devices;
         _context = SynchronizationContext.Current; // where NAudio's players post their stop
         _feed = new BoundFeed();
-        if (OpenFirstAvailable(mode, engineRate: null) is { } opened)
+        if (_releaseWhileStopped)
+        {
+            // Nothing is opened until Play: only the rate is asked for, so a device held by
+            // another player at launch is no notice, and Mode is the mode to be asked for.
+            if (QueryRate() is { } rate)
+            {
+                _feed.Format = WaveFormat.CreateIeeeFloatWaveFormat(rate, Channels);
+                Mode = mode;
+            }
+        }
+        else if (OpenFirstAvailable(mode, engineRate: null) is { } opened)
         {
             Mode = opened.Mode;
         }
-        SampleRate = _feed.Format.SampleRate; // the rate the player was opened for
-        if (_releaseWhileStopped)
-        {
-            ClosePlayer(); // the rate is known; the device is opened again at Play
-        }
+        SampleRate = _feed.Format.SampleRate; // the rate the player was, or will be, opened for
     }
 
     /// <summary>The modes tried in turn when the one asked for cannot be opened, at launch and on
@@ -104,8 +134,13 @@ public sealed class NAudioAudioOutput : IAudioOutput
 
     public int SampleRate { get; }
 
-    /// <summary>The mode in use: what the title names. Null when no output could be opened.</summary>
+    /// <summary>The mode in use: what the title names. Null when no output could be opened. An
+    /// output that lets go while stopped names the mode asked for until its first Play.</summary>
     public AudioOutputMode? Mode { get; private set; }
+
+    /// <summary>The device in use, by its name in Windows: the one the player is on, or at launch
+    /// the one found for the device asked for. Null when none was found.</summary>
+    public string? Device { get; private set; }
 
     /// <summary>Raised when reopening lands on another mode than the one in use.</summary>
     public event Action? ModeChanged;
@@ -185,9 +220,10 @@ public sealed class NAudioAudioOutput : IAudioOutput
         }
     }
 
-    /// <summary>Closes the failed player and opens the current default device, from the mode in
-    /// use down the fallback chain, at the engine's rate. Returns the device's own rate: a WASAPI
-    /// device's mix rate, or the engine's on WaveOut, which cannot be asked.</summary>
+    /// <summary>Closes the failed player and opens the device asked for again (or the default),
+    /// from the mode in use down the fallback chain, at the engine's rate; an output that lets
+    /// go while stopped opens from the mode asked for, as its Play does. Returns the device's own
+    /// rate: a WASAPI device's mix rate, or the engine's on WaveOut, which cannot be asked.</summary>
     public int Reopen()
     {
         ClosePlayer();
@@ -196,7 +232,8 @@ public sealed class NAudioAudioOutput : IAudioOutput
         _counting?.Reset();
         _counting?.ClearStop();
         var inUse = Mode;
-        if (OpenFirstAvailable(inUse ?? _asked, SampleRate) is not { } opened)
+        var from = _releaseWhileStopped ? _asked : inUse ?? _asked;
+        if (OpenFirstAvailable(from, SampleRate) is not { } opened)
         {
             throw new InvalidOperationException("no audio output could be opened");
         }
@@ -264,6 +301,7 @@ public sealed class NAudioAudioOutput : IAudioOutput
         // Its last PlaybackStopped is no longer this output's; closed once, from whichever thread
         // gets there first (Stop on the UI thread, or the render thread's own stop).
         var player = Interlocked.Exchange(ref _player, null);
+        var device = Interlocked.Exchange(ref _playerDevice, null);
         try
         {
             player?.Dispose();
@@ -273,46 +311,111 @@ public sealed class NAudioAudioOutput : IAudioOutput
             // A device that has gone can fail to close; the output is being replaced anyway.
             _notify($"Closing the audio output failed ({e.Message}).");
         }
+        device?.Dispose();
     }
 
-    /// <summary>Opens the first mode down the chain from <paramref name="from"/> that the
-    /// current default device allows, with a notice for each that fails. The feed runs at
+    /// <summary>The device asked for, or the default when none is asked for or the one asked for
+    /// is not there, with a notice. Null when there is no device at all, with a notice.</summary>
+    private OutputDevice? ResolveDevice()
+    {
+        var wanted = _deviceName();
+        var device = _devices.Find(wanted);
+        if (device is null && wanted is not null)
+        {
+            _notify($"Output device \"{wanted}\" was not found; using the default device.");
+            device = _devices.Find(null);
+        }
+        if (device is null)
+        {
+            _notify("No audio output device was found; no audio output could be opened.");
+        }
+        Device = device?.Name;
+        return device;
+    }
+
+    /// <summary>The rate the engine will run at, asked of the device without opening it: its
+    /// mix rate, or 44.1 kHz for WaveOut. Null when there is no device, or it cannot be asked.</summary>
+    private int? QueryRate()
+    {
+        using var device = ResolveDevice();
+        if (device is null)
+        {
+            return null;
+        }
+        try
+        {
+            return RateOf(device, _asked, engineRate: null);
+        }
+        catch (Exception e)
+        {
+            _notify($"The audio output device could not be asked for its rate ({e.Message}); no audio output could be opened.");
+            return null;
+        }
+    }
+
+    /// <summary>Opens the first mode down the chain from <paramref name="from"/> that the device
+    /// allows, with a notice for each that fails; an output that lets go while stopped retries
+    /// the first mode for <see cref="AskedModeRetry"/> before falling back. The feed runs at
     /// <paramref name="engineRate"/>, or at launch at the device's own rate. Returns the mode
     /// opened and the device's rate: the format an exclusive stream actually opened at, a shared
     /// device's mix rate, or on WaveOut, which cannot be asked, the feed's. Null when none opens.
     /// </summary>
     private (AudioOutputMode Mode, int DeviceRate)? OpenFirstAvailable(AudioOutputMode from, int? engineRate)
     {
-        foreach (var candidate in Fallbacks(from))
+        var device = ResolveDevice();
+        if (device is null)
         {
-            try
+            return null;
+        }
+        var chain = Fallbacks(from);
+        for (var i = 0; i < chain.Count; i++)
+        {
+            var candidate = chain[i];
+            var deadline = i == 0 && _releaseWhileStopped ? DateTime.UtcNow + AskedModeRetry : DateTime.UtcNow;
+            while (true)
             {
-                var deviceRate = candidate == AudioOutputMode.WaveOut ? engineRate ?? WaveOutRate : QueryMixRate();
-                _feed.Format = WaveFormat.CreateIeeeFloatWaveFormat(engineRate ?? deviceRate, Channels);
-                _player = Open(candidate);
-                if (candidate == AudioOutputMode.WasapiExclusive && _player is WasapiOut exclusive)
+                try
                 {
-                    deviceRate = exclusive.OutputWaveFormat.SampleRate;
+                    var deviceRate = RateOf(device, candidate, engineRate);
+                    _feed.Format = WaveFormat.CreateIeeeFloatWaveFormat(engineRate ?? deviceRate, Channels);
+                    _player = Open(device, candidate);
+                    _playerDevice = device;
+                    if (candidate == AudioOutputMode.WasapiExclusive && _player is WasapiOut exclusive)
+                    {
+                        deviceRate = exclusive.OutputWaveFormat.SampleRate;
+                    }
+                    return (candidate, deviceRate);
                 }
-                return (candidate, deviceRate);
-            }
-            catch (Exception e)
-            {
-                NoticeFallback(candidate, e);
+                catch (Exception e)
+                {
+                    if (DateTime.UtcNow < deadline)
+                    {
+                        Thread.Sleep(AskedModeRetryStep);
+                        continue;
+                    }
+                    NoticeFallback(candidate, e);
+                    break;
+                }
             }
         }
+        device.Dispose();
         return null;
     }
 
-    /// <summary>Opens <paramref name="mode"/> on the current default device for the feed's
-    /// format, or throws.</summary>
-    private IWavePlayer Open(AudioOutputMode mode)
+    /// <summary>The device's own rate for <paramref name="mode"/>: its mix rate for WASAPI, or
+    /// for WaveOut, which cannot be asked, the engine's rate, or 44.1 kHz at launch.</summary>
+    private static int RateOf(OutputDevice device, AudioOutputMode mode, int? engineRate) =>
+        mode == AudioOutputMode.WaveOut ? engineRate ?? WaveOutRate : device.MixRate();
+
+    /// <summary>Opens <paramref name="mode"/> on <paramref name="device"/> for the feed's format,
+    /// or throws.</summary>
+    private IWavePlayer Open(OutputDevice device, AudioOutputMode mode)
     {
         if (_unavailable.Contains(mode))
         {
             throw new InvalidOperationException("the device is in use (--unavailable)");
         }
-        var player = _createPlayer(mode);
+        var player = device.Open(mode);
         try
         {
             player.Init(_feed);
@@ -381,27 +484,12 @@ public sealed class NAudioAudioOutput : IAudioOutput
         return new Frames(Math.Max(0, rendered - (long)_latencyMs * SampleRate / 1000));
     }
 
-    private static IWavePlayer CreatePlayer(AudioOutputMode mode) => mode switch
-    {
-        AudioOutputMode.WasapiExclusive => new WasapiOut(AudioClientShareMode.Exclusive, ExclusiveLatencyMs),
-        AudioOutputMode.WaveOut => new WaveOutEvent { DesiredLatency = WaveOutLatencyMs },
-        _ => new WasapiOut(AudioClientShareMode.Shared, SharedLatencyMs),
-    };
-
     private static int LatencyOf(AudioOutputMode mode) => mode switch
     {
         AudioOutputMode.WasapiExclusive => ExclusiveLatencyMs,
         AudioOutputMode.WaveOut => WaveOutLatencyMs,
         _ => SharedLatencyMs,
     };
-
-    /// <summary>The current default device's mix rate; throws when there is no device.</summary>
-    private static int QueryMixRate()
-    {
-        using var enumerator = new MMDeviceEnumerator();
-        using var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-        return device.AudioClient.MixFormat.SampleRate;
-    }
 
     /// <summary>The player's input: its format is fixed when a player is opened, before the
     /// engine exists, and the engine's source is bound to it by <see cref="Initialise"/>.</summary>

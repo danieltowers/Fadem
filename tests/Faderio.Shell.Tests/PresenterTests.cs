@@ -128,6 +128,8 @@ public sealed class PresenterTests
         var music = new LibraryView(@"C:\Music", "Music", IsAvailable: true);
         Assert.Equal("Music · WASAPI shared at 48000 Hz", Presenter.FmtHost(music, AudioOutputMode.WasapiShared, 48000));
         Assert.Equal("no library · no audio output", Presenter.FmtHost(null, null, 44100));
+        Assert.Equal("Music · WASAPI exclusive at 44100 Hz on DAC", Presenter.FmtHost(music, AudioOutputMode.WasapiExclusive, 44100, "DAC"));
+        Assert.Equal("Music · no audio output", Presenter.FmtHost(music, null, 44100, "DAC"));
         Assert.Equal(
             "Locked (could not be opened) · WaveOut at 44100 Hz",
             Presenter.FmtHost(new LibraryView(@"D:\Locked", "Locked", IsAvailable: false), AudioOutputMode.WaveOut, 44100));

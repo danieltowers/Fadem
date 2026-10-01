@@ -138,8 +138,10 @@ internal sealed class SettingsForm : Form
     /// send it.</summary>
     public bool LibraryChanged => LibraryChoice != _shownLibrary;
 
-    /// <summary>What the machine group says now, whole: one engine call takes it.</summary>
-    public MachineSettings MachineChoice => new()
+    /// <summary>What the machine group says now, whole: one engine call takes it. The output
+    /// device is not this form's (phase 5 issue 13: standalone faderio opens the default
+    /// device), so the value it opened on is kept.</summary>
+    public MachineSettings MachineChoice => _shownMachine with
     {
         OutputMode = ((ModeItem)_outputMode.SelectedItem!).Mode,
     };

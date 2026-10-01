@@ -22,7 +22,8 @@ namespace MusicBeePlugin;
 public partial class Plugin
 {
     private readonly PluginInfo _about = new();
-    private readonly Func<AudioOutputMode, Action<string>, IAudioOutput>? _outputs;
+    private readonly Func<AudioOutputMode, Func<string?>, Action<string>, IAudioOutput>? _outputs;
+    private readonly Func<IReadOnlyList<string>>? _devices;
     private MusicBeeApiInterface _api;
     private SynchronizationContext? _ui;
     private MessageBoxes? _boxes;
@@ -37,9 +38,14 @@ public partial class Plugin
         ShowSettings = dialog => dialog.ShowDialog(new Window(_api.MB_GetWindowHandle())) == DialogResult.OK;
     }
 
-    /// <summary>For tests: the output each start opens, in place of the device.</summary>
-    internal Plugin(Func<AudioOutputMode, Action<string>, IAudioOutput> outputs)
-        : this() => _outputs = outputs;
+    /// <summary>For tests: the output each start opens, in place of the device, and the devices
+    /// the settings dialog lists in place of this machine's.</summary>
+    internal Plugin(Func<AudioOutputMode, Func<string?>, Action<string>, IAudioOutput> outputs, Func<IReadOnlyList<string>>? devices = null)
+        : this()
+    {
+        _outputs = outputs;
+        _devices = devices;
+    }
 
     /// <summary>Shows the settings dialog, owned by MusicBee's main window, and says whether the
     /// user pressed OK. A test replaces it, since a headless plugin cannot show a dialog.</summary>
@@ -165,7 +171,26 @@ public partial class Plugin
     /// <summary>The first method to touch a Core type, compiled only once the resolver is in place.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void Start() =>
-        _host = new Host(Path.Combine(_api.Setting_GetPersistentStoragePath(), "faderio"), _boxes!, _ui!, _outputs);
+        _host = new Host(Path.Combine(_api.Setting_GetPersistentStoragePath(), "faderio"), _boxes!, _ui!, MusicBeesDevice, _outputs, _devices);
+
+    /// <summary>MusicBee's own output device, by the name its preferences show ("Primary Sound
+    /// Driver" on DirectSound's default), or null when it cannot say (phase 5 issue 13): the
+    /// plugin's device when none is chosen, where the host finds it among this machine's.</summary>
+    private string? MusicBeesDevice()
+    {
+        try
+        {
+            if (_api.Player_GetOutputDevices is null || !_api.Player_GetOutputDevices(out _, out var active))
+            {
+                return null;
+            }
+            return string.IsNullOrWhiteSpace(active) ? null : active;
+        }
+        catch (Exception)
+        {
+            return null; // MusicBee's player not yet up at start: Windows' default until it is
+        }
+    }
 
     /// <summary>Stops and disposes the engine and its output, releasing the device.</summary>
     private void End()

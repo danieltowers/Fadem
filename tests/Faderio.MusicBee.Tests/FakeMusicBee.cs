@@ -29,7 +29,20 @@ internal sealed class FakeMusicBee
             PlayerStopped?.Invoke();
             return true;
         };
+        _api.Player_GetOutputDevices = (out string[] names, out string active) =>
+        {
+            Calls.Add("Player_GetOutputDevices");
+            names = OutputDevices;
+            active = ActiveDevice;
+            return true;
+        };
     }
+
+    /// <summary>What MusicBee's own preferences list as output devices, and the active one:
+    /// "Primary Sound Driver" when it follows Windows' on DirectSound, as MusicBee says.</summary>
+    public string[] OutputDevices { get; set; } = { "Primary Sound Driver", "Speakers (Test)", "DAC" };
+
+    public string ActiveDevice { get; set; } = "Primary Sound Driver";
 
     public string StoragePath { get; }
 

@@ -32,6 +32,7 @@ internal sealed class PluginView : UserControl
     private readonly PlaybackEngine _engine;
     private readonly NoticeLog _notices;
     private readonly Func<AudioOutputMode?> _outputModeInUse;
+    private readonly Func<string?> _outputDeviceInUse;
     private readonly Action _stopMusicBeesPlayer;
     private readonly System.Windows.Forms.Timer _timer;
     private readonly ToolTip _tips;
@@ -76,12 +77,16 @@ internal sealed class PluginView : UserControl
     /// <param name="notices">The session's notices, the composition's: it outlives this view.</param>
     /// <param name="notice">The host's one notice route, for the editor's own: the log and every strip.</param>
     /// <param name="outputModeInUse">The mode the output opened in, or null when none could be.</param>
+    /// <param name="outputDeviceInUse">The device the output is on, by name, or null when none was found.</param>
     /// <param name="stopMusicBeesPlayer">MusicBee's <c>Player_Stop</c>, called before faderio starts to sound.</param>
-    public PluginView(PlaybackEngine engine, NoticeLog notices, Action<string> notice, Func<AudioOutputMode?> outputModeInUse, Action stopMusicBeesPlayer)
+    public PluginView(
+        PlaybackEngine engine, NoticeLog notices, Action<string> notice, Func<AudioOutputMode?> outputModeInUse,
+        Func<string?> outputDeviceInUse, Action stopMusicBeesPlayer)
     {
         _engine = engine;
         _notices = notices;
         _outputModeInUse = outputModeInUse;
+        _outputDeviceInUse = outputDeviceInUse;
         _stopMusicBeesPlayer = stopMusicBeesPlayer;
         ConfirmClear = ShowClearDialog;
         ShowNoticeList = ShowModeless;
@@ -92,8 +97,8 @@ internal sealed class PluginView : UserControl
 
         _status = new SpringLabel("Ready.") { TextAlign = ContentAlignment.MiddleLeft };
         _noticeCount = new ToolStripStatusLabel { Available = false, IsLink = true, ToolTipText = "Show this session's notices" };
-        // Where MusicBee's window has no title of faderio's: the library and the mode in use. Cut
-        // short in a narrow panel, whole in its tooltip.
+        // Where MusicBee's window has no title of faderio's: the library, the mode in use and the
+        // device. Cut short in a narrow panel, whole in its tooltip.
         _host = new ToolStripStatusLabel { ForeColor = SystemColors.GrayText, Margin = new Padding(8, 3, 0, 2), AutoSize = false, TextAlign = ContentAlignment.MiddleLeft };
         var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _host }, ShowItemToolTips = true, SizingGrip = false };
 
@@ -305,7 +310,7 @@ internal sealed class PluginView : UserControl
         {
             _attendedTrack.Text = attendedTrack;
         }
-        var host = Presenter.FmtHost(view.Library, _outputModeInUse(), _engine.SampleRate);
+        var host = Presenter.FmtHost(view.Library, _outputModeInUse(), _engine.SampleRate, _outputDeviceInUse());
         if (_host.Text != host)
         {
             _host.Text = host;

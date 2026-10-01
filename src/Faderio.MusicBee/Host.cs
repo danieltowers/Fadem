@@ -11,8 +11,11 @@ namespace Faderio.MusicBee;
 /// The plugin's composition, as standalone faderio's composition root builds it: the output,
 /// the library its settings name, a sink for the notices and the machine settings store. Its
 /// settings are its own, in a folder of MusicBee's persistent storage, so the two hosts never
-/// overwrite each other's output mode or library. MusicBee's plugin preferences change them:
-/// <see cref="Configure"/> takes the dialog's choice, and <see cref="SaveSettings"/> sends it.
+/// overwrite each other's output mode, device or library. MusicBee's plugin preferences change
+/// them: <see cref="Configure"/> takes the dialog's choice, and <see cref="SaveSettings"/> sends it.
+/// <para>The output device (phase 5 issue 13) is the one the settings name, or with none chosen
+/// MusicBee's own, asked of MusicBee at each open so a change in its preferences is followed.
+/// The output opens the device at every Play from stopped, so a saved device applies there.</para>
 /// <para>The view (phase 5 issue 10) comes and goes with MusicBee's panel: <see cref="AttachView"/>
 /// puts one in a panel MusicBee made, and it leaves when MusicBee disposes the panel. The engine,
 /// the sink and the session's notice log stay here across them. A notice shows in every attached
@@ -24,13 +27,27 @@ internal sealed class Host : IDisposable
     private readonly PostingSink _sink;
     private readonly MessageBoxes _boxes;
     private readonly Func<AudioOutputMode?> _modeInUse;
+    private readonly Func<string?> _deviceInUse;
+    private readonly Func<string?> _musicBeesDevice;
+    private readonly Func<IReadOnlyList<string>> _devices;
     private readonly List<PluginView> _views = new();
 
     /// <param name="ui">MusicBee's UI thread, which every publication is posted to.</param>
-    /// <param name="outputs">The output to open for a mode, for tests; null opens the device.</param>
-    public Host(string settingsFolder, MessageBoxes boxes, SynchronizationContext ui, Func<AudioOutputMode, Action<string>, IAudioOutput>? outputs)
+    /// <param name="musicBeesDevice">MusicBee's own output device by the name its preferences
+    /// show, or null when it cannot say: the plugin's device when none is chosen, where it names
+    /// one of this machine's. MusicBee's "Default", DirectSound's "Primary Sound Driver" and an
+    /// ASIO driver name none, so they are Windows' default device, without a notice.</param>
+    /// <param name="outputs">The output to open for a mode and a device, for tests; null opens
+    /// the device.</param>
+    /// <param name="devices">This machine's output devices by name, for the dialog; null lists
+    /// the installed ones.</param>
+    public Host(
+        string settingsFolder, MessageBoxes boxes, SynchronizationContext ui, Func<string?> musicBeesDevice,
+        Func<AudioOutputMode, Func<string?>, Action<string>, IAudioOutput>? outputs, Func<IReadOnlyList<string>>? devices)
     {
         _boxes = boxes;
+        _devices = devices ?? OutputDevices.Installed.Names;
+        _musicBeesDevice = () => musicBeesDevice() is { } name && _devices().Contains(name) ? name : null;
         // The shell's own sink, as standalone faderio's: publications reach the UI thread posted,
         // renders coalesced until it has been idle (see Plugin's Application.Idle).
         _sink = new PostingSink(ui);
@@ -55,18 +72,23 @@ internal sealed class Host : IDisposable
         // rate (ADR 0008). A guest in MusicBee's process lets go of the device while stopped, so
         // MusicBee's own player has it back after faderio's Stop (issue 06, decision A).
         var mode = machine.Settings.OutputMode;
+        // The device, asked at each open: the one saved, else MusicBee's own. Before the engine
+        // exists (the launch query) the store's; after, the engine's, read and forgotten.
+        string? ChosenDevice() => (Engine is null ? machine.Settings : Engine.View.MachineSettings).OutputDevice ?? _musicBeesDevice();
         IAudioOutput output;
         NAudioAudioOutput? device = null;
         if (outputs is null)
         {
-            device = new NAudioAudioOutput(mode, notify, releaseWhileStopped: true);
+            device = new NAudioAudioOutput(mode, notify, releaseWhileStopped: true, device: ChosenDevice);
             _modeInUse = () => device.Mode;
+            _deviceInUse = () => device.Device;
             output = device;
         }
         else
         {
-            output = outputs(mode, notify);
+            output = outputs(mode, ChosenDevice, notify);
             _modeInUse = ModeAsked(mode); // a fake opens in the mode asked for
+            _deviceInUse = ChosenDevice; // and on the device asked for
         }
         Engine = new PlaybackEngine(output, library, _sink, machine: machine);
         if (device is not null)
@@ -98,7 +120,7 @@ internal sealed class Host : IDisposable
     /// <param name="stopMusicBeesPlayer">MusicBee's <c>Player_Stop</c>, for the view's starts.</param>
     public PluginView AttachView(Control panel, Action stopMusicBeesPlayer)
     {
-        var view = new PluginView(Engine, Notices, OnNoticed, _modeInUse, stopMusicBeesPlayer);
+        var view = new PluginView(Engine, Notices, OnNoticed, _modeInUse, _deviceInUse, stopMusicBeesPlayer);
         _views.Add(view);
         view.Disposed += (_, _) => _views.Remove(view);
         panel.Controls.Add(view);
@@ -109,25 +131,27 @@ internal sealed class Host : IDisposable
     internal IReadOnlyList<PluginView> Views => _views;
 
     /// <summary>Opens the settings dialog on the choice waiting to be saved, or else on the
-    /// library open (or the one remembered) and the output mode saved. OK keeps its choice for
+    /// library open (or the one remembered), the output mode saved and the device saved, among
+    /// this machine's devices and MusicBee's own. OK keeps its choice for
     /// <see cref="SaveSettings"/>, as MusicBee's own preferences wait for Save.</summary>
     /// <param name="show">Shows the dialog and says whether the user pressed OK.</param>
     public void Configure(Func<SettingsDialog, bool> show)
     {
         var view = Engine.View;
         var shown = _chosen ?? view.MachineSettings with { Library = view.Library?.Path ?? view.MachineSettings.Library };
-        using var dialog = new SettingsDialog(shown.Library, shown.OutputMode);
+        using var dialog = new SettingsDialog(shown.Library, shown.OutputMode, shown.OutputDevice, _devices(), _musicBeesDevice());
         if (show(dialog))
         {
-            _chosen = new MachineSettings { Library = dialog.Library, OutputMode = dialog.OutputMode };
+            _chosen = new MachineSettings { Library = dialog.Library, OutputMode = dialog.OutputMode, OutputDevice = dialog.OutputDevice };
         }
     }
 
     /// <summary>Sends what the dialog chose, each change to its own engine command, as standalone
     /// faderio's Open library and Settings do: another library stops playback and opens that
-    /// library's open playlist, remembered for the next start; another output mode is saved for
-    /// the next start. One the same as now sends nothing, so an Apply that follows another
-    /// preference's change never stops faderio.</summary>
+    /// library's open playlist, remembered for the next start; another output mode or device is
+    /// saved, the mode for the next start and the device for the next Play from stopped. One
+    /// the same as now sends nothing, so an Apply that follows another preference's change never
+    /// stops faderio.</summary>
     public void SaveSettings()
     {
         if (_chosen is not { } chosen)
@@ -140,7 +164,7 @@ internal sealed class Host : IDisposable
         {
             Engine.OpenLibrary(folder);
         }
-        if (chosen.OutputMode != view.MachineSettings.OutputMode)
+        if (chosen.OutputMode != view.MachineSettings.OutputMode || chosen.OutputDevice != view.MachineSettings.OutputDevice)
         {
             Engine.ChangeMachineSettings(chosen);
         }

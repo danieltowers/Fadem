@@ -259,7 +259,7 @@ public sealed partial class PluginTests
     [Fact]
     public void WithNoEngine_ThePanelSaysWhy() => RunSta(() =>
     {
-        var plugin = new Plugin((_, _) => throw new InvalidOperationException("no device"));
+        var plugin = new Plugin((_, _, _) => throw new InvalidOperationException("no device"));
         Start(plugin);
         using var panel = new Panel();
 

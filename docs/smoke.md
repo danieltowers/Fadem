@@ -334,6 +334,10 @@ play:
 { "schemaVersion": 2, "outputMode": "WasapiShared", "library": "C:\path\to\library" }
 ```
 
+An `"outputDevice"` key names the device by its name in Windows (phase 5 issue 13); without it
+the plugin plays on MusicBee's own device, or Windows' default when MusicBee's is DirectSound's
+"Primary Sound Driver" or a device faderio cannot open.
+
 ### Looks — the agent runs this
 
 MusicBee draws its own window, so UI Automation sees neither its menus nor its transport.
@@ -373,7 +377,8 @@ which a background run cannot give.
       "0:00 / -0:00"; **Playlists** listing the library's playlists with the open one bold on
       yellow; the queue with #, Title, Artist, Length and a ✎ on every row but the last, bold
       where this → next is authored (phase 5 issue 11), and row 1 marked at rest; the strip
-      reading "Ready." and, at its right, "library · WASAPI shared at 48000 Hz". In the
+      reading "Ready." and, at its right, "library · WASAPI shared at 48000 Hz on Speakers
+      (…)", the device in use (phase 5 issue 13). In the
       sidebar as shipped (284 px) the seven buttons fit one row, the playlists sit above the
       queue, no column is off the edge, and the host line is cut short with its whole text as
       its tooltip.
@@ -455,8 +460,26 @@ which a background run cannot give.
       takes the row out of the manager. Esc and the close box hide the manager.
 - [ ] **Edit → Edit Preferences → Plugins** lists faderio with a **Configure…** button, which
       opens faderio's dialog, owned by MusicBee's main window. It shows the settings file's
-      library folder and its output mode by name ("WASAPI shared"), with "Applies when MusicBee
-      next starts."
+      library folder, its output mode by name ("WASAPI shared") and its output device (phase 5
+      issue 13): "MusicBee's device" first, with MusicBee's device named in brackets when it is
+      one faderio can open, then every active render device by name; with "The mode applies
+      when MusicBee next starts; the device when faderio next plays from stopped."
+- [ ] **The output device** (phase 5 issue 13). Another device chosen (a second render device,
+      say the Steam virtual speakers) and OK: the file is unchanged, and Configure… again opens
+      on it. Preferences' **Save** writes `"outputDevice"` to the file and the strip reads
+      "Saved machine settings." with no box; the host line still names the device in use. **▶**
+      plays on the new device: its session meter shows the tone and the old device's reads 0,
+      and the host line reads "… on *the new device*". **⏹** stops it.
+- [ ] **A device that is not there.** With `"outputDevice": "Gone DAC"` written by hand and
+      MusicBee restarted, a box owned by MusicBee reads "Output device "Gone DAC" was not found;
+      using the default device." (the view is not yet attached at start), the strip the same
+      with **1 notice**, and the host line names the default device. Configure… lists "Gone
+      DAC (not found)", selected; Cancel keeps it in the file. **▶** plays on the default device
+      and repeats the notice (the device is tried again at each open); **⏹** stops it.
+- [ ] **No notice at start in exclusive** (phase 5 issue 13). With `"outputMode":
+      "WasapiExclusive"` and MusicBee restarted: no box, the strip reads "Ready." and the host
+      line "library · WASAPI exclusive at 48000 Hz on …". The exclusive probe below opens
+      before any play, is refused while **▶** plays, and opens again after **⏹**.
 - [ ] Choosing another library folder and **WaveOut**, then OK and Preferences' **Save**,
       writes both to the settings file and shows "Saved machine settings.". After MusicBee is
       restarted, the dialog opens on them. Cancel, or closing Preferences unsaved, changes
@@ -485,3 +508,9 @@ which a background run cannot give.
       playback" on a start made at once after Stop is the known limit accepted at the spike's
       verdict (ADR 0012); a second try plays.
 - [ ] Playback survives MusicBee's other plugins being enabled.
+- [ ] **▶ while MusicBee's own player plays, in WASAPI exclusive** (phase 5 issue 13): faderio
+      stops MusicBee's player and opens exclusive, with no "WASAPI exclusive unavailable …
+      trying WASAPI shared." in the strip. The output retries the mode asked for while
+      MusicBee's player lets go of the device.
+- [ ] **A device chosen in Configure…** is heard on that device at the next **▶** from stopped,
+      with no restart.

@@ -34,6 +34,13 @@ public sealed record MachineSettings
     /// <summary>The folder of the last library that opened, or null before any has.</summary>
     public string? Library { get; init; }
 
+    /// <summary>The output device by its name in Windows, or null for the host's default
+    /// (phase 5 issue 13): standalone faderio opens Windows' default device and leaves this
+    /// null; the plugin follows MusicBee's own device. The plugin's output opens the device at
+    /// every Play from stopped, so it applies there. Schema 2 still: a file without the key
+    /// reads as null.</summary>
+    public string? OutputDevice { get; init; }
+
     /// <summary>These settings as the engine keeps them: the current schema, a mode no version
     /// knows (or one from before schema 2) replaced by the default, and a blank library none.</summary>
     public MachineSettings Normalised() => this with
@@ -41,6 +48,7 @@ public sealed record MachineSettings
         SchemaVersion = CurrentSchemaVersion,
         OutputMode = SchemaVersion >= 2 && Compat.IsDefined(OutputMode) ? OutputMode : AudioOutputMode.WasapiShared,
         Library = string.IsNullOrWhiteSpace(Library) ? null : Library,
+        OutputDevice = string.IsNullOrWhiteSpace(OutputDevice) ? null : OutputDevice,
     };
 }
 

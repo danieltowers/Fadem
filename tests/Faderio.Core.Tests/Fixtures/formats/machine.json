@@ -1,5 +1,6 @@
 {
   "schemaVersion": 2,
   "outputMode": "WasapiExclusive",
-  "library": "C:\\Music\\\u2B50\uFE0F Favourites"
+  "library": "C:\\Music\\\u2B50\uFE0F Favourites",
+  "outputDevice": "Speakers (C-Media(R) Audio)"
 }

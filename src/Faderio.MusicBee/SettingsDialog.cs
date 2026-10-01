@@ -7,9 +7,12 @@ namespace Faderio.MusicBee;
 
 /// <summary>
 /// The plugin's settings (phase 5 issue 04), opened from MusicBee's plugin preferences: the
-/// library folder, typed or picked, and the output mode, which applies when MusicBee next
-/// starts, as standalone faderio's applies at its next launch. It holds nothing once closed:
-/// its caller reads <see cref="Library"/> and <see cref="OutputMode"/>.
+/// library folder, typed or picked, the output mode, which applies when MusicBee next starts,
+/// as standalone faderio's applies at its next launch, and the output device (issue 13), which
+/// applies when faderio next plays from stopped: MusicBee's own device, or one of this
+/// machine's by name. A saved device that is not there is listed as not found, so opening the
+/// dialog never loses it. It holds nothing once closed: its caller reads <see cref="Library"/>,
+/// <see cref="OutputMode"/> and <see cref="OutputDevice"/>.
 /// <para>MusicBee loads every type here before the plugin's resolver exists, so no field holds
 /// a Core value: the mode list's items are boxed modes, named as they are drawn.</para>
 /// </summary>
@@ -18,12 +21,19 @@ internal sealed class SettingsDialog : Form
     internal readonly TextBox _library;
     internal readonly Button _browse;
     internal readonly ComboBox _outputMode;
+    internal readonly ComboBox _outputDevice;
+
+    /// <summary>The device each item of the list stands for: null for MusicBee's own.</summary>
+    private readonly List<string?> _deviceNames = new();
     internal readonly Button _ok;
     internal readonly Button _cancel;
 
     /// <param name="library">The library folder to open on, or null when none is chosen.</param>
     /// <param name="mode">The output mode to open on.</param>
-    public SettingsDialog(string? library, AudioOutputMode mode)
+    /// <param name="device">The output device chosen, by name, or null for MusicBee's own.</param>
+    /// <param name="devices">This machine's output devices, by name.</param>
+    /// <param name="musicBeesDevice">MusicBee's own device, by name, or null when it is Windows' default.</param>
+    public SettingsDialog(string? library, AudioOutputMode mode, string? device, IReadOnlyList<string> devices, string? musicBeesDevice)
     {
         Text = "faderio";
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -50,7 +60,25 @@ internal sealed class SettingsDialog : Form
             _outputMode.Items.Add(each);
         }
         _outputMode.SelectedItem = mode;
-        var nextStart = new Label { Text = "Applies when MusicBee next starts.", AutoSize = true, ForeColor = SystemColors.GrayText };
+
+        // The device list: MusicBee's own device first, then this machine's; one saved that is
+        // not there is listed as such, so the choice is never lost by opening the dialog.
+        _outputDevice = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 320, AccessibleName = "Output device" };
+        AddDevice(null, musicBeesDevice is null ? "MusicBee's device" : $"MusicBee's device ({musicBeesDevice})");
+        foreach (var name in devices)
+        {
+            AddDevice(name, name);
+        }
+        if (device is not null && !devices.Contains(device))
+        {
+            AddDevice(device, $"{device} (not found)");
+        }
+        _outputDevice.SelectedIndex = _deviceNames.IndexOf(device);
+        var nextStart = new Label
+        {
+            Text = "The mode applies when MusicBee next starts; the device when faderio next plays from stopped.",
+            AutoSize = true, ForeColor = SystemColors.GrayText,
+        };
 
         _ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Width = 80 };
         _cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Width = 80 };
@@ -75,8 +103,10 @@ internal sealed class SettingsDialog : Form
         rows.Controls.Add(folder, 1, 0);
         rows.Controls.Add(Caption("Output mode:"), 0, 1);
         rows.Controls.Add(_outputMode, 1, 1);
-        rows.Controls.Add(nextStart, 1, 2);
-        rows.Controls.Add(buttons, 0, 3);
+        rows.Controls.Add(Caption("Output device:"), 0, 2);
+        rows.Controls.Add(_outputDevice, 1, 2);
+        rows.Controls.Add(nextStart, 1, 3);
+        rows.Controls.Add(buttons, 0, 4);
         rows.SetColumnSpan(buttons, 2);
         Controls.Add(rows);
 
@@ -87,6 +117,15 @@ internal sealed class SettingsDialog : Form
     public string? Library => string.IsNullOrWhiteSpace(_library.Text) ? null : _library.Text.Trim();
 
     public AudioOutputMode OutputMode => (AudioOutputMode)_outputMode.SelectedItem!;
+
+    /// <summary>The device chosen, by name, or null for MusicBee's own.</summary>
+    public string? OutputDevice => _deviceNames[_outputDevice.SelectedIndex];
+
+    private void AddDevice(string? name, string text)
+    {
+        _deviceNames.Add(name);
+        _outputDevice.Items.Add(text);
+    }
 
     /// <summary>The folder picked in the Browse dialog, or null when cancelled. A test replaces
     /// it, since a headless dialog cannot show another.</summary>

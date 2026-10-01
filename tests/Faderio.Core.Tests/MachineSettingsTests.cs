@@ -114,6 +114,32 @@ public sealed class MachineSettingsTests : IDisposable
         Assert.Equal(new MachineSettings { Library = @"D:\Music" }, machine.Settings);
     }
 
+    /// <summary>The output device (phase 5 issue 13): a name, round-tripped through the file and
+    /// a change; a blank one is none, which a file from before the key reads as.</summary>
+    [Fact]
+    public void TheOutputDevice_RoundTrips_AndABlankOneIsNone()
+    {
+        var machine = new MachineSettingsStore(MachinePath);
+        machine.Save(new MachineSettings { OutputDevice = "Speakers (C-Media(R) Audio)" });
+
+        Assert.Equal("Speakers (C-Media(R) Audio)", new MachineSettingsStore(MachinePath).Settings.OutputDevice);
+        Assert.Contains("\"outputDevice\": \"Speakers (C-Media(R) Audio)\"", File.ReadAllText(MachinePath));
+
+        File.WriteAllText(MachinePath, "{\"schemaVersion\": 2, \"outputMode\": \"WaveOut\", \"outputDevice\": \"  \"}");
+        Assert.Null(new MachineSettingsStore(MachinePath).Settings.OutputDevice);
+        File.WriteAllText(MachinePath, "{\"schemaVersion\": 2, \"outputMode\": \"WaveOut\"}");
+        Assert.Equal(new MachineSettings { OutputMode = AudioOutputMode.WaveOut }, new MachineSettingsStore(MachinePath).Settings);
+
+        var (engine, sink, _) = EngineOn(null, new MachineSettingsStore(MachinePath));
+        using (engine)
+        {
+            engine.ChangeMachineSettings(new MachineSettings { OutputMode = AudioOutputMode.WaveOut, OutputDevice = "DAC" });
+            Assert.Equal("DAC", engine.View.MachineSettings.OutputDevice);
+            Assert.Equal("DAC", new MachineSettingsStore(MachinePath).Settings.OutputDevice);
+            Assert.Contains("Saved machine settings.", sink.Notices);
+        }
+    }
+
     // ── ChangeMachineSettings ────────────────────────────────────────────────────────────
 
     [Fact]
