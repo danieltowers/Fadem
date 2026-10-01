@@ -6,7 +6,7 @@ Blocked by:
 
 ## Question
 
-Findings: branch `research/mp3-gapless-padding`, `docs/research/mp3-gapless-padding.md`
+Findings: `docs/research/mp3-gapless-padding.md` (merged from branch `research/mp3-gapless-padding`)
 
 Ticket 14 of the predecessor measured that an MP3's `Length` is whole 1152-frame blocks, so
 it carries encoder delay at the start and padding at the end, up to about 50 ms each. An
