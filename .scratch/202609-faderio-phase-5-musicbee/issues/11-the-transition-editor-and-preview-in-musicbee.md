@@ -97,8 +97,8 @@ output, so it takes and lets go of the device as Play and Stop do.
 
 - [x] A transition authored in MusicBee plays the same in standalone faderio, and the reverse.
       (One store, read and written by one engine: the tests read back what the plugin's editor
-      saved through Core's store, and load what Core authored into the plugin's editor. The
-      listening is the Sounds half's.)
+      saved through Core's store, and load what Core authored into the plugin's editor. Heard
+      both ways by the user, see the Sounds half below.)
 - [x] Preview plays the draft and leaves the queue where it was.
 - [x] The MusicBee Looks smoke covers the editor; the Sounds half gains preview.
 
@@ -147,6 +147,18 @@ output, so it takes and lets go of the device as Play and Stop do.
       The Sounds half is the user's: preview heard as standalone's, and the authored-both-ways
       listening.
     - The ini and the smoke library's `transitions.json` were put back as found.
+  - **The MusicBee Sounds half, by the user (2026-10-01),** driven step by step by the agent:
+    - ✅ With MusicBee playing a track, Preview from the editor stopped it and was heard as
+      standalone faderio's preview of the same draft: the pre-roll, the crossfade, the tail,
+      then silence with the queue at 0:00 (the meter: 0.156 before, 0.300 and 0.333 through
+      the crossfade, 0 by 13 s). ▶ then played the queue from its start.
+    - ✅ Authored both ways: a 4 s fade-out saved in MusicBee's editor was heard in standalone
+      faderio opened on the library; a 1 s fade-out saved in standalone faderio was heard in
+      MusicBee **after a MusicBee restart**. The engine reads the library's transition store
+      once at open, so a running host does not see the other host's edits until it reopens
+      the library: issue 15's ground (one library holder at a time), not a fault here.
+    - The store was put back to the 2 s fade-out through MusicBee's editor; the file now also
+      names the curve ("EqualPower"), which the resolver reads as the absent one.
   - **Review (2026-10-01).** Standards: the "is faderio sounding" test was derived in the shell
     from two engine values, in two shapes (▶ and the preview hook); now one `PlayerView`
     member, read by both. The Edit transition items were a verbatim copy of `MainForm`'s;

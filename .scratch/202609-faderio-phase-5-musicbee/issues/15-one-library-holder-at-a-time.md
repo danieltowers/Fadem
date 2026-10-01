@@ -20,3 +20,11 @@ host must not leave the library held for ever.
 - [ ] A library held by one host is refused by the other with a notice naming the holder.
 - [ ] A host that crashed or was killed does not block the next open.
 - [ ] Tests cover it on net8.0 and net48 x86.
+
+## Comments
+
+- **Seen in issue 11's Sounds run (2026-10-01):** the engine reads the library's transition
+  store once at open, so an edit saved by one host is not heard by the other until it reopens
+  the library (MusicBee needed a restart to play standalone faderio's 1 s fade-out). With one
+  holder at a time this cannot happen mid-session; the spec here should say what the second
+  host sees on reopening.
