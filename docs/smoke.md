@@ -436,6 +436,23 @@ which a background run cannot give.
       changes to tone-a-440 → tone-b-660?" in a Yes / No / Cancel box titled "Unsaved
       transition", owned by MusicBee's window; Cancel leaves the queue and the draft as they
       were.
+- [ ] **The transition manager** (phase 5 issue 12). The queue's right-click menu has
+      **Transitions…** after the Edit transition items, live with any selection. With row 1
+      selected it opens "faderio — transitions", a separate window owned by MusicBee's, on
+      row 1's track: the picker names it, the legend reads "Each value reads global | override
+      in *playlist*…", and the grid lists the authored crossfade as → *tone-b*, each value as
+      "global | override" and the effective transition, with **Preview** and **Preview global**
+      on the row. With no row selected it opens on the store's first track. **Preview** with
+      faderio stopped: the meter shows sound, ▶ and the readout stay as they were, the line
+      beside **Stop preview** reads "Pre-roll · outgoing 0:0…" counting up from 5 s before
+      the fade-out point; **Stop preview** ends it. A
+      double-click on the row opens it in the view's editor (the page in a sidebar), with
+      MusicBee's window brought forward and the manager still open. A row whose file has been
+      moved from under the store (the library's `transitions.json` naming a path that is not
+      there, as auto-organise leaves one) reads "⚠ *path*", greyed, with "Not found where the
+      store says: …" as its tooltip, and the picker marks it the same way; double-clicked, the
+      editor says it is missing and can be removed, not changed, and **Remove transition**
+      takes the row out of the manager. Esc and the close box hide the manager.
 - [ ] **Edit → Edit Preferences → Plugins** lists faderio with a **Configure…** button, which
       opens faderio's dialog, owned by MusicBee's main window. It shows the settings file's
       library folder and its output mode by name ("WASAPI shared"), with "Applies when MusicBee

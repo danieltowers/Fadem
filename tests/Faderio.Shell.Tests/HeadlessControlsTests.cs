@@ -1,5 +1,6 @@
 using System.Runtime.ExceptionServices;
 using Faderio.Core.Domain;
+using Faderio.Core.Playback;
 using Faderio.Core.Tests;
 using Faderio.Shell;
 
@@ -51,6 +52,40 @@ public sealed class HeadlessControlsTests
         Assert.Equal(TransitionManagerForm.PreviewGlobalColumn + 1, manager._grid.Columns.Count);
         Assert.False(manager._stopPreview.Enabled);
     });
+
+    [Fact]
+    public void TheManager_RaisesBeforeSounding_BeforeAStoredPreviewSounds_AndNotForStopPreview() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        tc.Engine.Add(new[] { TestAudio.WriteDcWav("manager-a.wav", 10, 0.3), TestAudio.WriteDcWav("manager-b.wav", 10, 0.3) }).Wait();
+        var (a, b) = (tc.View.Queue[0].Track, tc.View.Queue[1].Track);
+        tc.Engine.Author(new Adjacency(a, b), new TransitionSpec { FadeOutPoint = TimeSpan.FromSeconds(6) });
+        var outputAtHook = new List<(Transport, int)>();
+        using var manager = new TransitionManagerForm(tc.Engine, _ => { }, beforeSounding: () => outputAtHook.Add((tc.Output.State, tc.Output.ReadCallCount)));
+        manager.Open(a);
+
+        manager.PreviewAt(0, TransitionLayer.Global);
+        tc.Output.Advance(441);
+
+        Assert.Equal(new[] { (Transport.Stopped, 0) }, outputAtHook);
+        Assert.NotNull(tc.View.Preview);
+        manager.Render(tc.View);
+        Assert.True(manager._stopPreview.Enabled);
+
+        Click(manager._stopPreview);
+
+        Assert.Null(tc.View.Preview);
+        Assert.Single(outputAtHook);
+    });
+
+    /// <summary>Raises a button's Click as a press would, where an unshown button's own
+    /// <c>PerformClick</c> does nothing.</summary>
+    private static void Click(ButtonBase button)
+    {
+        Assert.True(button.Enabled, $"{button.Text} is disabled");
+        typeof(Control).GetMethod("OnClick", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(button, new object[] { EventArgs.Empty });
+    }
 
     [Fact]
     public void TheSeekBar_ShowsAPlayhead_AndMapsAClickBackToOne() => RunSta(() =>

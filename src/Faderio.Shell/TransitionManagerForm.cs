@@ -15,6 +15,7 @@ internal sealed class TransitionManagerForm : Form
 {
     private readonly PlaybackEngine _engine;
     private readonly Action<Adjacency> _edit;
+    private readonly Action? _beforeSounding;
 
     internal readonly ComboBox _track;
     internal readonly Label _legend;
@@ -41,10 +42,13 @@ internal sealed class TransitionManagerForm : Form
     internal const int PreviewGlobalColumn = 10;
 
     /// <param name="edit">Opens the editor on an adjacency, in the mode it was left in.</param>
-    public TransitionManagerForm(PlaybackEngine engine, Action<Adjacency> edit)
+    /// <param name="beforeSounding">Raised before a stored preview starts sound: a host in another
+    /// player's process stops that player first (phase 5 issue 12). Null raises nothing.</param>
+    public TransitionManagerForm(PlaybackEngine engine, Action<Adjacency> edit, Action? beforeSounding = null)
     {
         _engine = engine;
         _edit = edit;
+        _beforeSounding = beforeSounding;
 
         Text = "faderio — transitions";
         FormBorderStyle = FormBorderStyle.SizableToolWindow;
@@ -277,6 +281,7 @@ internal sealed class TransitionManagerForm : Form
     {
         if (row >= 0 && row < _grid.Rows.Count)
         {
+            _beforeSounding?.Invoke();
             _engine.PreviewStored(AdjacencyAt(row), layer);
         }
     }

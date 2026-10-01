@@ -21,6 +21,9 @@ namespace Faderio.MusicBee;
 /// ✎ and its menu: docked right and always shown in a main panel, and in a sidebar a page that
 /// takes the lists' place while an adjacency is open, under a bar that closes it. Its preview
 /// sounds through the plugin's output, so it stops MusicBee's player first as ▶ does.</para>
+/// <para>The shared transition manager is the view's too (phase 5 issue 12), opened from the
+/// queue's menu as a window owned by MusicBee's: a double-click on its rows opens the editor
+/// here, and its previews stop MusicBee's player first as the editor's do.</para>
 /// <para>MusicBee makes and disposes the panel this sits in; the engine outlives it, so the
 /// notice log is the composition's, handed in, and only rendered here.</para>
 /// </summary>
@@ -53,11 +56,13 @@ internal sealed class PluginView : UserControl
     internal readonly ToolStripStatusLabel _noticeCount;
     internal readonly ToolStripStatusLabel _host;
     internal readonly EditTransitionMenu _editMenu;
+    internal readonly ToolStripMenuItem _openTransitions;
     internal readonly ToolStripMenuItem _removeRows;
     internal readonly ToolStripMenuItem _clearQueue;
     internal readonly TransitionEditorPanel _editor;
     internal readonly Button _closeEditor;
     internal NoticeListForm? _noticeList;
+    internal TransitionManagerForm? _manager;
 
     private long _shownQueue = -1;
 
@@ -80,6 +85,7 @@ internal sealed class PluginView : UserControl
         _stopMusicBeesPlayer = stopMusicBeesPlayer;
         ConfirmClear = ShowClearDialog;
         ShowNoticeList = ShowModeless;
+        ShowTransitionManager = ShowModeless;
         AskUnsavedEdits = a => Dialogs.AskUnsavedEdits(FindForm(), a);
 
         Dock = DockStyle.Fill;
@@ -157,17 +163,21 @@ internal sealed class PluginView : UserControl
         _queueList.Columns.Add("", EditColumnWidth, HorizontalAlignment.Center);
         _queueList.Resize += (_, _) => FitTitle();
         _editMenu = new EditTransitionMenu(SelectedAdjacencies, Edit);
+        // The manager lists the whole store, not the queue, so the item is always live: on the
+        // one selected row's track, else the store's first (the App's Transitions… button).
+        _openTransitions = new ToolStripMenuItem("Transitions…");
         _removeRows = new ToolStripMenuItem("Remove") { ShortcutKeyDisplayString = "Del" };
         _clearQueue = new ToolStripMenuItem("Clear queue");
         var menu = new ContextMenuStrip();
         menu.Items.AddRange(_editMenu.Items);
-        menu.Items.AddRange(new ToolStripItem[] { new ToolStripSeparator(), _removeRows, _clearQueue });
+        menu.Items.AddRange(new ToolStripItem[] { _openTransitions, new ToolStripSeparator(), _removeRows, _clearQueue });
         menu.Opening += (_, _) =>
         {
             _editMenu.Refresh();
             _removeRows.Enabled = _queueList.SelectedItems.Count > 0;
             _clearQueue.Enabled = _queueList.Items.Count > 0;
         };
+        _openTransitions.Click += (_, _) => OpenTransitions();
         _removeRows.Click += (_, _) => RemoveSelected();
         _clearQueue.Click += (_, _) => ClearQueue();
         _queueList.ContextMenuStrip = menu;
@@ -254,6 +264,7 @@ internal sealed class PluginView : UserControl
             _tips.Dispose();
             _rowStyle.Dispose(); // after the list, which draws with its fonts
             _noticeList?.Dispose();
+            _manager?.Dispose();
         };
 
         ShowNotices();
@@ -304,6 +315,7 @@ internal sealed class PluginView : UserControl
 
         _editor.Refresh(view);
         _playlists.Render(view);
+        _manager?.Render(view);
     }
 
     /// <summary>The strip shows the log's latest notice and how many the log holds; the list,
@@ -449,6 +461,27 @@ internal sealed class PluginView : UserControl
 
     private static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
 
+    /// <summary>The one selected row, or null for none or several.</summary>
+    private RowId? SingleSelectedRow() =>
+        _queueList.SelectedItems.Count == 1 ? RowOf(_queueList.SelectedItems[0]) : null;
+
+    /// <summary>The one selected row's track as the published queue has it, or null for no row
+    /// or several. A loop, not a lambda: a closure over a <see cref="RowId"/> would give this
+    /// assembly a class with a Core value type in a field, which MusicBee's reflection over the
+    /// plugin cannot load before the resolver exists (LoadingTests).</summary>
+    private Track? SelectedTrack()
+    {
+        var row = SingleSelectedRow();
+        foreach (var queued in _engine.View.Queue)
+        {
+            if (queued.Id == row)
+            {
+                return queued.Track;
+            }
+        }
+        return null;
+    }
+
     // ── Commands: one intent, one engine call ───────────────────────────────────────────
 
     /// <summary>▶ while faderio is silent starts sound, so MusicBee's player is stopped first;
@@ -456,7 +489,7 @@ internal sealed class PluginView : UserControl
     private void TogglePlayPause()
     {
         StopMusicBeesPlayerIfSilent();
-        _engine.TogglePlayPause(_queueList.SelectedItems.Count == 1 ? RowOf(_queueList.SelectedItems[0]) : null);
+        _engine.TogglePlayPause(SingleSelectedRow());
     }
 
     /// <summary>A row's double-click, or Enter on it: that row plays, after MusicBee's player stops.</summary>
@@ -522,6 +555,35 @@ internal sealed class PluginView : UserControl
 
     /// <summary>The Close editor bar: the lists come back once the editor is settled.</summary>
     internal void CloseEditor() => LeaveEditor();
+
+    // ── The transition manager ──────────────────────────────────────────────────────────
+
+    /// <summary>Shows the transition manager beside MusicBee's window. A test replaces it.</summary>
+    internal Action<Form> ShowTransitionManager { get; set; }
+
+    /// <summary>Opens the transition manager on the one selected row's track, else on the
+    /// store's first track, as the App's Transitions… does. One manager, reused; its previews
+    /// stop MusicBee's player first when faderio is silent, as the editor's do.</summary>
+    private void OpenTransitions()
+    {
+        if (_manager is null || _manager.IsDisposed)
+        {
+            _manager = new TransitionManagerForm(_engine, EditFromManager, beforeSounding: StopMusicBeesPlayerIfSilent);
+        }
+        _manager.Open(SelectedTrack());
+        ShowTransitionManager(_manager);
+    }
+
+    /// <summary>A double-click in the manager: the editor opens on that adjacency, shown where
+    /// a sidebar hides it, and MusicBee's window comes forward to show it.</summary>
+    private void EditFromManager(Adjacency adjacency)
+    {
+        Edit(adjacency);
+        if (FindForm() is { Visible: true } form)
+        {
+            form.Activate();
+        }
+    }
 
     /// <summary>Asks what to do with the editor's unsaved edits before it leaves them. A test
     /// replaces it.</summary>
