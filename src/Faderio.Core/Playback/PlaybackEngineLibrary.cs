@@ -14,7 +14,9 @@ public sealed partial class PlaybackEngine
     /// that cannot be opened leaves no library open: a notice says why, authoring is refused
     /// and playback is allowed. One that opens is remembered for the next launch. The playlist
     /// left is written, and deleted if it is an empty Untitled; the new library's last open
-    /// playlist opens, or a new Untitled (playlists issue 01, D20).</summary>
+    /// playlist opens, or a new Untitled (playlists issue 01, D20). The library left is let go
+    /// of once its last write is made and before the new one is held (phase 5 issue 15), so the
+    /// same folder opened again stays open rather than being refused by its own holder.</summary>
     public void OpenLibrary(string folder)
     {
         ThrowIfDisposed();
@@ -28,6 +30,8 @@ public sealed partial class PlaybackEngine
                 WritePendingUnderGate(RaiseNotice); // the playlist left, in the library left
             }
             DeleteIfEmptyUntitled();
+            _library?.Dispose(); // let go only once the library left has its last write
+            Hold(library);
             _openPlaylist = null;
             _rememberTried = null;
             ReleasePreview();
@@ -51,6 +55,20 @@ public sealed partial class PlaybackEngine
             Publish();
             return opened with { Cancelled = [.. cancelled, .. opened.Cancelled] };
         }));
+    }
+
+    /// <summary>The name this engine holds libraries under, or null for an engine that holds none.</summary>
+    private readonly string? _host;
+
+    /// <summary>Holds <paramref name="library"/> for this engine's host, if it has one, and
+    /// returns it: a library another host holds becomes unavailable, its notices saying so.</summary>
+    private Library? Hold(Library? library)
+    {
+        if (library is not null && _host is not null)
+        {
+            library.Hold(_host);
+        }
+        return library;
     }
 
     /// <summary>Writes a library that opened to the machine's settings, as the one the next

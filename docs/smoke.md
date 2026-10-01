@@ -468,6 +468,15 @@ which a background run cannot give.
       The file does not exist. …" with a **1 notice** link and no box. Neither player starts
       or stops: added while MusicBee's own player plays, MusicBee keeps playing and faderio's
       ▶ and "0:00 / -0:00" stay as they were. Restore the playlist file after.
+- [ ] **One holder at a time** (phase 5 issue 15). With standalone faderio open on the smoke
+      library, MusicBee starts with a box owned by it reading "The library library could not be
+      opened (it is open in faderio). Nothing is saved until a library opens; what is queued
+      still plays.", the strip the same with **1 notice**, the host line "library (could not be
+      opened) · …", and an empty queue; `.faderio\host.lock` in the library reads "faderio".
+      faderio closed, then Configure… and Preferences' **Save** on the same folder: the
+      playlists and queue fill, no new notice, the file reads "MusicBee". The reverse, standalone
+      faderio launched on the library MusicBee holds, reads "… (it is open in MusicBee) …" in
+      its strip; MusicBee closed and Open library… on the folder opens it.
 - [ ] **Edit → Edit Preferences → Plugins** lists faderio with a **Configure…** button, which
       opens faderio's dialog, owned by MusicBee's main window. It shows the settings file's
       library folder, its output mode by name ("WASAPI shared") and its output device (phase 5

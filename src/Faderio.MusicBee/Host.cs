@@ -90,7 +90,9 @@ internal sealed class Host : IDisposable
             _modeInUse = ModeAsked(mode); // a fake opens in the mode asked for
             _deviceInUse = ChosenDevice; // and on the device asked for
         }
-        Engine = new PlaybackEngine(output, library, _sink, machine: machine);
+        // The engine holds the library for this host (phase 5 issue 15): standalone faderio is
+        // refused it, naming MusicBee, while it is open here.
+        Engine = new PlaybackEngine(output, library, _sink, machine: machine, host: "MusicBee");
         if (device is not null)
         {
             // The strip names the mode in use; a fallback or a reopen changes it between publications.

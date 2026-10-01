@@ -20,8 +20,12 @@ _Avoid_: Workspace, collection, instance, profile
 
 **Host**:
 The program playing a library: faderio itself, or MusicBee through the plugin. Both hosts run
-the same engine on the same library folder; each keeps its own machine settings.
-_Avoid_: Frontend, client, player (MusicBee's player never plays a library)
+the same engine on the same library folder; each keeps its own machine settings. One host
+**holds** a library at a time, from opening it until it lets go: the other host is refused it
+with a notice naming the holder, and opens it once the holder has let go, a crashed one
+included.
+_Avoid_: Frontend, client, player (MusicBee's player never plays a library), lock (the file is
+how, not what)
 
 **Output device**:
 The sound device a host's output opens, named as Windows names it. A host's **default** device

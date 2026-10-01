@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
+using Faderio.Core.Persistence;
 using Faderio.Core.Playback;
 
 namespace Faderio.Core.Tests;
@@ -27,6 +28,9 @@ public static class ChildProcess
                 return 0;
             case "window":
                 Window(args[1], long.Parse(args[2], CultureInfo.InvariantCulture), int.Parse(args[3], CultureInfo.InvariantCulture));
+                return 0;
+            case "hold":
+                Hold(args[1], args[2]);
                 return 0;
             default:
                 Console.Error.WriteLine($"Unknown child command: {string.Join(' ', args)}");
@@ -114,6 +118,57 @@ public static class ChildProcess
         Console.WriteLine($"current={tc.CurrentTrack?.FilePath}");
     }
 
+    /// <summary>Opens the library in <paramref name="folder"/> on an engine for <paramref name="host"/>,
+    /// which holds it (phase 5 issue 15), says so, and then waits to be killed: the parent proves
+    /// that a host that dies lets go of its library.</summary>
+    private static void Hold(string folder, string host)
+    {
+        using var engine = new PlaybackEngine(new FakeAudioOutput(), Library.Open(folder), new RecordingSink(), host: host);
+        Console.WriteLine($"held={engine.View.Library?.IsAvailable}");
+        Console.Out.Flush();
+        Thread.Sleep(Timeout.Infinite);
+    }
+
+    /// <summary>A child started and left running, for a parent to read and then kill.</summary>
+    public sealed class Running : IDisposable
+    {
+        private readonly Process _process;
+
+        internal Running(Process process) => _process = process;
+
+        /// <summary>The next <c>key=value</c> line the child prints, within 30 s.</summary>
+        public KeyValuePair<string, string> ReadLine()
+        {
+            var read = _process.StandardOutput.ReadLineAsync();
+            if (!read.Wait(30_000) || read.Result is not { } line)
+            {
+                throw new TimeoutException("The child printed nothing in 30 s.");
+            }
+            var pair = line.Split('=', 2);
+            return new KeyValuePair<string, string>(pair[0], pair.Length > 1 ? pair[1] : "");
+        }
+
+        /// <summary>Kills the child outright, as a crash would end it, and waits for it to be gone.</summary>
+        public void Kill()
+        {
+            if (!_process.HasExited)
+            {
+                _process.Kill(entireProcessTree: true);
+                _process.WaitForExit();
+            }
+        }
+
+        public void Dispose()
+        {
+            Kill();
+            _process.Dispose();
+        }
+    }
+
+    /// <summary>Starts this assembly's <see cref="Main"/> with <paramref name="args"/> in a new
+    /// process and leaves it running.</summary>
+    public static Running Start(params string[] args) => new(Process.Start(StartInfo(args))!);
+
     /// <summary>What a child process printed, and how it ended.</summary>
     public sealed record Result(int ExitCode, IReadOnlyDictionary<string, string> Values, string Output)
     {
@@ -123,6 +178,24 @@ public static class ChildProcess
     /// <summary>Runs this assembly's <see cref="Main"/> with <paramref name="args"/> in a new
     /// process and waits for it (30 s at most).</summary>
     public static Result Run(params string[] args)
+    {
+        using var process = Process.Start(StartInfo(args))!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(30_000))
+        {
+            process.Kill(entireProcessTree: true);
+            throw new TimeoutException($"Child process {string.Join(' ', args)} did not finish in 30 s.");
+        }
+        var values = stdout.Result
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(line => line.Split('=', 2))
+            .Where(pair => pair.Length == 2)
+            .ToDictionary(pair => pair[0], pair => pair[1]);
+        return new Result(process.ExitCode, values, stdout.Result + stderr.Result);
+    }
+
+    private static ProcessStartInfo StartInfo(string[] args)
     {
         var assembly = Assembly.GetExecutingAssembly().Location;
         var start = new ProcessStartInfo("dotnet")
@@ -138,19 +211,6 @@ public static class ChildProcess
         {
             start.ArgumentList.Add(arg);
         }
-        using var process = Process.Start(start)!;
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
-        if (!process.WaitForExit(30_000))
-        {
-            process.Kill(entireProcessTree: true);
-            throw new TimeoutException($"Child process {string.Join(' ', args)} did not finish in 30 s.");
-        }
-        var values = stdout.Result
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(line => line.Split('=', 2))
-            .Where(pair => pair.Length == 2)
-            .ToDictionary(pair => pair[0], pair => pair[1]);
-        return new Result(process.ExitCode, values, stdout.Result + stderr.Result);
+        return start;
     }
 }

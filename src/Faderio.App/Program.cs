@@ -55,7 +55,9 @@ internal static class Program
         var output = new NAudioAudioOutput(
             (machine?.Settings ?? new MachineSettings()).OutputMode, notify,
             Presenter.ParseUnavailableOutputs(args));
-        var engine = new PlaybackEngine(output, library, sink, machine: machine);
+        // The engine holds the library for this host (phase 5 issue 15): the plugin in MusicBee
+        // is refused it, naming faderio, while it is open here.
+        var engine = new PlaybackEngine(output, library, sink, machine: machine, host: "faderio");
 
         // The title follows the library and the mode in use; the form renders both.
         var form = new MainForm(engine, sink, () => output.Mode,

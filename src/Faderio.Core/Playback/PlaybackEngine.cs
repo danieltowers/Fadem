@@ -118,13 +118,17 @@ public sealed partial class PlaybackEngine : IDisposable
     /// be opened, or when no library was chosen (null). What went wrong opening it is raised as
     /// notices. Given the machine's settings, a library that opens is remembered there for the
     /// next launch (library issue 02).</summary>
+    /// <param name="host">The name this engine holds its libraries under, as the other host
+    /// reads it when refused (phase 5 issue 15): "faderio" or "MusicBee". Null holds nothing:
+    /// the renderer's and the tests' engines.</param>
     public PlaybackEngine(
         IAudioOutput output,
         Library? library,
         IEngineSink sink,
         Random? rng = null,
-        MachineSettingsStore? machine = null)
-        : this(output, library?.Transitions, sink, library?.Settings, library, machine, rng)
+        MachineSettingsStore? machine = null,
+        string? host = null)
+        : this(output, null, sink, null, library, machine, rng, host: host)
     {
     }
 
@@ -136,11 +140,19 @@ public sealed partial class PlaybackEngine : IDisposable
         Library? library,
         MachineSettingsStore? machine,
         Random? rng,
-        PlayerSettings? initial = null)
+        PlayerSettings? initial = null,
+        string? host = null)
     {
         _output = output;
+        _host = host;
+        _library = Hold(library);
+        // A library's stores are read once it is held: a refused one has none.
+        if (library is not null)
+        {
+            store = library.Transitions;
+            settings = library.Settings;
+        }
         _store = store;
-        _library = library;
         _sink = sink;
         _settingsStore = settings;
         _machine = machine;
@@ -214,6 +226,7 @@ public sealed partial class PlaybackEngine : IDisposable
             ResetForRestart();
             _output.Stopped -= OnOutputStopped;
             HaltOutput(_output.Dispose);
+            _library?.Dispose(); // lets go of the library
         }
         Complete(unanswered);
     }

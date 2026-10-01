@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using Faderio.Core.Playback;
 using Faderio.Core.Settings;
 using Faderio.Core.Transitions;
@@ -13,13 +14,19 @@ namespace Faderio.Core.Persistence;
 /// is from a newer schema, is left alone with writes going to <c>.recovered</c> beside it.
 /// A folder that cannot be opened (gone, not writable, unreadable) opens unavailable: it holds
 /// no store and its <see cref="Notices"/> name why. Opening never throws.
+/// <para>One host holds a library at a time (phase 5 issue 15): the engine that opens it for
+/// a host calls <see cref="Hold"/>, which keeps <c>.faderio/host.lock</c> open, named for the
+/// host, until <see cref="Dispose"/>; the OS deletes the file with the last handle, a crashed
+/// host's included. Another host's hold is refused, and its library opens unavailable with the
+/// holder's name. Opening alone holds nothing: a reader is never refused.</para>
 /// </summary>
-public sealed class Library
+public sealed class Library : IDisposable
 {
     /// <summary>The folder inside the library that faderio writes to, and nothing outside it.</summary>
     public const string StoreFolderName = ".faderio";
 
     private readonly List<string> _notices = new();
+    private FileStream? _hold;
 
     private Library(string folder)
     {
@@ -30,6 +37,7 @@ public sealed class Library
         TransitionsPath = Path.Combine(StoreFolder, "transitions.json");
         SettingsPath = Path.Combine(StoreFolder, "settings.json");
         PlaylistsFolder = Path.Combine(StoreFolder, "playlists");
+        HoldPath = Path.Combine(StoreFolder, "host.lock");
     }
 
     /// <summary>The folder the user chose, in full.</summary>
@@ -42,6 +50,9 @@ public sealed class Library
     public string TransitionsPath { get; }
     public string SettingsPath { get; }
     public string PlaylistsFolder { get; }
+
+    /// <summary>The file a host keeps open while it holds the library, holding the host's name.</summary>
+    public string HoldPath { get; }
 
     /// <summary>The transition store, or null when the library is unavailable.</summary>
     public JsonTransitionStore? Transitions { get; private set; }
@@ -91,6 +102,73 @@ public sealed class Library
         if (Settings.LoadNotice is { } notice)
         {
             _notices.Add(notice);
+        }
+    }
+
+    /// <summary>Takes the library for <paramref name="host"/> (its name as the other host will
+    /// read it): the lock file is opened for writing, shared for reading, deleted by the OS when
+    /// the last handle on it closes, and named for the host. A library another host holds
+    /// becomes unavailable, its reason naming that host ("another host" when its name cannot be
+    /// read); one that is unavailable already is left so. Holding again is a no-op.</summary>
+    public void Hold(string host)
+    {
+        if (!IsAvailable || _hold is not null)
+        {
+            return;
+        }
+        try
+        {
+            // Shared for reading only: nobody else may write it, or unlink it from under its holder.
+            var hold = new FileStream(HoldPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read, 4096, FileOptions.DeleteOnClose);
+            try
+            {
+                hold.SetLength(0);
+                var name = Encoding.UTF8.GetBytes(host + Environment.NewLine);
+                hold.Write(name, 0, name.Length);
+                hold.Flush(true);
+            }
+            catch
+            {
+                hold.Dispose();
+                throw;
+            }
+            _hold = hold;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Transitions = null;
+            Settings = null;
+            Unavailable(IsHeldByAnother(e) ? $"it is open in {ReadHolder()}" : e.Message);
+        }
+    }
+
+    /// <summary>Whether the open failed because another handle holds the file: Windows' sharing
+    /// or lock violation, the only refusal that means a holder. (A holder that let go while a
+    /// reader still had the file open leaves it delete-pending for that instant, which refuses
+    /// with access denied instead; the next open, a moment later, takes it.)</summary>
+    private static bool IsHeldByAnother(Exception e) => e is IOException && (e.HResult & 0xFFFF) is 32 or 33;
+
+    /// <summary>Lets go of the library, if held: the lock file closes and goes.</summary>
+    public void Dispose()
+    {
+        _hold?.Dispose();
+        _hold = null;
+    }
+
+    /// <summary>The name in the lock file another host keeps open, or "another host" when it
+    /// cannot be read.</summary>
+    private string ReadHolder()
+    {
+        try
+        {
+            using var stream = new FileStream(HoldPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            var name = reader.ReadLine()?.Trim();
+            return string.IsNullOrEmpty(name) ? "another host" : name!;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return "another host";
         }
     }
 

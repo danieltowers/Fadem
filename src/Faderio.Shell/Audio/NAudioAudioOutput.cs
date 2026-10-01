@@ -201,7 +201,10 @@ public sealed class NAudioAudioOutput : IAudioOutput
     {
         _state = Transport.Stopped;
         _heardAtFailure = null;
-        if (_counting is null || _player is null)
+        // Read once: the render thread's own stop can close the player meanwhile (ClosePlayer
+        // takes it from whichever thread gets there first), and a player closed is stopped.
+        var player = _player;
+        if (_counting is null || player is null)
         {
             return;
         }
@@ -212,7 +215,7 @@ public sealed class NAudioAudioOutput : IAudioOutput
         }
         else
         {
-            _player.Stop();
+            player.Stop();
             if (_releaseWhileStopped)
             {
                 ClosePlayer();

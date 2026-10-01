@@ -39,8 +39,9 @@
   </PropertyGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
     <!-- ChildProcess starts this assembly as a child through dotnet, which a net48 test binary
-         cannot do; the tests built on it (a decoder that can kill its process) stay net8.0. -->
-    <Compile Remove="ChildProcess.cs;FlacFrameTableTests.cs;TruncatedFlacTests.cs" />
+         cannot do; the tests built on it (a decoder that can kill its process, and a library
+         holder that is killed) stay net8.0. -->
+    <Compile Remove="ChildProcess.cs;FlacFrameTableTests.cs;TruncatedFlacTests.cs;LibraryHolderAcrossProcessesTests.cs" />
   </ItemGroup>
   <!-- PluginRuntimeTests proves the net48 build itself; Compat holds what the tests use that
        net48 lacks, as Core's Compat/Net48 does for the engine. -->
