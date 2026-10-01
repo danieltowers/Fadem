@@ -98,7 +98,7 @@ internal sealed class Host : IDisposable
     /// <param name="stopMusicBeesPlayer">MusicBee's <c>Player_Stop</c>, for the view's starts.</param>
     public PluginView AttachView(Control panel, Action stopMusicBeesPlayer)
     {
-        var view = new PluginView(Engine, Notices, _modeInUse, stopMusicBeesPlayer);
+        var view = new PluginView(Engine, Notices, OnNoticed, _modeInUse, stopMusicBeesPlayer);
         _views.Add(view);
         view.Disposed += (_, _) => _views.Remove(view);
         panel.Controls.Add(view);
@@ -164,7 +164,8 @@ internal sealed class Host : IDisposable
         }
     }
 
-    /// <summary>On the UI thread: into the log, then to the views' strips, or a box with none.</summary>
+    /// <summary>On the UI thread: into the log, then to the views' strips, or a box with none.
+    /// The editor's own notices ("Not saved: …") come here too, so they have the same route.</summary>
     private void OnNoticed(string message)
     {
         Notices.Add(message);

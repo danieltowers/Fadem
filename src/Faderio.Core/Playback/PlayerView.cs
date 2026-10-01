@@ -68,6 +68,11 @@ public sealed record PlayerView(
     /// stay the queue's, paused where it was held, or stopped.</summary>
     public PreviewView? Preview { get; init; }
 
+    /// <summary>Whether faderio sounds now: the queue playing, or a preview running over it.
+    /// A host sharing a device with another player (phase 5 issue 11) stops that player before
+    /// faderio starts to sound, and leaves it alone while faderio already has the device.</summary>
+    public bool IsSounding => Transport == Transport.Playing || Preview is not null;
+
     /// <summary>The clip light (build issue 17): the clips heard since it was last cleared, or null.
     /// A clip is latched when the listener hears it, not when it is rendered.</summary>
     public ClipView? Clip { get; init; }

@@ -62,9 +62,7 @@ internal sealed class MainForm : Form
     internal readonly TransitionEditorPanel _editor;
     internal readonly PlaylistSidebar _playlists;
     internal readonly PlaylistNameBar _playlistName;
-    internal readonly ToolStripMenuItem _editNext;
-    internal readonly ToolStripMenuItem _editPrevious;
-    internal readonly ToolStripMenuItem _editSelf;
+    internal readonly EditTransitionMenu _editMenu;
     internal readonly ToolStripMenuItem _transitionsForTrack;
     internal readonly ToolStripMenuItem _removeRows;
     internal readonly ToolStripMenuItem _clearQueue;
@@ -115,7 +113,7 @@ internal sealed class MainForm : Form
         ChooseExportPath = ShowExportDialog;
         ConfirmClear = ShowClearDialog;
         ChooseLibrary = () => ShowLibraryDialog(this);
-        AskUnsavedEdits = ShowUnsavedDialog;
+        AskUnsavedEdits = a => Dialogs.AskUnsavedEdits(this, a);
         ShowSettings = dialog => dialog.ShowDialog(this) == DialogResult.OK;
         StartDrag = data => _queueList!.DoDragDrop(data, DragDropEffects.Move);
         ShowNoticeList = ShowModeless;
@@ -307,25 +305,15 @@ internal sealed class MainForm : Form
                 FitColumns();
             }
         };
-        // The list's own size draws the pencil at eight pixels; this size fits the row.
-        _buttonFont = new Font("Segoe UI Symbol", 11f);
-        _authoredFont = new Font(_buttonFont, FontStyle.Bold);
-        Disposed += (_, _) =>
-        {
-            // After the list, which draws with them.
-            _buttonFont.Dispose();
-            _authoredFont.Dispose();
-        };
+        Disposed += (_, _) => _rowStyle.Dispose(); // after the list, which draws with its fonts
 
-        _editNext = new ToolStripMenuItem("Edit transition: this → next");
-        _editPrevious = new ToolStripMenuItem("Edit transition: previous → this");
-        _editSelf = new ToolStripMenuItem("Edit transition: this → this");
+        _editMenu = new EditTransitionMenu(SelectedAdjacencies, Edit);
         _transitionsForTrack = new ToolStripMenuItem("Transitions for this track…");
         _removeRows = new ToolStripMenuItem("Remove") { ShortcutKeyDisplayString = "Del" };
         _clearQueue = new ToolStripMenuItem("Clear queue");
         var menu = new ContextMenuStrip
         {
-            Items = { _editNext, _editPrevious, _editSelf, _transitionsForTrack, new ToolStripSeparator(), _removeRows, _clearQueue },
+            Items = { _editMenu.Next, _editMenu.Previous, _editMenu.Self, _transitionsForTrack, new ToolStripSeparator(), _removeRows, _clearQueue },
         };
         menu.Opening += (_, e) =>
         {
@@ -338,17 +326,11 @@ internal sealed class MainForm : Form
                 BeginInvoke(() => _columnMenu.Show(at));
                 return;
             }
-            var adjacencies = SelectedAdjacencies();
-            _editNext.Enabled = adjacencies.Next is not null;
-            _editPrevious.Enabled = adjacencies.Previous is not null;
-            _editSelf.Available = adjacencies.Self is not null; // shown while repeat-one is on
+            _editMenu.Refresh();
             _transitionsForTrack.Enabled = _queueList.SelectedItems.Count == 1;
             _removeRows.Enabled = _queueList.SelectedItems.Count > 0;
             _clearQueue.Enabled = _queueList.Items.Count > 0;
         };
-        _editNext.Click += (_, _) => EditSelected(t => t.Next);
-        _editPrevious.Click += (_, _) => EditSelected(t => t.Previous);
-        _editSelf.Click += (_, _) => EditSelected(t => t.Self);
         _transitionsForTrack.Click += (_, _) => OpenTransitions();
         _removeRows.Click += (_, _) => RemoveSelected();
         _clearQueue.Click += (_, _) => ClearQueue();
@@ -411,7 +393,7 @@ internal sealed class MainForm : Form
             }
         };
 
-        _editor = new TransitionEditorPanel(engine, ShowNotice, ChooseRenderPath, a => AskUnsavedEdits(a));
+        _editor = new TransitionEditorPanel(engine, ShowNotice, suggested => Dialogs.ChooseRenderPath(this, suggested), a => AskUnsavedEdits(a));
         _playlists = new PlaylistSidebar(engine, LeaveEditor);
         _playlistName = new PlaylistNameBar(engine);
 
@@ -533,47 +515,8 @@ internal sealed class MainForm : Form
             RebuildRows(view, SelectedRows());
             _shownQueue = view.QueueVersion;
         }
-        var editColumn = EditColumn;
-        for (var i = 0; i < _queueList.Items.Count && i < view.Queue.Count; i++)
-        {
-            var row = view.Queue[i];
-            var item = _queueList.Items[i];
-            // Render runs on every tick: each row's look is set only when it changes (build issue 20).
-            var back = RowMarks.BackOf(row.IsCurrent, view.Transport);
-            var fore = row.IsUnreadable ? SystemColors.GrayText : SystemColors.WindowText;
-            // Each cell is styled on its own, for the editor button's: bold while its adjacency
-            // is authored, grey and plain while it is not.
-            var authored = row.NextAuthored == true;
-            foreach (ListViewItem.ListViewSubItem cell in item.SubItems)
-            {
-                if (cell.BackColor != back)
-                {
-                    cell.BackColor = back;
-                }
-                var cellFore = cell == item.SubItems[editColumn] && !authored ? SystemColors.GrayText : fore;
-                if (cell.ForeColor != cellFore)
-                {
-                    cell.ForeColor = cellFore;
-                }
-            }
-            var button = item.SubItems[editColumn];
-            var glyph = Presenter.EditGlyph(row.NextAuthored, isLast: i == view.Queue.Count - 1);
-            if (button.Text != glyph)
-            {
-                button.Text = glyph;
-            }
-            var font = authored ? _authoredFont : _buttonFont;
-            if (button.Font != font)
-            {
-                button.Font = font;
-            }
-            var label = Presenter.RowLabel(i + 1, row.IsUnreadable);
-            if (item.Text != label)
-            {
-                item.Text = label;
-                item.ToolTipText = Presenter.RowTip(row.IsUnreadable);
-            }
-        }
+        // Render runs on every tick: each row's look is set only when it changes (build issue 20).
+        _rowStyle.Apply(_queueList, view, EditColumn);
 
         var attended = view.Attended;
         _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length);
@@ -1090,16 +1033,12 @@ internal sealed class MainForm : Form
         }
     }
 
-    private readonly Font _buttonFont;
-    private readonly Font _authoredFont;
+    /// <summary>The rows' look, shared with the plugin's queue (phase 5 issue 11).</summary>
+    private readonly QueueRowStyle _rowStyle = new();
 
     /// <summary>The row whose editor button is at <paramref name="location"/>, or null: a click
     /// anywhere else on a row, or on a row that shows no button, is not a press of it.</summary>
-    internal int? EditButtonAt(System.Drawing.Point location) =>
-        _queueList.HitTest(location) is { Item: { } item, SubItem: { } cell }
-            && cell == item.SubItems[EditColumn] && cell.Text.Length > 0
-            ? item.Index
-            : null;
+    internal int? EditButtonAt(System.Drawing.Point location) => QueueRowStyle.EditButtonAt(_queueList, location, EditColumn);
 
     /// <summary>The row ▶ hands the engine: the selected one when exactly one is, else none.</summary>
     private RowId? SingleSelectedRow() =>
@@ -1241,8 +1180,6 @@ internal sealed class MainForm : Form
     private RowAdjacencies SelectedAdjacencies() =>
         _queueList.SelectedIndices.Count == 1 ? AdjacenciesAt(_queueList.SelectedIndices[0]) : RowAdjacencies.None;
 
-    private void EditSelected(Func<RowAdjacencies, Adjacency?> which) => Edit(which(SelectedAdjacencies()));
-
     /// <summary>Opens the editor on the row's this → next, as the menu does.</summary>
     internal void EditTransitionAt(int rowIndex) => Edit(AdjacenciesAt(rowIndex).Next);
 
@@ -1256,33 +1193,4 @@ internal sealed class MainForm : Form
 
     /// <summary>Asks what to do with the editor's unsaved edits before it leaves them.</summary>
     internal Func<Adjacency, UnsavedEdits> AskUnsavedEdits { get; set; }
-
-    private UnsavedEdits ShowUnsavedDialog(Adjacency adjacency)
-    {
-        var save = new TaskDialogButton("Save");
-        var discard = new TaskDialogButton("Discard");
-        var page = new TaskDialogPage
-        {
-            Caption = "Unsaved transition",
-            Heading = $"Save your changes to {adjacency.Name}?",
-            Text = "The editor has changes that are not saved. Discard loses them.",
-            Icon = TaskDialogIcon.Warning,
-            Buttons = { save, discard, TaskDialogButton.Cancel },
-            DefaultButton = save,
-        };
-        var chosen = TaskDialog.ShowDialog(this, page);
-        return chosen == save ? UnsavedEdits.Save : chosen == discard ? UnsavedEdits.Discard : UnsavedEdits.Cancel;
-    }
-
-    private string? ChooseRenderPath(string suggestedName)
-    {
-        using var dialog = new SaveFileDialog
-        {
-            Title = "Render this boundary",
-            Filter = "WAV|*.wav",
-            DefaultExt = "wav",
-            FileName = suggestedName,
-        };
-        return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
-    }
 }

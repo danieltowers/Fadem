@@ -35,6 +35,7 @@ internal sealed class TransitionEditorPanel : Panel
     private readonly Action<string> _notice;
     private readonly Func<string, string?> _chooseRenderPath;
     private readonly Func<Adjacency, UnsavedEdits> _askUnsaved;
+    private readonly Action? _beforeSounding;
 
     internal readonly Label _title;
     internal readonly RadioButton _editGlobal;
@@ -77,17 +78,21 @@ internal sealed class TransitionEditorPanel : Panel
         public override string ToString() => Presenter.FmtCurve(Curve);
     }
 
+    /// <param name="beforeSounding">Raised before a preview starts sound: a host in another
+    /// player's process stops that player first (phase 5 issue 11). Null does nothing.</param>
     public TransitionEditorPanel(
         PlaybackEngine engine, Action<string> notice,
-        Func<string, string?> chooseRenderPath, Func<Adjacency, UnsavedEdits> askUnsaved)
+        Func<string, string?> chooseRenderPath, Func<Adjacency, UnsavedEdits> askUnsaved,
+        Action? beforeSounding = null)
     {
         _engine = engine;
         _notice = notice;
         _chooseRenderPath = chooseRenderPath;
         _askUnsaved = askUnsaved;
+        _beforeSounding = beforeSounding;
 
         Dock = DockStyle.Right;
-        Width = 340;
+        Width = DefaultWidth;
         Padding = new Padding(10);
         BorderStyle = BorderStyle.FixedSingle;
 
@@ -225,6 +230,9 @@ internal sealed class TransitionEditorPanel : Panel
         Controls.Add(scroller);
         Controls.Add(_title);
     }
+
+    /// <summary>The width the editor is designed at, docked beside a queue: nothing wraps.</summary>
+    internal const int DefaultWidth = 340;
 
     public Adjacency? Adjacency => _adjacency;
 
@@ -409,13 +417,22 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeInLess.Enabled = _fadeInMore.Enabled = inLive;
     }
 
+    /// <summary>A row of buttons that wraps where the panel is narrower than they are (a sidebar,
+    /// phase 5 issue 11), and takes one row's height where it is not.</summary>
     private static void ButtonRow(TableLayoutPanel layout, ref int row, params Button[] buttons)
     {
-        var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Margin = new Padding(0) };
+        var flow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            WrapContents = true,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0),
+        };
         flow.Controls.AddRange(buttons);
         layout.Controls.Add(flow, 0, row);
         layout.SetColumnSpan(flow, 2);
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         row++;
     }
 
@@ -617,6 +634,7 @@ internal sealed class TransitionEditorPanel : Panel
         }
         if (ParsedDraft("Not previewed") is { } spec)
         {
+            _beforeSounding?.Invoke();
             ShowReasons(_engine.Preview(_adjacency, spec, Layer));
         }
     }

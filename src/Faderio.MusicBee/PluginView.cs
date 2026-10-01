@@ -17,6 +17,10 @@ namespace Faderio.MusicBee;
 /// commands; it holds no engine state between calls and computes nothing from engine values
 /// (the placement rule in CLAUDE.md). Starting sound stops MusicBee's player first, as the Tools
 /// menu's Play does: never two players at once, nor two on one device.
+/// <para>The shared transition editor sits in it too (phase 5 issue 11), opened from the queue's
+/// ✎ and its menu: docked right and always shown in a main panel, and in a sidebar a page that
+/// takes the lists' place while an adjacency is open, under a bar that closes it. Its preview
+/// sounds through the plugin's output, so it stops MusicBee's player first as ▶ does.</para>
 /// <para>MusicBee makes and disposes the panel this sits in; the engine outlives it, so the
 /// notice log is the composition's, handed in, and only rendered here.</para>
 /// </summary>
@@ -28,6 +32,8 @@ internal sealed class PluginView : UserControl
     private readonly Action _stopMusicBeesPlayer;
     private readonly System.Windows.Forms.Timer _timer;
     private readonly ToolTip _tips;
+    private readonly QueueRowStyle _rowStyle = new();
+    private readonly Panel _editorBar;
 
     internal readonly PlaylistSidebar _playlists;
     internal readonly ListView _queueList;
@@ -46,8 +52,11 @@ internal sealed class PluginView : UserControl
     internal readonly ToolStripStatusLabel _status;
     internal readonly ToolStripStatusLabel _noticeCount;
     internal readonly ToolStripStatusLabel _host;
+    internal readonly EditTransitionMenu _editMenu;
     internal readonly ToolStripMenuItem _removeRows;
     internal readonly ToolStripMenuItem _clearQueue;
+    internal readonly TransitionEditorPanel _editor;
+    internal readonly Button _closeEditor;
     internal NoticeListForm? _noticeList;
 
     private long _shownQueue = -1;
@@ -56,10 +65,14 @@ internal sealed class PluginView : UserControl
     /// later issue needs them.</summary>
     private static readonly QueueColumn[] Columns = [QueueColumn.Number, QueueColumn.Title, QueueColumn.Artist, QueueColumn.Length];
 
+    /// <summary>The ✎ column, after the queue's own: the editor button on every row but the last.</summary>
+    internal int EditColumn => Columns.Length;
+
     /// <param name="notices">The session's notices, the composition's: it outlives this view.</param>
+    /// <param name="notice">The host's one notice route, for the editor's own: the log and every strip.</param>
     /// <param name="outputModeInUse">The mode the output opened in, or null when none could be.</param>
     /// <param name="stopMusicBeesPlayer">MusicBee's <c>Player_Stop</c>, called before faderio starts to sound.</param>
-    public PluginView(PlaybackEngine engine, NoticeLog notices, Func<AudioOutputMode?> outputModeInUse, Action stopMusicBeesPlayer)
+    public PluginView(PlaybackEngine engine, NoticeLog notices, Action<string> notice, Func<AudioOutputMode?> outputModeInUse, Action stopMusicBeesPlayer)
     {
         _engine = engine;
         _notices = notices;
@@ -67,6 +80,7 @@ internal sealed class PluginView : UserControl
         _stopMusicBeesPlayer = stopMusicBeesPlayer;
         ConfirmClear = ShowClearDialog;
         ShowNoticeList = ShowModeless;
+        AskUnsavedEdits = a => Dialogs.AskUnsavedEdits(FindForm(), a);
 
         Dock = DockStyle.Fill;
 
@@ -140,12 +154,17 @@ internal sealed class PluginView : UserControl
             var header = _queueList.Columns.Add(Presenter.ColumnHeading(column), WidthOf(column));
             header.TextAlign = column == QueueColumn.Length ? HorizontalAlignment.Right : HorizontalAlignment.Left;
         }
+        _queueList.Columns.Add("", EditColumnWidth, HorizontalAlignment.Center);
         _queueList.Resize += (_, _) => FitTitle();
+        _editMenu = new EditTransitionMenu(SelectedAdjacencies, Edit);
         _removeRows = new ToolStripMenuItem("Remove") { ShortcutKeyDisplayString = "Del" };
         _clearQueue = new ToolStripMenuItem("Clear queue");
-        var menu = new ContextMenuStrip { Items = { _removeRows, _clearQueue } };
+        var menu = new ContextMenuStrip();
+        menu.Items.AddRange(_editMenu.Items);
+        menu.Items.AddRange(new ToolStripItem[] { new ToolStripSeparator(), _removeRows, _clearQueue });
         menu.Opening += (_, _) =>
         {
+            _editMenu.Refresh();
             _removeRows.Enabled = _queueList.SelectedItems.Count > 0;
             _clearQueue.Enabled = _queueList.Items.Count > 0;
         };
@@ -169,19 +188,40 @@ internal sealed class PluginView : UserControl
                 e.Handled = true;
             }
         };
+        _queueList.MouseClick += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left && QueueRowStyle.EditButtonAt(_queueList, e.Location, EditColumn) is { } index)
+            {
+                EditTransitionAt(index);
+            }
+        };
+        // A double-click on the button is not a request to play the row.
         _queueList.MouseDoubleClick += (_, e) =>
         {
-            if (e.Button == MouseButtons.Left && _queueList.HitTest(e.Location).Item is { } item)
+            if (e.Button == MouseButtons.Left && QueueRowStyle.EditButtonAt(_queueList, e.Location, EditColumn) is null
+                && _queueList.HitTest(e.Location).Item is { } item)
             {
                 PlayRowAt(item.Index);
             }
         };
 
-        _playlists = new PlaylistSidebar(engine, () => true); // no editor here to leave
+        // The editor's preview sounds through the plugin's output: MusicBee's player stops first,
+        // unless faderio already sounds and so already has the device.
+        _editor = new TransitionEditorPanel(
+            engine, notice, suggested => Dialogs.ChooseRenderPath(FindForm(), suggested), a => AskUnsavedEdits(a),
+            beforeSounding: StopMusicBeesPlayerIfSilent);
+        _closeEditor = new Button { Text = "Close editor", AutoSize = true, Height = 26, Dock = DockStyle.Right, Margin = new Padding(0) };
+        _editorBar = new Panel { Dock = DockStyle.Top, Height = 30, Padding = new Padding(4, 2, 4, 2), Visible = false };
+        _editorBar.Controls.Add(_closeEditor);
+        _closeEditor.Click += (_, _) => CloseEditor();
+        _playlists = new PlaylistSidebar(engine, LeaveEditor);
 
-        // Docking order: the playlists and the strip first, the transport rows next, the list last.
+        // Docking order: the strip and the editor's bar first, then the playlists, then the
+        // editor (at the right, or filling the lists' place), and the list last.
         Controls.Add(_queueList);
+        Controls.Add(_editor);
         Controls.Add(_playlists);
+        Controls.Add(_editorBar);
         Controls.Add(statusStrip);
         Controls.Add(seekRow);
         Controls.Add(buttons);
@@ -212,6 +252,7 @@ internal sealed class PluginView : UserControl
         {
             _timer.Dispose();
             _tips.Dispose();
+            _rowStyle.Dispose(); // after the list, which draws with its fonts
             _noticeList?.Dispose();
         };
 
@@ -242,31 +283,7 @@ internal sealed class PluginView : UserControl
             RebuildRows(view);
             _shownQueue = view.QueueVersion;
         }
-        for (var i = 0; i < _queueList.Items.Count && i < view.Queue.Count; i++)
-        {
-            var row = view.Queue[i];
-            var item = _queueList.Items[i];
-            // Render runs on every tick: each row's look is set only when it changes.
-            var back = RowMarks.BackOf(row.IsCurrent, view.Transport);
-            var fore = row.IsUnreadable ? SystemColors.GrayText : SystemColors.WindowText;
-            foreach (ListViewItem.ListViewSubItem cell in item.SubItems)
-            {
-                if (cell.BackColor != back)
-                {
-                    cell.BackColor = back;
-                }
-                if (cell.ForeColor != fore)
-                {
-                    cell.ForeColor = fore;
-                }
-            }
-            var label = Presenter.RowLabel(i + 1, row.IsUnreadable);
-            if (item.Text != label)
-            {
-                item.Text = label;
-                item.ToolTipText = Presenter.RowTip(row.IsUnreadable);
-            }
-        }
+        _rowStyle.Apply(_queueList, view, EditColumn);
 
         var attended = view.Attended;
         _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length);
@@ -285,6 +302,7 @@ internal sealed class PluginView : UserControl
             FitWidth();
         }
 
+        _editor.Refresh(view);
         _playlists.Render(view);
     }
 
@@ -338,6 +356,7 @@ internal sealed class PluginView : UserControl
             {
                 item.SubItems.Add(Presenter.QueueCell(column, row.Track));
             }
+            item.SubItems.Add(""); // the ✎ cell, styled at render
             _queueList.Items.Add(item);
             item.Selected = selected.Contains(row.Id);
         }
@@ -349,8 +368,9 @@ internal sealed class PluginView : UserControl
     internal const int NarrowWidth = 560;
 
     /// <summary>Lays the view out for its width: the playlists beside the queue in a main panel,
-    /// above it in a sidebar; the host line at its own width, or half the strip's when that is
-    /// less, so the notice keeps the rest.</summary>
+    /// above it in a sidebar; the editor at the right in a main panel, always, and in a sidebar
+    /// a page in the lists' place while an adjacency is open, under its Close bar; the host line
+    /// at its own width, or half the strip's when that is less, so the notice keeps the rest.</summary>
     private void FitWidth()
     {
         var narrow = ClientSize.Width < NarrowWidth;
@@ -367,8 +387,33 @@ internal sealed class PluginView : UserControl
                 _playlists.Width = 200;
             }
         }
+        PlaceEditor();
         var preferred = TextRenderer.MeasureText(_host.Text, _host.Font).Width + 8;
         _host.Width = Math.Max(0, Math.Min(preferred, ClientSize.Width / 2));
+    }
+
+    /// <summary>Puts the editor where the view's width wants it: at the right in a main panel,
+    /// as a page in the lists' place in a sidebar while an adjacency is open, hidden there
+    /// otherwise.</summary>
+    private void PlaceEditor()
+    {
+        if (ClientSize.Width >= NarrowWidth)
+        {
+            _editor.Dock = DockStyle.Right;
+            _editor.Width = TransitionEditorPanel.DefaultWidth;
+            _editor.Visible = true;
+            _editorBar.Visible = false;
+            _playlists.Visible = _queueList.Visible = true;
+            return;
+        }
+        // A sidebar can be short (MusicBee stacks its panels), so the editor and the lists do
+        // not share it: the editor is a page in their place, scrolling inside, with the transport
+        // still above it for capture by ear.
+        var open = _editor.Adjacency is not null;
+        _editor.Dock = DockStyle.Fill;
+        _editorBar.Visible = open;
+        _editor.Visible = open;
+        _playlists.Visible = _queueList.Visible = !open;
     }
 
     private static int WidthOf(QueueColumn column) => column switch
@@ -381,6 +426,7 @@ internal sealed class PluginView : UserControl
 
     private const int MinTitleWidth = 100;
     private const int MinArtistWidth = 60;
+    private const int EditColumnWidth = 28;
 
     /// <summary>The title takes what the other columns leave, and where that would squeeze it
     /// below its least, Artist gives way to its floor, as the App's columns do: in a sidebar the
@@ -388,7 +434,7 @@ internal sealed class PluginView : UserControl
     private void FitTitle()
     {
         var (number, title, artist, length) = (_queueList.Columns[0], _queueList.Columns[1], _queueList.Columns[2], _queueList.Columns[3]);
-        var free = _queueList.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - number.Width - length.Width;
+        var free = _queueList.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - number.Width - length.Width - EditColumnWidth;
         var artistWidth = Math.Max(MinArtistWidth, Math.Min(WidthOf(QueueColumn.Artist), free - MinTitleWidth));
         if (artist.Width != artistWidth)
         {
@@ -405,14 +451,11 @@ internal sealed class PluginView : UserControl
 
     // ── Commands: one intent, one engine call ───────────────────────────────────────────
 
-    /// <summary>▶ from stopped or paused starts sound, so MusicBee's player is stopped first;
+    /// <summary>▶ while faderio is silent starts sound, so MusicBee's player is stopped first;
     /// ⏸ starts nothing and leaves it alone.</summary>
     private void TogglePlayPause()
     {
-        if (_engine.View.Transport != Transport.Playing)
-        {
-            _stopMusicBeesPlayer();
-        }
+        StopMusicBeesPlayerIfSilent();
         _engine.TogglePlayPause(_queueList.SelectedItems.Count == 1 ? RowOf(_queueList.SelectedItems[0]) : null);
     }
 
@@ -428,6 +471,61 @@ internal sealed class PluginView : UserControl
     }
 
     internal void SeekTo(Playhead playhead) => _engine.Seek(playhead);
+
+    /// <summary>Before faderio starts to sound, from ▶ or a preview: MusicBee's player stops
+    /// unless faderio sounds already and so already has the device.</summary>
+    private void StopMusicBeesPlayerIfSilent()
+    {
+        if (!_engine.View.IsSounding)
+        {
+            _stopMusicBeesPlayer();
+        }
+    }
+
+    // ── The editor ──────────────────────────────────────────────────────────────────────
+
+    /// <summary>The one selected row's adjacencies, from the engine; none for no row or several.</summary>
+    private RowAdjacencies SelectedAdjacencies() =>
+        _queueList.SelectedIndices.Count == 1 ? AdjacenciesAt(_queueList.SelectedIndices[0]) : RowAdjacencies.None;
+
+    /// <summary>The editor's adjacencies for the row at <paramref name="index"/>, from the
+    /// engine; none for a row out of range.</summary>
+    private RowAdjacencies AdjacenciesAt(int index) =>
+        index >= 0 && index < _queueList.Items.Count ? _engine.AdjacenciesOf(RowOf(_queueList.Items[index])) : RowAdjacencies.None;
+
+    /// <summary>✎ on a row: the editor opens on its this → next, as the menu's first item does.</summary>
+    internal void EditTransitionAt(int index) => Edit(AdjacenciesAt(index).Next);
+
+    /// <summary>Opens the editor on an adjacency, and shows it where a sidebar hides it.</summary>
+    private void Edit(Adjacency? adjacency)
+    {
+        if (adjacency is null)
+        {
+            return;
+        }
+        _editor.Open(adjacency);
+        PlaceEditor(); // shown now, in a sidebar
+    }
+
+    /// <summary>Settles the editor's unsaved edits and empties it: before the open playlist
+    /// changes under it, and from the sidebar's Close.</summary>
+    private bool LeaveEditor()
+    {
+        if (!_editor.ConfirmLeave())
+        {
+            return false;
+        }
+        _editor.Close();
+        PlaceEditor();
+        return true;
+    }
+
+    /// <summary>The Close editor bar: the lists come back once the editor is settled.</summary>
+    internal void CloseEditor() => LeaveEditor();
+
+    /// <summary>Asks what to do with the editor's unsaved edits before it leaves them. A test
+    /// replaces it.</summary>
+    internal Func<Adjacency, UnsavedEdits> AskUnsavedEdits { get; set; }
 
     /// <summary>The selected rows go in one call; what that does to playback is the engine's.</summary>
     private void RemoveSelected() =>

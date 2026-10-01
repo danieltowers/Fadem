@@ -371,7 +371,8 @@ which a background run cannot give.
 - [ ] **The view** (phase 5 issue 10), placed as above and present after a restart: under a
       "faderio" header, the transport row ⏮ ▶ ⏹ ⏭ ⤳ 🔀 🔁, then −5 s, the seek bar, +5 s and
       "0:00 / -0:00"; **Playlists** listing the library's playlists with the open one bold on
-      yellow; the queue with #, Title, Artist and Length and row 1 marked at rest; the strip
+      yellow; the queue with #, Title, Artist, Length and a ✎ on every row but the last, bold
+      where this → next is authored (phase 5 issue 11), and row 1 marked at rest; the strip
       reading "Ready." and, at its right, "library · WASAPI shared at 48000 Hz". In the
       sidebar as shipped (284 px) the seven buttons fit one row, the playlists sit above the
       queue, no column is off the edge, and the host line is cut short with its whole text as
@@ -409,6 +410,32 @@ which a background run cannot give.
       catch { "exclusive: refused ($($_.Exception.GetBaseException().Message))" }
       finally { $out.Dispose() }
       ```
+- [ ] **The editor in a sidebar** (phase 5 issue 11). No editor shows until ✎ on row 1 is
+      clicked: then "tone-a-440 → tone-b-660" opens as a page in the lists' place, under the
+      transport and a **Close editor** bar, with the authored values in its fields, Editing:
+      Global ticked, every field, From end, the curve, Preview, Save, Revert, Remove transition
+      and Render live, scrolling inside where the panel is short (MusicBee stacks its sidebar
+      panels); at 284 px Save / Revert / Remove transition wrap onto two rows rather than being
+      cut off at the edge. **Close editor** empties it and brings the lists back; with an
+      unsaved edit it asks first, as the playlist switch below does.
+- [ ] **The editor in a main panel** (the element moved to `LC_RightMainPanel` as above): the
+      editor is docked at the right from the start, 340 px wide, reading "No boundary
+      selected" with its fields greyed, and no Close bar; ✎ on row 1 fills it.
+- [ ] **A save and its notice.** Fade-out duration typed as "abc", Save: the strip reads "Not
+      saved: …" with a **1 notice** link and no box appears; the reason shows in red under the
+      field. Typed as 3, Save: "Saved tone-a-440 → tone-b-660." in the strip, ✎ on row 1 bold,
+      and the library's `transitions.json` holds the 3 s fade-out duration, as standalone
+      faderio would have saved it.
+- [ ] **Preview** from the editor with faderio stopped: the meter shows sound, ▶ and the
+      readout stay as they were ("0:00 / -0:00"), both Capture buttons come live, the button
+      reads **Preview again**, **Stop preview** is live and the line under them says where the
+      preview is ("Pre-roll · outgoing 0:05"). **Stop preview**: meter 0, the buttons as before.
+      Then **▶** plays the queue from its start, and **⏹** stops it.
+- [ ] **Leaving the editor with unsaved edits** (a duration typed, not saved), by **Close
+      editor** in a sidebar or a click on another playlist in a main panel, asks "Save your
+      changes to tone-a-440 → tone-b-660?" in a Yes / No / Cancel box titled "Unsaved
+      transition", owned by MusicBee's window; Cancel leaves the queue and the draft as they
+      were.
 - [ ] **Edit → Edit Preferences → Plugins** lists faderio with a **Configure…** button, which
       opens faderio's dialog, owned by MusicBee's main window. It shows the settings file's
       library folder and its output mode by name ("WASAPI shared"), with "Applies when MusicBee
@@ -430,6 +457,11 @@ which a background run cannot give.
       playlist: the two players never sound at once. So do the view's **▶** and a row's
       double-click (phase 5 issue 10).
 - [ ] An authored crossfade in the open playlist is heard as in standalone faderio.
+- [ ] **Preview** in the plugin's editor (phase 5 issue 11) is heard as standalone faderio's
+      preview of the same draft: the pre-roll, the crossfade, the tail, then silence with the
+      queue where it was. With MusicBee playing a track, Preview stops it first.
+- [ ] A transition authored in MusicBee's editor plays the same in standalone faderio opened
+      on that library, and one authored in standalone faderio plays the same in MusicBee.
 - [ ] After faderio's **Stop**, MusicBee's own player plays again straight away on WASAPI
       shared, and within a few seconds on WASAPI exclusive (the output mode in faderio's
       Configure… dialog, then a MusicBee restart). In exclusive, MusicBee's "unable to start

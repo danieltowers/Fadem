@@ -64,6 +64,64 @@ public sealed class HeadlessControlsTests
         Assert.Equal(30_000, bar.PlayheadAt(SeekBar.Inset + (400 - 2 * SeekBar.Inset) / 2).Milliseconds);
     });
 
+    [Fact]
+    public void TheRowStyle_MarksTheAttendedRow_AndSetsThePencil_BoldWhileAuthored_BlankOnTheLastRow() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        var a = tc.TrackOfLength(Path.Combine(tc.TempDir, "a.wav"), 30);
+        var b = tc.TrackOfLength(Path.Combine(tc.TempDir, "b.wav"), 30);
+        tc.Engine.AddTracks(new[] { a, b });
+        tc.Engine.Author(new Adjacency(a, b), new TransitionSpec { FadeOutPoint = TimeSpan.FromSeconds(20) });
+        var view = tc.View;
+        using var style = new QueueRowStyle();
+        using var list = new ListView { View = View.Details };
+        list.Columns.Add("#"); list.Columns.Add("Title"); list.Columns.Add("");
+        var rows = view.Queue.Select(r => new ListViewItem(new[] { "", r.Track.Title, "" }) { UseItemStyleForSubItems = false }).ToList();
+        list.Items.AddRange(rows.ToArray());
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            style.Apply(rows[i], view.Queue[i], i, view, editColumn: 2);
+        }
+
+        Assert.Equal("1", rows[0].Text);
+        Assert.Equal(RowMarks.Resting, rows[0].SubItems[1].BackColor); // the attended row, at rest
+        Assert.Equal(SystemColors.Window, rows[1].SubItems[1].BackColor);
+        Assert.Equal("✎", rows[0].SubItems[2].Text);
+        Assert.True(rows[0].SubItems[2].Font.Bold);
+        Assert.Equal(SystemColors.WindowText, rows[0].SubItems[2].ForeColor);
+        Assert.Equal("", rows[1].SubItems[2].Text); // the last row has no next
+
+        tc.Engine.Unauthor(new Adjacency(a, b));
+        style.Apply(rows[0], tc.View.Queue[0], 0, tc.View, editColumn: 2);
+
+        Assert.Equal("✎", rows[0].SubItems[2].Text);
+        Assert.False(rows[0].SubItems[2].Font.Bold);
+        Assert.Equal(SystemColors.GrayText, rows[0].SubItems[2].ForeColor);
+    });
+
+    [Fact]
+    public void TheEditorsButtonRows_WrapInASidebar_AndNotAtTheAppsWidth() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        var a = tc.TrackOfLength(Path.Combine(tc.TempDir, "a.wav"), 30);
+        var b = tc.TrackOfLength(Path.Combine(tc.TempDir, "b.wav"), 30);
+        tc.Engine.AddTracks(new[] { a, b });
+        using var editor = new TransitionEditorPanel(tc.Engine, _ => { }, _ => null, _ => UnsavedEdits.Discard) { Height = 800 };
+        editor.Open(new Adjacency(a, b));
+
+        editor.Width = 340; // standalone faderio's
+        editor.PerformLayout();
+        Assert.Equal(editor._save.Top, editor._remove.Top); // one row
+
+        editor.Width = 265; // a sidebar's, less a scroll bar
+        editor.PerformLayout();
+
+        Assert.True(editor._remove.Top > editor._save.Top, "Remove transition did not wrap below Save");
+        Assert.True(editor._remove.Right <= editor._remove.Parent!.ClientSize.Width, "Remove transition is off the edge");
+        Assert.True(editor._save.Parent!.Height >= 64, $"the wrapped row is only {editor._save.Parent!.Height} px tall");
+    });
+
     /// <summary>WinForms wants an STA thread; xunit does not give one.</summary>
     private static void RunSta(Action body)
     {

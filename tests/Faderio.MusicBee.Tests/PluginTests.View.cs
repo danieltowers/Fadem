@@ -44,7 +44,7 @@ public sealed partial class PluginTests
         Assert.Equal(DockStyle.Fill, view.Dock);
         view.Render();
         Assert.Equal(expected.Playlists, view._playlists._list.Items.Cast<ListViewItem>().Select(i => i.Text));
-        Assert.Equal(new[] { "#", "Title", "Artist", "Length" }, view._queueList.Columns.Cast<ColumnHeader>().Select(c => c.Text));
+        Assert.Equal(new[] { "#", "Title", "Artist", "Length", "" }, view._queueList.Columns.Cast<ColumnHeader>().Select(c => c.Text));
         Assert.Equal(
             new[] { Path.GetFileNameWithoutExtension(a), Path.GetFileNameWithoutExtension(b) },
             view._queueList.Items.Cast<ListViewItem>().Select(i => i.SubItems[1].Text));

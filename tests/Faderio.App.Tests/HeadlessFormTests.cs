@@ -1720,12 +1720,12 @@ public sealed partial class HeadlessFormTests
         var (a, _, c) = ThreeQueued(h);
 
         OpenMenuOn(h.Form._queueList, 2);
-        Assert.False(h.Form._editNext.Enabled);
+        Assert.False(h.Form._editMenu.Next.Enabled);
 
         h.Engine.SetRepeat(RepeatMode.All);
         OpenMenuOn(h.Form._queueList, 2);
-        Assert.True(h.Form._editNext.Enabled);
-        Click(h.Form._editNext);
+        Assert.True(h.Form._editMenu.Next.Enabled);
+        Click(h.Form._editMenu.Next);
 
         Assert.Equal((c, a), Opened(h));
     });
@@ -1737,7 +1737,7 @@ public sealed partial class HeadlessFormTests
         var (_, b, c) = ThreeQueued(h);
 
         OpenMenuOn(h.Form._queueList, 1);
-        Click(h.Form._editNext);
+        Click(h.Form._editMenu.Next);
 
         Assert.Equal((b, c), Opened(h));
     });
@@ -1749,11 +1749,11 @@ public sealed partial class HeadlessFormTests
         var (a, b, _) = ThreeQueued(h);
 
         OpenMenuOn(h.Form._queueList, 0);
-        Assert.False(h.Form._editPrevious.Enabled);
+        Assert.False(h.Form._editMenu.Previous.Enabled);
 
         OpenMenuOn(h.Form._queueList, 1);
-        Assert.True(h.Form._editPrevious.Enabled);
-        Click(h.Form._editPrevious);
+        Assert.True(h.Form._editMenu.Previous.Enabled);
+        Click(h.Form._editMenu.Previous);
 
         Assert.Equal((a, b), Opened(h));
     });
@@ -1765,13 +1765,13 @@ public sealed partial class HeadlessFormTests
         var (_, b, _) = ThreeQueued(h);
 
         OpenMenuOn(h.Form._queueList, 1);
-        Assert.False(h.Form._editSelf.Available);
+        Assert.False(h.Form._editMenu.Self.Available);
 
         h.Engine.SetRepeat(RepeatMode.One);
         OpenMenuOn(h.Form._queueList, 1);
-        Assert.True(h.Form._editSelf.Available);
-        Assert.True(h.Form._editSelf.Enabled);
-        Click(h.Form._editSelf);
+        Assert.True(h.Form._editMenu.Self.Available);
+        Assert.True(h.Form._editMenu.Self.Enabled);
+        Click(h.Form._editMenu.Self);
 
         Assert.Equal((b, b), Opened(h));
     });
@@ -1783,11 +1783,11 @@ public sealed partial class HeadlessFormTests
         ThreeQueued(h);
 
         OpenMenu(h.Form._queueList); // nothing selected
-        Assert.False(h.Form._editNext.Enabled);
-        Assert.False(h.Form._editPrevious.Enabled);
-        Assert.Contains("this → next", h.Form._editNext.Text);
-        Assert.Contains("previous → this", h.Form._editPrevious.Text);
-        Assert.Contains("this → this", h.Form._editSelf.Text);
+        Assert.False(h.Form._editMenu.Next.Enabled);
+        Assert.False(h.Form._editMenu.Previous.Enabled);
+        Assert.Contains("this → next", h.Form._editMenu.Next.Text);
+        Assert.Contains("previous → this", h.Form._editMenu.Previous.Text);
+        Assert.Contains("this → this", h.Form._editMenu.Self.Text);
     });
 
     // ── The row button (interim transport 07) ───────────────────────────────────────────
@@ -1816,7 +1816,7 @@ public sealed partial class HeadlessFormTests
         Assert.Equal((b, c), Opened(h));
         Assert.Equal(h.Engine.AdjacenciesOf(h.Engine.View.Queue[1].Id).Next!.Name, h.Form._editor._title.Text);
         OpenMenuOn(h.Form._queueList, 1);
-        Click(h.Form._editNext);
+        Click(h.Form._editMenu.Next);
         Assert.Equal((b, c), Opened(h));
     });
 
