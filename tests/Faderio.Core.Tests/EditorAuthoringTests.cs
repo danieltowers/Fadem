@@ -83,8 +83,8 @@ public sealed class EditorAuthoringTests
         tc.Play(a);
         tc.Output.Advance(12345 + Latency);
 
-        var fromStart = tc.Engine.Capture(CaptureSide.FadeOut)!.Value;
-        var fromEnd = tc.Engine.Capture(CaptureSide.FadeOut, fromEnd: true)!.Value;
+        var fromStart = tc.Engine.Capture(tc.AdjacencyOf(a, a), CaptureSide.FadeOut)!.Value;
+        var fromEnd = tc.Engine.Capture(tc.AdjacencyOf(a, a), CaptureSide.FadeOut, fromEnd: true)!.Value;
 
         Assert.Equal(12345, Ticks.FramesOf(fromStart.TimeSpan, Rate));
         Assert.Equal(4 * Rate - 12345, Ticks.FramesOf(fromEnd.TimeSpan, Rate));
@@ -94,8 +94,10 @@ public sealed class EditorAuthoringTests
     public void CaptureFromEnd_WhenNothingPlays_IsNull()
     {
         using var tc = TestEngine.Create();
+        var a = TestAudio.WriteDcWav("capture-end.wav", 4, 0.4);
+        tc.Add(a);
 
-        Assert.Null(tc.Engine.Capture(CaptureSide.FadeOut, fromEnd: true));
+        Assert.Null(tc.Engine.Capture(tc.AdjacencyOf(a, a), CaptureSide.FadeOut, fromEnd: true));
     }
 
     // ── Curve ────────────────────────────────────────────────────────────────────────────

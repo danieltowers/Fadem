@@ -107,6 +107,17 @@ internal static class Presenter
         : string.IsNullOrEmpty(track.Artist) ? track.Title
         : $"{track.Title} — {track.Artist}";
 
+    /// <summary>A Capture button's tooltip, naming the track whose playhead it reads (phase 6
+    /// issue 06).</summary>
+    public static string FmtCaptureTip(Track track) => $"Capture {TitleOf(track)}'s playhead";
+
+    /// <summary>The line under a greyed Capture button's field: what to play so it can capture. A
+    /// preview plays both of the boundary's tracks, so it always serves.</summary>
+    public static string FmtCaptureHint(Track track) => $"Play {TitleOf(track)} or preview to capture";
+
+    private static string TitleOf(Track track) =>
+        string.IsNullOrEmpty(track.Title) ? Path.GetFileNameWithoutExtension(track.FilePath) : track.Title;
+
     /// <summary>A gone track's tooltip in the manager (phase 3 issue 02).</summary>
     public static string FmtGoneTip(Track track) => $"Not found where the store says: {track.FilePath}";
 

@@ -155,6 +155,11 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       puts the transition back, "Undone: removed …".
 - [ ] Pressing capture writes a number into the field, and it is the number the time readout
       showed at that moment.
+- [ ] Capture reads the open transition's own tracks (phase 6 issue 06). Track a playing, the
+      editor on b → c: both Capture buttons greyed, the grey line under the fade-out point reads
+      "Play *b* or preview to capture", under the fade-in point the same for *c*. Play b: the
+      fade-out Capture comes live, its line goes, its tooltip reads "Capture *b*'s playhead";
+      the fade-in one stays greyed. A preview of b → c makes both live.
 - [ ] Beside each **point** box (not the durations) sit **−** and **+**. Each press moves the
       number shown by 0.1, Shift-click by 1; with **From end** ticked, + makes the from-end number
       bigger. They stop at 0 and at the track's length, and are greyed out while the box is blank
@@ -266,7 +271,8 @@ sharp percussive transient; the realism check is the authored boundary from the 
 - [ ] The outgoing track plays clean — no buzz, no silence, correct pitch, correct speed.
 - [ ] Seeking lands where the bar was released, within the track — not at a tenth-of-track
       grid point.
-- [ ] Capture at a drum hit; play the boundary; the fade **starts on the hit**, not after it.
+- [ ] With the hit's track playing, capture at a drum hit; play the boundary; the fade **starts
+      on the hit**, not after it.
 - [ ] Seek back a few seconds and listen again; the point still lands on the hit.
 - [ ] Tick **From end**, capture the fade-out point on a drum hit (it saves). Play through into
       the next track; the fade starts on the hit.
@@ -443,6 +449,10 @@ which a background run cannot give.
       reads **Preview again**, **Stop preview** is live and the line under them says where the
       preview is ("Pre-roll · outgoing 0:05"). **Stop preview**: meter 0, the buttons as before.
       Then **▶** plays the queue from its start, and **⏹** stops it.
+- [ ] **Capture reads its own track** (phase 6 issue 06). Row 1 playing, the editor on row 2's
+      ✎: both Capture buttons greyed, a grey line under each point names its track ("Play *b*
+      or preview to capture"). Playing row 2 brings the fade-out Capture live, its line gone and
+      its tooltip "Capture *b*'s playhead"; the fade-in one stays greyed.
 - [ ] **Leaving the editor with a box being typed in** (a duration typed, not yet left), by
       **Close editor** in a sidebar or a click on another playlist in a main panel, asks
       nothing: the duration is saved ("Saved …" in the strip) and the editor goes.

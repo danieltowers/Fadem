@@ -1,6 +1,6 @@
 # 06: Capture reads the open transition's own tracks
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Phase 6, improvements round 1, both hosts (the editor panel is shared). Raised 2026-10-02: "the
@@ -86,9 +86,38 @@ the fade starts on the hit", now with the hit's track playing.
 
 ## Acceptance criteria
 
-- [ ] A capture never writes another track's playhead into a point.
-- [ ] A Capture button is live only while its own track is heard, in both hosts.
-- [ ] The editor says which track a capture reads, and what to play when it cannot.
-- [ ] Preview captures as before.
+- [x] A capture never writes another track's playhead into a point.
+- [x] A Capture button is live only while its own track is heard, in both hosts.
+- [x] The editor says which track a capture reads, and what to play when it cannot.
+- [x] Preview captures as before.
 
 ## Comments
+
+- **Resolved 2026-10-02.** Built as specified, with these choices:
+  - **Engine:** `Capture(adjacency, side, fromEnd)` and `CanCapture(adjacency, side)` share
+    one lookup, `VoiceFor`: a preview of the same pair of files gives its voice for the side;
+    otherwise the attended or incoming voice whose track has the side's file path. `CanCapture`
+    reads the published view without the lock, as `AdjacenciesOf` does. A paused queue's
+    attended voice still counts, as it did before (capture while paused at a spot). So does the
+    held queue's voice during a preview of *another* adjacency. That case is unreachable from the
+    editor, which stops a preview when it opens another adjacency.
+  - **Words:** the tooltip is "Capture *title*'s playhead". The hint is one form, "Play *title*
+    or preview to capture", since a preview always serves. The engine's notice names the file
+    stem, as its other notices do.
+  - **Layout:** the two hint lines pushed Render below the fold at the default 1240 × 600
+    window. The panel was tightened to fit again: field label rows 24 → 20, curve row 34 → 28,
+    the editor's buttons 32 → 30, From end with no vertical margin. UIA reports no scrollable
+    pane in the editor at the default size.
+  - **Tests:** `CaptureOwnTracksTests`, 8 tests on both targets; `EditorCapturesOwnTracksTests`,
+    3 tests on both targets. The old single-track callers capture through `AdjacencyOf(a, a)`.
+  - **Smoke (standalone).** The build on a scratch library with tone-a, tone-b and tone-c, editor
+    on tone-a → tone-b:
+    - ✅ Stopped: both Capture buttons greyed, "Play tone-a or preview to capture" and "Play
+      tone-b or preview to capture" under the fields, Render in view.
+    - ✅ tone-a playing: the fade-out Capture live and its line gone, the fade-in one greyed with
+      its line. A click saved 4.44 s ("Saved tone-a → tone-b.").
+    - ✅ After the queue moved on to tone-b, the fade-in side was live and the fade-out greyed.
+      A press that raced the handover was told "Nothing captured: tone-a is not playing."
+    - ✅ Preview: both live.
+    - Not seen: the tooltips (WinForms tooltips are not UIA help text).
+    - The MusicBee Looks item was not run in this session.

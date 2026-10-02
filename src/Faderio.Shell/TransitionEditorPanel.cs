@@ -44,6 +44,9 @@ internal sealed class TransitionEditorPanel : Panel
     internal readonly ComboBox _curve;
     internal readonly Button _captureOut;
     internal readonly Button _captureIn;
+    internal readonly Label _captureOutHint;
+    internal readonly Label _captureInHint;
+    internal readonly ToolTip _captureTips = new();
     internal readonly Button _fadeOutLess;
     internal readonly Button _fadeOutMore;
     internal readonly Button _fadeInLess;
@@ -169,30 +172,30 @@ internal sealed class TransitionEditorPanel : Panel
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         row++;
 
-        _fadeOutFromEnd = new CheckBox { Text = "From end", Dock = DockStyle.Fill, Enabled = false };
-        _fadeOutPoint = Field(layout, ref row, TransitionField.FadeOutPoint, "Fade-out point (s)", _fadeOutFromEnd, out _captureOut, "Capture");
+        _fadeOutFromEnd = new CheckBox { Text = "From end", Dock = DockStyle.Fill, Enabled = false, Margin = new Padding(3, 0, 3, 0) };
+        _fadeOutPoint = Field(layout, ref row, TransitionField.FadeOutPoint, "Fade-out point (s)", _fadeOutFromEnd, out _captureOut, "Capture", out _captureOutHint);
         (_fadeOutLess, _fadeOutMore) = NudgeButtons(_fadeOutPoint);
-        _fadeOutDuration = Field(layout, ref row, TransitionField.FadeOutDuration, "Fade-out duration (s)", null, out _, null);
-        _fadeInPoint = Field(layout, ref row, TransitionField.FadeInPoint, "Fade-in point (s)", null, out _captureIn, "Capture");
+        _fadeOutDuration = Field(layout, ref row, TransitionField.FadeOutDuration, "Fade-out duration (s)", null, out _, null, out _);
+        _fadeInPoint = Field(layout, ref row, TransitionField.FadeInPoint, "Fade-in point (s)", null, out _captureIn, "Capture", out _captureInHint);
         (_fadeInLess, _fadeInMore) = NudgeButtons(_fadeInPoint);
-        _fadeInDuration = Field(layout, ref row, TransitionField.FadeInDuration, "Fade-in duration (s)", null, out _, null);
+        _fadeInDuration = Field(layout, ref row, TransitionField.FadeInDuration, "Fade-in duration (s)", null, out _, null, out _);
 
         _curve = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill, Enabled = false };
         ListCurves();
         ShowCurve(FadeCurveKind.EqualPower);
         layout.Controls.Add(new Label { Text = "Fade curve", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, row);
         layout.Controls.Add(_curve, 1, row);
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         row++;
 
         // Narrower than the panel with its scroll bar showing, so it never scrolls sideways.
-        _undo = new Button { Text = "Undo", Width = 72, Height = 32, Enabled = false };
-        _redo = new Button { Text = "Redo", Width = 72, Height = 32, Enabled = false };
-        _remove = new Button { Text = "Remove transition", Width = 124, Height = 32, Enabled = false };
-        _removeOverride = new Button { Text = "Remove override", Width = 124, Height = 32, Enabled = false, Visible = false };
-        _render = new Button { Text = "Render this boundary", Width = 160, Height = 32, Enabled = false };
-        _preview = new Button { Text = "Preview", Width = 110, Height = 32, Enabled = false };
-        _stopPreview = new Button { Text = "Stop preview", Width = 110, Height = 32, Enabled = false };
+        _undo = new Button { Text = "Undo", Width = 72, Height = 30, Enabled = false };
+        _redo = new Button { Text = "Redo", Width = 72, Height = 30, Enabled = false };
+        _remove = new Button { Text = "Remove transition", Width = 124, Height = 30, Enabled = false };
+        _removeOverride = new Button { Text = "Remove override", Width = 124, Height = 30, Enabled = false, Visible = false };
+        _render = new Button { Text = "Render this boundary", Width = 160, Height = 30, Enabled = false };
+        _preview = new Button { Text = "Preview", Width = 110, Height = 30, Enabled = false };
+        _stopPreview = new Button { Text = "Stop preview", Width = 110, Height = 30, Enabled = false };
         ButtonRow(layout, ref row, _preview, _stopPreview);
         _previewStatus = new Label { AutoSize = true, MaximumSize = new Size(300, 0), Margin = new Padding(3, 0, 3, 8), Visible = false };
         layout.Controls.Add(_previewStatus, 0, row);
@@ -317,20 +320,33 @@ internal sealed class TransitionEditorPanel : Panel
 
     private TextBox Field(
         TableLayoutPanel layout, ref int row, TransitionField field, string label, Control? beside,
-        out Button button, string? buttonText)
+        out Button button, string? buttonText, out Label hint)
     {
         layout.Controls.Add(new Label { Text = label, Dock = DockStyle.Fill, TextAlign = ContentAlignment.BottomLeft }, 0, row);
         if (beside is not null)
         {
             layout.Controls.Add(beside, 1, row);
         }
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 20));
         row++;
         var box = new TextBox { Dock = DockStyle.Fill, Enabled = false };
         layout.Controls.Add(box, 0, row);
         button = new Button { Text = buttonText ?? "", Dock = DockStyle.Fill, Enabled = false, Visible = buttonText is not null };
         layout.Controls.Add(button, 1, row);
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+        row++;
+        // What to play so the button can capture; shown only while it is greyed (phase 6 issue 06).
+        hint = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(280, 0),
+            ForeColor = SystemColors.GrayText,
+            Visible = false,
+            Margin = new Padding(3, 0, 3, 0),
+        };
+        layout.Controls.Add(hint, 0, row);
+        layout.SetColumnSpan(hint, 2);
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         row++;
         // Hidden until a value is refused; an auto-sized row with nothing visible takes no room.
         var reason = new Label
@@ -595,10 +611,11 @@ internal sealed class TransitionEditorPanel : Panel
         _missing.Text = _adjacency is { } adjacency ? Presenter.FmtMissing(adjacency) : "";
         _missing.Visible = _missing.Text.Length > 0;
         ShowNudges();
+        ShowCaptures();
     }
 
-    /// <summary>Called on every render: the capture buttons live only while a voice is attended
-    /// or a preview runs, and the preview's buttons and line follow the preview.</summary>
+    /// <summary>Called on every render: each capture button live only while its own track is
+    /// heard, as the engine says, and the preview's buttons and line follow the preview.</summary>
     public void Refresh(PlayerView view)
     {
         var choice = PlaylistChoice(view.OpenPlaylist);
@@ -607,15 +624,37 @@ internal sealed class TransitionEditorPanel : Panel
             _editPlaylist.Text = choice;
         }
         ShowSelector(view.OpenPlaylist);
-        var canCapture = _adjacency is not null && !Gone && (view.Attended is not null || view.Preview is not null);
-        _captureOut.Enabled = canCapture;
-        _captureIn.Enabled = canCapture;
+        ShowCaptures();
         _preview.Text = view.Preview is null ? "Preview" : "Preview again";
         _stopPreview.Enabled = view.Preview is not null;
         _previewStatus.Text = Presenter.FmtPreview(view.Preview);
         _previewStatus.Visible = view.Preview is not null; // no room kept for it otherwise
         ShowHistory(_undo, "Undo", view.NextUndo);
         ShowHistory(_redo, "Redo", view.NextRedo);
+    }
+
+    private void ShowCaptures()
+    {
+        ShowCapture(_captureOut, _captureOutHint, CaptureSide.FadeOut);
+        ShowCapture(_captureIn, _captureInHint, CaptureSide.FadeIn);
+    }
+
+    /// <summary>A Capture button is live while the engine would find its track's voice, and its
+    /// tooltip names the track. Greyed on an adjacency that can be played, the line under its field
+    /// says what to play, since a disabled button shows no tooltip; a gone one has no line.</summary>
+    private void ShowCapture(Button button, Label hint, CaptureSide side)
+    {
+        var track = _adjacency is { } a ? (side == CaptureSide.FadeOut ? a.Outgoing : a.Incoming) : null;
+        var playable = _adjacency is not null && !Gone;
+        var live = playable && _engine.CanCapture(_adjacency!, side);
+        button.Enabled = live;
+        var tip = track is null ? "" : Presenter.FmtCaptureTip(track);
+        if (_captureTips.GetToolTip(button) != tip)
+        {
+            _captureTips.SetToolTip(button, tip);
+        }
+        hint.Text = track is null ? "" : Presenter.FmtCaptureHint(track);
+        hint.Visible = playable && !live;
     }
 
     /// <summary>Undo and Redo live while the engine has a change to walk, and say which.</summary>
@@ -677,10 +716,11 @@ internal sealed class TransitionEditorPanel : Panel
         _editPlaylist.Enabled = _adjacency is not null && openPlaylist is not null;
     }
 
-    /// <summary>A capture that captured nothing leaves the field as it was; the engine says why.</summary>
+    /// <summary>A capture reads the open adjacency's own track; one that captured nothing leaves
+    /// the field as it was, and the engine says why.</summary>
     internal void CaptureFadeOut()
     {
-        if (_engine.Capture(CaptureSide.FadeOut, fromEnd: _fadeOutFromEnd.Checked) is { } point)
+        if (_adjacency is not null && _engine.Capture(_adjacency, CaptureSide.FadeOut, fromEnd: _fadeOutFromEnd.Checked) is { } point)
         {
             ShowFadeOut(point);
             CommitNow();
@@ -689,7 +729,7 @@ internal sealed class TransitionEditorPanel : Panel
 
     internal void CaptureFadeIn()
     {
-        if (_engine.Capture(CaptureSide.FadeIn) is { } point)
+        if (_adjacency is not null && _engine.Capture(_adjacency, CaptureSide.FadeIn) is { } point)
         {
             _fadeIn = point;
             _fadeInPoint.Text = Presenter.FmtSeconds(point);

@@ -251,3 +251,16 @@ heading line needs no comparison of its own. `IsAuthored` and `Preview` take a
 override over the stored global, and a global draft plays under the stored override, as the
 playlist would. The engine resolves every adjacency (boundary, Transition now, preview, the
 join, and the rows' ✎ marks) with the open playlist's override.
+
+## Addendum: capture reads the open adjacency's own tracks (2026-10-02)
+
+`Capture(adjacency, side, fromEnd)` replaces `Capture(side, fromEnd)`
+([phase 6 issue 06](../../.scratch/202609-faderio-phase-6-musicbee-improvements-round-1/issues/06-capture-reads-the-open-transitions-own-tracks.md)).
+The fade-out point reads the adjacency's outgoing track and the fade-in point its incoming
+track, never merely the attended voice: with A playing and the editor on B → C, the old call
+wrote A's playhead into B's point. During a preview of that adjacency each side reads the
+preview's voice, as above. Otherwise the voice is the attended one, or a live crossfade's
+incoming one, whose track has that file path; with none, the capture returns nothing and says
+"*track* is not playing". `CanCapture(adjacency, side)` says whether a voice would be found, so
+the editor greys each button by the engine's answer and compares no tracks. It stays true
+through a preview of the adjacency, so an early or late press is still told by notice.

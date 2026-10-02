@@ -50,7 +50,7 @@ public sealed class SeamTests
         tc.Play(a, b);
         tc.Output.Advance(66150 + Latency); // rendered 1.6 s; the listener has heard 1.5 s
 
-        var point = tc.Engine.Capture(CaptureSide.FadeOut);
+        var point = tc.Engine.Capture(tc.AdjacencyOf(a, b), CaptureSide.FadeOut);
         Assert.NotNull(point);
         Assert.Equal(1.5, point!.Value.TotalSeconds, 4);
 
@@ -81,7 +81,7 @@ public sealed class SeamTests
         tc.Play(a);
         tc.Output.Advance(12345 + Latency);
 
-        var point = tc.Engine.Capture(CaptureSide.FadeOut)!.Value;
+        var point = tc.Engine.Capture(tc.AdjacencyOf(a, a), CaptureSide.FadeOut)!.Value;
         Assert.Equal(tc.View.Attended!.Playhead.TimeSpan, point.TimeSpan);
         Assert.Equal(12345, Ticks.FramesOf(point.TimeSpan, Rate)); // frame-exact, not "0.###"
     }

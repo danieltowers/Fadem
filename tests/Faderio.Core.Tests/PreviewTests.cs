@@ -166,7 +166,7 @@ public sealed class PreviewTests
         tc.Engine.Preview(tc.AdjacencyOf(a, b), Fade(12, 2, fadeInPoint: 4, fadeIn: 2));
         tc.Output.Advance(2 * Second);
 
-        Assert.Null(tc.Engine.Capture(CaptureSide.FadeIn));
+        Assert.Null(tc.Engine.Capture(tc.AdjacencyOf(a, b), CaptureSide.FadeIn));
         Assert.Contains(tc.Notices, n => n.Contains("incoming track has not started yet"));
     }
 
@@ -178,10 +178,10 @@ public sealed class PreviewTests
         tc.Engine.Preview(tc.AdjacencyOf(a, b), Fade(12, 2, fadeInPoint: 4, fadeIn: 2));
         tc.Output.Advance(5 * Second + Second / 2); // half a second into the transition
 
-        Assert.Equal(12.5, tc.Engine.Capture(CaptureSide.FadeOut)!.Value.TotalSeconds, 3);
-        Assert.Equal(4.5, tc.Engine.Capture(CaptureSide.FadeIn)!.Value.TotalSeconds, 3);
+        Assert.Equal(12.5, tc.Engine.Capture(tc.AdjacencyOf(a, b), CaptureSide.FadeOut)!.Value.TotalSeconds, 3);
+        Assert.Equal(4.5, tc.Engine.Capture(tc.AdjacencyOf(a, b), CaptureSide.FadeIn)!.Value.TotalSeconds, 3);
         // From the end of the previewed outgoing track, 20 s long.
-        Assert.Equal(7.5, tc.Engine.Capture(CaptureSide.FadeOut, fromEnd: true)!.Value.TotalSeconds, 3);
+        Assert.Equal(7.5, tc.Engine.Capture(tc.AdjacencyOf(a, b), CaptureSide.FadeOut, fromEnd: true)!.Value.TotalSeconds, 3);
     }
 
     [Fact]
@@ -192,7 +192,7 @@ public sealed class PreviewTests
         tc.Engine.Preview(tc.AdjacencyOf(a, b), Fade(12, 2, fadeInPoint: 4, fadeIn: 2));
         tc.Output.Advance(8 * Second);
 
-        Assert.Null(tc.Engine.Capture(CaptureSide.FadeOut));
+        Assert.Null(tc.Engine.Capture(tc.AdjacencyOf(a, b), CaptureSide.FadeOut));
         Assert.Contains(tc.Notices, n => n.Contains("outgoing track has fallen silent"));
     }
 
@@ -207,7 +207,7 @@ public sealed class PreviewTests
         var adjacency = tc.AdjacencyOf(a, b);
         tc.Engine.Preview(adjacency, Fade(12, 2, fadeInPoint: 4, fadeIn: 2));
         tc.Output.Advance(8 * Second); // B heard at 7 s
-        var captured = tc.Engine.Capture(CaptureSide.FadeIn)!.Value;
+        var captured = tc.Engine.Capture(tc.AdjacencyOf(a, b), CaptureSide.FadeIn)!.Value;
 
         tc.Engine.Preview(adjacency, Fade(12, 0, fadeInPoint: captured.TotalSeconds, fadeIn: 0));
         tc.Output.Advance(5 * Second + Second / 2);

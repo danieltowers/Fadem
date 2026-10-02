@@ -8,49 +8,72 @@ public sealed partial class PlaybackEngine
 {
     // ── Authoring ────────────────────────────────────────────────────────────────────────
 
-    /// <summary>A playhead as a point for <paramref name="side"/>: the only sound→point path.
-    /// Returns the same value the view's playhead would have at this instant, unquantised: the
-    /// attended voice's, or during a preview the preview's own voice for that side, the outgoing
-    /// one for a fade-out point and the incoming one for a fade-in point (build issue 16). With
-    /// <paramref name="fromEnd"/>, the point is measured from the end of that voice's track:
-    /// <c>Length − playhead</c>, for a from-end fade-out point (build issue 14). Null when nothing
-    /// is playing; during a preview, null with a notice saying why when that side's voice is not
-    /// heard.</summary>
-    public Point? Capture(CaptureSide side, bool fromEnd = false)
+    /// <summary>A playhead as a point for <paramref name="side"/> of <paramref name="adjacency"/>:
+    /// the only sound→point path. It reads the adjacency's own track, the outgoing one for a
+    /// fade-out point and the incoming one for a fade-in point, never merely the attended voice
+    /// (phase 6 issue 06). The voice is, during a preview of this adjacency, the preview's own for
+    /// that side (build issue 16); otherwise the attended voice, or a live crossfade's incoming
+    /// voice, whose track is that track by its file path. Returns the same value that voice's
+    /// playhead has in the view at this instant, unquantised. With <paramref name="fromEnd"/>, the
+    /// point is measured from the end of that track: <c>Length − playhead</c>, for a from-end
+    /// fade-out point (build issue 14). Null with a notice when no voice plays the track, and
+    /// during a preview when that side's voice is not heard.</summary>
+    public Point? Capture(Adjacency adjacency, CaptureSide side, bool fromEnd = false)
     {
         ThrowIfDisposed();
         return Run(() =>
         {
             ObserveClock();
-            var view = View;
-            Playhead playhead;
-            Track track;
-            if (view.Preview is { } preview)
+            var track = side == CaptureSide.FadeOut ? adjacency.Outgoing : adjacency.Incoming;
+            if (VoiceFor(View, adjacency, side) is not { } voice)
             {
-                var outgoing = side == CaptureSide.FadeOut;
-                if ((outgoing ? preview.Outgoing : preview.Incoming) is not { } heard)
-                {
-                    RaiseNotice(outgoing
-                        ? "Nothing captured: the preview's outgoing track has fallen silent."
-                        : _preview?.IncomingEndedAt is null
-                            ? "Nothing captured: the preview's incoming track has not started yet."
-                            : "Nothing captured: the preview's incoming track has ended.");
-                    return (Point?)null;
-                }
-                (playhead, track) = (heard, outgoing ? preview.Adjacency.Outgoing : preview.Adjacency.Incoming);
+                RaiseNotice($"Nothing captured: {Path.GetFileNameWithoutExtension(track.FilePath)} is not playing.");
+                return (Point?)null;
             }
-            else if (view.Attended is { } attended)
+            if (voice.Playhead is not { } playhead)
             {
-                (playhead, track) = (attended.Playhead, attended.Row.Track);
-            }
-            else
-            {
+                RaiseNotice(side == CaptureSide.FadeOut
+                    ? "Nothing captured: the preview's outgoing track has fallen silent."
+                    : _preview?.IncomingEndedAt is null
+                        ? "Nothing captured: the preview's incoming track has not started yet."
+                        : "Nothing captured: the preview's incoming track has ended.");
                 return null;
             }
             var point = Point.FromTimeSpan(playhead.TimeSpan);
             return fromEnd ? MeasuredFromOtherEnd(track, point) : point;
         });
     }
+
+    /// <summary>Whether <see cref="Capture"/> would find a voice for <paramref name="side"/> of
+    /// <paramref name="adjacency"/>: the editor's Capture button is live exactly then (phase 6
+    /// issue 06). Through a preview of the adjacency both sides stay live, since a capture a
+    /// moment early or late is told by notice (ADR 0003). Read from the same published state as
+    /// <see cref="View"/>, without the lock, since the editor asks on every render.</summary>
+    public bool CanCapture(Adjacency adjacency, CaptureSide side)
+    {
+        ThrowIfDisposed();
+        return VoiceFor(View, adjacency, side) is not null;
+    }
+
+    /// <summary>The voice a capture reads, or null when none plays the side's track. A preview's
+    /// voice for the side that is not heard is found, with no playhead.</summary>
+    private static CaptureSource? VoiceFor(PlayerView view, Adjacency adjacency, CaptureSide side)
+    {
+        var outgoing = side == CaptureSide.FadeOut;
+        if (view.Preview is { } preview && SamePair(preview.Adjacency, adjacency))
+        {
+            return new CaptureSource(outgoing ? preview.Outgoing : preview.Incoming);
+        }
+        var path = (outgoing ? adjacency.Outgoing : adjacency.Incoming).FilePath;
+        return new[] { view.Attended, view.Incoming }.FirstOrDefault(v => v?.Row.Track.FilePath == path) is { } voice
+            ? new CaptureSource(voice.Playhead)
+            : null;
+
+        static bool SamePair(Adjacency x, Adjacency y) =>
+            x.Outgoing.FilePath == y.Outgoing.FilePath && x.Incoming.FilePath == y.Incoming.FilePath;
+    }
+
+    private sealed record CaptureSource(Playhead? Playhead);
 
     /// <summary>The same moment in <paramref name="track"/>, measured from its other end:
     /// ticking or unticking from-end on a fade-out point (build issue 14). On a 3:40 track, 3:12
