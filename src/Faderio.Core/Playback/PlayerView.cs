@@ -94,6 +94,13 @@ public sealed record PlayerView(
     /// another playlist or library opened. The transition manager asks again only then, since
     /// the answers probe files.</summary>
     public long StoreVersion { get; init; }
+
+    /// <summary>The change <c>Undo</c> would undo next, or null with none (phase 6 issue 04): this
+    /// session's, in the library open.</summary>
+    public HistoryStep? NextUndo { get; init; }
+
+    /// <summary>The change <c>Redo</c> would put back next, or null with none.</summary>
+    public HistoryStep? NextRedo { get; init; }
 }
 
 /// <summary>The open library as the shell sees it: its folder, the folder's leaf name, and

@@ -460,6 +460,8 @@ public sealed partial class PlaybackEngine : IDisposable
             Playlists = _playlists,
             OpenPlaylist = _openPlaylist,
             StoreVersion = StoreVersionNow(),
+            NextUndo = NextUndo,
+            NextRedo = NextRedo,
         };
     }
 
@@ -531,6 +533,10 @@ public sealed partial class PlaybackEngine : IDisposable
 
         public long StoreVersion { get; init; }
 
+        public HistoryStep? NextUndo { get; init; }
+
+        public HistoryStep? NextRedo { get; init; }
+
         /// <summary>Rows still sounding from the playlist open before (playlists issue 01): the
         /// queue passes out of them and never steps into one.</summary>
         public ImmutableHashSet<RowId> Passing { get; init; } = [];
@@ -571,6 +577,8 @@ public sealed partial class PlaybackEngine : IDisposable
                 Playlists = Playlists,
                 OpenPlaylist = OpenPlaylist,
                 StoreVersion = StoreVersion,
+                NextUndo = NextUndo,
+                NextRedo = NextRedo,
             };
         }
 

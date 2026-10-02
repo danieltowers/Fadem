@@ -40,6 +40,7 @@ public sealed partial class PlaybackEngine
             EmptyQueue();
             _library = library;
             _store = library.Transitions;
+            ClearHistory(); // its steps name the store left
             _settingsStore = library.Settings;
             _settings = library.Settings?.Settings ?? new PlayerSettings();
             _resolver.Settings = _settings;

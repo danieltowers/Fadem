@@ -190,6 +190,7 @@ public sealed partial class PlaybackEngine
                 RaiseNotice($"Not saved: {adjacency.Name} in {name}. " + string.Join(" ", refusals.Select(r => r.Reason)));
                 return refusals;
             }
+            var before = _store.GetOverride(name, adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
             try
             {
                 _store.UpsertOverride(name, adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath, partial);
@@ -199,6 +200,7 @@ public sealed partial class PlaybackEngine
                 RaiseStoreWriteFailure("Not saved", adjacency, e);
                 return [];
             }
+            Record(adjacency, name, before, partial);
             StoreChanged();
             RaiseNotice($"Saved {adjacency.Name} in {name}.");
             RescheduleIfPending(adjacency);
@@ -242,10 +244,11 @@ public sealed partial class PlaybackEngine
     /// removed; a failed write is a notice and false.</summary>
     private bool RemoveOverride(Adjacency adjacency, string playlist)
     {
+        var before = _store!.GetOverride(playlist, adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
         bool removed;
         try
         {
-            removed = _store!.RemoveOverride(playlist, adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
+            removed = _store.RemoveOverride(playlist, adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
         }
         catch (Exception e) when (IsStoreWriteFailure(e))
         {
@@ -254,6 +257,7 @@ public sealed partial class PlaybackEngine
         }
         if (removed)
         {
+            Record(adjacency, playlist, before, null);
             StoreChanged();
             RaiseNotice($"Removed the override of {adjacency.Name} in {playlist}.");
             RescheduleIfPending(adjacency);
@@ -303,6 +307,7 @@ public sealed partial class PlaybackEngine
                 RaiseNotice($"Not saved: {adjacency.Name}. " + string.Join(" ", refusals.Select(r => r.Reason)));
                 return refusals;
             }
+            var before = _store.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
             try
             {
                 _store.Upsert(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath, spec);
@@ -312,6 +317,7 @@ public sealed partial class PlaybackEngine
                 RaiseStoreWriteFailure("Not saved", adjacency, e);
                 return [];
             }
+            Record(adjacency, null, before, spec);
             StoreChanged();
             RaiseNotice($"Saved {adjacency.Name}.");
             RescheduleIfPending(adjacency);
@@ -340,6 +346,7 @@ public sealed partial class PlaybackEngine
             RaiseNotice($"Not removed: {adjacency.Name}. {NoLibrary}");
             return false;
         }
+        var before = _store.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
         bool removed;
         try
         {
@@ -352,6 +359,7 @@ public sealed partial class PlaybackEngine
         }
         if (removed)
         {
+            Record(adjacency, null, before, null);
             StoreChanged();
             RaiseNotice($"Removed {adjacency.Name}.");
             RescheduleIfPending(adjacency);

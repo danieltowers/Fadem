@@ -162,6 +162,7 @@ public sealed partial class PlaybackEngine
                     return;
                 }
             }
+            RenameInHistory(old, name);
             if (old == _openPlaylist)
             {
                 _openPlaylist = name;
@@ -205,6 +206,7 @@ public sealed partial class PlaybackEngine
                     _authoredPairs.Clear();
                 }
             }
+            RemoveFromHistory(found);
             if (RemoveOverrides(found) is { } failure)
             {
                 RaiseNotice($"Deleted {found}, but its transition overrides could not be removed: {failure}");
