@@ -31,6 +31,8 @@ internal sealed class TransitionEditorPanel : Panel
     private readonly Action? _beforeSounding;
 
     internal readonly Label _title;
+    internal readonly Label _light;
+    internal readonly ToolTip _lightTip = new();
     internal readonly RadioButton _editGlobal;
     internal readonly RadioButton _editPlaylist;
     internal readonly Label _effective;
@@ -112,12 +114,25 @@ internal sealed class TransitionEditorPanel : Panel
         _title = new Label
         {
             Text = NoAdjacency,
-            Dock = DockStyle.Top,
-            Height = 26,
+            Dock = DockStyle.Fill,
             Font = new Font(Font, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft,
             AutoEllipsis = true,
         };
+        // The traffic light (phase 6 issue 07): which of the adjacency's tracks is heard, at the
+        // heading's right, so it takes no height of its own.
+        _light = new Label
+        {
+            Text = "●",
+            Dock = DockStyle.Right,
+            Width = 26,
+            Font = new Font(Font.FontFamily, 14f),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Visible = false,
+        };
+        var heading = new Panel { Dock = DockStyle.Top, Height = 26 };
+        heading.Controls.Add(_title);
+        heading.Controls.Add(_light);
 
         var row = 0;
         _editGlobal = new RadioButton { Text = "Global", AutoSize = true, Checked = true, Enabled = false, Margin = new Padding(3, 0, 3, 0) };
@@ -248,7 +263,7 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeInMore.Click += (_, _) => NudgePoint(fadeOut: false, +1, ShiftHeld);
 
         Controls.Add(scroller);
-        Controls.Add(_title);
+        Controls.Add(heading);
     }
 
     /// <summary>The width the editor is designed at, docked beside a queue: nothing wraps.</summary>
@@ -612,10 +627,12 @@ internal sealed class TransitionEditorPanel : Panel
         _missing.Visible = _missing.Text.Length > 0;
         ShowNudges();
         ShowCaptures();
+        ShowLight();
     }
 
     /// <summary>Called on every render: each capture button live only while its own track is
-    /// heard, as the engine says, and the preview's buttons and line follow the preview.</summary>
+    /// heard, as the engine says, the traffic light, and the preview's buttons and line, which
+    /// follow the preview.</summary>
     public void Refresh(PlayerView view)
     {
         var choice = PlaylistChoice(view.OpenPlaylist);
@@ -625,6 +642,7 @@ internal sealed class TransitionEditorPanel : Panel
         }
         ShowSelector(view.OpenPlaylist);
         ShowCaptures();
+        ShowLight();
         _preview.Text = view.Preview is null ? "Preview" : "Preview again";
         _stopPreview.Enabled = view.Preview is not null;
         _previewStatus.Text = Presenter.FmtPreview(view.Preview);
@@ -656,6 +674,35 @@ internal sealed class TransitionEditorPanel : Panel
         hint.Text = track is null ? "" : Presenter.FmtCaptureHint(track);
         hint.Visible = playable && !live;
     }
+
+    /// <summary>The traffic light: green while the open adjacency's outgoing track is heard,
+    /// amber while only its incoming track is, red while another track is, grey when stopped, as
+    /// the engine says; hidden with no adjacency open. Its tooltip and accessible name say
+    /// which.</summary>
+    private void ShowLight()
+    {
+        _light.Visible = _adjacency is not null;
+        if (_adjacency is null)
+        {
+            return;
+        }
+        var heard = _engine.Heard(_adjacency);
+        _light.ForeColor = LightColor(heard);
+        var words = Presenter.FmtHeard(heard, _adjacency);
+        _light.AccessibleName = words;
+        if (_lightTip.GetToolTip(_light) != words)
+        {
+            _lightTip.SetToolTip(_light, words);
+        }
+    }
+
+    internal static Color LightColor(AdjacencyHeard heard) => heard switch
+    {
+        AdjacencyHeard.Outgoing => Color.FromArgb(0x2E, 0xA0, 0x43),
+        AdjacencyHeard.Incoming => Color.FromArgb(0xF0, 0xA0, 0x00),
+        AdjacencyHeard.OtherTrack => Color.FromArgb(0xD0, 0x30, 0x30),
+        _ => SystemColors.GrayText,
+    };
 
     /// <summary>Undo and Redo live while the engine has a change to walk, and say which.</summary>
     private void ShowHistory(Button button, string verb, HistoryStep? step)

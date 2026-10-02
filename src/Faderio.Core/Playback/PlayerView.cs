@@ -161,6 +161,19 @@ public enum CaptureSide
     FadeIn,
 }
 
+/// <summary>Which of an adjacency's tracks the listener has in hand (phase 6 issue 07): the
+/// editor's traffic light. <see cref="Outgoing"/> while its outgoing track is heard, whether or
+/// not its incoming one is too; <see cref="Incoming"/> while only its incoming track is;
+/// <see cref="OtherTrack"/> while a track of neither side is; <see cref="Nothing"/> when stopped.
+/// </summary>
+public enum AdjacencyHeard
+{
+    Nothing,
+    OtherTrack,
+    Incoming,
+    Outgoing,
+}
+
 /// <summary>The adjacencies the editor can open from one row, each as the queue would reach it
 /// (build issue 15). <see cref="Next"/> is this → next: the adjacency ⏭ would reach from the row,
 /// by the rule <see cref="PlayerView.NextAdjacency"/> follows from the current row.

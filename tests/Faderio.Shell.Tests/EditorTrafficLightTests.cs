@@ -1,0 +1,118 @@
+using System.Drawing;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
+using Faderio.Core.Domain;
+using Faderio.Core.Playback;
+using Faderio.Core.Tests;
+using Faderio.Shell;
+
+namespace Faderio.Shell.Tests;
+
+/// <summary>Phase 6 issue 07: the light at the editor's top right is green while the open
+/// transition's first track plays, amber while its second does, red while another does. On each
+/// host's runtime, against a real engine.</summary>
+public sealed class EditorTrafficLightTests
+{
+    private const int Second = 44100;
+
+    [Fact]
+    public void AnotherTrackPlaying_IsRed() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        var (editor, _) = Editing(tc, playing: 0);
+
+        Assert.True(IsSetVisible(editor._light));
+        Assert.Equal(TransitionEditorPanel.LightColor(AdjacencyHeard.OtherTrack), editor._light.ForeColor);
+        Assert.Equal("Playing a track that is not in this transition", editor._lightTip.GetToolTip(editor._light));
+    });
+
+    [Fact]
+    public void TheFirstTrackPlaying_IsGreen_AndItsTooltipNamesIt() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        var (editor, bc) = Editing(tc, playing: 1);
+
+        Assert.Equal(TransitionEditorPanel.LightColor(AdjacencyHeard.Outgoing), editor._light.ForeColor);
+        Assert.Equal($"Playing {bc.Outgoing.Title}, this transition's first track", editor._lightTip.GetToolTip(editor._light));
+        Assert.Equal(editor._lightTip.GetToolTip(editor._light), editor._light.AccessibleName);
+    });
+
+    [Fact]
+    public void TheSecondTrackPlaying_IsAmber() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        var (editor, bc) = Editing(tc, playing: 2);
+
+        Assert.Equal(TransitionEditorPanel.LightColor(AdjacencyHeard.Incoming), editor._light.ForeColor);
+        Assert.Equal($"Playing {bc.Incoming.Title}, this transition's second track", editor._lightTip.GetToolTip(editor._light));
+    });
+
+    [Fact]
+    public void TheColoursAreDistinct_AndStoppedIsGrey()
+    {
+        var colours = new[] { AdjacencyHeard.Nothing, AdjacencyHeard.OtherTrack, AdjacencyHeard.Incoming, AdjacencyHeard.Outgoing }
+            .Select(TransitionEditorPanel.LightColor).ToList();
+
+        Assert.Equal(4, colours.Distinct().Count());
+        Assert.Equal(SystemColors.GrayText, colours[0]);
+    }
+
+    [Fact]
+    public void NoAdjacencyOpen_HidesTheLight() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        using var editor = new TransitionEditorPanel(tc.Engine, _ => { }, _ => null);
+        editor.Refresh(tc.View);
+
+        Assert.False(IsSetVisible(editor._light));
+    });
+
+    /// <summary>A queue of A, B and C, the row named by <paramref name="playing"/> playing for
+    /// 2 s, and the editor open on B → C and refreshed.</summary>
+    private static (TransitionEditorPanel Editor, Adjacency BC) Editing(TestEngine tc, int playing)
+    {
+        var paths = new[]
+        {
+            TestAudio.WriteDcWav("light-a.wav", 10, 0.1),
+            TestAudio.WriteDcWav("light-b.wav", 10, 0.2),
+            TestAudio.WriteDcWav("light-c.wav", 10, 0.3),
+        };
+        tc.Add(paths);
+        tc.Engine.PlayRow(tc.View.Queue[playing].Id);
+        tc.Output.Advance(2 * Second);
+        var editor = new TransitionEditorPanel(tc.Engine, _ => { }, _ => null);
+        var bc = tc.AdjacencyOf(paths[1], paths[2]);
+        editor.Open(bc);
+        editor.Refresh(tc.View);
+        return (editor, bc);
+    }
+
+    /// <summary>Whether the control itself is set visible. <see cref="Control.Visible"/> also
+    /// asks every parent, and a panel that is never shown has none visible. net48's GetState takes
+    /// the flag as an int, net8.0's as an enum.</summary>
+    private static bool IsSetVisible(Control control)
+    {
+        var getState = typeof(Control).GetMethod("GetState", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var type = getState.GetParameters()[0].ParameterType;
+        var visible = type.IsEnum ? Enum.ToObject(type, 0x2) : 0x2; // States.Visible
+        return (bool)getState.Invoke(control, new[] { visible })!;
+    }
+
+    /// <summary>WinForms wants an STA thread; xunit does not give one.</summary>
+    private static void RunSta(Action body)
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try { body(); }
+            catch (Exception e) { failure = e; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null)
+        {
+            ExceptionDispatchInfo.Capture(failure).Throw();
+        }
+    }
+}

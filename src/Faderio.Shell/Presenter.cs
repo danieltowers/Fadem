@@ -115,6 +115,16 @@ internal static class Presenter
     /// preview plays both of the boundary's tracks, so it always serves.</summary>
     public static string FmtCaptureHint(Track track) => $"Play {TitleOf(track)} or preview to capture";
 
+    /// <summary>The editor's traffic light, in words (phase 6 issue 07): its tooltip and its
+    /// accessible name.</summary>
+    public static string FmtHeard(AdjacencyHeard heard, Adjacency adjacency) => heard switch
+    {
+        AdjacencyHeard.Outgoing => $"Playing {TitleOf(adjacency.Outgoing)}, this transition's first track",
+        AdjacencyHeard.Incoming => $"Playing {TitleOf(adjacency.Incoming)}, this transition's second track",
+        AdjacencyHeard.OtherTrack => "Playing a track that is not in this transition",
+        _ => "Nothing is playing",
+    };
+
     private static string TitleOf(Track track) =>
         string.IsNullOrEmpty(track.Title) ? Path.GetFileNameWithoutExtension(track.FilePath) : track.Title;
 

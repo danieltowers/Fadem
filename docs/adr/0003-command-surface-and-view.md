@@ -264,3 +264,12 @@ incoming one, whose track has that file path; with none, the capture returns not
 "*track* is not playing". `CanCapture(adjacency, side)` says whether a voice would be found, so
 the editor greys each button by the engine's answer and compares no tracks. It stays true
 through a preview of the adjacency, so an early or late press is still told by notice.
+
+## Addendum: the engine says which of an adjacency's tracks is heard (2026-10-02)
+
+`Heard(adjacency)` returns an `AdjacencyHeard`: `Outgoing`, `Incoming`, `OtherTrack` or
+`Nothing` ([phase 6 issue 07](../../.scratch/202609-faderio-phase-6-musicbee-improvements-round-1/issues/07-a-traffic-light-says-which-track-is-heard.md)).
+The editor's traffic light shows it as green, amber, red or grey. The tracks in hand are a
+running preview's heard voices, or else the queue's attended voice, playing or paused, and a
+live crossfade's incoming voice. They match by file path, as a capture does, and the outgoing
+side wins when both are in hand. The shell maps the value to a colour and compares no tracks.

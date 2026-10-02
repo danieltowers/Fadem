@@ -160,6 +160,10 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       "Play *b* or preview to capture", under the fade-in point the same for *c*. Play b: the
       fade-out Capture comes live, its line goes, its tooltip reads "Capture *b*'s playhead";
       the fade-in one stays greyed. A preview of b → c makes both live.
+- [ ] The traffic light (phase 6 issue 07) sits at the editor's top right, on the heading's
+      line, hidden with no boundary open. Editor on b → c: grey when stopped, red while a plays,
+      green while b plays, amber while c plays. Its tooltip says which ("Playing *b*, this
+      transition's first track").
 - [ ] Beside each **point** box (not the durations) sit **−** and **+**. Each press moves the
       number shown by 0.1, Shift-click by 1; with **From end** ticked, + makes the from-end number
       bigger. They stop at 0 and at the track's length, and are greyed out while the box is blank
@@ -453,6 +457,9 @@ which a background run cannot give.
       ✎: both Capture buttons greyed, a grey line under each point names its track ("Play *b*
       or preview to capture"). Playing row 2 brings the fade-out Capture live, its line gone and
       its tooltip "Capture *b*'s playhead"; the fade-in one stays greyed.
+- [ ] **The traffic light** (phase 6 issue 07) at the editor's top right, beside the heading:
+      red while row 1 plays with row 2's ✎ open, green while row 2 plays, amber while row 3
+      plays, grey when stopped.
 - [ ] **Leaving the editor with a box being typed in** (a duration typed, not yet left), by
       **Close editor** in a sidebar or a click on another playlist in a main panel, asks
       nothing: the duration is saved ("Saved …" in the strip) and the editor goes.

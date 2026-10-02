@@ -68,12 +68,35 @@ public sealed partial class PlaybackEngine
         return new[] { view.Attended, view.Incoming }.FirstOrDefault(v => v?.Row.Track.FilePath == path) is { } voice
             ? new CaptureSource(voice.Playhead)
             : null;
-
-        static bool SamePair(Adjacency x, Adjacency y) =>
-            x.Outgoing.FilePath == y.Outgoing.FilePath && x.Incoming.FilePath == y.Incoming.FilePath;
     }
 
     private sealed record CaptureSource(Playhead? Playhead);
+
+    private static bool SamePair(Adjacency x, Adjacency y) =>
+        x.Outgoing.FilePath == y.Outgoing.FilePath && x.Incoming.FilePath == y.Incoming.FilePath;
+
+    /// <summary>Which of <paramref name="adjacency"/>'s tracks the listener has in hand: the
+    /// editor's traffic light (phase 6 issue 07). The tracks in hand are a running preview's
+    /// heard voices, or else the queue's attended voice, playing or paused, and a live crossfade's
+    /// incoming voice. They match the adjacency's sides by file path, as a capture does; the
+    /// outgoing side wins when both are in hand. Read from the same published state as
+    /// <see cref="View"/>, without the lock, since the editor asks on every render.</summary>
+    public AdjacencyHeard Heard(Adjacency adjacency)
+    {
+        ThrowIfDisposed();
+        var view = View;
+        var paths = view.Preview is { } preview
+            ? new[]
+            {
+                preview.Outgoing is null ? null : preview.Adjacency.Outgoing.FilePath,
+                preview.Incoming is null ? null : preview.Adjacency.Incoming.FilePath,
+            }
+            : new[] { view.Attended?.Row.Track.FilePath, view.Incoming?.Row.Track.FilePath };
+        return paths.Contains(adjacency.Outgoing.FilePath) ? AdjacencyHeard.Outgoing
+            : paths.Contains(adjacency.Incoming.FilePath) ? AdjacencyHeard.Incoming
+            : paths.Any(p => p is not null) ? AdjacencyHeard.OtherTrack
+            : AdjacencyHeard.Nothing;
+    }
 
     /// <summary>The same moment in <paramref name="track"/>, measured from its other end:
     /// ticking or unticking from-end on a fade-out point (build issue 14). On a 3:40 track, 3:12
