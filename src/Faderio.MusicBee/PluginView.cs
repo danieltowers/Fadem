@@ -46,6 +46,7 @@ internal sealed class PluginView : UserControl
     internal readonly Panel _editorPane;
     private readonly Label _editorTitle;
     internal readonly QueueDrag _queueDrag;
+    internal readonly QueueSections _sections;
 
     internal readonly PlaylistSidebar _playlists;
     internal readonly ListView _queueList;
@@ -184,12 +185,17 @@ internal sealed class PluginView : UserControl
         _openTransitions = new ToolStripMenuItem("Transitions…");
         _removeRows = new ToolStripMenuItem("Remove") { ShortcutKeyDisplayString = "Del" };
         _clearQueue = new ToolStripMenuItem("Clear queue");
+        _sections = new QueueSections(_queueList, engine);
         var menu = new ContextMenuStrip();
         menu.Items.AddRange(_editMenu.Items);
-        menu.Items.AddRange(new ToolStripItem[] { _openTransitions, new ToolStripSeparator(), _removeRows, _clearQueue });
+        menu.Items.AddRange(new ToolStripItem[]
+        {
+            _openTransitions, new ToolStripSeparator(), _sections.Menu.Root, new ToolStripSeparator(), _removeRows, _clearQueue,
+        });
         menu.Opening += (_, _) =>
         {
             _editMenu.Refresh();
+            _sections.MenuOpening();
             _removeRows.Enabled = _queueList.SelectedItems.Count > 0;
             _clearQueue.Enabled = _queueList.Items.Count > 0;
         };
@@ -288,6 +294,7 @@ internal sealed class PluginView : UserControl
             _timer.Dispose();
             _tips.Dispose();
             _rowStyle.Dispose(); // after the list, which draws with its fonts
+            _sections.Dispose(); // after the list, which draws its stripes
             _noticeList?.Dispose();
             _manager?.Dispose();
         };
@@ -320,6 +327,7 @@ internal sealed class PluginView : UserControl
             _shownQueue = view.QueueVersion;
         }
         _rowStyle.Apply(_queueList, view, EditColumn);
+        _sections.Apply(view);
 
         var attended = view.Attended;
         _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length);
@@ -471,6 +479,12 @@ internal sealed class PluginView : UserControl
     /// list keeps its columns rather than scrolling sideways.</summary>
     private void FitTitle()
     {
+        // A list being disposed has given its columns up already, and can still be resized:
+        // with groups shown, MusicBee closing once resized it after (phase 6 issue 09).
+        if (_queueList.IsDisposed || _queueList.Disposing || _queueList.Columns.Count < 4)
+        {
+            return;
+        }
         var (number, title, artist, length) = (_queueList.Columns[0], _queueList.Columns[1], _queueList.Columns[2], _queueList.Columns[3]);
         var free = _queueList.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - number.Width - length.Width - EditColumnWidth;
         var artistWidth = Math.Max(MinArtistWidth, Math.Min(WidthOf(QueueColumn.Artist), free - MinTitleWidth));

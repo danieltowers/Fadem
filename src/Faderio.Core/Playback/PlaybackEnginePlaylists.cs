@@ -51,8 +51,9 @@ public sealed partial class PlaybackEngine
     /// <summary>The file whose last write failed and was told. Under the gate.</summary>
     private string? _failingPlaylist;
 
-    /// <summary>The open playlist's rows in its own order, to be written to its file.</summary>
-    private sealed record PlaylistSave(string Name, string Path, IReadOnlyList<Track> Tracks);
+    /// <summary>The open playlist's rows in its own order, and its sections, to be written to its
+    /// file.</summary>
+    private sealed record PlaylistSave(string Name, string Path, IReadOnlyList<Track> Tracks, IReadOnlyList<SectionHeader> Sections);
 
     /// <summary>A playlist opened: the add runs it cut short, and the add that loads its rows.</summary>
     private readonly record struct Opened(List<AddCompletion> Cancelled, AddJob? Job, bool StartWorker)
@@ -85,11 +86,11 @@ public sealed partial class PlaybackEngine
             {
                 return Opened.Nothing;
             }
-            if (ReadPlaylist(found) is not { } entries)
+            if (ReadPlaylist(found) is not { } file)
             {
                 return Opened.Nothing;
             }
-            var opened = SwitchTo(found, entries);
+            var opened = SwitchTo(found, file);
             Publish();
             return opened;
         }));
@@ -114,7 +115,7 @@ public sealed partial class PlaybackEngine
             {
                 return Opened.Nothing;
             }
-            var opened = SwitchTo(name, []);
+            var opened = SwitchTo(name, PlaylistFile.Empty);
             Publish();
             return opened;
         }));
@@ -241,15 +242,15 @@ public sealed partial class PlaybackEngine
             }
             var imported = sources
                 .Select(ImportPlaylistFile)
-                .OfType<(string Told, string Name, IReadOnlyList<string> Entries)>()
+                .OfType<(string Told, string Name, PlaylistFile File)>()
                 .ToList();
             if (imported.Count == 0)
             {
                 return Opened.Nothing;
             }
             RaiseNotice($"Imported {string.Join(", ", imported.Select(i => i.Told))}.");
-            var (_, name, entries) = imported[^1];
-            var opened = SwitchTo(name, entries);
+            var (_, name, file) = imported[^1];
+            var opened = SwitchTo(name, file);
             Publish();
             return opened;
         }));
@@ -257,7 +258,7 @@ public sealed partial class PlaybackEngine
 
     /// <summary>Copies one playlist into the folder; returns how the notice names it, its name and
     /// its entries, or null with a notice saying why not.</summary>
-    private (string Told, string Name, IReadOnlyList<string> Entries)? ImportPlaylistFile(string source)
+    private (string Told, string Name, PlaylistFile File)? ImportPlaylistFile(string source)
     {
         var file = Path.GetFileName(source);
         void Refuse(string why) => RaiseNotice($"Not imported: {file}. {why}");
@@ -271,10 +272,10 @@ public sealed partial class PlaybackEngine
             Refuse("The file does not exist.");
             return null;
         }
-        IReadOnlyList<string> entries;
+        PlaylistFile contents;
         try
         {
-            entries = M3UPlaylist.Read(source);
+            contents = M3UPlaylist.ReadFile(source);
         }
         catch (Exception e) when (IsStoreWriteFailure(e))
         {
@@ -293,7 +294,7 @@ public sealed partial class PlaybackEngine
         {
             lock (_saveGate)
             {
-                M3UPlaylist.WriteEntries(PlaylistPath(name), entries);
+                M3UPlaylist.WriteEntries(PlaylistPath(name), contents);
             }
         }
         catch (Exception e) when (IsStoreWriteFailure(e))
@@ -302,7 +303,7 @@ public sealed partial class PlaybackEngine
             return null;
         }
         RefreshPlaylists();
-        return (name == wanted ? name : $"{file} as {name}", name, entries);
+        return (name == wanted ? name : $"{file} as {name}", name, contents);
     }
 
     // ── Opening, under the lock ──────────────────────────────────────────────────────────
@@ -325,21 +326,22 @@ public sealed partial class PlaybackEngine
     {
         foreach (var name in names)
         {
-            if (ReadPlaylist(name) is { } entries)
+            if (ReadPlaylist(name) is { } file)
             {
-                return SwitchTo(name, entries, launching);
+                return SwitchTo(name, file, launching);
             }
         }
         var untitled = PlaylistFolder.FirstFreeUntitled(_playlists);
         return CreatePlaylistFile(untitled, "No playlist is open")
-            ? SwitchTo(untitled, [], launching)
+            ? SwitchTo(untitled, PlaylistFile.Empty, launching)
             : Opened.Nothing;
     }
 
     /// <summary>Leaves the open playlist and opens <paramref name="name"/>: a running add ends, the
     /// playlist left is written and, if it is an empty Untitled, deleted; the queue keeps only
-    /// what sounds, as passing rows; and <paramref name="entries"/> are queued to load.</summary>
-    private Opened SwitchTo(string name, IReadOnlyList<string> entries, bool launching = false)
+    /// what sounds, as passing rows; and <paramref name="file"/>'s entries are queued to load, each
+    /// into its section.</summary>
+    private Opened SwitchTo(string name, PlaylistFile file, bool launching = false)
     {
         var cancelled = EndAddRun(cancelled: true, notify: true);
         lock (_saveGate)
@@ -350,16 +352,16 @@ public sealed partial class PlaybackEngine
         KeepOnlySoundingRows();
         _openPlaylist = name;
         _authoredPairs.Clear(); // the rows' marks follow this playlist's overrides
-        if (entries.Count > 0 || !PlaylistFolder.IsUntitled(name))
+        if (file.Entries.Count > 0 || !PlaylistFolder.IsUntitled(name))
         {
             RememberOpenPlaylist(launching);
         }
         RefreshPlaylists();
-        if (entries.Count == 0)
+        if (file.Entries.Count == 0)
         {
             return new Opened(cancelled, null, false);
         }
-        var job = new AddJob(entries, opening: true);
+        var job = new AddJob(file.Entries, opening: true, sections: SectionsOf(file));
         _loading = job;
         _editedWhileLoading = false;
         return new Opened(cancelled, job, Enqueue(job));
@@ -398,6 +400,7 @@ public sealed partial class PlaybackEngine
             _queue.SetCurrent(index);
         }
         _originalOrder.Clear();
+        _rowSection.Clear(); // the passing rows are in no playlist, so in no section
         _passing.Clear();
         _passing.UnionWith(sounding);
         _queueVersion++;
@@ -479,7 +482,7 @@ public sealed partial class PlaybackEngine
         }
         _saveDeferred = false;
         _saveTakenAt = Stopwatch.GetTimestamp();
-        var save = new PlaylistSave(name, PlaylistPath(name), PlaylistTracks);
+        var save = new PlaylistSave(name, PlaylistPath(name), PlaylistTracks, PlaylistSections());
         lock (_saveGate)
         {
             _pendingSave = save;
@@ -516,7 +519,7 @@ public sealed partial class PlaybackEngine
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(save.Path)!);
-            M3UPlaylist.Write(save.Path, save.Tracks);
+            M3UPlaylist.Write(save.Path, save.Tracks, save.Sections);
             _failingPlaylist = null;
         }
         catch (Exception e) when (IsStoreWriteFailure(e))
@@ -565,14 +568,14 @@ public sealed partial class PlaybackEngine
         return found;
     }
 
-    /// <summary>The playlist's entries, or null with a notice when its file cannot be read.</summary>
-    private IReadOnlyList<string>? ReadPlaylist(string name)
+    /// <summary>The playlist's file, or null with a notice when it cannot be read.</summary>
+    private PlaylistFile? ReadPlaylist(string name)
     {
         try
         {
             lock (_saveGate)
             {
-                return M3UPlaylist.Read(PlaylistPath(name));
+                return M3UPlaylist.ReadFile(PlaylistPath(name));
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)

@@ -51,6 +51,13 @@ One place in the queue, holding one track. The same track can fill several rows.
 its identity when it moves; removing it removes that place, not the track.
 _Avoid_: Entry, item, slot
 
+**Section**:
+A named run of consecutive rows in a playlist, in its own order, that only organises it: a
+section never changes what plays or how. It has a colour from a fixed palette and is shown
+collapsed or open, and the playlist keeps all three. Rows above the first section are in none.
+A section with no rows left is gone.
+_Avoid_: Group, folder, set
+
 **Adjacency**:
 An ordered pair of tracks — the **outgoing** and the **incoming** — at a boundary in a
 sequence. Directional: A→B and B→A are distinct adjacencies. A track can be adjacent to

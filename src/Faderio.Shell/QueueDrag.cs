@@ -21,6 +21,9 @@ internal sealed class QueueDrag : IDisposable
     private readonly PlaybackEngine _engine;
     private readonly System.Windows.Forms.Timer _scroll;
 
+    /// <summary>Whether the drag under way is of rows, which can end a section, or of files.</summary>
+    private bool _draggingRows;
+
     /// <summary>Where dragged rows will land. A ListView draws no insertion mark in details
     /// view, so it is a thin panel over the list.</summary>
     internal Panel DropLine { get; }
@@ -46,7 +49,7 @@ internal sealed class QueueDrag : IDisposable
         {
             var client = _list.PointToClient(Cursor.Position);
             ScrollNearEdge(client);
-            ShowDropLine(DropIndex(client));
+            ShowDropLine(client, _draggingRows);
         };
         _list.ItemDrag += (_, _) => DragSelectedRows();
         _list.DragEnter += (_, e) => DragOver(e);
@@ -57,7 +60,7 @@ internal sealed class QueueDrag : IDisposable
             EndRowDrag();
             if (RowsOf(e) is { } rows)
             {
-                MoveRows(rows, DropIndex(ClientPoint(e)));
+                MoveRows(rows, ClientPoint(e));
             }
             else if (e.Data?.GetData(DataFormats.FileDrop) is string[] paths)
             {
@@ -67,6 +70,20 @@ internal sealed class QueueDrag : IDisposable
     }
 
     public void Dispose() => _scroll.Dispose();
+
+    /// <summary>The row whose group a drop of rows at the cursor ends, or null: over the lower
+    /// half of the last row of a section's group, with the next section's header below it, rows
+    /// land after it, in its section (phase 6 issue 09), not before the next row, in the next.</summary>
+    internal int? EndOfGroupAt(Point client)
+    {
+        var index = DropIndex(client);
+        if (!_list.ShowGroups || index == 0 || index >= _list.Items.Count
+            || RowAtHeight(client.Y) is not { } item || item.Index != index - 1)
+        {
+            return null;
+        }
+        return _list.Items[index].Group != item.Group ? item.Index : null;
+    }
 
     /// <summary>The list position a drop at the cursor lands in: before the row under it when
     /// over its upper half, after it when over its lower half, and after the last row when
@@ -103,9 +120,11 @@ internal sealed class QueueDrag : IDisposable
             EndRowDrag();
             return;
         }
+        _draggingRows = RowsOf(e) is not null;
         _scroll.Start();
-        ShowDropLine(DropIndex(ClientPoint(e)));
+        ShowDropLine(ClientPoint(e), _draggingRows);
     }
+
 
     /// <summary>The rows dragged from this list, or null: rows never leave the list they came
     /// from, so another view's rows are refused.</summary>
@@ -143,7 +162,7 @@ internal sealed class QueueDrag : IDisposable
         }
     }
 
-    private void ShowDropLine(int index)
+    private void ShowDropLine(Point client, bool rows)
     {
         var count = _list.Items.Count;
         if (count == 0)
@@ -151,16 +170,29 @@ internal sealed class QueueDrag : IDisposable
             DropLine.Visible = false;
             return;
         }
-        var y = index < count ? _list.Items[index].Bounds.Top - 1 : _list.Items[count - 1].Bounds.Bottom - 1;
+        var index = DropIndex(client);
+        var y = rows && EndOfGroupAt(client) is { } end ? _list.Items[end].Bounds.Bottom - 1
+            : index < count ? _list.Items[index].Bounds.Top - 1
+            : _list.Items[count - 1].Bounds.Bottom - 1;
         DropLine.SetBounds(0, y, _list.ClientSize.Width, DropLine.Height);
         DropLine.Visible = true;
         DropLine.BringToFront();
     }
 
     /// <summary>One drop, one call: the drop position is passed as the row the dragged rows
-    /// land before, or none for the end. Where they land, and what that does to playback, is
-    /// the engine's.</summary>
-    private void MoveRows(IReadOnlyList<RowId> rows, int index) => _engine.Move(rows, RowBefore(index));
+    /// land before, or none for the end, or the row they land after where they end its section.
+    /// Where they land, and what that does to playback, is the engine's.</summary>
+    private void MoveRows(IReadOnlyList<RowId> rows, Point client)
+    {
+        if (EndOfGroupAt(client) is { } end)
+        {
+            _engine.MoveAfter(rows, (RowId)_list.Items[end].Tag!);
+        }
+        else
+        {
+            _engine.Move(rows, RowBefore(DropIndex(client)));
+        }
+    }
 
     /// <summary>The row at a drop index, which a drop lands before; none past the last row.</summary>
     private RowId? RowBefore(int index) => index < _list.Items.Count ? (RowId)_list.Items[index].Tag! : null;

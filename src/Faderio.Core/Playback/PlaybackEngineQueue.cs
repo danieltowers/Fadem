@@ -31,6 +31,7 @@ public sealed partial class PlaybackEngine
         var entry = new QueueEntry(new RowId(_nextRowId++), track);
         _queue.Add(entry);
         _originalOrder.Add(entry);
+        JoinSectionAt(_originalOrder.Count - 1);
         if (_settings.Shuffle && _queue.Count > 1)
         {
             // A track added while shuffling lands somewhere among the upcoming ones.
@@ -76,6 +77,7 @@ public sealed partial class PlaybackEngine
             _originalOrder.Clear();
             _originalOrder.AddRange(order.Where(e => !_passing.Contains(e)));
         }
+        JoinSectionAt(_originalOrder.IndexOf(entry));
         job.LastPlaced = entry;
         return new QueueRow(entry.Id, track, _queue.Current == entry && _attendedVoice is null);
     }
@@ -84,19 +86,21 @@ public sealed partial class PlaybackEngine
     /// playlist at <paramref name="path"/> (<see cref="M3UPlaylist.Write"/>): the export primitive.
     /// A row still sounding from the playlist open before is in no playlist, so not in this. The
     /// rows are taken under the lock and the file is written off it. Total: the outcome is a
-    /// notice either way.</summary>
+    /// notice either way. Unshuffled, the visible order is the playlist's, so its sections are
+    /// written too; under shuffle, whose order runs across them, none are.</summary>
     public void SaveAsPlaylist(string path)
     {
         ThrowIfDisposed();
-        var tracks = Run(() =>
+        var (tracks, sections) = Run(() =>
         {
             ObserveClock();
-            return _queue.Entries.Where(e => !_passing.Contains(e)).Select(e => e.Track).ToList();
+            var rows = _queue.Entries.Where(e => !_passing.Contains(e)).Select(e => e.Track).ToList();
+            return (rows, _settings.Shuffle ? [] : PlaylistSections());
         });
         string notice;
         try
         {
-            M3UPlaylist.Write(path, tracks);
+            M3UPlaylist.Write(path, tracks, sections);
             var count = tracks.Count == 1 ? "1 track" : $"{tracks.Count} tracks";
             notice = $"Saved {count} to {Path.GetFileName(path)}.";
         }
@@ -151,6 +155,7 @@ public sealed partial class PlaybackEngine
                 _queue.RemoveAt(_queue.IndexOf(entry.Id));
                 _originalOrder.Remove(entry);
                 _unreadable.Remove(entry.Id);
+                _rowSection.Remove(entry.Id);
             }
 
             if (!allCut)
@@ -183,8 +188,18 @@ public sealed partial class PlaybackEngine
     /// the pending boundary follows it, unless its transition has started: one in flight plays
     /// out. Under shuffle it changes the shuffled order, which is the visible one; unshuffled it
     /// is also the order that turning shuffle off returns to. Rows already gone are one notice,
-    /// and the rest still move; a <paramref name="before"/> that is gone moves nothing.</summary>
-    public void Move(IEnumerable<RowId> rows, RowId? before)
+    /// and the rest still move; a <paramref name="before"/> that is gone moves nothing.
+    /// Unshuffled, the rows join the section of the row they land before, or at the end the last
+    /// row's (phase 6 issue 09); under shuffle they keep their own, since the playlist's order is
+    /// not the one changed.</summary>
+    public void Move(IEnumerable<RowId> rows, RowId? before) => MoveRows(rows, before, after: null);
+
+    /// <summary>Moves the given rows as <see cref="Move"/> does, to just after
+    /// <paramref name="after"/>, and unshuffled into its section: a drop below a section's last
+    /// row ends that section, where one above the next section's first row would start that.</summary>
+    public void MoveAfter(IEnumerable<RowId> rows, RowId after) => MoveRows(rows, before: null, after);
+
+    private void MoveRows(IEnumerable<RowId> rows, RowId? before, RowId? after)
     {
         ThrowIfDisposed();
         var ids = rows.Distinct().ToList();
@@ -192,20 +207,26 @@ public sealed partial class PlaybackEngine
         {
             ObserveClock();
             var entries = _queue.Entries.ToList();
-            var beforeIndex = before is { } b ? _queue.IndexOf(b) : entries.Count;
-            if (beforeIndex < 0)
+            var target = after ?? before;
+            var targetIndex = target is { } t ? _queue.IndexOf(t) : entries.Count;
+            if (targetIndex < 0)
             {
-                RaiseNotice($"That row is no longer in the queue ({before}).");
+                RaiseNotice($"That row is no longer in the queue ({target}).");
                 return;
             }
             var moving = EntriesOf(ids);
             moving.ExceptWith(_passing); // a passing row stays at the top, in no playlist
             // Dropped before one of the moving rows, they land before the next row that stays.
-            var anchor = entries.Skip(beforeIndex).FirstOrDefault(e => !moving.Contains(e));
+            var anchor = entries.Skip(after is null ? targetIndex : targetIndex + 1).FirstOrDefault(e => !moving.Contains(e));
             var order = entries.Where(e => !moving.Contains(e)).ToList();
             order.InsertRange(anchor is null ? order.Count : order.IndexOf(anchor), entries.Where(moving.Contains));
             order = order.Where(_passing.Contains).Concat(order.Where(e => !_passing.Contains(e))).ToList();
-            if (order.SequenceEqual(entries))
+            var joining = after is not null ? SectionOf(entries[targetIndex])
+                : anchor is not null ? SectionOf(anchor)
+                : _originalOrder.LastOrDefault(e => !moving.Contains(e)) is { } last ? SectionOf(last)
+                : null;
+            var rejoined = !_settings.Shuffle && moving.Any(e => SectionOf(e) != joining);
+            if (order.SequenceEqual(entries) && !rejoined)
             {
                 return;
             }
@@ -215,6 +236,10 @@ public sealed partial class PlaybackEngine
                 // Unshuffled, the visible order is the original order.
                 _originalOrder.Clear();
                 _originalOrder.AddRange(order.Where(e => !_passing.Contains(e)));
+                foreach (var entry in moving)
+                {
+                    SetSection(entry.Id, joining);
+                }
             }
             RescheduleCurrentBoundary();
             _queueVersion++;
@@ -288,6 +313,7 @@ public sealed partial class PlaybackEngine
         _queue.Clear();
         _originalOrder.Clear();
         _unreadable.Clear();
+        _rowSection.Clear();
         _passing.Clear();
         _queueVersion++;
     }

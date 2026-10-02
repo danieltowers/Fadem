@@ -16,11 +16,12 @@ public sealed partial class PlaybackEngine
         /// a playlist among them is not followed, and its rows are the file's already, so they are not
         /// written back to it.</param>
         /// <param name="before">The row its files land before, or null for the end.</param>
-        public AddJob(IReadOnlyList<string> paths, bool opening = false, RowId? before = null)
+        /// <param name="sections">The section of each path, parallel to them: a playlist's.</param>
+        public AddJob(IReadOnlyList<string> paths, bool opening = false, RowId? before = null, IReadOnlyList<Section?>? sections = null)
         {
             Opening = opening;
             Before = before;
-            Remaining = new LinkedList<PendingPath>(paths.Select(p => new PendingPath(p, Named: !opening)));
+            Remaining = new LinkedList<PendingPath>(paths.Select((p, i) => new PendingPath(p, Named: !opening, sections?[i])));
         }
 
         public bool Opening { get; }
@@ -40,8 +41,9 @@ public sealed partial class PlaybackEngine
 
     /// <summary>A path still to resolve. <see cref="Named"/> when the caller passed it to
     /// <see cref="Add"/>, rather than a folder or playlist yielding it: only a named playlist is
-    /// opened, so a playlist naming a playlist, or itself, is probed and rejected, never followed.</summary>
-    private readonly record struct PendingPath(string Path, bool Named);
+    /// opened, so a playlist naming a playlist, or itself, is probed and rejected, never followed.
+    /// <see cref="Section"/> is the section a path from a playlist being opened loads into.</summary>
+    private readonly record struct PendingPath(string Path, bool Named, Section? Section = null);
 
     /// <summary>A path taken by the worker, and the run it was taken in.</summary>
     private sealed record AddStep(AddJob Job, PendingPath Pending, long RunId)
@@ -234,7 +236,12 @@ public sealed partial class PlaybackEngine
         var job = step.Job;
         if (resolved.Track is { } track)
         {
-            job.Added.Add(job.Before is null ? Append(track) : Place(track, job));
+            var row = job.Before is null ? Append(track) : Place(track, job);
+            if (job.Opening)
+            {
+                SetSection(row.Id, step.Pending.Section);
+            }
+            job.Added.Add(row);
             _queueVersion++;
             RescheduleCurrentBoundary();
             if (!job.Opening)

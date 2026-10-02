@@ -67,6 +67,7 @@ internal sealed class MainForm : Form
     internal readonly ToolStripMenuItem _removeRows;
     internal readonly ToolStripMenuItem _clearQueue;
     private readonly QueueDrag _queueDrag;
+    internal readonly QueueSections _sections;
     private readonly System.Windows.Forms.Timer _timer;
 
     /// <summary>The line showing where dragged rows will land.</summary>
@@ -307,9 +308,15 @@ internal sealed class MainForm : Form
         _transitionsForTrack = new ToolStripMenuItem("Transitions for this track…");
         _removeRows = new ToolStripMenuItem("Remove") { ShortcutKeyDisplayString = "Del" };
         _clearQueue = new ToolStripMenuItem("Clear queue");
+        _sections = new QueueSections(_queueList, engine);
+        Disposed += (_, _) => _sections.Dispose();
         var menu = new ContextMenuStrip
         {
-            Items = { _editMenu.Next, _editMenu.Previous, _editMenu.Self, _transitionsForTrack, new ToolStripSeparator(), _removeRows, _clearQueue },
+            Items =
+            {
+                _editMenu.Next, _editMenu.Previous, _editMenu.Self, _transitionsForTrack, new ToolStripSeparator(),
+                _sections.Menu.Root, new ToolStripSeparator(), _removeRows, _clearQueue,
+            },
         };
         menu.Opening += (_, e) =>
         {
@@ -323,6 +330,7 @@ internal sealed class MainForm : Form
                 return;
             }
             _editMenu.Refresh();
+            _sections.MenuOpening();
             _transitionsForTrack.Enabled = _queueList.SelectedItems.Count == 1;
             _removeRows.Enabled = _queueList.SelectedItems.Count > 0;
             _clearQueue.Enabled = _queueList.Items.Count > 0;
@@ -482,6 +490,7 @@ internal sealed class MainForm : Form
         }
         // Render runs on every tick: each row's look is set only when it changes (build issue 20).
         _rowStyle.Apply(_queueList, view, EditColumn);
+        _sections.Apply(view);
 
         var attended = view.Attended;
         _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length);

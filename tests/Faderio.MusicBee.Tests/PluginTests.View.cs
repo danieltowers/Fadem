@@ -241,6 +241,25 @@ public sealed partial class PluginTests
     });
 
     [Fact]
+    public void APanelShowingSections_IsRemovedWithoutAnError() => RunSta(() =>
+    {
+        AuthorLibrary();
+        ChooseLibrary(LibraryFolder);
+        Start();
+        Launched();
+        var panel = new Panel { Size = new Size(600, 400) };
+        _plugin.OnDockablePanelCreated(panel);
+        var view = View(panel);
+        var engine = _plugin.Host!.Engine;
+        Assert.NotEmpty(engine.View.Queue);
+        engine.StartSection(engine.View.Queue[0].Id, "Intro");
+        view.Render();
+        Assert.True(view._queueList.ShowGroups);
+
+        panel.Dispose(); // MusicBee closing, or the user removing the panel
+    });
+
+    [Fact]
     public void ANewPanel_ShowsTheNoticesAlreadyDelivered() => RunSta(() =>
     {
         ChooseLibrary(Path.Combine(_dir, "gone"));

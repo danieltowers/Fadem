@@ -455,6 +455,7 @@ public sealed partial class PlaybackEngine : IDisposable
         return snapshot with
         {
             Onward = snapshot.OnwardOf(IsAuthoredPair),
+            Sections = SectionRows(),
             Library = _library?.View,
             MachineSettings = _machine?.Settings ?? new MachineSettings(),
             Playlists = _playlists,
@@ -523,6 +524,10 @@ public sealed partial class PlaybackEngine : IDisposable
         /// it is authored (interim transport 07). A row with none is absent.</summary>
         public IReadOnlyDictionary<RowId, bool> Onward { get; init; } = new Dictionary<RowId, bool>();
 
+        /// <summary>Each sectioned row's section, and whether its header is drawn above it.</summary>
+        public IReadOnlyDictionary<RowId, (SectionView View, bool Starts)> Sections { get; init; } =
+            new Dictionary<RowId, (SectionView View, bool Starts)>();
+
         public LibraryView? Library { get; init; }
 
         public MachineSettings MachineSettings { get; init; } = new();
@@ -584,7 +589,11 @@ public sealed partial class PlaybackEngine : IDisposable
 
         private QueueRow Row(QueueEntry entry, bool isCurrent) =>
             new(entry.Id, entry.Track, isCurrent, Unreadable.Contains(entry.Id),
-                Onward.TryGetValue(entry.Id, out var authored) ? authored : null);
+                Onward.TryGetValue(entry.Id, out var authored) ? authored : null)
+            {
+                Section = Sections.TryGetValue(entry.Id, out var section) ? section.View : null,
+                StartsSection = section.Starts,
+            };
 
         /// <summary>Builds <see cref="Onward"/>: every row's this → next, told whether
         /// <paramref name="authored"/>.</summary>

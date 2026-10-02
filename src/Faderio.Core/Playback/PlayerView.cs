@@ -18,7 +18,16 @@ public readonly record struct RowId(long Value)
 /// is whether the row's this → next, the <see cref="RowAdjacencies.Next"/> the editor opens from
 /// it, has a transition in the store: null where the row has none, and in an
 /// <see cref="AddReport"/> (interim transport 07).</summary>
-public sealed record QueueRow(RowId Id, Track Track, bool IsCurrent, bool IsUnreadable = false, bool? NextAuthored = null);
+public sealed record QueueRow(RowId Id, Track Track, bool IsCurrent, bool IsUnreadable = false, bool? NextAuthored = null)
+{
+    /// <summary>The section the row is in, or null above the first section and for a row in no
+    /// playlist (phase 6 issue 09).</summary>
+    public SectionView? Section { get; init; }
+
+    /// <summary>Whether a section's header is drawn above the row: its section differs from the
+    /// row above's. Never under shuffle, whose play order runs across sections.</summary>
+    public bool StartsSection { get; init; }
+}
 
 /// <summary>One voice as the shell sees it: which row, where the listener is within it, and how
 /// long it is. <see cref="Playhead"/> is audible time, derived from the frames the device has

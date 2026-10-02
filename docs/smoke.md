@@ -266,6 +266,18 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] Adding the library's longest FLAC (about 26 minutes) shows its full length in the time
       readout, and seeking into its last minute lands there. Length is not proven by the test
       suite; this is where it is checked.
+- [ ] **Sections** (phase 6 issue 09). With four rows and none selected, the queue menu's
+      **Section** is greyed out. On the second row, **Section → Start a section here…** asks
+      "Section name:" in a small dialog; "Intro" and OK shows a header "Intro" behind a swatch of its
+      colour, with a chevron, above rows 2–4, row 1 under a blank header, and a stripe of that
+      colour at the left of rows 2–4 only.
+      Starting "End" on row 4 heads it in another colour. **Rename section…** opens on the old
+      name; **Colour** lists eight swatches with the section's own ticked. Clicking a header's
+      chevron collapses its rows to the header; a right-click on a header offers that section's
+      items. **Move section up** on End puts row 4 above rows 2–3, under its header. Relaunching
+      with the same `--library=` shows the sections, colours and the collapsed one as left.
+      **Remove section** puts its rows under the header above. Shuffle on shows no headers,
+      stripes kept; off, the headers are back.
 
 ## Sounds — the user runs this
 
@@ -558,6 +570,10 @@ which a background run cannot give.
       "Queue" and "Transition editor" sit on one line, and the three boxes under them start and
       end level. In the sidebar "Queue" sits over the queue as "Playlists" does over its list,
       and the editor's page has its Close bar, no title.
+- [ ] **Sections** (phase 6 issue 09). In the sidebar, the queue menu's **Section → Start a
+      section here…** on a row shows a header with its swatch, name and chevron, its rows striped in
+      its colour, as in standalone faderio; the chevron collapses it, and MusicBee restarted shows
+      it collapsed still.
 - [ ] With `Plugins\faderio\` removed, MusicBee starts, and a message box owned by it reads
       "faderio could not start: Could not load file or assembly 'Faderio.Core…'". Put the
       folder back.

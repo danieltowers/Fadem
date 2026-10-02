@@ -79,6 +79,31 @@ public sealed class QueueDragTests
         Assert.True(drag.DropLine.Bounds.Width > 0);
     });
 
+    [Fact]
+    public void RowsDroppedBelowASectionsLastRow_EndThatSection_AndAboveTheNextsFirst_StartIt() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        using var list = QueueSectionsTests.QueueOf(tc, 4);
+        using var sections = new QueueSections(list, tc.Engine);
+        using var drag = new QueueDrag(list, tc.Engine, (_, _) => { });
+        tc.Engine.StartSection(tc.View.Queue[0].Id, "Intro");
+        tc.Engine.StartSection(tc.View.Queue[2].Id, "End");
+        sections.Apply(tc.View);
+        var last = tc.View.Queue[3].Id;
+        IDataObject? dragged = null;
+        drag.StartDrag = data => dragged = data;
+        list.Items[3].Selected = true;
+        typeof(ListView).GetMethod("OnItemDrag", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(list, new object[] { new ItemDragEventArgs(MouseButtons.Left, list.Items[3]) });
+
+        DropAt(list, dragged!, new Point(8, list.Items[1].Bounds.Bottom - 2), drop: false);
+        Assert.InRange(drag.DropLine.Top, list.Items[1].Bounds.Bottom - 2, list.Items[1].Bounds.Bottom);
+        DropAt(list, dragged!, new Point(8, list.Items[1].Bounds.Bottom - 2));
+
+        Assert.Equal(last, tc.View.Queue[2].Id);
+        Assert.Equal("Intro", tc.View.Queue[2].Section!.Name);
+    });
+
     /// <summary>A details list of the engine's queue, <paramref name="rows"/> tones long, each
     /// item carrying its row's id as both hosts' queues do, laid out but never shown.</summary>
     private static ListView QueueOf(TestEngine tc, int rows)
