@@ -47,6 +47,39 @@ public sealed partial class PlaybackEngine
         return new QueueRow(entry.Id, track, _queue.Current == entry && _attendedVoice is null);
     }
 
+    /// <summary>Puts <paramref name="track"/> where <paramref name="job"/>'s drop asked: after its
+    /// last placed row while that is still queued, else before its row, never above the passing
+    /// rows; or appended when neither is left. Under shuffle the place is in the visible order,
+    /// and the order shuffling off returns to has it at the end.</summary>
+    private QueueRow Place(Track track, AddJob job)
+    {
+        var at = job.LastPlaced is { } last && _queue.IndexOf(last.Id) is var after and >= 0 ? after + 1
+            : job.Before is { } before && _queue.IndexOf(before) is var index and >= 0 ? index
+            : -1;
+        if (at < 0)
+        {
+            return Append(track);
+        }
+        var order = _queue.Entries.ToList();
+        at = Math.Max(at, order.Count(_passing.Contains)); // the passing rows are at the top
+        var entry = new QueueEntry(new RowId(_nextRowId++), track);
+        order.Insert(at, entry);
+        _queue.Add(entry);
+        _queue.Reorder(order);
+        if (_settings.Shuffle)
+        {
+            _originalOrder.Add(entry);
+        }
+        else
+        {
+            // Unshuffled, the visible order is the original order.
+            _originalOrder.Clear();
+            _originalOrder.AddRange(order.Where(e => !_passing.Contains(e)));
+        }
+        job.LastPlaced = entry;
+        return new QueueRow(entry.Id, track, _queue.Current == entry && _attendedVoice is null);
+    }
+
     /// <summary>Writes the queue in its visible order (under shuffle, the play order) as a UTF-8
     /// playlist at <paramref name="path"/> (<see cref="M3UPlaylist.Write"/>): the export primitive.
     /// A row still sounding from the playlist open before is in no playlist, so not in this. The

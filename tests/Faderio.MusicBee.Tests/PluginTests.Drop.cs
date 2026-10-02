@@ -8,8 +8,8 @@ namespace Faderio.MusicBee.Tests;
 /// <summary>
 /// Tracks dropped on the plugin's view (phase 6 issue 01): MusicBee's track drag is a shell drag
 /// of the files, as Explorer's is, and the view sends them to the engine's Add, as the context
-/// item sends the selection. Rows dragged in the view's queue move (issue 02), through the drag
-/// the App's queue uses.
+/// item sends the selection, landing where they are dropped (issue 03). Rows dragged in the
+/// view's queue move (issue 02), through the drag the App's queue uses.
 /// </summary>
 public sealed partial class PluginTests
 {
@@ -43,6 +43,31 @@ public sealed partial class PluginTests
         _ui.Pump();
         Assert.Empty(_plugin.Host!.Notices.Entries);
         Assert.Equal("Ready.", view._status.Text);
+    });
+
+    [Fact]
+    public void TracksDropped_BetweenTwoRows_LandThere() => RunSta(() =>
+    {
+        var (a, b) = AuthorLibrary();
+        ChooseLibrary(LibraryFolder);
+        Start();
+        Launched();
+        using var panel = new Panel { Size = new System.Drawing.Size(900, 500) };
+        _plugin.OnDockablePanelCreated(panel);
+        var view = View(panel);
+        view.Render();
+        var list = view._queueList;
+        _ = list.Handle;
+        var c = TestAudio.WriteToneWav("musicbee-c.wav", 2, 880);
+        var d = TestAudio.WriteToneWav("musicbee-d.wav", 2, 220);
+
+        var effect = DropAt(list, new DataObject(DataFormats.FileDrop, new[] { d, c }), UpperHalfOf(list, 1));
+        var queue = Added(4);
+
+        Assert.Equal(DragDropEffects.Copy, effect);
+        Assert.Equal(new[] { a, d, c, b }, queue.Queue.Select(r => r.Track.FilePath));
+        Assert.Equal(new[] { a, d, c, b }, SavedOpenPlaylist(4));
+        Assert.False(IsSetVisible(view._queueDrag.DropLine));
     });
 
     [Fact]
@@ -169,16 +194,18 @@ public sealed partial class PluginTests
         Assert.Equal(new[] { a, b }, _plugin.Host!.Engine.View.Queue.Select(r => r.Track.FilePath));
     });
 
-    /// <summary>Delivers a drag to the list as Windows does for MusicBee's: DragEnter, then, if
-    /// the list accepted it, DragDrop. Returns the effect the list offered. A list that never
-    /// asked for drops gets neither, as Windows would not deliver them.</summary>
+    /// <summary>Delivers a drag to the list as Windows does for MusicBee's, below its rows (the
+    /// end): DragEnter, then, if the list accepted it, DragDrop. Returns the effect the list
+    /// offered. A list that never asked for drops gets neither, as Windows would not deliver
+    /// them.</summary>
     private static DragDropEffects Drop(ListView list, IDataObject data)
     {
         if (!list.AllowDrop)
         {
             return DragDropEffects.None;
         }
-        var args = new DragEventArgs(data, 0, 0, 0, MusicBeesDrag, DragDropEffects.None);
+        var below = list.PointToScreen(new System.Drawing.Point(8, 10000));
+        var args = new DragEventArgs(data, 0, below.X, below.Y, MusicBeesDrag, DragDropEffects.None);
         typeof(Control).GetMethod("OnDragEnter", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
         if (args.Effect != DragDropEffects.None)
         {
@@ -203,7 +230,7 @@ public sealed partial class PluginTests
     private static DragDropEffects DropAt(ListView list, IDataObject data, System.Drawing.Point client, bool drop = true)
     {
         var screen = list.PointToScreen(client);
-        var args = new DragEventArgs(data, 0, screen.X, screen.Y, DragDropEffects.Move, DragDropEffects.None);
+        var args = new DragEventArgs(data, 0, screen.X, screen.Y, MusicBeesDrag, DragDropEffects.None);
         typeof(Control).GetMethod("OnDragEnter", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
         typeof(Control).GetMethod("OnDragOver", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
         if (drop && args.Effect != DragDropEffects.None)

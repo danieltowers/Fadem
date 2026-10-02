@@ -1,6 +1,6 @@
 # 03: Dropped files land where they are dropped
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02
 
 Phase 6, MusicBee improvements round 1. Raised 2026-10-02: tracks dropped on the queue, from
@@ -55,8 +55,26 @@ MusicBee, or files from Explorer, onto the middle of the queue shows the line an
 
 ## Acceptance criteria
 
-- [ ] Files dropped on the queue land at the drop line, in order, in both hosts.
-- [ ] One drop is one engine call.
-- [ ] Menu adds, the context item and imports still append.
+- [x] Files dropped on the queue land at the drop line, in order, in both hosts.
+- [x] One drop is one engine call.
+- [x] Menu adds, the context item and imports still append.
 
 ## Comments
+
+- **Resolved 2026-10-02.** Built as specified above.
+  - **The engine:** `Add(paths, RowId? before = null)`. The job carries its row and the last
+    row it placed; `Place` inserts after that row while it is queued, else before the job's
+    row, never above the passing rows, else appends. Unshuffled the original order follows the
+    visible one; under shuffle the new row goes to the original order's end. The boundary is
+    rescheduled as after any add, which is what `Move` does.
+  - **The shell:** `QueueDrag` shows the drop line for files as for rows and hands the host
+    the row at the drop; both hosts send `Engine.Add(paths, before)`, one call.
+  - **Tests:** `AddBeforeARowTests` on both targets (in place and in order, the end for none, a
+    folder in place, two adds each at their own row, the row removed before and after the first
+    lands, shuffle on and off, the next row and a started fade), and the passing row in
+    `PlaylistsInTheLibraryTests`. With the position ignored, 9 of the 11 fail; the two expecting
+    the end pass. `QueueDragTests`: files to the host with the row at the drop, none below the
+    rows, the line shown for files. A drop between two rows in the App's and the plugin's tests.
+    The plugin's issue 01 drops now arrive below the rows: at (0, 0) they would land at the top.
+  - **Smoke** on the portable MusicBee, this build installed: ✅ loads with no box, the strip
+    "Ready."; ✅ (the user) tracks dropped from MusicBee land at the line.

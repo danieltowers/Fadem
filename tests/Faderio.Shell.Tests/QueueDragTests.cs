@@ -1,12 +1,14 @@
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using Faderio.Core.Playback;
 using Faderio.Core.Tests;
 using Faderio.Shell;
 
 namespace Faderio.Shell.Tests;
 
 /// <summary>The queue's drag, shared by both hosts (phase 6 issue 02), on each host's runtime:
-/// where a drop lands, and that a drop of rows is one Move and of files the host's add.</summary>
+/// where a drop lands, and that a drop of rows is one Move and of files the host's add, before
+/// the row at the drop (issue 03).</summary>
 public sealed class QueueDragTests
 {
     [Fact]
@@ -14,7 +16,7 @@ public sealed class QueueDragTests
     {
         using var tc = TestEngine.Create();
         using var list = QueueOf(tc, 3);
-        using var drag = new QueueDrag(list, tc.Engine, _ => { });
+        using var drag = new QueueDrag(list, tc.Engine, (_, _) => { });
         var row = list.Items[1].Bounds;
 
         Assert.Equal(1, drag.DropIndex(new Point(8, row.Top + 2)));
@@ -28,7 +30,7 @@ public sealed class QueueDragTests
     {
         using var tc = TestEngine.Create();
         using var list = QueueOf(tc, 3);
-        using var drag = new QueueDrag(list, tc.Engine, _ => { });
+        using var drag = new QueueDrag(list, tc.Engine, (_, _) => { });
         var paths = tc.View.Queue.Select(r => r.Track.FilePath).ToArray();
         IDataObject? dragged = null;
         drag.StartDrag = data => dragged = data;
@@ -43,20 +45,38 @@ public sealed class QueueDragTests
     });
 
     [Fact]
-    public void FilesDropped_GoToTheHost_InTheOrderDropped_AndTextIsRefused() => RunSta(() =>
+    public void FilesDropped_GoToTheHost_InTheOrderDropped_BeforeTheRowAtTheDrop_AndTextIsRefused() => RunSta(() =>
     {
         using var tc = TestEngine.Create();
-        using var list = QueueOf(tc, 1);
-        var dropped = new List<string[]>();
-        using var drag = new QueueDrag(list, tc.Engine, dropped.Add);
-        var point = new Point(8, list.Items[0].Bounds.Bottom - 2);
+        using var list = QueueOf(tc, 2);
+        var dropped = new List<(string[] Paths, RowId? Before)>();
+        using var drag = new QueueDrag(list, tc.Engine, (paths, before) => dropped.Add((paths, before)));
+        var files = new DataObject(DataFormats.FileDrop, new[] { "b.wav", "a.wav" });
 
-        var files = DropAt(list, new DataObject(DataFormats.FileDrop, new[] { "b.wav", "a.wav" }), point);
-        var text = DropAt(list, new DataObject(DataFormats.UnicodeText, "not a path"), point);
+        var between = DropAt(list, files, new Point(8, list.Items[0].Bounds.Bottom - 2));
+        var below = DropAt(list, files, new Point(8, list.Items[1].Bounds.Bottom + 20));
+        var text = DropAt(list, new DataObject(DataFormats.UnicodeText, "not a path"), new Point(8, 4));
 
-        Assert.Equal(DragDropEffects.Copy, files);
+        Assert.Equal(DragDropEffects.Copy, between);
+        Assert.Equal(DragDropEffects.Copy, below);
         Assert.Equal(DragDropEffects.None, text);
-        Assert.Equal(new[] { "b.wav", "a.wav" }, Assert.Single(dropped));
+        Assert.Equal(2, dropped.Count);
+        Assert.Equal(new[] { "b.wav", "a.wav" }, dropped[0].Paths);
+        Assert.Equal(tc.View.Queue[1].Id, dropped[0].Before);
+        Assert.Null(dropped[1].Before);
+    });
+
+    [Fact]
+    public void FilesDraggedOverARow_ShowTheLineAboveIt() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        using var list = QueueOf(tc, 2);
+        using var drag = new QueueDrag(list, tc.Engine, (_, _) => { });
+
+        DropAt(list, new DataObject(DataFormats.FileDrop, new[] { "a.wav" }), new Point(8, list.Items[1].Bounds.Top + 2), drop: false);
+
+        Assert.InRange(drag.DropLine.Top, list.Items[1].Bounds.Top - 2, list.Items[1].Bounds.Top);
+        Assert.True(drag.DropLine.Bounds.Width > 0);
     });
 
     /// <summary>A details list of the engine's queue, <paramref name="rows"/> tones long, each
@@ -74,13 +94,13 @@ public sealed class QueueDragTests
         return list;
     }
 
-    private static DragDropEffects DropAt(ListView list, IDataObject data, Point client)
+    private static DragDropEffects DropAt(ListView list, IDataObject data, Point client, bool drop = true)
     {
         var screen = list.PointToScreen(client);
         var args = new DragEventArgs(data, 0, screen.X, screen.Y, DragDropEffects.Copy | DragDropEffects.Move, DragDropEffects.None);
         typeof(Control).GetMethod("OnDragEnter", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
         typeof(Control).GetMethod("OnDragOver", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
-        if (args.Effect != DragDropEffects.None)
+        if (drop && args.Effect != DragDropEffects.None)
         {
             typeof(Control).GetMethod("OnDragDrop", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
         }

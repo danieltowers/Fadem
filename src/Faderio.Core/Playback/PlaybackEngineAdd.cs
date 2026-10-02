@@ -1,4 +1,5 @@
 using Faderio.Core.Domain;
+using Faderio.Core.Queue;
 
 namespace Faderio.Core.Playback;
 
@@ -14,13 +15,21 @@ public sealed partial class PlaybackEngine
         /// <param name="opening">The job loads a playlist being opened: its entries are not named, so
         /// a playlist among them is not followed, and its rows are the file's already, so they are not
         /// written back to it.</param>
-        public AddJob(IReadOnlyList<string> paths, bool opening = false)
+        /// <param name="before">The row its files land before, or null for the end.</param>
+        public AddJob(IReadOnlyList<string> paths, bool opening = false, RowId? before = null)
         {
             Opening = opening;
+            Before = before;
             Remaining = new LinkedList<PendingPath>(paths.Select(p => new PendingPath(p, Named: !opening)));
         }
 
         public bool Opening { get; }
+
+        public RowId? Before { get; }
+
+        /// <summary>The last row this job placed before <see cref="Before"/>: the next follows it,
+        /// so the job's rows stay together in its order.</summary>
+        public QueueEntry? LastPlaced { get; set; }
 
         public LinkedList<PendingPath> Remaining { get; }
         public List<QueueRow> Added { get; } = new();
@@ -68,7 +77,8 @@ public sealed partial class PlaybackEngine
         new Thread(() => work()) { IsBackground = true, Name = "faderio add" }.Start();
 
     /// <summary>
-    /// Queues files at the end of the queue, in the given order, and returns at once. A folder
+    /// Queues files at the end of the queue, or before the row <paramref name="before"/> names (a
+    /// drop on the queue, phase 6 issue 03), in the given order, and returns at once. A folder
     /// stands for every promised file under it (<see cref="FolderContents"/>), and an
     /// <c>.m3u</c> or <c>.m3u8</c> for its entries (<see cref="M3UPlaylist.Read"/>), a missing one
     /// rejected like any file; each is listed when the add reaches it and counted as one path until
@@ -80,8 +90,13 @@ public sealed partial class PlaybackEngine
     /// since its rows are the news. Adding never starts playback. The task completes with this
     /// call's own report once its last file is in, after the sink has been told; the run's notice
     /// comes with the last add of the run.
+    /// <para>Before a row, the call's rows land together in its order, as <see cref="Move"/>
+    /// places rows: in the visible order under shuffle, and at the end of the order shuffling off
+    /// returns to; never above a row still passing from the playlist open before. If that row is
+    /// gone before the first lands, they go to the end; once one has landed, the rest follow it.
+    /// No notice either way: where the rows went is plain to see.</para>
     /// </summary>
-    public Task<AddReport> Add(IEnumerable<string> paths)
+    public Task<AddReport> Add(IEnumerable<string> paths, RowId? before = null)
     {
         ThrowIfDisposed();
         var list = paths.ToList();
@@ -89,7 +104,7 @@ public sealed partial class PlaybackEngine
         {
             return Task.FromResult(new AddReport(Array.Empty<QueueRow>(), Array.Empty<Rejection>()));
         }
-        var job = new AddJob(list);
+        var job = new AddJob(list, before: before);
         var start = Run(() =>
         {
             ThrowIfDisposed(); // again under the lock: a job joining a run Dispose ended would never be answered
@@ -219,7 +234,7 @@ public sealed partial class PlaybackEngine
         var job = step.Job;
         if (resolved.Track is { } track)
         {
-            job.Added.Add(Append(track));
+            job.Added.Add(job.Before is null ? Append(track) : Place(track, job));
             _queueVersion++;
             RescheduleCurrentBoundary();
             if (!job.Opening)

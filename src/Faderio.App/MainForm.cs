@@ -360,9 +360,9 @@ internal sealed class MainForm : Form
                 PlaySelected();
             }
         };
-        // Rows drag to a new place; files dropped go in at the end (shared with the plugin,
-        // phase 6 issue 02).
-        _queueDrag = new QueueDrag(_queueList, engine, paths => _ = AddPaths(paths));
+        // Rows drag to a new place, and dropped files land where they are dropped (shared with
+        // the plugin, phase 6 issues 02 and 03).
+        _queueDrag = new QueueDrag(_queueList, engine, (paths, before) => _ = _engine.Add(paths, before));
 
         _editor = new TransitionEditorPanel(engine, ShowNotice, suggested => Dialogs.ChooseRenderPath(this, suggested), a => AskUnsavedEdits(a));
         _playlists = new PlaylistSidebar(engine, LeaveEditor);

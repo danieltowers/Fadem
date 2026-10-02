@@ -193,6 +193,24 @@ public sealed class PlaylistsInTheLibraryTests
     }
 
     [Fact]
+    public void FilesAddedAboveThePassingRow_LandJustBelowIt_AtTheTopOfTheNewPlaylist()
+    {
+        using var tc = TestEngine.Create();
+        var (a0, b0, b1, n) = (Tone("above-a0"), Tone("above-b0"), Tone("above-b1"), Tone("above-n"));
+        WritePlaylist(tc, "A", a0);
+        WritePlaylist(tc, "B", b0, b1);
+        tc.Engine.OpenPlaylist("A").Wait();
+        tc.Engine.Play();
+        tc.Output.Advance(At(0.5));
+        tc.Engine.OpenPlaylist("B").Wait();
+
+        tc.Engine.Add(new[] { n }, before: tc.RowOf(a0)).Wait(); // dropped above the passing row
+
+        Assert.Equal(new[] { a0, n, b0, b1 }, Queued(tc));
+        Assert.Equal(new[] { n, b0, b1 }, Entries(tc, "B"));
+    }
+
+    [Fact]
     public void OpenPlaylist_ThatIsNotThere_IsANotice_AndNothingChanges()
     {
         using var tc = TestEngine.Create();

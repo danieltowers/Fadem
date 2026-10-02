@@ -162,9 +162,9 @@ internal sealed class PluginView : UserControl
             ShowItemToolTips = true,
         };
         // Rows drag to a new place, as in the App (phase 6 issue 02). Files dropped from
-        // MusicBee's track list, or from Explorer, are both a shell drag of the files (issue 01):
-        // they copy in at the end, as the context item adds the selection.
-        _queueDrag = new QueueDrag(_queueList, engine, paths => _ = _engine.Add(paths));
+        // MusicBee's track list, or from Explorer, are both a shell drag of the files (issue 01),
+        // and land where they are dropped (issue 03).
+        _queueDrag = new QueueDrag(_queueList, engine, (paths, before) => _ = _engine.Add(paths, before));
         foreach (var column in Columns)
         {
             var header = _queueList.Columns.Add(Presenter.ColumnHeading(column), WidthOf(column));

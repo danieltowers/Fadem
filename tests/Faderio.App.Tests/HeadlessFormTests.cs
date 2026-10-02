@@ -280,6 +280,24 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
+    public void FilesDropped_BetweenTwoRows_LandThere_InTheOrderDropped() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var paths = new[] { "one", "two" }.Select(n => TestAudio.WriteDcWav(n + ".wav", 1, 0.2)).ToArray();
+        h.Form.AddPaths(paths);
+        var list = h.Form._queueList;
+        _ = list.Handle;
+        var c = TestAudio.WriteDcWav("three.wav", 1, 0.2);
+        var d = TestAudio.WriteDcWav("four.wav", 1, 0.2);
+
+        var effect = DropAt(list, new DataObject(DataFormats.FileDrop, new[] { d, c }), LowerHalfOf(list, 0));
+
+        Assert.Equal(DragDropEffects.Copy, effect);
+        Assert.Equal(new[] { paths[0], d, c, paths[1] }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
+        Assert.False(IsSetVisible(h.Form._dropLine));
+    });
+
+    [Fact]
     public void DraggingSomethingOtherThanFiles_IsRefused() => RunSta(() =>
     {
         using var h = new Harness();

@@ -8,8 +8,9 @@ namespace Faderio.Shell;
 /// Drag and drop on a queue list, the same in both hosts (phase 6 issue 02; build issue 05
 /// first, in the App alone). The selected rows drag to a new place: a line shows where they will
 /// land, a drag held at the top or bottom edge scrolls the list, and the drop is one
-/// <see cref="PlaybackEngine.Move"/>. Files dropped, from Explorer or MusicBee's track list, go
-/// to the host's handler; anything else is refused. The list's items carry their
+/// <see cref="PlaybackEngine.Move"/>. Files dragged, from Explorer or MusicBee's track list, show
+/// the same line, and their drop goes to the host's handler with the row they land before
+/// (issue 03); anything else is refused. The list's items carry their
 /// <see cref="RowId"/> in <see cref="ListViewItem.Tag"/>, as both hosts' queues do.
 /// </summary>
 internal sealed class QueueDrag : IDisposable
@@ -28,8 +29,9 @@ internal sealed class QueueDrag : IDisposable
     /// cannot enter the modal drag loop.</summary>
     internal Action<IDataObject> StartDrag { get; set; }
 
-    /// <param name="dropFiles">The host's add of files dropped, in the order dropped.</param>
-    public QueueDrag(ListView list, PlaybackEngine engine, Action<string[]> dropFiles)
+    /// <param name="dropFiles">The host's add of files dropped, in the order dropped, before the
+    /// row given, or at the end for none.</param>
+    public QueueDrag(ListView list, PlaybackEngine engine, Action<string[], RowId?> dropFiles)
     {
         _list = list;
         _engine = engine;
@@ -59,7 +61,7 @@ internal sealed class QueueDrag : IDisposable
             }
             else if (e.Data?.GetData(DataFormats.FileDrop) is string[] paths)
             {
-                dropFiles(paths);
+                dropFiles(paths, RowBefore(DropIndex(ClientPoint(e))));
             }
         };
     }
@@ -89,20 +91,20 @@ internal sealed class QueueDrag : IDisposable
         }
     }
 
-    /// <summary>Rows move and show where they will land; files copy in; anything else is
-    /// refused.</summary>
+    /// <summary>Rows move and files copy in, both showing where they will land; anything else
+    /// is refused.</summary>
     private void DragOver(DragEventArgs e)
     {
-        if (RowsOf(e) is not null)
+        e.Effect = RowsOf(e) is not null ? DragDropEffects.Move
+            : e.Data?.GetDataPresent(DataFormats.FileDrop) == true ? DragDropEffects.Copy
+            : DragDropEffects.None;
+        if (e.Effect == DragDropEffects.None)
         {
-            e.Effect = DragDropEffects.Move;
-            _scroll.Start();
-            ShowDropLine(DropIndex(ClientPoint(e)));
+            EndRowDrag();
+            return;
         }
-        else
-        {
-            e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true ? DragDropEffects.Copy : DragDropEffects.None;
-        }
+        _scroll.Start();
+        ShowDropLine(DropIndex(ClientPoint(e)));
     }
 
     /// <summary>The rows dragged from this list, or null: rows never leave the list they came
@@ -158,8 +160,10 @@ internal sealed class QueueDrag : IDisposable
     /// <summary>One drop, one call: the drop position is passed as the row the dragged rows
     /// land before, or none for the end. Where they land, and what that does to playback, is
     /// the engine's.</summary>
-    private void MoveRows(IReadOnlyList<RowId> rows, int index) =>
-        _engine.Move(rows, index < _list.Items.Count ? (RowId)_list.Items[index].Tag! : null);
+    private void MoveRows(IReadOnlyList<RowId> rows, int index) => _engine.Move(rows, RowBefore(index));
+
+    /// <summary>The row at a drop index, which a drop lands before; none past the last row.</summary>
+    private RowId? RowBefore(int index) => index < _list.Items.Count ? (RowId)_list.Items[index].Tag! : null;
 
     /// <summary>What a row drag carries: the rows, and the list they came from.</summary>
     private sealed class DraggedRows(ListView source, RowId[] rows)

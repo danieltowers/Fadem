@@ -170,7 +170,8 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       lists the albums in year order, each album's discs in order, and each album's tracks
       "1" to "10" in natural order. The cover scans are ignored without a notice.
 - [ ] Dropping a mix of files and folders from Explorer onto the list adds them in the order
-      dropped, each folder expanded in place.
+      dropped, each folder expanded in place: dragged over the rows they show the drop line and
+      land on it (phase 6 issue 03), and below the rows at the end.
 - [ ] **Export playlist…** offers "*open playlist*.m3u8"; saved in a folder whose name has `†`
       or `⭐️`, the strip names the file saved. **Import playlist…** on that file (it takes
       several, and only `.m3u`/`.m3u8`) adds it to the sidebar as "*name* 2", open, with the same
@@ -468,10 +469,10 @@ which a background run cannot give.
       The file does not exist. …" with a **1 notice** link and no box. Neither player starts
       or stops: added while MusicBee's own player plays, MusicBee keeps playing and faderio's
       ▶ and "0:00 / -0:00" stay as they were. Restore the playlist file after.
-- [ ] **Tracks dropped on the view** (phase 6 issue 01). Tracks dragged from MusicBee's main
-      panel onto the view's queue show the copy cursor and are appended to the queue and the
-      open playlist's `.m3u8` in the drag's order, with no notice, the view docked and
-      floating alike; such a gone track dropped gives the strip's rejection with
+- [ ] **Tracks dropped on the view** (phase 6 issues 01 and 03). Tracks dragged from MusicBee's
+      main panel onto the view's queue show the copy cursor and the drop line, and land on it
+      (below the rows, at the end) in the queue and the open playlist's `.m3u8`, in the drag's
+      order, with no notice, the view docked and floating alike; such a gone track dropped gives the strip's rejection with
       **1 notice**, as the context item does. A drag of text is refused (no-entry cursor).
       Neither player starts or stops. A shell drag needs a real mouse, which posted messages
       cannot start: the user drags, the session reads the queue and the file. Restore the
