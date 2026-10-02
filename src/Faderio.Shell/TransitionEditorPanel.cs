@@ -121,16 +121,18 @@ internal sealed class TransitionEditorPanel : Panel
         };
         // The traffic light (phase 6 issue 07): which of the adjacency's tracks is heard, at the
         // heading's right, so it takes no height of its own.
-        _light = new Label
+        // Painted, not a glyph, so that it can be as large as the row allows without the font's
+        // line height clipping it. Its colour is its ForeColor.
+        _light = new Label { Dock = DockStyle.Right, Width = 32, Visible = false };
+        _light.Paint += (_, e) =>
         {
-            Text = "●",
-            Dock = DockStyle.Right,
-            Width = 26,
-            Font = new Font(Font.FontFamily, 14f),
-            TextAlign = ContentAlignment.MiddleCenter,
-            Visible = false,
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            var x = (_light.Width - LightDiameter) / 2f;
+            var y = (_light.Height - LightDiameter) / 2f;
+            using var brush = new SolidBrush(_light.ForeColor);
+            e.Graphics.FillEllipse(brush, x, y, LightDiameter, LightDiameter);
         };
-        var heading = new Panel { Dock = DockStyle.Top, Height = 26 };
+        var heading = new Panel { Dock = DockStyle.Top, Height = 28 };
         heading.Controls.Add(_title);
         heading.Controls.Add(_light);
 
@@ -200,7 +202,7 @@ internal sealed class TransitionEditorPanel : Panel
         ShowCurve(FadeCurveKind.EqualPower);
         layout.Controls.Add(new Label { Text = "Fade curve", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, row);
         layout.Controls.Add(_curve, 1, row);
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
         row++;
 
         // Narrower than the panel with its scroll bar showing, so it never scrolls sideways.
@@ -695,6 +697,10 @@ internal sealed class TransitionEditorPanel : Panel
             _lightTip.SetToolTip(_light, words);
         }
     }
+
+    /// <summary>The light's diameter in pixels: three times the "●" glyph it was first drawn
+    /// with, inside the heading's 28 px row, whose extra 2 px the curve row gave up.</summary>
+    internal const float LightDiameter = 27f;
 
     internal static Color LightColor(AdjacencyHeard heard) => heard switch
     {
