@@ -158,7 +158,20 @@ internal sealed class PluginView : UserControl
             FullRowSelect = true,
             MultiSelect = true,
             HideSelection = false,
+            AllowDrop = true,
             ShowItemToolTips = true,
+        };
+        // Files dropped from MusicBee's track list, or from Explorer: both are a shell drag of
+        // the files (phase 6 issue 01). They copy in at the end, as the context item adds the
+        // selection; anything else is refused.
+        _queueList.DragEnter += (_, e) => OfferCopy(e);
+        _queueList.DragOver += (_, e) => OfferCopy(e);
+        _queueList.DragDrop += (_, e) =>
+        {
+            if (e.Data?.GetData(DataFormats.FileDrop) is string[] paths)
+            {
+                _ = _engine.Add(paths);
+            }
         };
         foreach (var column in Columns)
         {
@@ -465,6 +478,9 @@ internal sealed class PluginView : UserControl
     }
 
     private static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
+
+    private static void OfferCopy(DragEventArgs e) =>
+        e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true ? DragDropEffects.Copy : DragDropEffects.None;
 
     /// <summary>The one selected row, or null for none or several.</summary>
     private RowId? SingleSelectedRow() =>

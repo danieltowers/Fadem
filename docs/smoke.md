@@ -468,6 +468,14 @@ which a background run cannot give.
       The file does not exist. …" with a **1 notice** link and no box. Neither player starts
       or stops: added while MusicBee's own player plays, MusicBee keeps playing and faderio's
       ▶ and "0:00 / -0:00" stay as they were. Restore the playlist file after.
+- [ ] **Tracks dropped on the view** (phase 6 issue 01). Tracks dragged from MusicBee's main
+      panel onto the view's queue show the copy cursor and are appended to the queue and the
+      open playlist's `.m3u8` in the drag's order, with no notice, the view docked and
+      floating alike; such a gone track dropped gives the strip's rejection with
+      **1 notice**, as the context item does. A drag of text is refused (no-entry cursor).
+      Neither player starts or stops. A shell drag needs a real mouse, which posted messages
+      cannot start: the user drags, the session reads the queue and the file. Restore the
+      playlist file after.
 - [ ] **One holder at a time** (phase 5 issue 15). With standalone faderio open on the smoke
       library, MusicBee starts with a box owned by it reading "The library library could not be
       opened (it is open in faderio). Nothing is saved until a library opens; what is queued
