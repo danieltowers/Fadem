@@ -476,6 +476,9 @@ which a background run cannot give.
       Neither player starts or stops. A shell drag needs a real mouse, which posted messages
       cannot start: the user drags, the session reads the queue and the file. Restore the
       playlist file after.
+- [ ] **Rows dragged in the view** (phase 6 issue 02). Selected rows dragged in the view's
+      queue show the drop line and land on it, still selected, docked and floating alike;
+      playback goes on. The user drags (a real mouse); the session reads the playlist file.
 - [ ] **One holder at a time** (phase 5 issue 15). With standalone faderio open on the smoke
       library, MusicBee starts with a box owned by it reading "The library library could not be
       opened (it is open in faderio). Nothing is saved until a library opens; what is queued

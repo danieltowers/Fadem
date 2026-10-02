@@ -66,12 +66,11 @@ internal sealed class MainForm : Form
     internal readonly ToolStripMenuItem _transitionsForTrack;
     internal readonly ToolStripMenuItem _removeRows;
     internal readonly ToolStripMenuItem _clearQueue;
-    internal readonly Panel _dropLine;
+    private readonly QueueDrag _queueDrag;
     private readonly System.Windows.Forms.Timer _timer;
-    private readonly System.Windows.Forms.Timer _dragScroll;
 
-    /// <summary>What a drag of rows carries: their ids, private to this window.</summary>
-    private const string RowsFormat = "faderio.rows";
+    /// <summary>The line showing where dragged rows will land.</summary>
+    internal Panel _dropLine => _queueDrag.DropLine;
 
     /// <summary>Notices already delivered, as the strip and the list show them: formatting of
     /// messages, not engine state (build issue 09).</summary>
@@ -115,7 +114,6 @@ internal sealed class MainForm : Form
         ChooseLibrary = () => ShowLibraryDialog(this);
         AskUnsavedEdits = a => Dialogs.AskUnsavedEdits(this, a);
         ShowSettings = dialog => dialog.ShowDialog(this) == DialogResult.OK;
-        StartDrag = data => _queueList!.DoDragDrop(data, DragDropEffects.Move);
         ShowNoticeList = ShowModeless;
         ShowTransitionManager = ShowModeless;
 
@@ -214,7 +212,6 @@ internal sealed class MainForm : Form
             FullRowSelect = true,
             MultiSelect = true,
             HideSelection = false,
-            AllowDrop = true,
             ShowItemToolTips = true,
         };
         // The columns (playlists issue 06): the default four until the library's own layout is
@@ -363,35 +360,9 @@ internal sealed class MainForm : Form
                 PlaySelected();
             }
         };
-        // The drop line: where dragged rows will land. A ListView draws no insertion mark in
-        // details view, so it is a thin panel over the list.
-        _dropLine = new Panel { Height = 2, BackColor = SystemColors.Highlight, Visible = false };
-        _queueList.Controls.Add(_dropLine);
-        // A drag raises DragOver only when the mouse moves, so a drag held still at an edge is
-        // scrolled on a timer.
-        _dragScroll = new System.Windows.Forms.Timer { Interval = 60 };
-        _dragScroll.Tick += (_, _) =>
-        {
-            var client = _queueList.PointToClient(Cursor.Position);
-            ScrollNearEdge(client);
-            ShowDropLine(DropIndex(client));
-        };
-        _queueList.ItemDrag += (_, _) => DragSelectedRows();
-        _queueList.DragEnter += (_, e) => DragOverList(e);
-        _queueList.DragOver += (_, e) => DragOverList(e);
-        _queueList.DragLeave += (_, _) => EndRowDrag();
-        _queueList.DragDrop += (_, e) =>
-        {
-            EndRowDrag();
-            if (e.Data?.GetData(RowsFormat) is RowId[] rows)
-            {
-                MoveRows(rows, DropIndex(ClientPoint(e)));
-            }
-            else if (e.Data?.GetData(DataFormats.FileDrop) is string[] paths)
-            {
-                _ = AddPaths(paths); // files and folders alike, in the order dropped
-            }
-        };
+        // Rows drag to a new place; files dropped go in at the end (shared with the plugin,
+        // phase 6 issue 02).
+        _queueDrag = new QueueDrag(_queueList, engine, paths => _ = AddPaths(paths));
 
         _editor = new TransitionEditorPanel(engine, ShowNotice, suggested => Dialogs.ChooseRenderPath(this, suggested), a => AskUnsavedEdits(a));
         _playlists = new PlaylistSidebar(engine, LeaveEditor);
@@ -817,7 +788,11 @@ internal sealed class MainForm : Form
 
     /// <summary>Starts a drag of the selected rows. A test replaces it, since a headless form
     /// cannot enter the modal drag loop.</summary>
-    internal Action<IDataObject> StartDrag { get; set; }
+    internal Action<IDataObject> StartDrag
+    {
+        get => _queueDrag.StartDrag;
+        set => _queueDrag.StartDrag = value;
+    }
 
     /// <summary>Shows the settings dialog and says whether the user pressed OK. A test replaces
     /// it, since a headless form cannot show a dialog.</summary>
@@ -1047,97 +1022,6 @@ internal sealed class MainForm : Form
     /// <summary>The selected rows go in one call; what that does to playback is the engine's.</summary>
     private void RemoveSelected() =>
         _engine.Remove(_queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToList());
-
-    private void DragSelectedRows()
-    {
-        var rows = _queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToArray();
-        if (rows.Length > 0)
-        {
-            StartDrag(new DataObject(RowsFormat, rows));
-            EndRowDrag();
-        }
-    }
-
-    private void EndRowDrag()
-    {
-        _dragScroll.Stop();
-        _dropLine.Visible = false;
-    }
-
-    /// <summary>Rows move and show where they will land; files copy in; anything else is
-    /// refused.</summary>
-    private void DragOverList(DragEventArgs e)
-    {
-        if (e.Data?.GetDataPresent(RowsFormat) == true)
-        {
-            e.Effect = DragDropEffects.Move;
-            _dragScroll.Start();
-            ShowDropLine(DropIndex(ClientPoint(e)));
-        }
-        else
-        {
-            e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true ? DragDropEffects.Copy : DragDropEffects.None;
-        }
-    }
-
-    private System.Drawing.Point ClientPoint(DragEventArgs e) =>
-        _queueList.PointToClient(new System.Drawing.Point(e.X, e.Y));
-
-    /// <summary>The list position a drop at the cursor lands in: before the row under it when
-    /// over its upper half, after it when over its lower half, and after the last row when
-    /// below them all. Only the height counts: past the last column is still that row.</summary>
-    private int DropIndex(System.Drawing.Point client)
-    {
-        if (RowAtHeight(client.Y) is { } item)
-        {
-            var bounds = item.Bounds;
-            return client.Y < bounds.Top + bounds.Height / 2 ? item.Index : item.Index + 1;
-        }
-        return _queueList.TopItem is { } top && client.Y < top.Bounds.Top ? top.Index : _queueList.Items.Count;
-    }
-
-    private ListViewItem? RowAtHeight(int y) => _queueList.HitTest(2, y).Item;
-
-    /// <summary>A drag held near the top or bottom edge scrolls the list a row at a time, so a
-    /// row can be dragged past what is in view.</summary>
-    private void ScrollNearEdge(System.Drawing.Point client)
-    {
-        if (_queueList.TopItem is not { } top)
-        {
-            return;
-        }
-        var margin = top.Bounds.Height;
-        if (client.Y < top.Bounds.Top + margin && top.Index > 0)
-        {
-            _queueList.EnsureVisible(top.Index - 1);
-        }
-        else if (client.Y > _queueList.ClientSize.Height - margin
-            && RowAtHeight(_queueList.ClientSize.Height - 1) is { } bottom
-            && bottom.Index + 1 < _queueList.Items.Count)
-        {
-            _queueList.EnsureVisible(bottom.Index + 1);
-        }
-    }
-
-    private void ShowDropLine(int index)
-    {
-        var count = _queueList.Items.Count;
-        if (count == 0)
-        {
-            _dropLine.Visible = false;
-            return;
-        }
-        var y = index < count ? _queueList.Items[index].Bounds.Top - 1 : _queueList.Items[count - 1].Bounds.Bottom - 1;
-        _dropLine.SetBounds(0, y, _queueList.ClientSize.Width, _dropLine.Height);
-        _dropLine.Visible = true;
-        _dropLine.BringToFront();
-    }
-
-    /// <summary>One drop, one call: the drop position is passed as the row the dragged rows
-    /// land before, or none for the end. Where they land, and what that does to playback, is
-    /// the engine's.</summary>
-    private void MoveRows(IReadOnlyList<RowId> rows, int index) =>
-        _engine.Move(rows, index < _queueList.Items.Count ? RowOf(_queueList.Items[index]) : null);
 
     /// <summary>There is no undo, so a queue of more than one row asks first.</summary>
     private void ClearQueue()

@@ -38,6 +38,7 @@ internal sealed class PluginView : UserControl
     private readonly ToolTip _tips;
     private readonly QueueRowStyle _rowStyle = new();
     private readonly Panel _editorBar;
+    internal readonly QueueDrag _queueDrag;
 
     internal readonly PlaylistSidebar _playlists;
     internal readonly ListView _queueList;
@@ -67,8 +68,8 @@ internal sealed class PluginView : UserControl
 
     private long _shownQueue = -1;
 
-    /// <summary>The queue's columns, fixed: the App's layout, menu and drag can follow when a
-    /// later issue needs them.</summary>
+    /// <summary>The queue's columns, fixed: the App's layout and menu can follow when a later
+    /// issue needs them.</summary>
     private static readonly QueueColumn[] Columns = [QueueColumn.Number, QueueColumn.Title, QueueColumn.Artist, QueueColumn.Length];
 
     /// <summary>The ✎ column, after the queue's own: the editor button on every row but the last.</summary>
@@ -158,21 +159,12 @@ internal sealed class PluginView : UserControl
             FullRowSelect = true,
             MultiSelect = true,
             HideSelection = false,
-            AllowDrop = true,
             ShowItemToolTips = true,
         };
-        // Files dropped from MusicBee's track list, or from Explorer: both are a shell drag of
-        // the files (phase 6 issue 01). They copy in at the end, as the context item adds the
-        // selection; anything else is refused.
-        _queueList.DragEnter += (_, e) => OfferCopy(e);
-        _queueList.DragOver += (_, e) => OfferCopy(e);
-        _queueList.DragDrop += (_, e) =>
-        {
-            if (e.Data?.GetData(DataFormats.FileDrop) is string[] paths)
-            {
-                _ = _engine.Add(paths);
-            }
-        };
+        // Rows drag to a new place, as in the App (phase 6 issue 02). Files dropped from
+        // MusicBee's track list, or from Explorer, are both a shell drag of the files (issue 01):
+        // they copy in at the end, as the context item adds the selection.
+        _queueDrag = new QueueDrag(_queueList, engine, paths => _ = _engine.Add(paths));
         foreach (var column in Columns)
         {
             var header = _queueList.Columns.Add(Presenter.ColumnHeading(column), WidthOf(column));
@@ -478,9 +470,6 @@ internal sealed class PluginView : UserControl
     }
 
     private static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
-
-    private static void OfferCopy(DragEventArgs e) =>
-        e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true ? DragDropEffects.Copy : DragDropEffects.None;
 
     /// <summary>The one selected row, or null for none or several.</summary>
     private RowId? SingleSelectedRow() =>
