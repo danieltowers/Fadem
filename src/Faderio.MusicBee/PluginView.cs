@@ -102,6 +102,10 @@ internal sealed class PluginView : UserControl
         ShowTransitionManager = ShowModeless;
 
         Dock = DockStyle.Fill;
+        // Light whatever MusicBee's skin: unset, both colours are ambient and a dark skin's
+        // panel turns the view's labels and buttons dark-on-dark.
+        BackColor = SystemColors.Control;
+        ForeColor = SystemColors.ControlText;
 
         _status = new SpringLabel("Ready.") { TextAlign = ContentAlignment.MiddleLeft };
         _noticeCount = new ToolStripStatusLabel { Available = false, IsLink = true, ToolTipText = "Show this session's notices" };
