@@ -554,6 +554,10 @@ which a background run cannot give.
       included. A transition opened with ✎ there is open again after a library tab and back.
       Three round trips leave no notice and no blank tab. Unticked and saved, the next visit
       shows MusicBee's own Now Playing.
+- [ ] **Three panes, three titles** (phase 6). In a main panel or the Now Playing tab, "Playlists",
+      "Queue" and "Transition editor" sit on one line, and the three boxes under them start and
+      end level. In the sidebar "Queue" sits over the queue as "Playlists" does over its list,
+      and the editor's page has its Close bar, no title.
 - [ ] With `Plugins\faderio\` removed, MusicBee starts, and a message box owned by it reads
       "faderio could not start: Could not load file or assembly 'Faderio.Core…'". Put the
       folder back.

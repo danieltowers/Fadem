@@ -39,7 +39,7 @@ internal sealed class PlaylistSidebar : Panel
         Width = 200;
         Padding = new Padding(4, 0, 0, 4);
 
-        var heading = new Label { Text = "Playlists", Dock = DockStyle.Top, Height = 22, TextAlign = ContentAlignment.BottomLeft };
+        var heading = PaneTitle.Create("Playlists");
         _list = new ListView
         {
             Dock = DockStyle.Fill,

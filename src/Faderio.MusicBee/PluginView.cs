@@ -38,6 +38,13 @@ internal sealed class PluginView : UserControl
     private readonly ToolTip _tips;
     private readonly QueueRowStyle _rowStyle = new();
     private readonly Panel _editorBar;
+
+    /// <summary>The queue and the editor, each under a title bar as the playlists are, so the
+    /// three panes start level (phase 6). The editor's title shows only in a main panel: in a
+    /// sidebar the editor's page has the Close bar over it.</summary>
+    internal readonly Panel _queuePane;
+    internal readonly Panel _editorPane;
+    private readonly Label _editorTitle;
     internal readonly QueueDrag _queueDrag;
 
     internal readonly PlaylistSidebar _playlists;
@@ -229,6 +236,15 @@ internal sealed class PluginView : UserControl
         _editor = new TransitionEditorPanel(
             engine, notice, suggested => Dialogs.ChooseRenderPath(FindForm(), suggested),
             beforeSounding: StopMusicBeesPlayerIfSilent);
+        _editor.Dock = DockStyle.Fill;
+        _editorTitle = PaneTitle.Create("Transition editor");
+        // The playlists end 4 px above the strip; the queue and the editor end level with them.
+        _editorPane = new Panel { Padding = new Padding(0, 0, 0, 4) };
+        _editorPane.Controls.Add(_editor);
+        _editorPane.Controls.Add(_editorTitle);
+        _queuePane = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 0, 4) };
+        _queuePane.Controls.Add(_queueList);
+        _queuePane.Controls.Add(PaneTitle.Create("Queue"));
         _closeEditor = new Button { Text = "Close editor", AutoSize = true, Height = 26, Dock = DockStyle.Right, Margin = new Padding(0) };
         _editorBar = new Panel { Dock = DockStyle.Top, Height = 30, Padding = new Padding(4, 2, 4, 2), Visible = false };
         _editorBar.Controls.Add(_closeEditor);
@@ -237,8 +253,8 @@ internal sealed class PluginView : UserControl
 
         // Docking order: the strip and the editor's bar first, then the playlists, then the
         // editor (at the right, or filling the lists' place), and the list last.
-        Controls.Add(_queueList);
-        Controls.Add(_editor);
+        Controls.Add(_queuePane);
+        Controls.Add(_editorPane);
         Controls.Add(_playlists);
         Controls.Add(_editorBar);
         Controls.Add(statusStrip);
@@ -420,21 +436,22 @@ internal sealed class PluginView : UserControl
     {
         if (ClientSize.Width >= NarrowWidth)
         {
-            _editor.Dock = DockStyle.Right;
-            _editor.Width = TransitionEditorPanel.DefaultWidth;
-            _editor.Visible = true;
+            _editorPane.Dock = DockStyle.Right;
+            _editorPane.Width = TransitionEditorPanel.DefaultWidth;
+            _editorPane.Visible = _editorTitle.Visible = true;
             _editorBar.Visible = false;
-            _playlists.Visible = _queueList.Visible = true;
+            _playlists.Visible = _queuePane.Visible = true;
             return;
         }
         // A sidebar can be short (MusicBee stacks its panels), so the editor and the lists do
         // not share it: the editor is a page in their place, scrolling inside, with the transport
         // still above it for capture by ear.
         var open = _editor.Adjacency is not null;
-        _editor.Dock = DockStyle.Fill;
+        _editorPane.Dock = DockStyle.Fill;
+        _editorTitle.Visible = false;
         _editorBar.Visible = open;
-        _editor.Visible = open;
-        _playlists.Visible = _queueList.Visible = !open;
+        _editorPane.Visible = open;
+        _playlists.Visible = _queuePane.Visible = !open;
     }
 
     private static int WidthOf(QueueColumn column) => column switch

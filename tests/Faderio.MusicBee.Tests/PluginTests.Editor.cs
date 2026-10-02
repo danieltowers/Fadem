@@ -156,12 +156,12 @@ public sealed partial class PluginTests
         view.EditTransitionAt(0);
 
         Assert.True(view._editor.Visible);
-        Assert.Equal(DockStyle.Fill, view._editor.Dock);
+        Assert.Equal(DockStyle.Fill, view._editorPane.Dock);
         Assert.True(view._closeEditor.Visible);
         Assert.False(view._queueList.Visible);
         Assert.False(view._playlists.Visible);
-        Assert.True(view._closeEditor.Parent!.Bottom <= view._editor.Top, "the Close bar is not above the editor");
-        Assert.True(view._editor.Top >= view._seek.Parent!.Bottom, "the editor covers the transport");
+        Assert.True(view._closeEditor.Parent!.Bottom <= view._editorPane.Top, "the Close bar is not above the editor");
+        Assert.True(view._editorPane.Top >= view._seek.Parent!.Bottom, "the editor covers the transport");
         Assert.True(view._editor.Height >= 150, $"the editor has only {view._editor.Height} px");
         // Nothing in the editor is cut off at this width: its button rows wrap instead.
         Assert.True(view._editor._render.Right <= view._editor._render.Parent!.ClientSize.Width, "Render is off the edge");
@@ -178,6 +178,40 @@ public sealed partial class PluginTests
     });
 
     [Fact]
+    public void InAMainPanel_ThePlaylistsQueueAndEditor_EachUnderATitle_StartAndEndLevel() => RunSta(() =>
+    {
+        AuthorLibrary();
+        ChooseLibrary(LibraryFolder);
+        Start();
+        Launched();
+        using var panel = new Panel { Size = new Size(1400, 800) };
+        _plugin.OnDockablePanelCreated(panel);
+        var view = View(panel);
+
+        var boxes = new Control[] { view._playlists._list, view._queueList, view._editor };
+        var tops = boxes.Select(box => BoundsIn(view, box).Top).ToArray();
+        var bottoms = boxes.Select(box => BoundsIn(view, box).Bottom).ToArray();
+
+        Assert.All(tops, top => Assert.Equal(tops[0], top));
+        Assert.All(bottoms, bottom => Assert.Equal(bottoms[0], bottom));
+        Assert.Equal(new[] { "Playlists", "Queue", "Transition editor" },
+            new Control[] { view._playlists, view._queuePane, view._editorPane }
+                .Select(pane => pane.Controls.OfType<Label>().Single(l => l.Dock == DockStyle.Top && l.Visible).Text));
+    });
+
+    /// <summary><paramref name="control"/>'s bounds in <paramref name="view"/>'s client
+    /// coordinates, through its parents, with no window handle needed.</summary>
+    private static Rectangle BoundsIn(Control view, Control control)
+    {
+        var bounds = control.Bounds;
+        for (var parent = control.Parent; parent != view; parent = parent!.Parent)
+        {
+            bounds.Offset(parent!.Left, parent.Top); // the panes have no borders
+        }
+        return bounds;
+    }
+
+    [Fact]
     public void InAMainPanel_TheEditorIsDockedRight_FromTheStart_AndMovesWithTheWidth() => RunSta(() =>
     {
         AuthorLibrary();
@@ -189,8 +223,8 @@ public sealed partial class PluginTests
         var view = View(panel);
 
         Assert.True(view._editor.Visible);
-        Assert.Equal(DockStyle.Right, view._editor.Dock);
-        Assert.Equal(340, view._editor.Width);
+        Assert.Equal(DockStyle.Right, view._editorPane.Dock);
+        Assert.Equal(340, view._editorPane.Width);
         Assert.False(view._closeEditor.Visible);
 
         panel.Size = new Size(285, 900); // to the sidebar with nothing open: no page
@@ -201,19 +235,19 @@ public sealed partial class PluginTests
         panel.Size = new Size(900, 500); // back: the empty editor shows at the right again
 
         Assert.True(view._editor.Visible);
-        Assert.Equal(DockStyle.Right, view._editor.Dock);
+        Assert.Equal(DockStyle.Right, view._editorPane.Dock);
         view.EditTransitionAt(0);
 
         panel.Size = new Size(285, 900); // dragged to the sidebar, with an adjacency open
 
-        Assert.Equal(DockStyle.Fill, view._editor.Dock);
+        Assert.Equal(DockStyle.Fill, view._editorPane.Dock);
         Assert.True(view._editor.Visible);
         Assert.True(view._closeEditor.Visible);
         Assert.False(view._queueList.Visible);
 
         panel.Size = new Size(900, 500);
 
-        Assert.Equal(DockStyle.Right, view._editor.Dock);
+        Assert.Equal(DockStyle.Right, view._editorPane.Dock);
         Assert.False(view._closeEditor.Visible);
         Assert.True(view._queueList.Visible);
     });
