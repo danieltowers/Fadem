@@ -561,6 +561,18 @@ internal sealed class PluginView : UserControl
     /// <summary>The Close editor bar: the lists come back.</summary>
     internal void CloseEditor() => LeaveEditor();
 
+    /// <summary>Opens the editor on <paramref name="adjacency"/>: the Now Playing tab's next view,
+    /// on what its last had open (phase 6 issue 08).</summary>
+    internal void OpenEditor(Adjacency adjacency) => Edit(adjacency);
+
+    /// <summary>Saves a box being typed in, as leaving it would, and says what the editor has
+    /// open: the Now Playing tab is left, and MusicBee disposes the view.</summary>
+    internal Adjacency? CommitEditor()
+    {
+        _editor.Commit();
+        return _editor.Adjacency;
+    }
+
     // ── The transition manager ──────────────────────────────────────────────────────────
 
     /// <summary>Shows the transition manager beside MusicBee's window. A test replaces it.</summary>

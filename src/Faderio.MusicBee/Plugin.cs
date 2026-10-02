@@ -10,8 +10,9 @@ namespace MusicBeePlugin;
 /// The class MusicBee loads (phase 5 issue 03): a second shell on faderio's engine. It plays the
 /// open playlist of the library its settings name, through its own output, from its view in a
 /// panel MusicBee makes (issue 10) or from a Tools → faderio menu, and adds MusicBee's selected
-/// tracks to that playlist from the main panel's context menu (issue 14). MusicBee's player
-/// never plays it: a start stops MusicBee's first.
+/// tracks to that playlist from the main panel's context menu (issue 14). Opted into, it also
+/// covers MusicBee's Now Playing tab with a view of its own (phase 6 issue 08, ADR 0013).
+/// MusicBee's player never plays it: a start stops MusicBee's first.
 /// <para>The engine's dependencies load from a private folder through a handler that
 /// <see cref="Initialise"/> registers. MusicBee loads every type in this assembly before calling
 /// it, so no type here may need Core to load: none derives from a Core type, implements a Core
@@ -136,14 +137,7 @@ public partial class Plugin
     /// <summary>On the panel's thread, the UI thread.</summary>
     private void FillPanel(Control panel)
     {
-        // A pushed render waits for the UI thread to go idle, so paint and input run between
-        // renders however fast the engine publishes, as in standalone faderio. Idle is the
-        // thread's own event, so it is hooked here, on the UI thread, once.
-        if (!_idleHooked)
-        {
-            Application.Idle += OnIdle;
-            _idleHooked = true;
-        }
+        HookIdle();
         string? failure = _failure ?? (_host is null ? "faderio is not running." : null);
         if (failure is null)
         {
@@ -167,8 +161,47 @@ public partial class Plugin
 
     public void Uninstall() => End();
 
+    /// <summary>MusicBee is up: faderio watches its main window for the Now Playing tab (phase 6
+    /// issue 08), on the window's own thread.</summary>
     public void ReceiveNotification(string sourceFileUrl, NotificationType type)
     {
+        if (type == NotificationType.PluginStartup)
+        {
+            _ui?.Post(_ => TakeOverNowPlaying(), null);
+        }
+    }
+
+    /// <summary>On MusicBee's UI thread: hands its main form, or null when there is none to find,
+    /// to the host, which takes over the Now Playing tab while its setting is on.</summary>
+    private void TakeOverNowPlaying()
+    {
+        if (_host is not { } host)
+        {
+            return;
+        }
+        var main = Control.FromHandle(_api.MB_GetWindowHandle()) as Form;
+        if (main is { InvokeRequired: true })
+        {
+            main.BeginInvoke(new Action(TakeOverNowPlaying));
+            return;
+        }
+        if (main is not null)
+        {
+            HookIdle(); // the Now Playing view renders on idle, with no panel arranged
+        }
+        host.TakeOverNowPlaying(main, StopMusicBeesPlayer);
+    }
+
+    /// <summary>A pushed render waits for the UI thread to go idle, so paint and input run between
+    /// renders however fast the engine publishes, as in standalone faderio. Idle is the thread's
+    /// own event, so it is hooked on the UI thread, once.</summary>
+    private void HookIdle()
+    {
+        if (!_idleHooked)
+        {
+            Application.Idle += OnIdle;
+            _idleHooked = true;
+        }
     }
 
     /// <summary>The first method to touch a Core type, compiled only once the resolver is in place.</summary>

@@ -354,6 +354,10 @@ An `"outputDevice"` key names the device by its name in Windows (phase 5 issue 1
 the plugin plays on MusicBee's own device, or Windows' default when MusicBee's is DirectSound's
 "Primary Sound Driver" or a device faderio cannot open.
 
+The plugin's own `AppData\faderio\plugin.json` (phase 6 issue 08) holds what only the plugin
+uses: `{ "nowPlayingTab": true }` puts faderio in the Now Playing tab. Configure…'s **Show
+faderio in the Now Playing tab** sets it.
+
 ### Looks — the agent runs this
 
 MusicBee draws its own window, so UI Automation sees neither its menus nor its transport.
@@ -539,6 +543,17 @@ which a background run cannot give.
 - [ ] A folder that does not exist, typed and saved, shows "The library … could not be opened
       (the folder does not exist)…" in a box owned by MusicBee, and the settings file keeps the
       library before it. A relative path is refused by the dialog itself, which stays open.
+- [ ] **faderio in the Now Playing tab** (phase 6 issue 08, ADR 0013). Configure… shows **Show
+      faderio in the Now Playing tab** under the device, with "In place of MusicBee's own view,
+      from the next visit to the tab."; ticked, OK and Preferences' **Save** write
+      `"nowPlayingTab": true` to `plugin.json`. With no restart, the Now Playing tab then shows
+      faderio's view filling the centre and the right sidebar's place (playlists beside the
+      queue, the editor at the right, the transport above), none of MusicBee's Now Playing
+      content showing through, and no box. Restoring and maximising the window resizes it with
+      the window. The library tabs (MUSIC, INBOX…) look as before, the sidebar's faderio panel
+      included. A transition opened with ✎ there is open again after a library tab and back.
+      Three round trips leave no notice and no blank tab. Unticked and saved, the next visit
+      shows MusicBee's own Now Playing.
 - [ ] With `Plugins\faderio\` removed, MusicBee starts, and a message box owned by it reads
       "faderio could not start: Could not load file or assembly 'Faderio.Core…'". Put the
       folder back.

@@ -323,9 +323,10 @@ public sealed partial class PluginTests
     /// in (a folder typed or browsed to, a mode picked) and OK or Cancel pressed. Returns what
     /// the dialog opened on.</summary>
     /// <param name="device">A device to pick by name, or with <paramref name="chooseMusicBees"/> MusicBee's own.</param>
+    /// <param name="nowPlayingTab">The Now Playing tab's box to tick or clear (phase 6 issue 08).</param>
     private (string? Library, AudioOutputMode Mode, string? Device) Configure(
         string? typed = null, string? browsed = null, AudioOutputMode? mode = null, bool ok = true,
-        Action<SettingsDialog>? read = null, string? device = null, bool chooseMusicBees = false)
+        Action<SettingsDialog>? read = null, string? device = null, bool chooseMusicBees = false, bool? nowPlayingTab = null)
     {
         (string?, AudioOutputMode, string?)? opened = null;
         _plugin.ShowSettings = dialog =>
@@ -352,6 +353,10 @@ public sealed partial class PluginTests
             if (mode is { } picked)
             {
                 dialog._outputMode.SelectedItem = picked;
+            }
+            if (nowPlayingTab is { } on)
+            {
+                dialog._nowPlayingTab.Checked = on;
             }
             return ok;
         };

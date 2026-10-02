@@ -1,4 +1,5 @@
 using System.Windows.Forms;
+using Faderio.Core.Domain;
 using Faderio.Core.Persistence;
 using Faderio.Core.Playback;
 using Faderio.Core.Settings;
@@ -31,6 +32,9 @@ internal sealed class Host : IDisposable
     private readonly Func<string?> _musicBeesDevice;
     private readonly Func<IReadOnlyList<string>> _devices;
     private readonly List<PluginView> _views = new();
+    private readonly SynchronizationContext _ui;
+    private readonly PluginSettingsFile _pluginSettings;
+    private NowPlayingTakeover? _nowPlaying;
 
     /// <param name="ui">MusicBee's UI thread, which every publication is posted to.</param>
     /// <param name="musicBeesDevice">MusicBee's own output device by the name its preferences
@@ -46,6 +50,7 @@ internal sealed class Host : IDisposable
         Func<AudioOutputMode, Func<string?>, Action<string>, IAudioOutput>? outputs, Func<IReadOnlyList<string>>? devices)
     {
         _boxes = boxes;
+        _ui = ui;
         _devices = devices ?? OutputDevices.Installed.Names;
         _musicBeesDevice = () => musicBeesDevice() is { } name && _devices().Contains(name) ? name : null;
         // The shell's own sink, as standalone faderio's: publications reach the UI thread posted,
@@ -57,6 +62,7 @@ internal sealed class Host : IDisposable
         Directory.CreateDirectory(settingsFolder);
         var settingsPath = Path.Combine(settingsFolder, "settings.json");
         var machine = new MachineSettingsStore(settingsPath);
+        _pluginSettings = new PluginSettingsFile(Path.Combine(settingsFolder, "plugin.json"), notify);
 
         // A folder that is gone is opened anyway: the engine says so. None chosen is said here,
         // through the same route as the engine's notices.
@@ -104,6 +110,9 @@ internal sealed class Host : IDisposable
     /// nothing waits. Not the engine's: the user's choice, not yet applied.</summary>
     private MachineSettings? _chosen;
 
+    /// <summary>Whether the dialog's OK chose the Now Playing tab, waiting as <see cref="_chosen"/> does.</summary>
+    private bool _chosenNowPlayingTab;
+
     public PlaybackEngine Engine { get; }
 
     /// <summary>This session's notices, as delivered: a record of messages already shown, not
@@ -145,10 +154,12 @@ internal sealed class Host : IDisposable
     {
         var view = Engine.View;
         var shown = _chosen ?? view.MachineSettings with { Library = view.Library?.Path ?? view.MachineSettings.Library };
-        using var dialog = new SettingsDialog(shown.Library, shown.OutputMode, shown.OutputDevice, _devices(), _musicBeesDevice());
+        var nowPlayingTab = _chosen is null ? _pluginSettings.Settings.NowPlayingTab : _chosenNowPlayingTab;
+        using var dialog = new SettingsDialog(shown.Library, shown.OutputMode, shown.OutputDevice, _devices(), _musicBeesDevice(), nowPlayingTab);
         if (show(dialog))
         {
             _chosen = new MachineSettings { Library = dialog.Library, OutputMode = dialog.OutputMode, OutputDevice = dialog.OutputDevice };
+            _chosenNowPlayingTab = dialog.NowPlayingTab;
         }
     }
 
@@ -174,11 +185,95 @@ internal sealed class Host : IDisposable
         {
             Engine.ChangeMachineSettings(chosen);
         }
+        if (_chosenNowPlayingTab != _pluginSettings.Settings.NowPlayingTab)
+        {
+            SaveNowPlayingTab(_chosenNowPlayingTab);
+        }
+    }
+
+    // ── The Now Playing tab (phase 6 issue 08) ──────────────────────────────────────────
+
+    /// <summary>The adjacency open in the Now Playing view's editor as its tab was left, and the
+    /// library it belongs to, so the next visit's fresh view reopens it. View state, not the
+    /// engine's. Two fields, not a tuple: a value type over a Core type in a field would stop
+    /// MusicBee loading this class before the resolver exists (LoadingTests).</summary>
+    private Adjacency? _nowPlayingEditor;
+
+    private string? _nowPlayingLibrary;
+
+    private bool _saidNowPlaying;
+
+    /// <summary>Watches MusicBee's main form, on its thread, for the Now Playing tab, and while
+    /// the setting is on fills each visit's view with a view of the engine (ADR 0013). With no
+    /// form to watch it leaves MusicBee alone, and says so once if the setting is on.</summary>
+    /// <param name="stopMusicBeesPlayer">MusicBee's <c>Player_Stop</c>, for the views' starts.</param>
+    public void TakeOverNowPlaying(Form? main, Action stopMusicBeesPlayer)
+    {
+        if (main is null)
+        {
+            if (_pluginSettings.Settings.NowPlayingTab)
+            {
+                SayNowPlayingIsLeftAlone("faderio could not find MusicBee's main window");
+            }
+            return;
+        }
+        _nowPlaying?.Dispose();
+        _nowPlaying = new NowPlayingTakeover(
+            main,
+            () => _pluginSettings.Settings.NowPlayingTab,
+            container => AttachNowPlayingView(container, stopMusicBeesPlayer),
+            LeaveNowPlayingView,
+            () => SayNowPlayingIsLeftAlone("faderio does not recognise this MusicBee's Now Playing view"));
+    }
+
+    /// <summary>A fresh view, as a panel's, on the transition left open at the last visit if its
+    /// library is still the one open.</summary>
+    private Control AttachNowPlayingView(Control container, Action stopMusicBeesPlayer)
+    {
+        var view = AttachView(container, stopMusicBeesPlayer);
+        if (_nowPlayingEditor is { } open && _nowPlayingLibrary is { } folder && IsOpen(Engine.View.Library, folder))
+        {
+            view.OpenEditor(open);
+        }
+        return view;
+    }
+
+    /// <summary>Its tab is left: a box being typed in is saved, and what the editor has open kept.</summary>
+    private void LeaveNowPlayingView(Control left)
+    {
+        _nowPlayingEditor = ((PluginView)left).CommitEditor();
+        _nowPlayingLibrary = Engine.View.Library?.Path;
+    }
+
+    private void SaveNowPlayingTab(bool on)
+    {
+        try
+        {
+            _pluginSettings.Save(new PluginSettings { NowPlayingTab = on });
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            OnNoticed($"faderio's plugin settings could not be saved ({e.Message}).");
+        }
+    }
+
+    /// <summary>Once a session, in the views' strips and the notice list, never a box: MusicBee
+    /// is only left as it is.</summary>
+    private void SayNowPlayingIsLeftAlone(string why)
+    {
+        if (_saidNowPlaying)
+        {
+            return;
+        }
+        _saidNowPlaying = true;
+        var message = $"{why}, so its Now Playing tab is left as MusicBee's own.";
+        _ui.Post(_ => ShowInStrips(message), null);
     }
 
     /// <summary>The views go first: their timers read the engine.</summary>
     public void Dispose()
     {
+        _nowPlaying?.Dispose();
         foreach (var view in _views.ToList())
         {
             view.Dispose();
@@ -198,12 +293,19 @@ internal sealed class Host : IDisposable
     /// The editor's own notices ("Not saved: …") come here too, so they have the same route.</summary>
     private void OnNoticed(string message)
     {
-        Notices.Add(message);
         if (_views.Count == 0)
         {
+            Notices.Add(message);
             _boxes.Show(message);
             return;
         }
+        ShowInStrips(message);
+    }
+
+    /// <summary>On the UI thread: into the log and every attached view's strip.</summary>
+    private void ShowInStrips(string message)
+    {
+        Notices.Add(message);
         foreach (var view in _views)
         {
             view.ShowNotices();

@@ -11,8 +11,9 @@ namespace Faderio.MusicBee;
 /// as standalone faderio's applies at its next launch, and the output device (issue 13), which
 /// applies when faderio next plays from stopped: MusicBee's own device, or one of this
 /// machine's by name. A saved device that is not there is listed as not found, so opening the
-/// dialog never loses it. It holds nothing once closed: its caller reads <see cref="Library"/>,
-/// <see cref="OutputMode"/> and <see cref="OutputDevice"/>.
+/// dialog never loses it. Below them, whether faderio takes over MusicBee's Now Playing tab
+/// (phase 6 issue 08). It holds nothing once closed: its caller reads <see cref="Library"/>,
+/// <see cref="OutputMode"/>, <see cref="OutputDevice"/> and <see cref="NowPlayingTab"/>.
 /// <para>MusicBee loads every type here before the plugin's resolver exists, so no field holds
 /// a Core value: the mode list's items are boxed modes, named as they are drawn.</para>
 /// </summary>
@@ -22,6 +23,7 @@ internal sealed class SettingsDialog : Form
     internal readonly Button _browse;
     internal readonly ComboBox _outputMode;
     internal readonly ComboBox _outputDevice;
+    internal readonly CheckBox _nowPlayingTab;
 
     /// <summary>The device each item of the list stands for: null for MusicBee's own.</summary>
     private readonly List<string?> _deviceNames = new();
@@ -33,7 +35,8 @@ internal sealed class SettingsDialog : Form
     /// <param name="device">The output device chosen, by name, or null for MusicBee's own.</param>
     /// <param name="devices">This machine's output devices, by name.</param>
     /// <param name="musicBeesDevice">MusicBee's own device, by name, or null when it is Windows' default.</param>
-    public SettingsDialog(string? library, AudioOutputMode mode, string? device, IReadOnlyList<string> devices, string? musicBeesDevice)
+    /// <param name="nowPlayingTab">Whether faderio takes over MusicBee's Now Playing tab (phase 6 issue 08).</param>
+    public SettingsDialog(string? library, AudioOutputMode mode, string? device, IReadOnlyList<string> devices, string? musicBeesDevice, bool nowPlayingTab)
     {
         Text = "faderio";
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -80,6 +83,15 @@ internal sealed class SettingsDialog : Form
             AutoSize = true, ForeColor = SystemColors.GrayText,
         };
 
+        _nowPlayingTab = new CheckBox
+        {
+            Text = "Show faderio in the Now Playing tab", Checked = nowPlayingTab, AutoSize = true, Margin = new Padding(0, 10, 0, 0),
+        };
+        var nextVisit = new Label
+        {
+            Text = "In place of MusicBee's own view, from the next visit to the tab.", AutoSize = true, ForeColor = SystemColors.GrayText,
+        };
+
         _ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Width = 80 };
         _cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Width = 80 };
         var buttons = new FlowLayoutPanel
@@ -106,7 +118,9 @@ internal sealed class SettingsDialog : Form
         rows.Controls.Add(Caption("Output device:"), 0, 2);
         rows.Controls.Add(_outputDevice, 1, 2);
         rows.Controls.Add(nextStart, 1, 3);
-        rows.Controls.Add(buttons, 0, 4);
+        rows.Controls.Add(_nowPlayingTab, 1, 4);
+        rows.Controls.Add(nextVisit, 1, 5);
+        rows.Controls.Add(buttons, 0, 6);
         rows.SetColumnSpan(buttons, 2);
         Controls.Add(rows);
 
@@ -120,6 +134,9 @@ internal sealed class SettingsDialog : Form
 
     /// <summary>The device chosen, by name, or null for MusicBee's own.</summary>
     public string? OutputDevice => _deviceNames[_outputDevice.SelectedIndex];
+
+    /// <summary>Whether faderio is to show in MusicBee's Now Playing tab.</summary>
+    public bool NowPlayingTab => _nowPlayingTab.Checked;
 
     private void AddDevice(string? name, string text)
     {
