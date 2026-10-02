@@ -112,7 +112,6 @@ internal sealed class MainForm : Form
         ChooseExportPath = ShowExportDialog;
         ConfirmClear = ShowClearDialog;
         ChooseLibrary = () => ShowLibraryDialog(this);
-        AskUnsavedEdits = a => Dialogs.AskUnsavedEdits(this, a);
         ShowSettings = dialog => dialog.ShowDialog(this) == DialogResult.OK;
         ShowNoticeList = ShowModeless;
         ShowTransitionManager = ShowModeless;
@@ -364,7 +363,7 @@ internal sealed class MainForm : Form
         // the plugin, phase 6 issues 02 and 03).
         _queueDrag = new QueueDrag(_queueList, engine, (paths, before) => _ = _engine.Add(paths, before));
 
-        _editor = new TransitionEditorPanel(engine, ShowNotice, suggested => Dialogs.ChooseRenderPath(this, suggested), a => AskUnsavedEdits(a));
+        _editor = new TransitionEditorPanel(engine, ShowNotice, suggested => Dialogs.ChooseRenderPath(this, suggested));
         _playlists = new PlaylistSidebar(engine, LeaveEditor);
         _playlistName = new PlaylistNameBar(engine);
 
@@ -410,12 +409,7 @@ internal sealed class MainForm : Form
 
         FormClosing += (_, e) =>
         {
-            // Closing the window closes the editor, so unsaved edits ask first.
-            if (!_editor.ConfirmLeave())
-            {
-                e.Cancel = true;
-                return;
-            }
+            _editor.Commit(); // a box being typed in, as leaving it would
             _timer.Stop();
             SaveColumns(); // a width still settling
             _saveColumns.Dispose();
@@ -802,11 +796,12 @@ internal sealed class MainForm : Form
     /// headless form cannot show a dialog.</summary>
     internal Func<string?> ChooseLibrary { get; set; }
 
-    /// <summary>Switches library (library issue 02): unsaved edits are settled first, then one
-    /// call. The editor empties, since what it had open belongs to the library left.</summary>
+    /// <summary>Switches library (library issue 02): a box being typed in is saved first, then
+    /// one call. The editor empties, since what it had open belongs to the library left.</summary>
     private void OpenLibrary()
     {
-        if (!_editor.ConfirmLeave() || ChooseLibrary() is not { } folder)
+        _editor.Commit();
+        if (ChooseLibrary() is not { } folder)
         {
             return;
         }
@@ -814,17 +809,12 @@ internal sealed class MainForm : Form
         _engine.OpenLibrary(folder);
     }
 
-    /// <summary>Before the open playlist changes (playlists issue 02): unsaved edits are settled,
-    /// then the editor empties, as what it had open was the queue left. False when the user
-    /// cancels.</summary>
-    private bool LeaveEditor()
+    /// <summary>Before the open playlist changes (playlists issue 02): a box being typed in is
+    /// saved, then the editor empties, as what it had open was the queue left.</summary>
+    private void LeaveEditor()
     {
-        if (!_editor.ConfirmLeave())
-        {
-            return false;
-        }
+        _editor.Commit();
         _editor.Close();
-        return true;
     }
 
     /// <summary>Asks for a library folder, starting in Music (D12): at the first launch, before
@@ -913,13 +903,14 @@ internal sealed class MainForm : Form
         return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
     }
 
-    /// <summary>Import opens a playlist (D19), so unsaved edits are settled once something was
-    /// picked; then one call for all of them.</summary>
+    /// <summary>Import opens a playlist (D19), so the editor is left once something was picked;
+    /// then one call for all of them.</summary>
     private void ImportPlaylists()
     {
         var paths = ChoosePlaylists();
-        if (paths.Count > 0 && LeaveEditor())
+        if (paths.Count > 0)
         {
+            LeaveEditor();
             _ = _engine.ImportPlaylists(paths); // the rows and the notice arrive through the sink
         }
     }
@@ -1074,7 +1065,4 @@ internal sealed class MainForm : Form
             _editor.Open(adjacency);
         }
     }
-
-    /// <summary>Asks what to do with the editor's unsaved edits before it leaves them.</summary>
-    internal Func<Adjacency, UnsavedEdits> AskUnsavedEdits { get; set; }
 }

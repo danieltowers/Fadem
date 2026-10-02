@@ -16,7 +16,7 @@ public sealed class HeadlessControlsTests
     public void TheSidebar_ListsTheLibrarysPlaylists() => RunSta(() =>
     {
         using var tc = TestEngine.Create();
-        using var sidebar = new PlaylistSidebar(tc.Engine, () => true);
+        using var sidebar = new PlaylistSidebar(tc.Engine, () => { });
 
         sidebar.Render(tc.View);
 
@@ -32,7 +32,7 @@ public sealed class HeadlessControlsTests
         var a = tc.TrackOfLength(Path.Combine(tc.TempDir, "a.wav"), 30);
         var b = tc.TrackOfLength(Path.Combine(tc.TempDir, "b.wav"), 30);
         tc.Engine.AddTracks(new[] { a, b });
-        using var editor = new TransitionEditorPanel(tc.Engine, _ => { }, _ => null, _ => UnsavedEdits.Discard);
+        using var editor = new TransitionEditorPanel(tc.Engine, _ => { }, _ => null);
 
         editor.Open(new Adjacency(a, b));
         editor.Refresh(tc.View);
@@ -142,19 +142,19 @@ public sealed class HeadlessControlsTests
         var a = tc.TrackOfLength(Path.Combine(tc.TempDir, "a.wav"), 30);
         var b = tc.TrackOfLength(Path.Combine(tc.TempDir, "b.wav"), 30);
         tc.Engine.AddTracks(new[] { a, b });
-        using var editor = new TransitionEditorPanel(tc.Engine, _ => { }, _ => null, _ => UnsavedEdits.Discard) { Height = 800 };
+        using var editor = new TransitionEditorPanel(tc.Engine, _ => { }, _ => null) { Height = 800 };
         editor.Open(new Adjacency(a, b));
 
         editor.Width = 340; // standalone faderio's
         editor.PerformLayout();
-        Assert.Equal(editor._save.Top, editor._remove.Top); // one row
+        Assert.Equal(editor._undo.Top, editor._remove.Top); // one row
 
         editor.Width = 265; // a sidebar's, less a scroll bar
         editor.PerformLayout();
 
-        Assert.True(editor._remove.Top > editor._save.Top, "Remove transition did not wrap below Save");
+        Assert.True(editor._remove.Top > editor._undo.Top, "Remove transition did not wrap below Undo");
         Assert.True(editor._remove.Right <= editor._remove.Parent!.ClientSize.Width, "Remove transition is off the edge");
-        Assert.True(editor._save.Parent!.Height >= 64, $"the wrapped row is only {editor._save.Parent!.Height} px tall");
+        Assert.True(editor._undo.Parent!.Height >= 64, $"the wrapped row is only {editor._undo.Parent!.Height} px tall");
     });
 
     /// <summary>WinForms wants an STA thread; xunit does not give one.</summary>

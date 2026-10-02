@@ -199,7 +199,7 @@ public sealed partial class PluginTests
         Assert.Equal($"{Path.GetFileName(c)} is missing: this transition can be removed, not changed.", editor._missing.Text);
         Assert.Equal("1.5", editor._fadeOutPoint.Text); // what the store holds, to read
         Assert.True(editor._fadeOutPoint.ReadOnly);
-        foreach (var button in new[] { editor._save, editor._revert, editor._preview, editor._render })
+        foreach (var button in new[] { editor._preview, editor._render })
         {
             Assert.False(button.Enabled, button.Text);
         }
@@ -237,7 +237,7 @@ public sealed partial class PluginTests
         Open(view._queueList.ContextMenuStrip!);
         view._editMenu.Self.PerformClick(); // b → b
         view._editor._fadeOutPoint.Text = "2";
-        Click(view._editor._save);
+        view._editor.Commit();
         _ui.Pump();
         view.Render();
 

@@ -163,7 +163,7 @@ public sealed partial class HeadlessFormTests
 
         h.Form.EditTransitionAt(2); // gamma → delta
         h.Form._editor._fadeOutPoint.Text = "1";
-        Click(h.Form._editor._save);
+        h.Form._editor.Commit();
 
         Assert.Equal(c, manager.PickedTrack!.FilePath);
         Assert.Equal([("→", Title(d)), ("←", Title(a))],
@@ -221,7 +221,7 @@ public sealed partial class HeadlessFormTests
         Assert.Equal("epsilon.wav is missing: this transition can be removed, not changed.", editor._missing.Text);
         Assert.Equal("2", editor._fadeOutPoint.Text); // what the store holds, to read
         Assert.True(editor._fadeOutPoint.ReadOnly);
-        foreach (var button in new[] { editor._save, editor._revert, editor._preview, editor._render, editor._fadeOutLess, editor._fadeOutMore })
+        foreach (var button in new[] { editor._preview, editor._render, editor._fadeOutLess, editor._fadeOutMore })
         {
             Assert.False(button.Enabled, button.Text);
         }
@@ -252,7 +252,7 @@ public sealed partial class HeadlessFormTests
 
         Assert.True(manager._grid.Rows[index].DefaultCellStyle.ForeColor.IsEmpty);
         Assert.False(IsSetVisible(h.Form._editor._missing));
-        Assert.True(h.Form._editor._save.Enabled);
+        Assert.True(h.Form._editor._render.Enabled);
         Assert.False(h.Form._editor._fadeOutPoint.ReadOnly);
     });
 }

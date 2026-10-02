@@ -5,23 +5,17 @@ using Point = Faderio.Core.Domain.Point;
 
 namespace Faderio.Shell;
 
-/// <summary>What to do with unsaved edits on leaving the editor (build issue 15).</summary>
-internal enum UnsavedEdits
-{
-    Save,
-    Discard,
-    Cancel,
-}
-
 /// <summary>
 /// The transition editor for one adjacency: four parameter fields, two capture buttons, a
-/// from-end box on the fade-out point, the fade curve, Save, Revert, Remove transition and
+/// from-end box on the fade-out point, the fade curve, Undo, Redo, Remove transition and
 /// "Render this boundary" (ticket 05's slice, completed by build issue 14). Holds the two
 /// captured points as <see cref="Point"/>s, so the text boxes are a display of the value, never
 /// its source of truth: v2 formatted the capture with "0.###" before saving it and quantised
-/// every point to a millisecond (ticket 06). The fields are a draft; the engine converts,
-/// captures and validates, and each value it refuses is shown beside its field. Leaving a draft
-/// that differs from what is stored asks Save / Discard / Cancel (build issue 15). Preview plays
+/// every point to a millisecond (ticket 06). The engine converts, captures and validates, and
+/// each value it refuses is shown beside its field. A change is saved when it is finished
+/// (phase 6 issue 05): a box on leaving it or on Enter, a button at once. Undo and Redo, and
+/// Ctrl+Z and Ctrl+Y, step through the engine's history of every transition change (issue 04);
+/// leaving never asks, and text that could not be saved is dropped. Preview plays
 /// the draft on its own voices while the queue is held, and shows where it is (build issue 16).
 /// <para>A selector at the top picks the layer the fields edit (D21, playlists issue 04): the
 /// global transition, or the open playlist's override of it. In playlist mode each box shows the
@@ -34,7 +28,6 @@ internal sealed class TransitionEditorPanel : Panel
     private readonly PlaybackEngine _engine;
     private readonly Action<string> _notice;
     private readonly Func<string, string?> _chooseRenderPath;
-    private readonly Func<Adjacency, UnsavedEdits> _askUnsaved;
     private readonly Action? _beforeSounding;
 
     internal readonly Label _title;
@@ -55,8 +48,8 @@ internal sealed class TransitionEditorPanel : Panel
     internal readonly Button _fadeOutMore;
     internal readonly Button _fadeInLess;
     internal readonly Button _fadeInMore;
-    internal readonly Button _save;
-    internal readonly Button _revert;
+    internal readonly Button _undo;
+    internal readonly Button _redo;
     internal readonly Button _remove;
     internal readonly Button _render;
     internal readonly Button _preview;
@@ -72,6 +65,11 @@ internal sealed class TransitionEditorPanel : Panel
     /// <summary>The layer last chosen, kept for the session (D23).</summary>
     private TransitionLayer _layer = TransitionLayer.Global;
 
+    /// <summary>A box was typed in since the last save: leaving it, or Enter, saves.</summary>
+    private bool _pending;
+
+    private readonly ToolTip _historyTips = new();
+
     /// <summary>A curve as the list shows it; none is "(global)", in playlist mode only.</summary>
     private sealed record CurveItem(FadeCurveKind? Curve)
     {
@@ -82,13 +80,11 @@ internal sealed class TransitionEditorPanel : Panel
     /// player's process stops that player first (phase 5 issue 11). Null does nothing.</param>
     public TransitionEditorPanel(
         PlaybackEngine engine, Action<string> notice,
-        Func<string, string?> chooseRenderPath, Func<Adjacency, UnsavedEdits> askUnsaved,
-        Action? beforeSounding = null)
+        Func<string, string?> chooseRenderPath, Action? beforeSounding = null)
     {
         _engine = engine;
         _notice = notice;
         _chooseRenderPath = chooseRenderPath;
-        _askUnsaved = askUnsaved;
         _beforeSounding = beforeSounding;
 
         Dock = DockStyle.Right;
@@ -190,8 +186,8 @@ internal sealed class TransitionEditorPanel : Panel
         row++;
 
         // Narrower than the panel with its scroll bar showing, so it never scrolls sideways.
-        _save = new Button { Text = "Save", Width = 72, Height = 32, Enabled = false };
-        _revert = new Button { Text = "Revert", Width = 72, Height = 32, Enabled = false };
+        _undo = new Button { Text = "Undo", Width = 72, Height = 32, Enabled = false };
+        _redo = new Button { Text = "Redo", Width = 72, Height = 32, Enabled = false };
         _remove = new Button { Text = "Remove transition", Width = 124, Height = 32, Enabled = false };
         _removeOverride = new Button { Text = "Remove override", Width = 124, Height = 32, Enabled = false, Visible = false };
         _render = new Button { Text = "Render this boundary", Width = 160, Height = 32, Enabled = false };
@@ -203,15 +199,15 @@ internal sealed class TransitionEditorPanel : Panel
         layout.SetColumnSpan(_previewStatus, 2);
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         row++;
-        ButtonRow(layout, ref row, _save, _revert, _remove);
+        ButtonRow(layout, ref row, _undo, _redo, _remove);
         // Remove override sits under Remove transition in playlist mode only (D21), in Render's
         // row, so that Render stays in view at the default window size.
         ButtonRow(layout, ref row, _render, _removeOverride);
 
         _captureOut.Click += (_, _) => CaptureFadeOut();
         _captureIn.Click += (_, _) => CaptureFadeIn();
-        _save.Click += (_, _) => Save();
-        _revert.Click += (_, _) => Revert();
+        _undo.Click += (_, _) => UndoChange();
+        _redo.Click += (_, _) => RedoChange();
         _remove.Click += (_, _) => Remove();
         _removeOverride.Click += (_, _) => RemoveOverride();
         _editGlobal.CheckedChanged += (_, _) => { if (_editGlobal.Checked) SwitchLayer(TransitionLayer.Global); };
@@ -219,7 +215,28 @@ internal sealed class TransitionEditorPanel : Panel
         _render.Click += (_, _) => Render();
         _preview.Click += (_, _) => Preview();
         _stopPreview.Click += (_, _) => _engine.StopPreview();
-        _fadeOutFromEnd.CheckedChanged += (_, _) => { if (!_loading) MeasureFadeOutFromOtherEnd(); };
+        _fadeOutFromEnd.CheckedChanged += (_, _) =>
+        {
+            if (!_loading)
+            {
+                MeasureFadeOutFromOtherEnd();
+                CommitNow();
+            }
+        };
+        _curve.SelectedIndexChanged += (_, _) => { if (!_loading) CommitNow(); };
+        foreach (var box in new[] { _fadeOutPoint, _fadeOutDuration, _fadeInPoint, _fadeInDuration })
+        {
+            box.TextChanged += (_, _) => { if (!_loading) _pending = true; };
+            box.Leave += (_, _) => Commit();
+            box.KeyDown += (_, e) =>
+            {
+                if (e.KeyCode == Keys.Enter && e.Modifiers == Keys.None)
+                {
+                    e.SuppressKeyPress = true; // no ding
+                    Commit();
+                }
+            };
+        }
         _fadeOutPoint.TextChanged += (_, _) => { if (_fadeOutPoint.Text != Presenter.FmtSeconds(_fadeOut)) _fadeOut = null; ShowNudges(); };
         _fadeInPoint.TextChanged += (_, _) => { if (_fadeInPoint.Text != Presenter.FmtSeconds(_fadeIn)) _fadeIn = null; ShowNudges(); };
         _fadeOutLess.Click += (_, _) => NudgePoint(fadeOut: true, -1, ShiftHeld);
@@ -247,20 +264,15 @@ internal sealed class TransitionEditorPanel : Panel
     private static string PlaylistChoice(string? playlist) =>
         playlist is null ? "This playlist" : $"This playlist ({playlist})";
 
-    /// <summary>The selector moved: unsaved edits in the layer left are settled first, as on
-    /// leaving the adjacency, and Cancel puts the selector back. The fields then load the layer
-    /// chosen.</summary>
+    /// <summary>The selector moved: a box being typed in is saved to the layer left first, as on
+    /// leaving the adjacency. The fields then load the layer chosen.</summary>
     internal void SwitchLayer(TransitionLayer layer)
     {
         if (_loading || layer == _layer)
         {
             return;
         }
-        if (!ConfirmLeave())
-        {
-            ShowLayer();
-            return;
-        }
+        Commit();
         _layer = layer;
         ShowLayer();
         if (_adjacency is { } adjacency)
@@ -384,6 +396,7 @@ internal sealed class TransitionEditorPanel : Panel
             _fadeIn = moved;
             _fadeInPoint.Text = Presenter.FmtSeconds(moved);
         }
+        CommitNow();
     }
 
     /// <summary>The point a field shows: its own, or in playlist mode, while it is empty, the
@@ -436,15 +449,16 @@ internal sealed class TransitionEditorPanel : Panel
         row++;
     }
 
-    /// <summary>Opens the editor on an adjacency, loading what is authored for it, once any
-    /// unsaved edits to the one open now are saved or discarded. Reopening the adjacency already
-    /// open keeps its draft. Opening another one ends a running preview.</summary>
+    /// <summary>Opens the editor on an adjacency, loading what is authored for it, once a box
+    /// being typed in is saved; text that could not be saved is dropped. Reopening the adjacency
+    /// already open keeps such text. Opening another one ends a running preview.</summary>
     public void Open(Adjacency adjacency)
     {
-        if ((adjacency == _adjacency && HasUnsavedEdits) || !ConfirmLeave())
+        if (adjacency == _adjacency && HasUnsavedEdits)
         {
             return;
         }
+        Commit();
         if (adjacency != _adjacency)
         {
             _engine.StopPreview();
@@ -452,29 +466,32 @@ internal sealed class TransitionEditorPanel : Panel
         Load(adjacency);
     }
 
-    /// <summary>Whether the editor may be left: asks Save / Discard / Cancel when there are
-    /// unsaved edits, and nothing otherwise. A save that is refused stays, with its reasons shown.</summary>
-    public bool ConfirmLeave()
+    /// <summary>Saves a box typed in since the last save, as leaving it would: before the editor
+    /// is left, the adjacency or layer changes, or Undo walks back. Nothing typed, nothing
+    /// saved; a refusal shows its reasons, and the text is dropped when the fields load next.</summary>
+    public void Commit()
     {
-        if (!HasUnsavedEdits)
+        if (!_pending)
         {
-            return true;
+            return;
         }
-        switch (_askUnsaved(_adjacency!))
+        _pending = false;
+        if (HasUnsavedEdits)
         {
-            case UnsavedEdits.Save:
-                Save();
-                return !HasUnsavedEdits;
-            case UnsavedEdits.Discard:
-                return true;
-            default:
-                return false;
+            Save();
         }
     }
 
-    /// <summary>Saving would change the store: the engine says whether it holds the draft. Text
-    /// that is not a number is an edit too. After Remove transition the store holds nothing, so
-    /// filled fields are unsaved. On a gone adjacency nothing can be saved, so nothing is unsaved.</summary>
+    /// <summary>A button changed a field: saved at once.</summary>
+    private void CommitNow()
+    {
+        _pending = true;
+        Commit();
+    }
+
+    /// <summary>Saving would change the store: the engine says whether it holds the fields. Text
+    /// that is not a number is a change too. On a gone adjacency nothing can be saved, so nothing
+    /// is unsaved.</summary>
     internal bool HasUnsavedEdits
     {
         get
@@ -488,7 +505,7 @@ internal sealed class TransitionEditorPanel : Panel
         }
     }
 
-    /// <summary>Loads the fields from the store: opening an adjacency, and Revert. A stored
+    /// <summary>Loads the fields from the store: opening an adjacency, Undo and Redo. A stored
     /// point loads exactly, so a draft nobody touched is the transition stored. In playlist mode
     /// the fields hold the override, and the global values are their placeholders.</summary>
     private void Load(Adjacency adjacency)
@@ -532,8 +549,8 @@ internal sealed class TransitionEditorPanel : Panel
     }
 
     /// <summary>Empties the editor, as at launch: on switching library (library issue 02), where
-    /// the adjacency open belongs to the library left. Unsaved edits are the caller's to settle
-    /// first, through <see cref="ConfirmLeave"/>.</summary>
+    /// the adjacency open belongs to the library left. A box being typed in is the caller's to
+    /// save first, through <see cref="Commit"/>.</summary>
     public void Close()
     {
         _adjacency = null;
@@ -559,10 +576,11 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeInPoint.Text = Presenter.FmtSeconds(_fadeIn);
         _fadeOutDuration.Text = Presenter.FmtSeconds(spec?.FadeOutDuration);
         _fadeInDuration.Text = Presenter.FmtSeconds(spec?.FadeInDuration);
+        _pending = false; // what is stored, not typed
         ShowReasons([]);
         // On a gone adjacency only the removals stay: the rest would act on a file not there.
         var changeable = editing && !Gone;
-        foreach (var control in new Control[] { _fadeOutFromEnd, _curve, _save, _revert, _render, _preview })
+        foreach (var control in new Control[] { _fadeOutFromEnd, _curve, _render, _preview })
         {
             control.Enabled = changeable;
         }
@@ -596,6 +614,59 @@ internal sealed class TransitionEditorPanel : Panel
         _stopPreview.Enabled = view.Preview is not null;
         _previewStatus.Text = Presenter.FmtPreview(view.Preview);
         _previewStatus.Visible = view.Preview is not null; // no room kept for it otherwise
+        ShowHistory(_undo, "Undo", view.NextUndo);
+        ShowHistory(_redo, "Redo", view.NextRedo);
+    }
+
+    /// <summary>Undo and Redo live while the engine has a change to walk, and say which.</summary>
+    private void ShowHistory(Button button, string verb, HistoryStep? step)
+    {
+        button.Enabled = step is not null;
+        var tip = step is null ? "" : $"{verb}: {step.Describe()}";
+        if (_historyTips.GetToolTip(button) != tip)
+        {
+            _historyTips.SetToolTip(button, tip);
+        }
+    }
+
+    /// <summary>Undoes the engine's newest transition change and shows it: a box being typed in is
+    /// saved first, so Undo puts back what it held before the typing.</summary>
+    internal void UndoChange() => WalkHistory(() => _engine.View.NextUndo, _engine.Undo);
+
+    internal void RedoChange() => WalkHistory(() => _engine.View.NextRedo, _engine.Redo);
+
+    /// <summary>Opens the adjacency the step changed, in the layer it changed when that is the
+    /// global or the open playlist's, as <see cref="Open"/> opens one.</summary>
+    private void WalkHistory(Func<HistoryStep?> next, Func<Adjacency?> walk)
+    {
+        Commit();
+        var step = next();
+        if (walk() is not { } adjacency)
+        {
+            return;
+        }
+        if (adjacency != _adjacency)
+        {
+            _engine.StopPreview();
+        }
+        _layer = step?.Playlist is { } playlist && playlist == _engine.View.OpenPlaylist ? TransitionLayer.Playlist : TransitionLayer.Global;
+        Load(adjacency);
+    }
+
+    /// <summary>Ctrl+Z and Ctrl+Y anywhere in the editor, its boxes included, are Undo and Redo.</summary>
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (keyData == (Keys.Control | Keys.Z))
+        {
+            UndoChange();
+            return true;
+        }
+        if (keyData == (Keys.Control | Keys.Y))
+        {
+            RedoChange();
+            return true;
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
     }
 
     /// <summary>The layer choice is live only with a boundary open, and This playlist only with a
@@ -612,6 +683,7 @@ internal sealed class TransitionEditorPanel : Panel
         if (_engine.Capture(CaptureSide.FadeOut, fromEnd: _fadeOutFromEnd.Checked) is { } point)
         {
             ShowFadeOut(point);
+            CommitNow();
         }
     }
 
@@ -621,6 +693,7 @@ internal sealed class TransitionEditorPanel : Panel
         {
             _fadeIn = point;
             _fadeInPoint.Text = Presenter.FmtSeconds(point);
+            CommitNow();
         }
     }
 
@@ -657,7 +730,7 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeOutPoint.Text = Presenter.FmtSeconds(point);
     }
 
-    internal void Save()
+    private void Save()
     {
         if (_adjacency is null)
         {
@@ -687,7 +760,7 @@ internal sealed class TransitionEditorPanel : Panel
         return spec;
     }
 
-    /// <summary>The fields as the spec Save would author, and the fields whose text is not a
+    /// <summary>The fields as the spec a save authors, and the fields whose text is not a
     /// number of seconds.</summary>
     private (TransitionSpec Spec, IReadOnlyList<Refusal> Unparsed) Draft()
     {
@@ -713,37 +786,26 @@ internal sealed class TransitionEditorPanel : Panel
         return (spec, unparsed);
     }
 
-    /// <summary>Discards the draft and reloads the fields from the store.</summary>
-    internal void Revert()
-    {
-        if (_adjacency is not null)
-        {
-            Load(_adjacency);
-        }
-    }
-
-    /// <summary>Unauthors the adjacency and keeps the fields as an unsaved draft, so Save puts
-    /// the transition back. In playlist mode it is still the global transition that goes, and
-    /// the placeholders show that.</summary>
+    /// <summary>Unauthors the adjacency and loads the fields from the store, now without it;
+    /// Undo puts it back. In playlist mode it is still the global transition that goes, and the
+    /// placeholders show that.</summary>
     internal void Remove()
     {
         if (_adjacency is not null)
         {
             _engine.Unauthor(_adjacency);
-            ShowReasons([]);
-            ShowLayers();
+            Load(_adjacency);
         }
     }
 
     /// <summary>Removes the open playlist's override, so it plays the global transition again,
-    /// and keeps the fields as an unsaved draft, as <see cref="Remove"/> does.</summary>
+    /// and loads the fields as <see cref="Remove"/> does.</summary>
     internal void RemoveOverride()
     {
         if (_adjacency is not null)
         {
             _engine.UnauthorOverride(_adjacency);
-            ShowReasons([]);
-            ShowLayers();
+            Load(_adjacency);
         }
     }
 

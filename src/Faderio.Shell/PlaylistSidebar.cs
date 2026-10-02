@@ -12,7 +12,7 @@ namespace Faderio.Shell;
 internal sealed class PlaylistSidebar : Panel
 {
     private readonly PlaybackEngine _engine;
-    private readonly Func<bool> _leaveEditor;
+    private readonly Action _leaveEditor;
     private readonly Font _openFont;
 
     internal readonly ListView _list;
@@ -27,9 +27,9 @@ internal sealed class PlaylistSidebar : Panel
     /// <summary>While a label is being edited the list is not re-rendered, which would end the edit.</summary>
     private bool _editing;
 
-    /// <param name="leaveEditor">Settles the editor's unsaved edits and empties it before the open
-    /// playlist changes; false when the user cancels.</param>
-    public PlaylistSidebar(PlaybackEngine engine, Func<bool> leaveEditor)
+    /// <param name="leaveEditor">Saves a box being typed in and empties the editor before the
+    /// open playlist changes.</param>
+    public PlaylistSidebar(PlaybackEngine engine, Action leaveEditor)
     {
         _engine = engine;
         _leaveEditor = leaveEditor;
@@ -175,19 +175,18 @@ internal sealed class PlaylistSidebar : Panel
             return;
         }
         var name = _list.Items[index].Text;
-        if (name == _engine.View.OpenPlaylist || !_leaveEditor())
+        if (name == _engine.View.OpenPlaylist)
         {
             return;
         }
+        _leaveEditor();
         _ = _engine.OpenPlaylist(name); // its rows and any notice arrive through the sink
     }
 
     private void NewPlaylist()
     {
-        if (_leaveEditor())
-        {
-            _engine.NewPlaylist();
-        }
+        _leaveEditor();
+        _engine.NewPlaylist();
     }
 
     /// <summary>Starts the inline edit of a playlist's name. The label is the view's until the
@@ -235,9 +234,13 @@ internal sealed class PlaylistSidebar : Panel
             return;
         }
         var name = item.Text;
-        if (!ConfirmDelete(name) || (name == _engine.View.OpenPlaylist && !_leaveEditor()))
+        if (!ConfirmDelete(name))
         {
             return;
+        }
+        if (name == _engine.View.OpenPlaylist)
+        {
+            _leaveEditor();
         }
         _engine.DeletePlaylist(name);
     }

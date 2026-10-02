@@ -1,20 +1,12 @@
-using Faderio.Core.Domain;
-
 namespace Faderio.Shell;
 
 /// <summary>
-/// The questions the editor asks through its host, the same in both hosts (phase 5 issue 11):
-/// what to do with unsaved edits on leaving the editor, and where to render an adjacency. The
-/// unsaved-edits question is a task dialog on net8.0-windows and a Yes / No / Cancel message
-/// box on net48, which has no task dialog (<c>Compat</c>): the brief's TaskDialog swap.
+/// The question the editor asks through its host, the same in both hosts (phase 5 issue 11):
+/// where to render an adjacency. It asked what to do with unsaved edits too, until the editor
+/// saved itself (phase 6 issue 05).
 /// </summary>
-internal static partial class Dialogs
+internal static class Dialogs
 {
-    /// <summary>Asks what to do with the editor's unsaved edits to <paramref name="adjacency"/>
-    /// before it leaves them.</summary>
-    public static UnsavedEdits AskUnsavedEdits(IWin32Window? owner, Adjacency adjacency) =>
-        ShowUnsavedEdits(owner, $"Save your changes to {adjacency.Name}?");
-
     /// <summary>The WAV save dialog for "Render this boundary", opening on the suggested name.
     /// Null when cancelled.</summary>
     public static string? ChooseRenderPath(IWin32Window? owner, string suggestedName)

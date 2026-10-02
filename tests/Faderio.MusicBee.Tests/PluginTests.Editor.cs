@@ -44,7 +44,7 @@ public sealed partial class PluginTests
         Assert.Equal("1", view._editor._fadeOutDuration.Text);
         Assert.Equal("0", view._editor._fadeInPoint.Text);
         Assert.Equal("1", view._editor._fadeInDuration.Text);
-        Assert.True(view._editor._save.Enabled);
+        Assert.True(view._editor._render.Enabled);
     });
 
     [Fact]
@@ -128,7 +128,7 @@ public sealed partial class PluginTests
         view.EditTransitionAt(0);
 
         view._editor._fadeOutDuration.Text = "abc";
-        Click(view._editor._save);
+        view._editor.Commit();
         _ui.Pump();
 
         Assert.Empty(_ui.Messages);
@@ -219,7 +219,7 @@ public sealed partial class PluginTests
     });
 
     [Fact]
-    public void SwitchingPlaylist_WithUnsavedEdits_Asks_AndCancelStays() => RunSta(() =>
+    public void SwitchingPlaylist_SavesABoxBeingTypedIn_ThenOpensIt() => RunSta(() =>
     {
         var (a, _) = AuthorLibrary();
         ChooseLibrary(LibraryFolder);
@@ -234,15 +234,14 @@ public sealed partial class PluginTests
         var view = View(panel);
         view.Render();
         view.EditTransitionAt(0);
+        var adjacency = view._editor.Adjacency!;
         view._editor._fadeOutDuration.Text = "2";
-        var asked = new List<string>();
-        view.AskUnsavedEdits = a => { asked.Add(a.Name); return UnsavedEdits.Cancel; };
 
         view._playlists.OpenAt(view._playlists._list.Items.Cast<ListViewItem>().ToList().FindIndex(i => i.Text == "Untitled 2"));
 
-        Assert.Equal(new[] { view._editor.Adjacency!.Name }, asked);
-        Assert.Equal("Untitled", _plugin.Host.Engine.View.OpenPlaylist);
-        Assert.Equal("2", view._editor._fadeOutDuration.Text);
+        Assert.Equal(TimeSpan.FromSeconds(2), _plugin.Host.Engine.Transition(adjacency).Global!.FadeOutDuration);
+        Assert.Equal("Untitled 2", _plugin.Host.Engine.View.OpenPlaylist);
+        Assert.Null(view._editor.Adjacency);
     });
 
     [Fact]
@@ -263,7 +262,7 @@ public sealed partial class PluginTests
         view._editor._fadeInPoint.Text = "0.75";
         view._editor._fadeInDuration.Text = "1.5";
         view._editor._curve.SelectedIndex = view._editor._curve.Items.Cast<object>().ToList().FindIndex(i => i.ToString() == Presenter.FmtCurve(FadeCurveKind.Linear));
-        Click(view._editor._save);
+        view._editor.Commit();
         _ui.Pump();
 
         Assert.StartsWith("Saved ", view._status.Text);

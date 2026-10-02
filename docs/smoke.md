@@ -101,16 +101,21 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       A right-click on a row still shows the row's menu. Relaunched, or after **Open library…** elsewhere and back, the
       layout is as it was left; the other library shows its own. The file is
       `<library>\.faderio\columns.json`.
-- [ ] With unsaved edits (a field, **From end** or the curve changed, or **Remove transition**
-      pressed), opening another adjacency asks **Save / Discard / Cancel**, and so does closing
-      the window. Cancel keeps the edits and stays; Discard drops them; Save saves and moves on,
-      unless the save is refused. With nothing unsaved it asks nothing.
+- [ ] The editor saves itself (phase 6 issue 05): a box typed in saves on Tab, a click
+      elsewhere or Enter, with "Saved *a* → *b*." in the strip; capture, − / +, **From end** and
+      the curve save at once. Opening another adjacency, closing the window, switching playlist
+      or library never asks: a box being typed in is saved first. Text that cannot be saved
+      ("abc", or a point past the end) shows its reason and is dropped on leaving.
 - [ ] The transition editor opens with its title fully visible — not clipped, not behind
       another control.
 - [ ] All four parameter fields, the capture buttons, **From end** beside the fade-out point
       and the **Fade curve** list are visible without scrolling at the default window size.
-- [ ] Save, Revert, Remove transition and Render are visible and enabled once the editor is
-      open on an adjacency.
+- [ ] Undo, Redo, Remove transition and Render are visible once the editor is open on an
+      adjacency; there is no Save and no Revert. Undo and Redo are greyed until there is a
+      change to walk, and their tooltips say which ("Undo: saved *a* → *b*"). Undo puts the
+      field and the store back, opening the adjacency it changed if another is open; Redo puts
+      it back again. Ctrl+Z and Ctrl+Y do the same with focus anywhere in the editor; Ctrl+Z in
+      a box being typed in puts back what it held before the typing.
 - [ ] With the editor open, an empty duration box shows in grey what it plays if left blank:
       the **Blank fade durations** setting (5 by default) in Global, and in This playlist the
       global's duration, or that setting where the global sets none. Typing over it shows the
@@ -123,14 +128,15 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       3.5 again. The fade curve lists Equal-power and Linear.
 - [ ] Saving a fade-out point past the end of its track stores nothing: the strip says "Not
       saved", and the reason shows in red under the field, readable in full, without pushing
-      the buttons out of sight. The next good save clears it.
+      the buttons out of sight. The next good value clears it.
 - [ ] At the top of the editor, "Editing: ● Global ○ This playlist (*name*)". Switched to This
       playlist, the boxes are empty with the global values in grey, the curve reads "(global)",
       and **Remove override** sits under Remove transition, beside Render; Render stays in view
-      at the default window size. Typing one value shows it black among the grey; Save says
-      "Saved *a* → *b* in *name*." and a grey line under the selector names what the playlist
-      plays. **Remove override** says "Removed the override of …" and the line goes. Switching
-      mode with unsaved edits asks Save / Discard / Cancel; the next ✎ opens in the last mode.
+      at the default window size. Typing one value shows it black among the grey; leaving the
+      box says "Saved *a* → *b* in *name*." and a grey line under the selector names what the
+      playlist plays. **Remove override** says "Removed the override of …" and the line goes.
+      Switching mode saves a box being typed in to the mode left; the next ✎ opens in the last
+      mode.
 - [ ] **Transitions…**, between **Export playlist…** and **Open library…**, opens a separate
       "faderio — transitions" window on the selected row's track (else the first track with a
       transition), listing the boundary authored during the run: ← or →, the other track, then
@@ -143,17 +149,16 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       Author a transition, rename one of its files and open the manager: the row reads
       "⚠ *path*", greyed, with a tooltip saying it was not found where the store says; the picker
       marks that track the same way. Double-click it: under the heading the editor says
-      "*file* is missing: this transition can be removed, not changed."; Save, Revert, Preview,
-      Render, capture and ± are greyed; Remove transition removes it and the row leaves the manager.
-- [ ] **Remove transition** says "Removed …" in the strip and leaves the fields filled; Save
-      puts the transition back. **Revert** reloads what is stored.
+      "*file* is missing: this transition can be removed, not changed."; Preview, Render, capture
+      and ± are greyed and the boxes read-only; Remove transition removes it and the row leaves the manager.
+- [ ] **Remove transition** says "Removed …" in the strip and empties the fields; **Undo**
+      puts the transition back, "Undone: removed …".
 - [ ] Pressing capture writes a number into the field, and it is the number the time readout
       showed at that moment.
 - [ ] Beside each **point** box (not the durations) sit **−** and **+**. Each press moves the
       number shown by 0.1, Shift-click by 1; with **From end** ticked, + makes the from-end number
       bigger. They stop at 0 and at the track's length, and are greyed out while the box is blank
       or not a number.
-- [ ] After Save, the status strip shows a confirmation and nothing else changed.
 - [ ] **Preview** and **Stop preview** sit together in the editor, Stop preview greyed out
       until a preview runs. While one runs, Preview reads **Preview again**, and the line under
       them shows the phase and each voice's position ("Pre-roll · outgoing 2:25", then
@@ -196,7 +201,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       tooltip says "Transition now". It is greyed out while stopped, while paused, on the last
       row with repeat off, and during a crossfade, and live otherwise.
 - [ ] The status strip shows the latest notice and, at its right, a count ("3 notices").
-      Pressing Save on the same boundary several times shows one "Saved … ×n", not n notices.
+      Saving the same boundary several times shows one "Saved … ×n", not n notices.
       A notice longer than the strip is clipped and never pushes the count off. Clicking the
       notice or the count opens the notice list: every notice this session, oldest first, with
       its time and its count, and the selected one in full below. Esc and the close box hide
@@ -235,8 +240,8 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       temp library launched with two files it shows "Untitled", highlighted. Right-click on empty
       space offers **New playlist** (Rename and Delete greyed out); it adds "Untitled 2",
       highlighted, and empties the queue and the editor.
-- [ ] Clicking a playlist opens it: its rows replace the queue and the highlight moves. With
-      unsaved edits in the editor it asks Save / Discard / Cancel first; Cancel stays.
+- [ ] Clicking a playlist opens it: its rows replace the queue and the highlight moves. A box
+      being typed in in the editor is saved first, with no question.
 - [ ] F2, a double-click or the menu's **Rename** edits the name in place; Enter renames the file,
       Esc leaves it. A name another playlist has is refused: the strip says "Not renamed: …"
       and the label shows the old name. A slow second click on a selected name starts nothing.
@@ -263,7 +268,7 @@ sharp percussive transient; the realism check is the authored boundary from the 
       grid point.
 - [ ] Capture at a drum hit; play the boundary; the fade **starts on the hit**, not after it.
 - [ ] Seek back a few seconds and listen again; the point still lands on the hit.
-- [ ] Tick **From end**, capture the fade-out point on a drum hit and save. Play through into
+- [ ] Tick **From end**, capture the fade-out point on a drum hit (it saves). Play through into
       the next track; the fade starts on the hit.
 - [ ] During the crossfade, the time readout keeps following the outgoing track until it
       falls silent — it does not jump to the incoming track early.
@@ -419,29 +424,28 @@ which a background run cannot give.
 - [ ] **The editor in a sidebar** (phase 5 issue 11). No editor shows until ✎ on row 1 is
       clicked: then "tone-a-440 → tone-b-660" opens as a page in the lists' place, under the
       transport and a **Close editor** bar, with the authored values in its fields, Editing:
-      Global ticked, every field, From end, the curve, Preview, Save, Revert, Remove transition
-      and Render live, scrolling inside where the panel is short (MusicBee stacks its sidebar
-      panels); at 284 px Save / Revert / Remove transition wrap onto two rows rather than being
-      cut off at the edge. **Close editor** empties it and brings the lists back; with an
-      unsaved edit it asks first, as the playlist switch below does.
+      Global ticked, every field, From end, the curve, Preview, Remove transition and Render
+      live, Undo and Redo beside Remove transition, scrolling inside where the panel is short
+      (MusicBee stacks its sidebar panels); at 284 px Undo / Redo / Remove transition wrap onto
+      two rows rather than being cut off at the edge. **Close editor** empties it and brings the
+      lists back, a box being typed in saved first, with no question.
 - [ ] **The editor in a main panel** (the element moved to `LC_RightMainPanel` as above): the
       editor is docked at the right from the start, 340 px wide, reading "No boundary
       selected" with its fields greyed, and no Close bar; ✎ on row 1 fills it.
-- [ ] **A save and its notice.** Fade-out duration typed as "abc", Save: the strip reads "Not
+- [ ] **A save and its notice.** Fade-out duration typed as "abc", Enter: the strip reads "Not
       saved: …" with a **1 notice** link and no box appears; the reason shows in red under the
-      field. Typed as 3, Save: "Saved tone-a-440 → tone-b-660." in the strip, ✎ on row 1 bold,
+      field. Typed as 3, Enter: "Saved tone-a-440 → tone-b-660." in the strip, ✎ on row 1 bold,
       and the library's `transitions.json` holds the 3 s fade-out duration, as standalone
-      faderio would have saved it.
+      faderio would have saved it. **Undo** (and Ctrl+Z with focus in the editor) puts the
+      duration back, "Undone: saved …"; **Redo** puts 3 back.
 - [ ] **Preview** from the editor with faderio stopped: the meter shows sound, ▶ and the
       readout stay as they were ("0:00 / -0:00"), both Capture buttons come live, the button
       reads **Preview again**, **Stop preview** is live and the line under them says where the
       preview is ("Pre-roll · outgoing 0:05"). **Stop preview**: meter 0, the buttons as before.
       Then **▶** plays the queue from its start, and **⏹** stops it.
-- [ ] **Leaving the editor with unsaved edits** (a duration typed, not saved), by **Close
-      editor** in a sidebar or a click on another playlist in a main panel, asks "Save your
-      changes to tone-a-440 → tone-b-660?" in a Yes / No / Cancel box titled "Unsaved
-      transition", owned by MusicBee's window; Cancel leaves the queue and the draft as they
-      were.
+- [ ] **Leaving the editor with a box being typed in** (a duration typed, not yet left), by
+      **Close editor** in a sidebar or a click on another playlist in a main panel, asks
+      nothing: the duration is saved ("Saved …" in the strip) and the editor goes.
 - [ ] **The transition manager** (phase 5 issue 12). The queue's right-click menu has
       **Transitions…** after the Edit transition items, live with any selection. With row 1
       selected it opens "faderio — transitions", a separate window owned by MusicBee's, on

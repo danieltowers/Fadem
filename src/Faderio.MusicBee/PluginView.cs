@@ -92,7 +92,6 @@ internal sealed class PluginView : UserControl
         ConfirmClear = ShowClearDialog;
         ShowNoticeList = ShowModeless;
         ShowTransitionManager = ShowModeless;
-        AskUnsavedEdits = a => Dialogs.AskUnsavedEdits(FindForm(), a);
 
         Dock = DockStyle.Fill;
 
@@ -228,7 +227,7 @@ internal sealed class PluginView : UserControl
         // The editor's preview sounds through the plugin's output: MusicBee's player stops first,
         // unless faderio already sounds and so already has the device.
         _editor = new TransitionEditorPanel(
-            engine, notice, suggested => Dialogs.ChooseRenderPath(FindForm(), suggested), a => AskUnsavedEdits(a),
+            engine, notice, suggested => Dialogs.ChooseRenderPath(FindForm(), suggested),
             beforeSounding: StopMusicBeesPlayerIfSilent);
         _closeEditor = new Button { Text = "Close editor", AutoSize = true, Height = 26, Dock = DockStyle.Right, Margin = new Padding(0) };
         _editorBar = new Panel { Dock = DockStyle.Top, Height = 30, Padding = new Padding(4, 2, 4, 2), Visible = false };
@@ -550,20 +549,16 @@ internal sealed class PluginView : UserControl
         PlaceEditor(); // shown now, in a sidebar
     }
 
-    /// <summary>Settles the editor's unsaved edits and empties it: before the open playlist
+    /// <summary>Saves a box being typed in and empties the editor: before the open playlist
     /// changes under it, and from the sidebar's Close.</summary>
-    private bool LeaveEditor()
+    private void LeaveEditor()
     {
-        if (!_editor.ConfirmLeave())
-        {
-            return false;
-        }
+        _editor.Commit();
         _editor.Close();
         PlaceEditor();
-        return true;
     }
 
-    /// <summary>The Close editor bar: the lists come back once the editor is settled.</summary>
+    /// <summary>The Close editor bar: the lists come back.</summary>
     internal void CloseEditor() => LeaveEditor();
 
     // ── The transition manager ──────────────────────────────────────────────────────────
@@ -594,10 +589,6 @@ internal sealed class PluginView : UserControl
             form.Activate();
         }
     }
-
-    /// <summary>Asks what to do with the editor's unsaved edits before it leaves them. A test
-    /// replaces it.</summary>
-    internal Func<Adjacency, UnsavedEdits> AskUnsavedEdits { get; set; }
 
     /// <summary>The selected rows go in one call; what that does to playback is the engine's.</summary>
     private void RemoveSelected() =>

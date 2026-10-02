@@ -1,6 +1,6 @@
 # 05: The transition editor saves itself
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 04
 
 Phase 6, improvements round 1, both hosts (the editor panel is shared). Raised 2026-10-02:
@@ -60,9 +60,38 @@ the same way (no Save or Revert; Undo and Redo; no prompt on leaving).
 
 ## Acceptance criteria
 
-- [ ] The editor has no Save or Revert button, in either host.
-- [ ] A finished change is saved without a click.
-- [ ] Undo and Redo, buttons and Ctrl+Z / Ctrl+Y, step through every transition change.
-- [ ] Leaving the editor never prompts.
+- [x] The editor has no Save or Revert button, in either host.
+- [x] A finished change is saved without a click.
+- [x] Undo and Redo, buttons and Ctrl+Z / Ctrl+Y, step through every transition change.
+- [x] Leaving the editor never prompts.
 
 ## Comments
+
+- **Resolved 2026-10-02.** Built as specified above.
+  - **The panel:** `_save` and `_revert` became `_undo` and `_redo`. A box's TextChanged marks
+    it pending; Leave or Enter runs `Commit`, which saves only a pending box whose fields
+    differ from the store. Capture, the nudges, From end and the curve save at once
+    (`CommitNow`). `UndoChange` and `RedoChange` commit first, then call the engine, then load
+    the adjacency returned, in the step's layer when that is the open playlist's.
+    `ProcessCmdKey` maps Ctrl+Z and Ctrl+Y. `Refresh` sets the buttons from
+    `NextUndo`/`NextRedo`, with tooltips from `HistoryStep.Describe`. Remove transition and
+    Remove override reload the fields.
+  - **Gone:** `UnsavedEdits`, `ConfirmLeave`, `Dialogs.AskUnsavedEdits` and both Compat
+    dialogs, the hosts' `AskUnsavedEdits`. `PlaylistSidebar` takes an `Action` to leave the
+    editor, since leaving can no longer be cancelled.
+  - **Tests:** `EditorSavesItselfTests`, 8 on both targets. The App lost 8 prompt tests (Cancel
+    and Discard paths, Revert, "asks nothing"), and about 15 tests were rewritten to "a box
+    being typed in is saved, then the editor moves on". The nudge and Remove override tests
+    now expect saves. With the commit before an undo removed, the Ctrl+Z test fails.
+  - **Smoke.** Standalone, the build on a scratch library, driven by UIA and sent messages:
+    ✅ Undo, Redo and Remove transition with no Save or Revert, Undo and Redo greyed at first;
+    ✅ text set without Enter saves nothing; Enter saves ("Saved tone-a → tone-b.", the store
+    holding 0.5 s); ✅ Undo puts 0.5 back after a save of 1, Redo puts 1 back, Remove
+    transition empties the fields and Undo refills them, each with its strip message. Text
+    that is not a number: "Not saved: … is not a number of seconds", nothing stored (seen by
+    accident: a SetFocus took two stray keystrokes into the box). Sent messages are needed:
+    a posted Enter is eaten by WinForms' message-loop preprocessing, and SetFocus takes the
+    user's focus. MusicBee: ✅ loads with no box, the editor shows Undo, Redo and Remove
+    transition. ✅ (the user) saves, Undo and Redo, keys, and no prompt on leaving, in MusicBee.
+    Not seen by the session: the tooltips (WinForms tooltips are not UIA help text) and
+    Ctrl+Z / Ctrl+Y (WinForms reads modifiers from the real key state).

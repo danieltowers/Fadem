@@ -186,11 +186,10 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void ImportPlaylist_Cancelled_ImportsNothing_AndAsksNothing() => RunSta(() =>
+    public void ImportPlaylist_Cancelled_ImportsNothing() => RunSta(() =>
     {
         using var h = new Harness();
         h.Form.ChoosePlaylists = Array.Empty<string>;
-        h.Form.AskUnsavedEdits = _ => throw new InvalidOperationException("nothing was picked");
 
         Click(h.Form._importPlaylist);
 
@@ -199,27 +198,20 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void ImportPlaylist_WithUnsavedEdits_Asks_AndCancelImportsNothing() => RunSta(() =>
+    public void ImportPlaylist_SavesABoxBeingTypedIn_ThenImports() => RunSta(() =>
     {
         using var h = new Harness();
-        ThreeQueued(h);
+        var (a, b, _) = ThreeQueued(h);
         h.Form.EditTransitionAt(0);
         h.Form._editor._fadeOutPoint.Text = "2";
         var playlist = Path.Combine(h.TempDir, "Evening.m3u8");
         File.WriteAllLines(playlist, new[] { "#EXTM3U", TestAudio.WriteDcWav("delta.wav", 1, 0.2) });
         h.Form.ChoosePlaylists = () => new[] { playlist };
-        var asked = 0;
-        h.Form.AskUnsavedEdits = _ =>
-        {
-            asked++;
-            return UnsavedEdits.Cancel;
-        };
 
         Click(h.Form._importPlaylist);
 
-        Assert.Equal(1, asked);
-        Assert.Equal(new[] { "Untitled" }, h.Engine.View.Playlists);
-        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
+        Assert.Equal(TimeSpan.FromSeconds(2), h.Store.Get(a, b)!.FadeOutPoint!.Position);
+        Assert.Contains("Evening", h.Engine.View.Playlists);
     });
 
     [Fact]
@@ -498,7 +490,7 @@ public sealed partial class HeadlessFormTests
         h.Form._editor._fadeInPoint.Text = "0";
         h.Form._editor._fadeInDuration.Text = "0.5";
 
-        Click(h.Form._editor._save);
+        h.Form._editor.Commit();
 
         var spec = h.Store.Get(a, b)!;
         Assert.Equal(TimeSpan.FromSeconds(1.5), spec.FadeOutPoint!.Position);
@@ -518,7 +510,7 @@ public sealed partial class HeadlessFormTests
         h.Form.EditTransitionAt(0);
         h.Form._editor._fadeOutPoint.Text = "abc";
 
-        Click(h.Form._editor._save);
+        h.Form._editor.Commit();
 
         Assert.Null(h.Store.Get(a, b));
         Assert.StartsWith("Not saved:", h.Form._status.Text);
@@ -538,7 +530,7 @@ public sealed partial class HeadlessFormTests
         h.Form.Render();
 
         Click(h.Form._editor._captureOut);
-        Click(h.Form._editor._save);
+        h.Form._editor.Commit();
 
         Assert.Equal("0.28", h.Form._editor._fadeOutPoint.Text);
         var saved = h.Store.Get(a, b)!.FadeOutPoint!.Position;
@@ -581,10 +573,10 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void Nudge_MovesATypedPointATenth_ShiftASecond_AndMarksTheDraftUnsaved() => RunSta(() =>
+    public void Nudge_MovesATypedPointATenth_ShiftASecond_AndSavesEachStep() => RunSta(() =>
     {
         using var h = new Harness();
-        EditingAlphaToBeta(h);
+        var (a, b) = EditingAlphaToBeta(h);
         var editor = h.Form._editor;
         editor._fadeOutPoint.Text = "3.5";
         editor._fadeInPoint.Text = "0.05";
@@ -601,7 +593,9 @@ public sealed partial class HeadlessFormTests
 
         Click(editor._fadeInLess);
         Assert.Equal("0", editor._fadeInPoint.Text); // clamped at the start
-        Assert.True(editor.HasUnsavedEdits);
+        Assert.False(editor.HasUnsavedEdits);
+        Assert.Equal(TimeSpan.FromSeconds(5), h.Store.Get(a, b)!.FadeOutPoint!.Position);
+        Assert.Equal(TimeSpan.Zero, h.Store.Get(a, b)!.FadeInPoint!.Position);
     });
 
     [Fact]
@@ -689,7 +683,7 @@ public sealed partial class HeadlessFormTests
         h.Form.Render();
 
         Click(editor._captureOut);
-        Click(editor._save);
+        editor.Commit();
 
         Assert.Equal("3.5", editor._fadeOutPoint.Text);
         var saved = h.Store.Get(a, b)!.FadeOutPoint!;
@@ -727,7 +721,7 @@ public sealed partial class HeadlessFormTests
         Fill(editor, "1.5", "0.5", "0", "0.5");
         editor._curve.SelectedIndex = editor._curve.FindStringExact("Linear");
 
-        Click(editor._save);
+        editor.Commit();
         h.Form.EditTransitionAt(0);
 
         Assert.Equal(FadeCurveKind.Linear, h.Store.Get(a, b)!.Curve);
@@ -735,43 +729,25 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void Revert_DiscardsTheDraft_AndReloadsFromTheStore() => RunSta(() =>
-    {
-        using var h = new Harness();
-        EditingAlphaToBeta(h);
-        var editor = h.Form._editor;
-        Fill(editor, "1.5", "0.5", "0", "0.5");
-        Click(editor._save);
-        Fill(editor, "2", "", "", "");
-        editor._fadeOutFromEnd.Checked = true;
-
-        Click(editor._revert);
-
-        Assert.Equal("1.5", editor._fadeOutPoint.Text);
-        Assert.Equal("0.5", editor._fadeOutDuration.Text);
-        Assert.False(editor._fadeOutFromEnd.Checked);
-    });
-
-    [Fact]
-    public void RemoveTransition_Unauthors_KeepsTheFields_AndSavePutsItBack() => RunSta(() =>
+    public void RemoveTransition_Unauthors_EmptiesTheFields_AndUndoPutsItBack() => RunSta(() =>
     {
         using var h = new Harness();
         var (a, b) = EditingAlphaToBeta(h);
         var editor = h.Form._editor;
         Fill(editor, "1.5", "0.5", "0", "0.5");
-        Click(editor._save);
+        editor.Commit();
         var saved = h.Store.Get(a, b);
 
         Click(editor._remove);
 
         Assert.Null(h.Store.Get(a, b));
         Assert.StartsWith("Removed alpha", h.Form._status.Text);
-        Assert.Equal("1.5", editor._fadeOutPoint.Text);
-        Assert.Equal("0.5", editor._fadeInDuration.Text);
+        Assert.Equal("", editor._fadeOutPoint.Text);
 
-        Click(editor._save);
+        editor.UndoChange();
 
         Assert.Equal(saved, h.Store.Get(a, b));
+        Assert.Equal("1.5", editor._fadeOutPoint.Text);
     });
 
     [Fact]
@@ -781,10 +757,10 @@ public sealed partial class HeadlessFormTests
         var (a, b) = EditingAlphaToBeta(h);
         var editor = h.Form._editor;
         Fill(editor, "1.5", "0.5", "0", "0.5");
-        Click(editor._save);
+        editor.Commit();
 
         Fill(editor, "", "", "", "");
-        Click(editor._save);
+        editor.Commit();
 
         Assert.Null(h.Store.Get(a, b));
         Assert.DoesNotContain("alpha", File.ReadAllText(h.Library.TransitionsPath));
@@ -798,7 +774,7 @@ public sealed partial class HeadlessFormTests
         var editor = h.Form._editor;
         Fill(editor, "9", "0.5", "7", "0.5");
 
-        Click(editor._save);
+        editor.Commit();
 
         Assert.Null(h.Store.Get(a, b));
         var outReason = editor.ReasonFor(TransitionField.FadeOutPoint);
@@ -811,7 +787,7 @@ public sealed partial class HeadlessFormTests
         Assert.StartsWith("Not saved: alpha", h.Form._status.Text);
 
         Fill(editor, "1.5", "0.5", "0", "0.5");
-        Click(editor._save);
+        editor.Commit();
 
         Assert.NotNull(h.Store.Get(a, b));
         Assert.False(IsSetVisible(outReason)); // a good save clears the reasons
@@ -826,7 +802,7 @@ public sealed partial class HeadlessFormTests
         editor._fadeOutFromEnd.Checked = true;
         editor._fadeOutPoint.Text = "6";
 
-        Click(editor._save);
+        editor.Commit();
 
         Assert.Null(h.Store.Get(a, b));
         Assert.Contains("measured from the end", editor.ReasonFor(TransitionField.FadeOutPoint).Text);
@@ -840,7 +816,7 @@ public sealed partial class HeadlessFormTests
         var editor = h.Form._editor;
         editor._fadeInDuration.Text = "abc";
 
-        Click(editor._save);
+        editor.Commit();
 
         Assert.True(IsSetVisible(editor.ReasonFor(TransitionField.FadeInDuration)));
         Assert.Contains("\"abc\"", editor.ReasonFor(TransitionField.FadeInDuration).Text);
@@ -1877,23 +1853,17 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void TheRowButton_WithUnsavedEdits_Asks_AsTheMenuDoes() => RunSta(() =>
+    public void TheRowButton_SavesABoxBeingTypedIn_ThenOpensItsAdjacency() => RunSta(() =>
     {
         using var h = new Harness();
-        var (a, b, _) = ThreeQueued(h);
+        var (a, b, c) = ThreeQueued(h);
         ClickEditButton(h.Form._queueList, 0);
         h.Form._editor._fadeOutPoint.Text = "2";
-        var asked = 0;
-        h.Form.AskUnsavedEdits = _ =>
-        {
-            asked++;
-            return UnsavedEdits.Cancel;
-        };
 
         ClickEditButton(h.Form._queueList, 1);
 
-        Assert.Equal(1, asked);
-        Assert.Equal((a, b), Opened(h));
+        Assert.Equal(TimeSpan.FromSeconds(2), h.Store.Get(a, b)!.FadeOutPoint!.Position);
+        Assert.Equal((b, c), Opened(h));
     });
 
     [Fact]
@@ -1920,65 +1890,12 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void Switching_WithNoUnsavedEdits_AsksNothing() => RunSta(() =>
-    {
-        using var h = new Harness();
-        var (_, b, c) = ThreeQueued(h);
-        h.Form.AskUnsavedEdits = _ => throw new InvalidOperationException("a clean editor must not ask");
-        h.Form.EditTransitionAt(0);
-        Fill(h.Form._editor, "1.5", "0.5", "0", "0.5");
-        Click(h.Form._editor._save); // saved: clean again
-
-        h.Form.EditTransitionAt(1);
-
-        Assert.Equal((b, c), Opened(h));
-    });
-
-    [Fact]
-    public void Switching_WithUnsavedEdits_Asks_AndCancelKeepsTheEdits() => RunSta(() =>
-    {
-        using var h = new Harness();
-        var (a, b, _) = ThreeQueued(h);
-        h.Form.EditTransitionAt(0);
-        h.Form._editor._fadeOutPoint.Text = "2";
-        var asked = new List<(string, string)>();
-        h.Form.AskUnsavedEdits = adjacency =>
-        {
-            asked.Add((adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath));
-            return UnsavedEdits.Cancel;
-        };
-
-        h.Form.EditTransitionAt(1);
-
-        Assert.Equal(new[] { (a, b) }, asked);
-        Assert.Equal((a, b), Opened(h));
-        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
-    });
-
-    [Fact]
-    public void Switching_WithUnsavedEdits_DiscardDropsThem() => RunSta(() =>
+    public void Switching_SavesABoxBeingTypedIn_ThenOpensTheOther() => RunSta(() =>
     {
         using var h = new Harness();
         var (a, b, c) = ThreeQueued(h);
         h.Form.EditTransitionAt(0);
         h.Form._editor._fadeOutPoint.Text = "2";
-        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Discard;
-
-        h.Form.EditTransitionAt(1);
-
-        Assert.Equal((b, c), Opened(h));
-        Assert.Equal("", h.Form._editor._fadeOutPoint.Text);
-        Assert.Null(h.Store.Get(a, b));
-    });
-
-    [Fact]
-    public void Switching_WithUnsavedEdits_SaveSavesThem_ThenOpensTheOther() => RunSta(() =>
-    {
-        using var h = new Harness();
-        var (a, b, c) = ThreeQueued(h);
-        h.Form.EditTransitionAt(0);
-        h.Form._editor._fadeOutPoint.Text = "2";
-        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Save;
 
         h.Form.EditTransitionAt(1);
 
@@ -1987,57 +1904,36 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void Switching_WhenTheSaveIsRefused_StaysWithTheEdits() => RunSta(() =>
+    public void Switching_WithTextTheEngineRefuses_DropsIt_AndOpensTheOther() => RunSta(() =>
     {
         using var h = new Harness();
-        var (a, b, _) = ThreeQueued(h);
+        var (a, b, c) = ThreeQueued(h);
         h.Form.EditTransitionAt(0);
         h.Form._editor._fadeOutPoint.Text = "9"; // past alpha's end
-        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Save;
 
         h.Form.EditTransitionAt(1);
 
         Assert.Null(h.Store.Get(a, b));
-        Assert.Equal((a, b), Opened(h));
-        Assert.True(IsSetVisible(h.Form._editor.ReasonFor(TransitionField.FadeOutPoint)));
+        Assert.StartsWith("Not saved", h.Form._status.Text);
+        Assert.Equal((b, c), Opened(h));
+        Assert.Equal("", h.Form._editor._fadeOutPoint.Text);
     });
 
     [Fact]
-    public void TheFromEndBox_AndTheCurve_AreUnsavedEditsToo() => RunSta(() =>
-    {
-        using var h = new Harness();
-        ThreeQueued(h);
-        h.Form.EditTransitionAt(0);
-        Fill(h.Form._editor, "1.5", "0.5", "0", "0.5");
-        Click(h.Form._editor._save);
-        Assert.False(h.Form._editor.HasUnsavedEdits);
-
-        h.Form._editor._curve.SelectedIndex = h.Form._editor._curve.FindStringExact("Linear");
-        Assert.True(h.Form._editor.HasUnsavedEdits);
-        Click(h.Form._editor._revert);
-        Assert.False(h.Form._editor.HasUnsavedEdits);
-
-        h.Form._editor._fadeOutFromEnd.Checked = true;
-        Assert.True(h.Form._editor.HasUnsavedEdits);
-    });
-
-    [Fact]
-    public void AfterRemoveTransition_TheFilledFieldsAreUnsaved_AndLeavingAsks() => RunSta(() =>
+    public void TheFromEndBox_AndTheCurve_SaveAtOnce() => RunSta(() =>
     {
         using var h = new Harness();
         var (a, b, _) = ThreeQueued(h);
         h.Form.EditTransitionAt(0);
         Fill(h.Form._editor, "1.5", "0.5", "0", "0.5");
-        Click(h.Form._editor._save);
+        h.Form._editor.Commit();
 
-        Click(h.Form._editor._remove);
+        h.Form._editor._curve.SelectedIndex = h.Form._editor._curve.FindStringExact("Linear");
+        Assert.Equal(FadeCurveKind.Linear, h.Store.Get(a, b)!.Curve);
 
-        Assert.True(h.Form._editor.HasUnsavedEdits);
-        var asked = 0;
-        h.Form.AskUnsavedEdits = _ => { asked++; return UnsavedEdits.Cancel; };
-        h.Form.EditTransitionAt(1);
-        Assert.Equal(1, asked);
-        Assert.Equal((a, b), Opened(h));
+        h.Form._editor._fadeOutFromEnd.Checked = true;
+        Assert.True(h.Store.Get(a, b)!.FadeOutPoint!.FromEnd);
+        Assert.False(h.Form._editor.HasUnsavedEdits);
     });
 
     [Fact]
@@ -2065,35 +1961,32 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void ReopeningTheSameAdjacency_KeepsTheDraft_WithoutAsking() => RunSta(() =>
+    public void ReopeningTheSameAdjacency_KeepsTextThatCouldNotBeSaved() => RunSta(() =>
     {
         using var h = new Harness();
         ThreeQueued(h);
         h.Form.EditTransitionAt(0);
-        h.Form._editor._fadeOutPoint.Text = "2";
-        h.Form.AskUnsavedEdits = _ => throw new InvalidOperationException("the same adjacency must not ask");
+        h.Form._editor._fadeOutPoint.Text = "abc";
 
         h.Form.EditTransitionAt(0);
 
-        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
+        Assert.Equal("abc", h.Form._editor._fadeOutPoint.Text);
     });
 
     [Fact]
-    public void ClosingTheWindow_WithUnsavedEdits_Asks_AndCancelKeepsItOpen() => RunSta(() =>
+    public void ClosingTheWindow_SavesABoxBeingTypedIn() => RunSta(() =>
     {
         using var h = new Harness();
-        ThreeQueued(h);
+        var (a, b, _) = ThreeQueued(h);
         h.Form.EditTransitionAt(0);
         h.Form._editor._fadeOutPoint.Text = "2";
-        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Cancel;
 
         var closing = new FormClosingEventArgs(CloseReason.UserClosing, cancel: false);
         typeof(Form).GetMethod("OnFormClosing", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(h.Form, new object[] { closing });
 
-        Assert.True(closing.Cancel);
-        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
-        h.Engine.Play(); // the engine was not disposed: it would throw
+        Assert.False(closing.Cancel);
+        Assert.Equal(TimeSpan.FromSeconds(2), h.Store.Get(a, b)!.FadeOutPoint!.Position);
     });
 
     [Fact]
@@ -2118,7 +2011,7 @@ public sealed partial class HeadlessFormTests
         h.Form.EditTransitionAt(0);
 
         Assert.False(h.Form._editor.HasUnsavedEdits);
-        Click(h.Form._editor._save);
+        h.Form._editor.Commit();
         Assert.Equal(stored, h.Store.Get(a, b));
     });
 
@@ -2129,13 +2022,13 @@ public sealed partial class HeadlessFormTests
         var (a, b, _) = ThreeQueued(h);
         h.Form.EditTransitionAt(0);
         Fill(h.Form._editor, "1.5", "0.5", "0", "0.5");
-        Click(h.Form._editor._save);
+        h.Form._editor.Commit();
         var path = h.Library.TransitionsPath;
         File.SetAttributes(path, FileAttributes.ReadOnly);
         try
         {
             h.Form._editor._fadeOutPoint.Text = "2";
-            Click(h.Form._editor._save);
+            h.Form._editor.Commit();
 
             Assert.StartsWith("Not saved", h.Form._status.Text);
             Assert.True(h.Form._editor.HasUnsavedEdits);
@@ -2255,17 +2148,13 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void OpeningAnotherAdjacency_EndsThePreview_OnceTheUnsavedEditsAreSettled() => RunSta(() =>
+    public void OpeningAnotherAdjacency_EndsThePreview() => RunSta(() =>
     {
         using var h = new Harness();
         var (_, b, c) = EditingADraft(h);
         Click(h.Form._editor._preview);
-        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Cancel;
+        Assert.NotNull(h.Engine.View.Preview);
 
-        h.Form.EditTransitionAt(1);
-        Assert.NotNull(h.Engine.View.Preview); // cancelled: still on alpha → beta, still previewing
-
-        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Discard;
         h.Form.EditTransitionAt(1);
 
         Assert.Equal((b, c), Opened(h));
@@ -2368,7 +2257,7 @@ public sealed partial class HeadlessFormTests
         Assert.Empty(h.Form._queueList.Items);
         Assert.Null(h.Form._editor.Adjacency); // what it had open was the other library's
         Assert.Equal("No boundary selected", h.Form._editor._title.Text);
-        Assert.False(h.Form._editor._save.Enabled);
+        Assert.False(h.Form._editor._render.Enabled);
     });
 
     [Fact]
@@ -2386,37 +2275,13 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void OpenLibrary_WithUnsavedEdits_AsksFirst_AndCancelStays() => RunSta(() =>
-    {
-        using var h = new Harness();
-        ThreeQueued(h);
-        h.Form.EditTransitionAt(0);
-        h.Form._editor._fadeOutPoint.Text = "2";
-        var before = h.Engine.View.Library;
-        var asked = 0;
-        h.Form.AskUnsavedEdits = _ =>
-        {
-            asked++;
-            return UnsavedEdits.Cancel;
-        };
-        h.Form.ChooseLibrary = () => throw new InvalidOperationException("Cancel must not go on to ask for a folder");
-
-        Click(h.Form._openLibrary);
-
-        Assert.Equal(1, asked);
-        Assert.Equal(before, h.Engine.View.Library);
-        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
-    });
-
-    [Fact]
-    public void OpenLibrary_WithUnsavedEdits_SavesThemInTheLibraryLeft() => RunSta(() =>
+    public void OpenLibrary_SavesABoxBeingTypedIn_InTheLibraryLeft() => RunSta(() =>
     {
         using var h = new Harness();
         ThreeQueued(h);
         h.Form.EditTransitionAt(0);
         var adjacency = h.Form._editor.Adjacency!;
         Fill(h.Form._editor, "1.5", "0.5", "0", "0.5");
-        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Save;
         var second = Path.Combine(h.TempDir, "Second");
         Directory.CreateDirectory(second);
         h.Form.ChooseLibrary = () => second;
@@ -2582,50 +2447,29 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void AClick_WithUnsavedEdits_Asks_AndCancelStays() => RunSta(() =>
+    public void AClick_SavesABoxBeingTypedIn_OpensIt_AndEmptiesTheEditor() => RunSta(() =>
     {
         using var h = new Harness();
         TwoPlaylists(h);
         h.Form.EditTransitionAt(0);
+        var adjacency = h.Form._editor.Adjacency!;
         h.Form._editor._fadeOutPoint.Text = "2";
-        var asked = 0;
-        h.Form.AskUnsavedEdits = _ =>
-        {
-            asked++;
-            return UnsavedEdits.Cancel;
-        };
 
         h.Form._playlists.OpenAt(IndexOf(h.Form._playlists, "Evening"));
 
-        Assert.Equal(1, asked);
-        Assert.Equal("Untitled", h.Engine.View.OpenPlaylist);
-        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
-    });
-
-    [Fact]
-    public void AClick_WithUnsavedEdits_Discarded_OpensIt_AndEmptiesTheEditor() => RunSta(() =>
-    {
-        using var h = new Harness();
-        TwoPlaylists(h);
-        h.Form.EditTransitionAt(0);
-        h.Form._editor._fadeOutPoint.Text = "2";
-        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Discard;
-
-        h.Form._playlists.OpenAt(IndexOf(h.Form._playlists, "Evening"));
-
+        Assert.Equal(TimeSpan.FromSeconds(2), h.Store.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath)!.FadeOutPoint!.Position);
         Assert.Equal("Evening", h.Engine.View.OpenPlaylist);
         Assert.Null(h.Form._editor.Adjacency); // what it had open was the queue left
         Assert.Equal("", h.Form._editor._fadeOutPoint.Text);
     });
 
     [Fact]
-    public void AClickOnTheOpenPlaylist_ChangesNothing_AndAsksNothing() => RunSta(() =>
+    public void AClickOnTheOpenPlaylist_ChangesNothing() => RunSta(() =>
     {
         using var h = new Harness();
         TwoPlaylists(h);
         h.Form.EditTransitionAt(0);
         h.Form._editor._fadeOutPoint.Text = "2";
-        h.Form.AskUnsavedEdits = _ => throw new InvalidOperationException("the open playlist is no change");
 
         h.Form._playlists.OpenAt(IndexOf(h.Form._playlists, "Untitled"));
 
@@ -2755,30 +2599,26 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void DeletingTheOpenPlaylist_WithUnsavedEdits_AsksAfterTheConfirm_AndCancelKeepsIt() => RunSta(() =>
+    public void DeletingTheOpenPlaylist_AsksOnlyToDelete_AndSavesABoxBeingTypedIn() => RunSta(() =>
     {
         using var h = new Harness();
         TwoPlaylists(h);
         h.Form.EditTransitionAt(0);
+        var adjacency = h.Form._editor.Adjacency!;
         h.Form._editor._fadeOutPoint.Text = "2";
-        var asks = new List<string>();
+        var asks = 0;
         h.Form._playlists.ConfirmDelete = _ =>
         {
-            asks.Add("delete");
+            asks++;
             return true;
-        };
-        h.Form.AskUnsavedEdits = _ =>
-        {
-            asks.Add("unsaved");
-            return UnsavedEdits.Cancel;
         };
         SelectRows(h.Form._playlists._list, IndexOf(h.Form._playlists, "Untitled"));
 
         h.Form._playlists._delete.PerformClick();
 
-        Assert.Equal(new[] { "delete", "unsaved" }, asks);
-        Assert.Equal(new[] { "Evening", "Untitled" }, h.Engine.View.Playlists);
-        Assert.Equal("2", h.Form._editor._fadeOutPoint.Text);
+        Assert.Equal(1, asks);
+        Assert.Equal(new[] { "Evening" }, h.Engine.View.Playlists);
+        Assert.Equal(TimeSpan.FromSeconds(2), h.Store.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath)!.FadeOutPoint!.Position);
     });
 
     // ── Playlists issue 03: the open playlist's name ────────────────────────────────────
@@ -2975,7 +2815,7 @@ public sealed partial class HeadlessFormTests
 
         editor._fadeOutPoint.Text = "1";
         Assert.True(editor.HasUnsavedEdits);
-        Click(editor._save);
+        editor.Commit();
 
         var layers = h.Engine.Transition(adjacency);
         Assert.Equal(new TransitionSpec { FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1), FromEnd: false) }, layers.Override);
@@ -3003,7 +2843,7 @@ public sealed partial class HeadlessFormTests
 
         editor._fadeInDuration.Text = "";
         editor._curve.SelectedIndex = editor._curve.FindStringExact("Equal-power");
-        Click(editor._save);
+        editor.Commit();
 
         Assert.Equal(new TransitionSpec
         {
@@ -3013,7 +2853,7 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void RemoveOverride_PlaysTheGlobalAgain_AndKeepsTheFieldsAsADraft() => RunSta(() =>
+    public void RemoveOverride_PlaysTheGlobalAgain_AndUndoPutsItBack() => RunSta(() =>
     {
         using var h = new Harness();
         var adjacency = EditingAlphaBeta(h);
@@ -3026,9 +2866,15 @@ public sealed partial class HeadlessFormTests
 
         Assert.Null(h.Engine.Transition(adjacency).Override);
         Assert.Equal(GlobalAlphaBeta, h.Engine.Transition(adjacency).Global);
-        Assert.Equal("2", editor._fadeOutDuration.Text);
-        Assert.True(editor.HasUnsavedEdits); // Save puts it back
+        Assert.Equal("", editor._fadeOutDuration.Text); // the global's, as a placeholder
+        Assert.False(editor.HasUnsavedEdits);
         Assert.False(IsSetVisible(editor._effective));
+
+        editor.UndoChange();
+
+        Assert.Equal(TimeSpan.FromSeconds(2), h.Engine.Transition(adjacency).Override!.FadeOutDuration);
+        Assert.Equal("2", editor._fadeOutDuration.Text);
+        Assert.Equal(TransitionLayer.Playlist, editor.Layer);
     });
 
     [Fact]
@@ -3063,36 +2909,12 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void SwitchingModes_WithUnsavedEdits_Asks_AndCancelStaysInTheModeWithTheDraft() => RunSta(() =>
-    {
-        using var h = new Harness();
-        EditingAlphaBeta(h);
-        var editor = h.Form._editor;
-        editor._fadeOutPoint.Text = "2";
-        var asked = 0;
-        h.Form.AskUnsavedEdits = _ =>
-        {
-            asked++;
-            return UnsavedEdits.Cancel;
-        };
-
-        editor._editPlaylist.Checked = true;
-
-        Assert.Equal(1, asked);
-        Assert.True(editor._editGlobal.Checked);
-        Assert.False(editor._editPlaylist.Checked);
-        Assert.Equal(TransitionLayer.Global, editor.Layer);
-        Assert.Equal("2", editor._fadeOutPoint.Text);
-    });
-
-    [Fact]
-    public void SwitchingModes_WithUnsavedEdits_SaveSavesInTheModeLeft_ThenLoadsTheOther() => RunSta(() =>
+    public void SwitchingModes_SavesABoxBeingTypedIn_InTheModeLeft_ThenLoadsTheOther() => RunSta(() =>
     {
         using var h = new Harness();
         var adjacency = EditingAlphaBeta(h);
         var editor = h.Form._editor;
         editor._fadeOutPoint.Text = "2";
-        h.Form.AskUnsavedEdits = _ => UnsavedEdits.Save;
 
         editor._editPlaylist.Checked = true;
 
@@ -3104,7 +2926,7 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void PlaylistMode_ANudgeOnAnEmptyBox_StartsFromTheGlobalPoint_AndPreviewPlaysTheDraft() => RunSta(() =>
+    public void PlaylistMode_ANudgeOnAnEmptyBox_StartsFromTheGlobalPoint_AndSavesTheOverride() => RunSta(() =>
     {
         using var h = new Harness();
         var adjacency = EditingAlphaBeta(h);
@@ -3115,8 +2937,9 @@ public sealed partial class HeadlessFormTests
         editor.NudgePoint(fadeOut: true, +1, coarse: false);
 
         Assert.Equal("1.6", editor._fadeOutPoint.Text);
+        Assert.Equal(TimeSpan.FromSeconds(1.6), h.Engine.Transition(adjacency).Override!.FadeOutPoint!.Position);
+        Assert.Equal(GlobalAlphaBeta, h.Engine.Transition(adjacency).Global);
         Click(editor._preview);
         Assert.Equal(adjacency, h.Engine.View.Preview?.Adjacency);
-        Assert.Null(h.Engine.Transition(adjacency).Override); // a preview saves nothing
     });
 }
