@@ -113,6 +113,10 @@ internal sealed class Host : IDisposable
     /// <summary>Whether the dialog's OK chose the Now Playing tab, waiting as <see cref="_chosen"/> does.</summary>
     private bool _chosenNowPlayingTab;
 
+    /// <summary>The fade defaults the dialog's OK chose for the library open when it was shown,
+    /// waiting as <see cref="_chosen"/> does; null with no library open to hold them.</summary>
+    private PlayerSettings? _chosenLibrarySettings;
+
     public PlaybackEngine Engine { get; }
 
     /// <summary>This session's notices, as delivered: a record of messages already shown, not
@@ -155,11 +159,24 @@ internal sealed class Host : IDisposable
         var view = Engine.View;
         var shown = _chosen ?? view.MachineSettings with { Library = view.Library?.Path ?? view.MachineSettings.Library };
         var nowPlayingTab = _chosen is null ? _pluginSettings.Settings.NowPlayingTab : _chosenNowPlayingTab;
-        using var dialog = new SettingsDialog(shown.Library, shown.OutputMode, shown.OutputDevice, _devices(), _musicBeesDevice(), nowPlayingTab);
+        var libraryOpen = view.Library is { IsAvailable: true };
+        var library = (_chosen is null ? null : _chosenLibrarySettings) ?? view.Settings;
+        using var dialog = new SettingsDialog(
+            shown.Library, shown.OutputMode, shown.OutputDevice, _devices(), _musicBeesDevice(), nowPlayingTab,
+            libraryOpen, library.UnauthoredAdjacency == UnauthoredAdjacency.DefaultCrossfade, library.DefaultCrossfadeSeconds,
+            library.BlankDurationSeconds);
         if (show(dialog))
         {
             _chosen = new MachineSettings { Library = dialog.Library, OutputMode = dialog.OutputMode, OutputDevice = dialog.OutputDevice };
             _chosenNowPlayingTab = dialog.NowPlayingTab;
+            _chosenLibrarySettings = libraryOpen
+                ? view.Settings with
+                {
+                    UnauthoredAdjacency = dialog.Crossfade ? UnauthoredAdjacency.DefaultCrossfade : UnauthoredAdjacency.HardCut,
+                    DefaultCrossfadeSeconds = dialog.CrossfadeSeconds,
+                    BlankDurationSeconds = dialog.BlankSeconds,
+                }
+                : null;
         }
     }
 
@@ -168,7 +185,8 @@ internal sealed class Host : IDisposable
     /// library's open playlist, remembered for the next start; another output mode or device is
     /// saved, the mode for the next start and the device for the next Play from stopped. One
     /// the same as now sends nothing, so an Apply that follows another preference's change never
-    /// stops faderio.</summary>
+    /// stops faderio. The fade defaults go first, to the library they were shown for, before
+    /// another library opens.</summary>
     public void SaveSettings()
     {
         if (_chosen is not { } chosen)
@@ -177,6 +195,11 @@ internal sealed class Host : IDisposable
         }
         _chosen = null;
         var view = Engine.View;
+        if (_chosenLibrarySettings is { } library && library != view.Settings)
+        {
+            Engine.ChangeSettings(library);
+        }
+        _chosenLibrarySettings = null;
         if (chosen.Library is { } folder && !IsOpen(view.Library, folder))
         {
             Engine.OpenLibrary(folder);

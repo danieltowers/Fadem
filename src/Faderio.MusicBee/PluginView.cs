@@ -56,6 +56,7 @@ internal sealed class PluginView : UserControl
     internal readonly Button _stop;
     internal readonly Button _next;
     internal readonly Button _transitionNow;
+    internal readonly Button _cueTransition;
     internal readonly CheckBox _shuffle;
     internal readonly CheckBox _repeat;
     internal readonly Button _back5;
@@ -115,21 +116,23 @@ internal sealed class PluginView : UserControl
         var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _host }, ShowItemToolTips = true, SizingGrip = false };
 
         var symbols = new Font("Segoe UI Symbol", 9f);
-        // Sized so the seven fit MusicBee's sidebar as shipped (284 px) on one row; narrower, the
+        // Sized so the eight fit MusicBee's sidebar as shipped (284 px) on one row; narrower, the
         // row wraps.
-        _prev = new Button { Text = "⏮", Font = symbols, Width = 34, Height = 28, Margin = new Padding(4, 6, 1, 4) };
-        _playPause = new Button { Text = "▶", Font = symbols, Width = 34, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        _prev = new Button { Text = "⏮", Font = symbols, Width = 31, Height = 28, Margin = new Padding(4, 6, 1, 4) };
+        _playPause = new Button { Text = "▶", Font = symbols, Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
         // Stop is this host's: a guest in MusicBee's process lets go of the device while stopped.
-        _stop = new Button { Text = "⏹", Font = symbols, Width = 34, Height = 28, Margin = new Padding(1, 6, 1, 4) };
-        _next = new Button { Text = "⏭", Font = symbols, Width = 34, Height = 28, Margin = new Padding(1, 6, 1, 4) };
-        _transitionNow = new Button { Text = "⤳", Font = new Font("Segoe UI Symbol", 13f), Width = 34, Height = 28, Margin = new Padding(1, 6, 1, 4) };
-        _shuffle = new CheckBox { Text = "🔀", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 38, Height = 28, Margin = new Padding(8, 6, 1, 4) };
-        _repeat = new CheckBox { Text = "🔁", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 38, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        _stop = new Button { Text = "⏹", Font = symbols, Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        _next = new Button { Text = "⏭", Font = symbols, Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        _transitionNow = new Button { Text = "⤳", Font = new Font("Segoe UI Symbol", 13f), Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        _cueTransition = new Button { Text = "⏩", Font = symbols, Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        _shuffle = new CheckBox { Text = "🔀", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 35, Height = 28, Margin = new Padding(4, 6, 1, 4) };
+        _repeat = new CheckBox { Text = "🔁", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 35, Height = 28, Margin = new Padding(1, 6, 1, 4) };
         _back5 = new Button { Text = "−5 s", Width = 48, Height = 28, Enabled = false };
         _forward5 = new Button { Text = "+5 s", Width = 48, Height = 28, Enabled = false };
         _tips = new ToolTip();
         _tips.SetToolTip(_stop, "Stop, and let go of the audio device");
         _tips.SetToolTip(_transitionNow, "Transition now");
+        _tips.SetToolTip(_cueTransition, "Cue transition: play from 5 s before it");
         _tips.SetToolTip(_back5, "Back 5 seconds");
         _tips.SetToolTip(_forward5, "Forward 5 seconds");
         _seek = new SeekBar();
@@ -148,7 +151,7 @@ internal sealed class PluginView : UserControl
         // the seek bar between its jumps with the readout. A table, not anchors: the seek bar
         // takes whatever width is left at any panel size.
         var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = true };
-        buttons.Controls.AddRange(new Control[] { _prev, _playPause, _stop, _next, _transitionNow, _shuffle, _repeat });
+        buttons.Controls.AddRange(new Control[] { _prev, _playPause, _stop, _next, _transitionNow, _cueTransition, _shuffle, _repeat });
         var seekRow = new TableLayoutPanel { Dock = DockStyle.Top, Height = 38, ColumnCount = 4, RowCount = 1 };
         seekRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         seekRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -281,6 +284,11 @@ internal sealed class PluginView : UserControl
         _prev.Click += (_, _) => _engine.Previous();
         _next.Click += (_, _) => _engine.Next();
         _transitionNow.Click += (_, _) => _engine.TransitionNow();
+        _cueTransition.Click += (_, _) =>
+        {
+            StopMusicBeesPlayerIfSilent(); // paused, it starts to sound
+            _engine.CueTransition();
+        };
         // The press asks for the state after the one the view holds now, not the one last shown.
         _shuffle.Click += (_, _) => _engine.SetShuffle(!_engine.View.Shuffle);
         _repeat.Click += (_, _) => _engine.SetRepeat(Presenter.NextRepeat(_engine.View.Repeat));
@@ -319,6 +327,7 @@ internal sealed class PluginView : UserControl
         }
         _playPause.Text = Presenter.PlayPauseGlyph(view.Transport);
         _transitionNow.Enabled = view.CanTransitionNow;
+        _cueTransition.Enabled = view.CanCueTransition;
         _shuffle.Checked = view.Shuffle;
         _repeat.Checked = view.Repeat != RepeatMode.Off;
         _repeat.Text = Presenter.RepeatGlyph(view.Repeat);
@@ -334,7 +343,7 @@ internal sealed class PluginView : UserControl
         _sections.Apply(view);
 
         var attended = view.Attended;
-        _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length);
+        _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length, attended?.Marks);
         _back5.Enabled = _forward5.Enabled = _seek.Enabled;
         _time.Text = Presenter.TimeReadout(attended, held: view.Preview is not null);
         var attendedTrack = Presenter.FmtAttendedTrack(attended);
@@ -549,7 +558,7 @@ internal sealed class PluginView : UserControl
 
     internal void SeekTo(Playhead playhead) => _engine.Seek(playhead);
 
-    /// <summary>Before faderio starts to sound, from ▶ or a preview: MusicBee's player stops
+    /// <summary>Before faderio starts to sound, from ▶, ⏩ or a preview: MusicBee's player stops
     /// unless faderio sounds already and so already has the device.</summary>
     private void StopMusicBeesPlayerIfSilent()
     {

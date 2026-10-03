@@ -299,6 +299,85 @@ public sealed partial class PluginTests
         Assert.Equal(new MachineSettings { Library = LibraryFolder, OutputMode = AudioOutputMode.WasapiExclusive }, saved);
     }
 
+    // ── The library's fade defaults ──────────────────────────────────────────────────────
+
+    private string LibrarySettingsFile => Path.Combine(LibraryFolder, ".faderio", "settings.json");
+
+    [Fact]
+    public void TheFadeDefaults_OpenOnTheLibrarys_AndAreSavedToItAtSave()
+    {
+        AuthorLibrary();
+        ChooseLibrary(LibraryFolder);
+        Start();
+        Launched();
+        _musicBee.Choose("Play");
+        _output.Advance(4410);
+
+        Configure(read: dialog =>
+        {
+            Assert.True(dialog._hardCut.Checked);
+            Assert.Equal(5, dialog._crossfadeSeconds.Value);
+            Assert.False(dialog._crossfadeSeconds.Enabled);
+            Assert.Equal(5, dialog._blankSeconds.Value);
+            dialog._crossfade.Checked = true;
+            dialog._crossfadeSeconds.Value = 8;
+            dialog._blankSeconds.Value = 3;
+        });
+        Assert.Equal(UnauthoredAdjacency.HardCut, _plugin.Host!.Engine.View.Settings.UnauthoredAdjacency); // waits for Save
+        _plugin.SaveSettings();
+
+        Assert.Equal(Transport.Playing, _output.State); // a settings change stops nothing
+        var saved = new SettingsStore(LibrarySettingsFile).Settings;
+        Assert.Equal((UnauthoredAdjacency.DefaultCrossfade, 8, 3), (saved.UnauthoredAdjacency, saved.DefaultCrossfadeSeconds, saved.BlankDurationSeconds));
+        Assert.True(saved.ReplayGainEnabled); // not the dialog's: kept
+        _ui.Pump();
+        Assert.Equal("Saved settings.", Assert.Single(_ui.Messages));
+
+        Configure(ok: false, read: dialog =>
+        {
+            Assert.True(dialog._crossfade.Checked);
+            Assert.Equal(8, dialog._crossfadeSeconds.Value);
+            Assert.Equal(3, dialog._blankSeconds.Value);
+        });
+    }
+
+    [Fact]
+    public void TheFadeDefaults_ChosenWithAnotherLibrary_GoToTheLibraryTheyWereShownFor()
+    {
+        AuthorLibrary();
+        AuthorLibrary(OtherFolder, "musicbee-other", 550, 770);
+        ChooseLibrary(LibraryFolder);
+        Start();
+        Launched();
+
+        Configure(typed: OtherFolder, read: dialog => dialog._blankSeconds.Value = 2);
+        _plugin.SaveSettings();
+
+        Launched(_plugin, OtherFolder);
+        Assert.Equal(2, new SettingsStore(LibrarySettingsFile).Settings.BlankDurationSeconds);
+        Assert.Equal(5, _plugin.Host!.Engine.View.Settings.BlankDurationSeconds);
+    }
+
+    [Fact]
+    public void WithNoLibraryOpen_TheFadeDefaultsAreDisabled()
+    {
+        Start();
+        _ui.Pump();
+        var before = _ui.Messages.Count; // "No faderio library is chosen"
+
+        Configure(read: dialog =>
+        {
+            Assert.False(dialog._hardCut.Enabled);
+            Assert.False(dialog._crossfade.Enabled);
+            Assert.False(dialog._crossfadeSeconds.Enabled);
+            Assert.False(dialog._blankSeconds.Enabled);
+        });
+        _plugin.SaveSettings();
+        _ui.Pump();
+
+        Assert.Equal(before, _ui.Messages.Count); // nothing sent, so no "Not saved"
+    }
+
     [Fact]
     public void Configure_WhenTheEngineCouldNotStart_RepeatsWhy_AndOpensNoDialog()
     {

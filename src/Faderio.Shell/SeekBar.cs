@@ -1,4 +1,5 @@
 using Faderio.Core.Domain;
+using Faderio.Core.Playback;
 
 namespace Faderio.Shell;
 
@@ -7,7 +8,8 @@ namespace Faderio.Shell;
 /// moves the thumb with the mouse and seeks once, on release; ← and → step a second and seek on
 /// key-up. It speaks <see cref="Playhead"/> and <see cref="Length"/> at its edge: pixels never
 /// leave it. Disabled, with no thumb, while nothing is attended. Replaces a stock TrackBar,
-/// whose channel click paged by its <c>LargeChange</c> instead of jumping.
+/// whose channel click paged by its <c>LargeChange</c> instead of jumping. Red marks, the full
+/// height of the bar, show where the track's fades begin and end, as the engine resolves them.
 /// </summary>
 internal sealed class SeekBar : Control
 {
@@ -20,6 +22,8 @@ internal sealed class SeekBar : Control
     private static readonly TimeSpan KeyStep = TimeSpan.FromSeconds(1);
 
     private Length? _length;
+    private FadeMarks _marks = FadeMarks.None;
+    private static readonly Color MarkColour = Color.FromArgb(220, 20, 20);
     private bool _dragging;
     private bool _stepping;
 
@@ -39,10 +43,16 @@ internal sealed class SeekBar : Control
     /// <summary>Where the thumb stands: the view's playhead, or the mouse's while dragging.</summary>
     public Playhead Playhead { get; private set; }
 
-    /// <summary>The view's attended playhead and length, on every render. Ignored for the
-    /// playhead while the user holds the thumb or an arrow key.</summary>
-    public void Show(Playhead playhead, Length? length)
+    /// <summary>The view's attended playhead, length and fade marks, on every render. Ignored for
+    /// the playhead while the user holds the thumb or an arrow key.</summary>
+    public void Show(Playhead playhead, Length? length, FadeMarks? marks = null)
     {
+        marks ??= FadeMarks.None;
+        if (marks != _marks || length != _length)
+        {
+            _marks = marks;
+            Invalidate();
+        }
         _length = length;
         Enabled = length is not null;
         if (length is null)
@@ -170,6 +180,17 @@ internal sealed class SeekBar : Control
         using (var played = new SolidBrush(SystemColors.Highlight))
         {
             g.FillRectangle(played, track with { Width = x - Inset });
+        }
+        using (var mark = new Pen(MarkColour, 2))
+        {
+            foreach (var point in new[] { _marks.FadeInStart, _marks.FadeInEnd, _marks.FadeOutStart, _marks.FadeOutEnd })
+            {
+                if (point is { } p)
+                {
+                    var at = XOf(Playhead.At(p));
+                    g.DrawLine(mark, at, 0, at, Height);
+                }
+            }
         }
         var thumb = new Rectangle(x - Inset, mid - ThumbHeight / 2, 2 * Inset, ThumbHeight);
         using (var fill = new SolidBrush(SystemColors.Highlight))

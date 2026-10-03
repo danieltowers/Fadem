@@ -36,6 +36,20 @@ public sealed record VoiceView(QueueRow Row, Playhead Playhead, Length Length)
 {
     /// <summary>Never negative: <c>Playhead ≤ Length</c> by construction.</summary>
     public Length Remaining => new(Length.TimeSpan - Playhead.TimeSpan);
+
+    /// <summary>Where this track's fades begin and end, for the seek bar.</summary>
+    public FadeMarks Marks { get; init; } = FadeMarks.None;
+}
+
+/// <summary>
+/// Where a track's fades begin and end within it, as the transitions into and out of its row
+/// resolve: the fade-in from the row before (by ⏮'s rule), the fade-out into the row after (by
+/// ⏭'s). Each side is null where the transition is a hard cut, there is no row on that side, or
+/// it has no fade on this track; an end is cut short at the track's end.
+/// </summary>
+public sealed record FadeMarks(Point? FadeInStart, Point? FadeInEnd, Point? FadeOutStart, Point? FadeOutEnd)
+{
+    public static FadeMarks None { get; } = new(null, null, null, null);
 }
 
 /// <summary>
@@ -67,6 +81,10 @@ public sealed record PlayerView(
     Adjacency? NextAdjacency = null,
     bool CanTransitionNow = false)
 {
+    /// <summary>Whether <c>CueTransition</c> would act: playing or paused, one voice heard alone
+    /// with no handover or finish still in the device, and a next adjacency.</summary>
+    public bool CanCueTransition { get; init; }
+
     public PlayerSettings Settings { get; init; } = new();
 
     /// <summary>This machine's settings, as last saved: defaults when the run keeps none.</summary>

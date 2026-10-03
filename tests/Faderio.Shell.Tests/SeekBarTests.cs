@@ -1,6 +1,8 @@
+using System.Drawing;
 using System.Reflection;
 using Faderio.Shell;
 using Faderio.Core.Domain;
+using Faderio.Core.Playback;
 
 namespace Faderio.Shell.Tests;
 
@@ -25,6 +27,29 @@ public sealed class SeekBarTests
     private static void Near(int expected, int actual) => Assert.InRange(actual, expected - 20, expected + 20);
 
     private static MouseEventArgs At(int x) => new(MouseButtons.Left, 1, x, 15, 0);
+
+    [Fact]
+    public void TheFadeMarks_AreDrawnInRed_WhereTheyFallOnTheTravel()
+    {
+        using var bar = Bar();
+        bar.Show(Playhead.FromMilliseconds(1000), FiveSeconds,
+            new FadeMarks(Faderio.Core.Domain.Point.FromSeconds(0.5), Faderio.Core.Domain.Point.FromSeconds(1.5), Faderio.Core.Domain.Point.FromSeconds(3.5), Faderio.Core.Domain.Point.FromSeconds(4.5)));
+
+        using var picture = new Bitmap(bar.Width, bar.Height);
+        bar.DrawToBitmap(picture, new Rectangle(0, 0, bar.Width, bar.Height));
+
+        bool RedAt(double seconds)
+        {
+            var x = SeekBar.Inset + (int)Math.Round(seconds / 5 * (bar.Width - 2 * SeekBar.Inset));
+            var pixel = picture.GetPixel(x, 3); // above the groove and the thumb
+            return pixel.R > 180 && pixel.G < 80 && pixel.B < 80;
+        }
+        Assert.True(RedAt(0.5));
+        Assert.True(RedAt(1.5));
+        Assert.True(RedAt(3.5));
+        Assert.True(RedAt(4.5));
+        Assert.False(RedAt(2.5));
+    }
 
     [Fact]
     public void PixelsMapToPlayheads_AcrossTheTravel()

@@ -121,6 +121,13 @@ fade-out point. Only the fade-out point moves, to the playhead; everything else 
 authored. It targets the same adjacency a skip would.
 _Avoid_: Mix now, crossfade on skip
 
+**Cue transition**:
+The user action of jumping the playing track to 5 s before its coming transition begins (its
+fade-out point, or a hard cut's track end) and playing on, so the transition is heard for real
+into the next track. Unlike a **Preview**, it moves the queue's own playback and does not stop
+after the transition.
+_Avoid_: Jump to fade, rehearse
+
 **Preview**:
 Hearing one adjacency's transition as currently drafted in the editor, saved or not: from
 shortly before its fade-out point to shortly after its fades complete. The queue is held where

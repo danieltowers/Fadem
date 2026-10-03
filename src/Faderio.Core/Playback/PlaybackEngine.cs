@@ -454,6 +454,8 @@ public sealed partial class PlaybackEngine : IDisposable
         };
         return snapshot with
         {
+            Attended = WithMarks(snapshot.Attended, snapshot),
+            Current = WithMarks(snapshot.Current, snapshot),
             Onward = snapshot.OnwardOf(IsAuthoredPair),
             Sections = SectionRows(),
             Library = _library?.View,
@@ -493,8 +495,43 @@ public sealed partial class PlaybackEngine : IDisposable
     {
         public static VoiceSnap Of(MixerVoice voice, QueueEntry entry) => new(entry, VoiceClock.Of(voice));
 
+        public FadeMarks Marks { get; init; } = FadeMarks.None;
+
         public VoiceView At(long emitted, QueueRow row, int rate) =>
-            new(row, Playhead.FromFrames(Clock.PlayheadFrames(emitted), rate), Entry.Track.Length);
+            new(row, Playhead.FromFrames(Clock.PlayheadFrames(emitted), rate), Entry.Track.Length) { Marks = Marks };
+    }
+
+    /// <summary>The fades of <paramref name="voice"/>'s row, resolved as the queue would play the
+    /// adjacencies <paramref name="snapshot"/> finds either side of it.</summary>
+    private VoiceSnap? WithMarks(VoiceSnap? voice, Snapshot snapshot)
+    {
+        if (voice is null)
+        {
+            return null;
+        }
+        var adjacencies = snapshot.AdjacenciesOf(voice.Entry.Id);
+        var length = voice.Entry.Track.Length.TimeSpan;
+        Point? Clamped(TimeSpan at) => Point.FromTimeSpan(at < length ? at : length);
+        Point? inStart = null, inEnd = null, outStart = null, outEnd = null;
+        if (adjacencies.Previous is { } before && Resolved(before) is { IsHardCut: false } fadeIn)
+        {
+            inStart = Clamped(fadeIn.FadeInPoint);
+            inEnd = fadeIn.FadeInDuration > TimeSpan.Zero ? Clamped(fadeIn.FadeInPoint + fadeIn.FadeInDuration) : null;
+        }
+        if (adjacencies.Next is { } after && Resolved(after) is { IsHardCut: false } fadeOut && fadeOut.FadeOutDuration > TimeSpan.Zero)
+        {
+            outStart = Clamped(fadeOut.FadeOutPoint);
+            outEnd = Clamped(fadeOut.FadeOutPoint + fadeOut.FadeOutDuration);
+        }
+        return voice with { Marks = new FadeMarks(inStart, inEnd, outStart, outEnd) };
+    }
+
+    private EffectiveTransition Resolved(Adjacency adjacency)
+    {
+        var (outPath, inPath) = (adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
+        return _resolver.Resolve(
+            _store?.Get(outPath, inPath), OverrideOf(outPath, inPath),
+            adjacency.Outgoing.Length.TimeSpan, adjacency.Incoming.Length.TimeSpan);
     }
 
     private sealed record Snapshot(
@@ -574,6 +611,7 @@ public sealed partial class PlaybackEngine : IDisposable
                 Shuffle, Repeat, Adding, next,
                 CanTransitionNow: Transport == Transport.Playing && heardAlone && next is not null)
             {
+                CanCueTransition = Transport != Transport.Stopped && heardAlone && next is not null,
                 Settings = Settings,
                 Preview = preview,
                 Clip = clip,

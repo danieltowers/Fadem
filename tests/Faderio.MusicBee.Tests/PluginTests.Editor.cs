@@ -148,6 +148,7 @@ public sealed partial class PluginTests
         _plugin.OnDockablePanelCreated(panel);
         var view = View(panel);
         view.Render();
+        Assert.Equal(view._prev.Top, view._repeat.Top); // the transport's eight buttons on one row
 
         Assert.False(view._editor.Visible);
         Assert.False(view._closeEditor.Visible);

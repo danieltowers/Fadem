@@ -12,8 +12,12 @@ namespace Faderio.MusicBee;
 /// applies when faderio next plays from stopped: MusicBee's own device, or one of this
 /// machine's by name. A saved device that is not there is listed as not found, so opening the
 /// dialog never loses it. Below them, whether faderio takes over MusicBee's Now Playing tab
-/// (phase 6 issue 08). It holds nothing once closed: its caller reads <see cref="Library"/>,
-/// <see cref="OutputMode"/>, <see cref="OutputDevice"/> and <see cref="NowPlayingTab"/>.
+/// (phase 6 issue 08). Last, the open library's fade defaults, as standalone faderio's Settings
+/// has them: what a boundary nobody authored plays, and the blank duration. They are the
+/// library's, saved in it, so with none open they are shown disabled. It holds nothing once
+/// closed: its caller reads <see cref="Library"/>, <see cref="OutputMode"/>,
+/// <see cref="OutputDevice"/>, <see cref="NowPlayingTab"/>, <see cref="Crossfade"/>,
+/// <see cref="CrossfadeSeconds"/> and <see cref="BlankSeconds"/>.
 /// <para>MusicBee loads every type here before the plugin's resolver exists, so no field holds
 /// a Core value: the mode list's items are boxed modes, named as they are drawn.</para>
 /// </summary>
@@ -24,6 +28,10 @@ internal sealed class SettingsDialog : Form
     internal readonly ComboBox _outputMode;
     internal readonly ComboBox _outputDevice;
     internal readonly CheckBox _nowPlayingTab;
+    internal readonly RadioButton _hardCut;
+    internal readonly RadioButton _crossfade;
+    internal readonly NumericUpDown _crossfadeSeconds;
+    internal readonly NumericUpDown _blankSeconds;
 
     /// <summary>The device each item of the list stands for: null for MusicBee's own.</summary>
     private readonly List<string?> _deviceNames = new();
@@ -36,7 +44,13 @@ internal sealed class SettingsDialog : Form
     /// <param name="devices">This machine's output devices, by name.</param>
     /// <param name="musicBeesDevice">MusicBee's own device, by name, or null when it is Windows' default.</param>
     /// <param name="nowPlayingTab">Whether faderio takes over MusicBee's Now Playing tab (phase 6 issue 08).</param>
-    public SettingsDialog(string? library, AudioOutputMode mode, string? device, IReadOnlyList<string> devices, string? musicBeesDevice, bool nowPlayingTab)
+    /// <param name="libraryOpen">Whether a library is open to hold the fade defaults.</param>
+    /// <param name="crossfade">Whether a boundary nobody authored plays the default crossfade, not a hard cut.</param>
+    /// <param name="crossfadeSeconds">The default crossfade's length.</param>
+    /// <param name="blankSeconds">What a blank fade duration plays.</param>
+    public SettingsDialog(
+        string? library, AudioOutputMode mode, string? device, IReadOnlyList<string> devices, string? musicBeesDevice, bool nowPlayingTab,
+        bool libraryOpen, bool crossfade, int crossfadeSeconds, int blankSeconds)
     {
         Text = "faderio";
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -92,6 +106,40 @@ internal sealed class SettingsDialog : Form
             Text = "In place of MusicBee's own view, from the next visit to the tab.", AutoSize = true, ForeColor = SystemColors.GrayText,
         };
 
+        // One parent, so the two choices exclude each other; N sits on the crossfade's line.
+        _hardCut = new RadioButton { Text = "Hard cut", AutoSize = true, Checked = !crossfade, Enabled = libraryOpen };
+        _crossfade = new RadioButton { Text = "Crossfade for", AutoSize = true, Checked = crossfade, Enabled = libraryOpen };
+        _crossfadeSeconds = new NumericUpDown
+        {
+            Minimum = PlayerSettings.MinDefaultCrossfadeSeconds,
+            Maximum = PlayerSettings.MaxDefaultCrossfadeSeconds,
+            Value = Math.Max(PlayerSettings.MinDefaultCrossfadeSeconds, Math.Min(PlayerSettings.MaxDefaultCrossfadeSeconds, crossfadeSeconds)),
+            Width = 48,
+            Enabled = libraryOpen && crossfade,
+            AccessibleName = "Default crossfade seconds",
+        };
+        _crossfade.CheckedChanged += (_, _) => _crossfadeSeconds.Enabled = _crossfade.Checked && _crossfade.Enabled;
+        var boundaries = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0, 10, 0, 0) };
+        boundaries.Controls.AddRange(new Control[] { _hardCut, _crossfade, _crossfadeSeconds, Seconds() });
+        boundaries.SetFlowBreak(_hardCut, true);
+
+        _blankSeconds = new NumericUpDown
+        {
+            Minimum = PlayerSettings.MinBlankDurationSeconds,
+            Maximum = PlayerSettings.MaxBlankDurationSeconds,
+            Value = Math.Max(PlayerSettings.MinBlankDurationSeconds, Math.Min(PlayerSettings.MaxBlankDurationSeconds, blankSeconds)),
+            Width = 48,
+            Enabled = libraryOpen,
+            AccessibleName = "Blank fade duration seconds",
+        };
+        var blank = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
+        blank.Controls.AddRange(new Control[] { _blankSeconds, Seconds() });
+        var inLibrary = new Label
+        {
+            Text = libraryOpen ? "Saved in the open library, as standalone faderio's Settings." : "Open a library to set these.",
+            AutoSize = true, ForeColor = SystemColors.GrayText,
+        };
+
         _ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Width = 80 };
         _cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Width = 80 };
         var buttons = new FlowLayoutPanel
@@ -120,7 +168,14 @@ internal sealed class SettingsDialog : Form
         rows.Controls.Add(nextStart, 1, 3);
         rows.Controls.Add(_nowPlayingTab, 1, 4);
         rows.Controls.Add(nextVisit, 1, 5);
-        rows.Controls.Add(buttons, 0, 6);
+        var unauthored = Caption("Unauthored boundaries:");
+        unauthored.Margin = new Padding(0, 16, 12, 0);
+        rows.Controls.Add(unauthored, 0, 6);
+        rows.Controls.Add(boundaries, 1, 6);
+        rows.Controls.Add(Caption("Blank fade durations:"), 0, 7);
+        rows.Controls.Add(blank, 1, 7);
+        rows.Controls.Add(inLibrary, 1, 8);
+        rows.Controls.Add(buttons, 0, 9);
         rows.SetColumnSpan(buttons, 2);
         Controls.Add(rows);
 
@@ -137,6 +192,15 @@ internal sealed class SettingsDialog : Form
 
     /// <summary>Whether faderio is to show in MusicBee's Now Playing tab.</summary>
     public bool NowPlayingTab => _nowPlayingTab.Checked;
+
+    /// <summary>Whether a boundary nobody authored plays the default crossfade, not a hard cut.</summary>
+    public bool Crossfade => _crossfade.Checked;
+
+    /// <summary>The default crossfade's length, in whole seconds.</summary>
+    public int CrossfadeSeconds => (int)_crossfadeSeconds.Value;
+
+    /// <summary>What a blank fade duration plays, in whole seconds.</summary>
+    public int BlankSeconds => (int)_blankSeconds.Value;
 
     private void AddDevice(string? name, string text)
     {
@@ -187,6 +251,8 @@ internal sealed class SettingsDialog : Form
         };
         return dialog.ShowDialog(this) == DialogResult.OK ? dialog.SelectedPath : null;
     }
+
+    private static Label Seconds() => new() { Text = "s", AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
 
     private static Label Caption(string text) =>
         new() { Text = text, AutoSize = true, Margin = new Padding(0, 6, 12, 0) };

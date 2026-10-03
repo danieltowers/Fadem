@@ -51,6 +51,7 @@ internal sealed class MainForm : Form
     internal readonly Button _playPause;
     internal readonly Button _next;
     internal readonly Button _transitionNow;
+    internal readonly Button _cueTransition;
     internal readonly CheckBox _shuffle;
     internal readonly CheckBox _repeat;
     internal readonly ToolTip _tips;
@@ -121,7 +122,8 @@ internal sealed class MainForm : Form
         // The sidebar's 200 px on top of what the queue and the editor need: at the least width the
         // queue still shows the default columns, the row buttons in view.
         MinimumSize = new Size(960, 480);
-        Size = new Size(1240, 600);
+        // Tall enough for the whole editor, Render last, without its scroll bar.
+        Size = new Size(1240, 660);
         StartPosition = FormStartPosition.CenterScreen;
 
         _status = new SpringLabel("Ready.") { TextAlign = ContentAlignment.MiddleLeft };
@@ -148,12 +150,14 @@ internal sealed class MainForm : Form
         _next = new Button { Text = "⏭", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         // Arrows draw small in this font; at 13 pt the wave arrow reads as clearly as ⏭.
         _transitionNow = new Button { Text = "⤳", Font = new Font("Segoe UI Symbol", 13f), Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
+        _cueTransition = new Button { Text = "⏩", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         // Push buttons that stay pressed in while on. They never check themselves: what they
         // show is always the view's, set in Render.
         _shuffle = new CheckBox { Text = "🔀", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 44, Height = 28, Margin = new Padding(10, 8, 2, 4) };
         _repeat = new CheckBox { Text = "🔁", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 44, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _tips = new ToolTip();
         _tips.SetToolTip(_transitionNow, "Transition now");
+        _tips.SetToolTip(_cueTransition, "Cue transition: play from 5 s before it");
         // Either side of the seek bar (interim transport issue 05): fixed five-second jumps.
         _back5 = new Button { Text = "−5 s", Width = 48, Height = 28, Margin = new Padding(8, 8, 0, 4), Enabled = false };
         _forward5 = new Button { Text = "+5 s", Width = 48, Height = 28, Margin = new Padding(0, 8, 2, 4), Enabled = false };
@@ -186,8 +190,8 @@ internal sealed class MainForm : Form
         };
         // A table, not anchors: the seek bar takes whatever width is left between the buttons
         // and the readout, at any window size.
-        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 10, RowCount = 1 };
-        foreach (var _ in Enumerable.Range(0, 7))
+        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 11, RowCount = 1 };
+        foreach (var _ in Enumerable.Range(0, 8))
         {
             transport.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         }
@@ -198,12 +202,13 @@ internal sealed class MainForm : Form
         transport.Controls.Add(_playPause, 1, 0);
         transport.Controls.Add(_next, 2, 0);
         transport.Controls.Add(_transitionNow, 3, 0);
-        transport.Controls.Add(_shuffle, 4, 0);
-        transport.Controls.Add(_repeat, 5, 0);
-        transport.Controls.Add(_back5, 6, 0);
-        transport.Controls.Add(_seek, 7, 0);
-        transport.Controls.Add(_forward5, 8, 0);
-        transport.Controls.Add(_time, 9, 0);
+        transport.Controls.Add(_cueTransition, 4, 0);
+        transport.Controls.Add(_shuffle, 5, 0);
+        transport.Controls.Add(_repeat, 6, 0);
+        transport.Controls.Add(_back5, 7, 0);
+        transport.Controls.Add(_seek, 8, 0);
+        transport.Controls.Add(_forward5, 9, 0);
+        transport.Controls.Add(_time, 10, 0);
 
         _queueList = new ListView
         {
@@ -401,6 +406,7 @@ internal sealed class MainForm : Form
         _prev.Click += (_, _) => _engine.Previous();
         _next.Click += (_, _) => _engine.Next();
         _transitionNow.Click += (_, _) => _engine.TransitionNow();
+        _cueTransition.Click += (_, _) => _engine.CueTransition();
         // The press asks for the state after the one the view holds now, not the one last shown.
         _shuffle.Click += (_, _) => _engine.SetShuffle(!_engine.View.Shuffle);
         _repeat.Click += (_, _) => _engine.SetRepeat(Presenter.NextRepeat(_engine.View.Repeat));
@@ -467,6 +473,7 @@ internal sealed class MainForm : Form
         }
         _playPause.Text = Presenter.PlayPauseGlyph(view.Transport);
         _transitionNow.Enabled = view.CanTransitionNow;
+        _cueTransition.Enabled = view.CanCueTransition;
         _shuffle.Checked = view.Shuffle;
         _repeat.Checked = view.Repeat != RepeatMode.Off;
         _repeat.Text = Presenter.RepeatGlyph(view.Repeat);
@@ -493,7 +500,7 @@ internal sealed class MainForm : Form
         _sections.Apply(view);
 
         var attended = view.Attended;
-        _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length);
+        _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length, attended?.Marks);
         _back5.Enabled = _forward5.Enabled = _seek.Enabled;
         _time.Text = Presenter.TimeReadout(attended, held: view.Preview is not null);
         var attendedTrack = Presenter.FmtAttendedTrack(attended);

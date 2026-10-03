@@ -53,6 +53,10 @@ internal sealed class TransitionEditorPanel : Panel
     internal readonly Button _fadeOutMore;
     internal readonly Button _fadeInLess;
     internal readonly Button _fadeInMore;
+    internal readonly Button _fadeOutLessSecond;
+    internal readonly Button _fadeOutMoreSecond;
+    internal readonly Button _fadeInLessSecond;
+    internal readonly Button _fadeInMoreSecond;
     internal readonly Button _undo;
     internal readonly Button _redo;
     internal readonly Button _remove;
@@ -191,10 +195,10 @@ internal sealed class TransitionEditorPanel : Panel
 
         _fadeOutFromEnd = new CheckBox { Text = "From end", Dock = DockStyle.Fill, Enabled = false, Margin = new Padding(3, 0, 3, 0) };
         _fadeOutPoint = Field(layout, ref row, TransitionField.FadeOutPoint, "Fade-out point (s)", _fadeOutFromEnd, out _captureOut, "Capture", out _captureOutHint);
-        (_fadeOutLess, _fadeOutMore) = NudgeButtons(_fadeOutPoint);
+        (_fadeOutLess, _fadeOutMore, _fadeOutLessSecond, _fadeOutMoreSecond) = NudgeButtons(_fadeOutPoint);
         _fadeOutDuration = Field(layout, ref row, TransitionField.FadeOutDuration, "Fade-out duration (s)", null, out _, null, out _);
         _fadeInPoint = Field(layout, ref row, TransitionField.FadeInPoint, "Fade-in point (s)", null, out _captureIn, "Capture", out _captureInHint);
-        (_fadeInLess, _fadeInMore) = NudgeButtons(_fadeInPoint);
+        (_fadeInLess, _fadeInMore, _fadeInLessSecond, _fadeInMoreSecond) = NudgeButtons(_fadeInPoint);
         _fadeInDuration = Field(layout, ref row, TransitionField.FadeInDuration, "Fade-in duration (s)", null, out _, null, out _);
 
         _curve = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill, Enabled = false };
@@ -263,6 +267,10 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeOutMore.Click += (_, _) => NudgePoint(fadeOut: true, +1, ShiftHeld);
         _fadeInLess.Click += (_, _) => NudgePoint(fadeOut: false, -1, ShiftHeld);
         _fadeInMore.Click += (_, _) => NudgePoint(fadeOut: false, +1, ShiftHeld);
+        _fadeOutLessSecond.Click += (_, _) => NudgePoint(fadeOut: true, -1, coarse: true);
+        _fadeOutMoreSecond.Click += (_, _) => NudgePoint(fadeOut: true, +1, coarse: true);
+        _fadeInLessSecond.Click += (_, _) => NudgePoint(fadeOut: false, -1, coarse: true);
+        _fadeInMoreSecond.Click += (_, _) => NudgePoint(fadeOut: false, +1, coarse: true);
 
         Controls.Add(scroller);
         Controls.Add(heading);
@@ -383,28 +391,49 @@ internal sealed class TransitionEditorPanel : Panel
     }
 
     /// <summary>Puts − and + beside a point's box, in the box's own cell (interim transport issue
-    /// 06). Points only: durations have none, by decision (D8).</summary>
-    private static (Button Less, Button More) NudgeButtons(TextBox box)
+    /// 06), and under them −1 and +1, which always move a whole second. The row grows to hold
+    /// them; the button beside it (Capture) keeps the box's height. Points only: durations have
+    /// none, by decision (D8).</summary>
+    private static (Button Less, Button More, Button LessSecond, Button MoreSecond) NudgeButtons(TextBox box)
     {
         var layout = (TableLayoutPanel)box.Parent!;
         var cell = layout.GetPositionFromControl(box);
-        var less = new Button { Text = "−", Width = 26, Dock = DockStyle.Fill, Margin = new Padding(1, 0, 0, 0), Enabled = false };
-        var more = new Button { Text = "+", Width = 26, Dock = DockStyle.Fill, Margin = new Padding(1, 0, 0, 0), Enabled = false };
-        var strip = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = box.Margin, Padding = new Padding(0) };
+        var less = new Button { Text = "−", Width = 32, Dock = DockStyle.Fill, Margin = new Padding(1, 0, 0, 0), Enabled = false };
+        var more = new Button { Text = "+", Width = 32, Dock = DockStyle.Fill, Margin = new Padding(1, 0, 0, 0), Enabled = false };
+        var lessSecond = new Button { Text = "−1", Width = 32, Dock = DockStyle.Fill, Margin = new Padding(1, 2, 0, 0), Padding = new Padding(0), Enabled = false };
+        var moreSecond = new Button { Text = "+1", Width = 32, Dock = DockStyle.Fill, Margin = new Padding(1, 2, 0, 0), Padding = new Padding(0), Enabled = false };
+        var strip = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 2, Margin = box.Margin, Padding = new Padding(0) };
         strip.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        strip.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 27));
-        strip.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 27));
+        // Wide enough for "−1" and "+1" whole.
+        strip.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 33));
+        strip.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 33));
+        var boxHeight = layout.RowStyles[cell.Row].Height - box.Margin.Vertical;
+        strip.RowStyles.Add(new RowStyle(SizeType.Absolute, boxHeight));
+        strip.RowStyles.Add(new RowStyle(SizeType.Absolute, SecondRowHeight));
         layout.Controls.Remove(box);
         box.Margin = new Padding(0, 0, 0, 0);
         strip.Controls.Add(box, 0, 0);
         strip.Controls.Add(less, 1, 0);
         strip.Controls.Add(more, 2, 0);
+        strip.Controls.Add(lessSecond, 1, 1);
+        strip.Controls.Add(moreSecond, 2, 1);
         layout.Controls.Add(strip, cell.Column, cell.Row);
+        layout.RowStyles[cell.Row].Height += SecondRowHeight;
+        if (layout.GetControlFromPosition(cell.Column + 1, cell.Row) is { } beside)
+        {
+            beside.Dock = DockStyle.Top;
+            beside.Height = (int)boxHeight;
+        }
         var tips = new ToolTip();
         tips.SetToolTip(less, "Earlier by 0.1 s (Shift: 1 s) in the number shown");
         tips.SetToolTip(more, "Later by 0.1 s (Shift: 1 s) in the number shown");
-        return (less, more);
+        tips.SetToolTip(lessSecond, "Earlier by 1 s in the number shown");
+        tips.SetToolTip(moreSecond, "Later by 1 s in the number shown");
+        return (less, more, lessSecond, moreSecond);
     }
+
+    /// <summary>The height the whole-second nudges add under a point's box.</summary>
+    private const int SecondRowHeight = 26;
 
     private static bool ShiftHeld => (ModifierKeys & Keys.Shift) != 0;
 
@@ -459,8 +488,8 @@ internal sealed class TransitionEditorPanel : Panel
     {
         var outLive = _adjacency is not null && !Gone && (PointOf(_fadeOutPoint, _fadeOut).Point is not null || ShowsPlaceholder(_fadeOutPoint));
         var inLive = _adjacency is not null && !Gone && (PointOf(_fadeInPoint, _fadeIn).Point is not null || ShowsPlaceholder(_fadeInPoint));
-        _fadeOutLess.Enabled = _fadeOutMore.Enabled = outLive;
-        _fadeInLess.Enabled = _fadeInMore.Enabled = inLive;
+        _fadeOutLess.Enabled = _fadeOutMore.Enabled = _fadeOutLessSecond.Enabled = _fadeOutMoreSecond.Enabled = outLive;
+        _fadeInLess.Enabled = _fadeInMore.Enabled = _fadeInLessSecond.Enabled = _fadeInMoreSecond.Enabled = inLive;
     }
 
     /// <summary>A row of buttons that wraps where the panel is narrower than they are (a sidebar,

@@ -599,6 +599,34 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
+    public void TheSecondNudges_BelowTheTenths_MoveAPointAWholeSecond_AndSaveEachStep() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b) = EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        editor._fadeOutPoint.Text = "2.5";
+        editor._fadeInPoint.Text = "1.5";
+
+        Click(editor._fadeOutMoreSecond);
+        Assert.Equal("3.5", editor._fadeOutPoint.Text);
+        Click(editor._fadeOutLessSecond);
+        Click(editor._fadeOutLessSecond);
+        Assert.Equal("1.5", editor._fadeOutPoint.Text);
+        Click(editor._fadeInMoreSecond);
+        Assert.Equal("2.5", editor._fadeInPoint.Text);
+        Click(editor._fadeInLessSecond);
+        Click(editor._fadeInLessSecond);
+        Assert.Equal("0.5", editor._fadeInPoint.Text);
+
+        Assert.False(editor.HasUnsavedEdits);
+        Assert.Equal(TimeSpan.FromSeconds(1.5), h.Store.Get(a, b)!.FadeOutPoint!.Position);
+        Assert.Equal(TimeSpan.FromSeconds(0.5), h.Store.Get(a, b)!.FadeInPoint!.Position);
+        // Below the tenths' buttons, in the same column.
+        Assert.Equal(editor._fadeOutLess.Left, editor._fadeOutLessSecond.Left);
+        Assert.True(editor._fadeOutLessSecond.Top > editor._fadeOutLess.Bottom - 1);
+    });
+
+    [Fact]
     public void Nudge_FromEnd_MovesTheNumberShown_SoPlusIsEarlierInTheTrack() => RunSta(() =>
     {
         using var h = new Harness();
@@ -648,10 +676,15 @@ public sealed partial class HeadlessFormTests
         editor._fadeOutPoint.Text = "2";
         Assert.True(editor._fadeOutMore.Enabled);
         Assert.True(editor._fadeOutLess.Enabled);
+        Assert.True(editor._fadeOutMoreSecond.Enabled);
+        Assert.True(editor._fadeOutLessSecond.Enabled);
         editor._fadeOutPoint.Text = "two";
         Assert.False(editor._fadeOutMore.Enabled);
         Assert.False(editor._fadeOutLess.Enabled);
+        Assert.False(editor._fadeOutMoreSecond.Enabled);
+        Assert.False(editor._fadeOutLessSecond.Enabled);
         Assert.False(editor._fadeInMore.Enabled); // its own field is still blank
+        Assert.False(editor._fadeInMoreSecond.Enabled);
     });
 
     [Fact]
@@ -1121,7 +1154,7 @@ public sealed partial class HeadlessFormTests
         // Ordinal: UI text comparison folds ⏹ and ⏸ together.
         Assert.DoesNotContain(transport.Controls.Cast<Control>(), c => string.Equals(c.Text, "⏹", StringComparison.Ordinal));
         Assert.Equal(
-            new[] { "⏮", "▶", "⏭", "⤳", "🔀", "🔁", "−5 s", "+5 s" },
+            new[] { "⏮", "▶", "⏭", "⤳", "⏩", "🔀", "🔁", "−5 s", "+5 s" },
             transport.Controls.OfType<ButtonBase>().OrderBy(transport.GetColumn).Select(c => c.Text).ToArray());
     });
 
@@ -1320,6 +1353,34 @@ public sealed partial class HeadlessFormTests
         Assert.Equal(b, h.Engine.View.Incoming?.Row.Track.FilePath);
         Assert.False(h.Form._transitionNow.Enabled);
         Assert.Equal("Transition now", h.Form._tips.GetToolTip(h.Form._transitionNow));
+    });
+
+    [Fact]
+    public void ACueTransitionPress_IsOneCall_ThatJumpsTo5sBeforeTheFade_AndPlays() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("a.wav", 12, 0.4);
+        var b = TestAudio.WriteDcWav("b.wav", 4, 0.2);
+        h.Form.AddPaths(new[] { a, b });
+        h.Store.Upsert(a, b, new TransitionSpec
+        {
+            FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(8), FromEnd: false),
+            FadeOutDuration = TimeSpan.FromSeconds(1),
+        });
+        Assert.False(h.Form._cueTransition.Enabled); // stopped
+        h.Engine.Play();
+        h.Output.Advance(44100);
+        h.Engine.Pause();
+        h.Form.Render();
+        Assert.True(h.Form._cueTransition.Enabled); // paused too
+
+        Click(h.Form._cueTransition);
+
+        Assert.Equal(Transport.Playing, h.Engine.View.Transport);
+        Assert.Equal(3.0, h.Engine.View.Attended!.Playhead.TotalSeconds, 2);
+        Assert.Equal("Cue transition: play from 5 s before it", h.Form._tips.GetToolTip(h.Form._cueTransition));
+        var row = (TableLayoutPanel)h.Form._transitionNow.Parent!;
+        Assert.Equal(row.GetColumn(h.Form._transitionNow) + 1, row.GetColumn(h.Form._cueTransition));
     });
 
     /// <summary>Clicks a strip item through its own handler, as <see cref="Click"/> does.</summary>
@@ -2348,7 +2409,7 @@ public sealed partial class HeadlessFormTests
         using var h = new Harness(windowFile: file);
 
         Assert.Equal(FormStartPosition.CenterScreen, h.Form.StartPosition);
-        Assert.Equal(new Size(1240, 600), h.Form.Size);
+        Assert.Equal(new Size(1240, 660), h.Form.Size);
     });
 
     [Fact]

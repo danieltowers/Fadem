@@ -202,6 +202,51 @@ public sealed partial class PlaybackEngine
         });
     }
 
+    /// <summary>How far before its transition begins <see cref="CueTransition"/> lands: as a
+    /// preview's pre-roll. Not a setting.</summary>
+    private static readonly TimeSpan CuePreRoll = TimeSpan.FromSeconds(5);
+
+    /// <summary>Seeks the playing track to 5 s before its coming transition begins, at the
+    /// fade-out point as resolved or, for a hard cut or a transition with no fade-out, the
+    /// track's end, and plays on from there: paused, it resumes. The transition then plays as
+    /// the queue plays it, into the boundary's next track; a fade-out point already passed is
+    /// armed again, as by any seek before it. A point less than 5 s in lands at 0:00. It acts
+    /// exactly when <see cref="PlayerView.CanCueTransition"/> says so.</summary>
+    public void CueTransition()
+    {
+        ThrowIfDisposed();
+        Run(() =>
+        {
+            ObserveClock();
+            EndPreviewFirst();
+            if (!View.CanCueTransition || _currentVoice is not { } voice
+                || _pendingBoundary is not { } boundary || boundary.OutgoingVoice != voice)
+            {
+                return;
+            }
+            var index = IndexOf(voice);
+            if (index < 0)
+            {
+                return;
+            }
+            var total = voice.Source.TotalFrames;
+            var outPath = _queue.Entries[index].Track.FilePath;
+            var inTrack = boundary.Incoming.Track;
+            var transition = _resolver.Resolve(
+                _store?.Get(outPath, inTrack.FilePath), OverrideOf(outPath, inTrack.FilePath),
+                TimeSpanOf(total), inTrack.Length.TimeSpan);
+            var begins = transition.IsHardCut || Frames(transition.FadeOutDuration) <= 0
+                ? total
+                : Compat.Clamp(Frames(transition.FadeOutPoint), 0, total);
+            SeekNow(Playhead.FromFrames(Math.Max(0, begins - Frames(CuePreRoll)), _rate));
+            if (TransportNow == Transport.Paused)
+            {
+                PlayOutput();
+                Publish();
+            }
+        });
+    }
+
     /// <summary>Acts on the attended voice (build issue 06). Past 3 s it restarts the track; so
     /// it does at the head of the queue, unless repeat-all wraps it to the last row. Otherwise it
     /// hard-cuts to the previous readable row from 0:00, never through a reverse adjacency, passing
