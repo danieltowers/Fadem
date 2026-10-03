@@ -30,7 +30,8 @@ spec and this file disagree, this file wins.** Glossary terms settled here are a
   relative-seek command; a jump may land inside a transition and is treated as any seek.
 - **D8** ±0.1 s nudge buttons on the two **points** only, never on durations. Shift-click is
   1 s. They act on the displayed number, so under From end `+` moves the point earlier in the
-  track. No automatic preview.
+  track. No automatic preview. *Reversed for durations by the user on 2026-10-03: they have the
+  same − + −1 +1, stopping at 0.*
 - **D9** A button at the far right of row N opens N→N+1 in the editor panel. The last row has
   none. The panel keeps whatever Global / This playlist mode it was last in (D23).
 

@@ -121,6 +121,16 @@ public sealed partial class PlaybackEngine
         return Point.FromTimeSpan(moved > length ? length : moved);
     }
 
+    /// <summary><paramref name="duration"/> moved by <paramref name="delta"/>, never below zero:
+    /// the editor's nudges on a fade's duration. A duration past its track's end is left for
+    /// the resolver to shorten, as a typed one is.</summary>
+    public TimeSpan NudgeDuration(TimeSpan duration, TimeSpan delta)
+    {
+        ThrowIfDisposed();
+        var moved = duration + delta;
+        return moved < TimeSpan.Zero ? TimeSpan.Zero : moved;
+    }
+
     private static Point MeasuredFromOtherEnd(Track track, Point point)
     {
         var length = track.Length.TimeSpan;

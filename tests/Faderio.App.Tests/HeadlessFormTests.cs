@@ -630,6 +630,41 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
+    public void TheDurations_NudgeAsThePointsDo_StopAtZero_AndSaveEachStep() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var (a, b) = EditingAlphaToBeta(h);
+        var editor = h.Form._editor;
+        editor._fadeOutDuration.Text = "2";
+
+        Click(editor._fadeOutDurationMore);
+        Assert.Equal("2.1", editor._fadeOutDuration.Text);
+        Click(editor._fadeOutDurationLess);
+        Click(editor._fadeOutDurationLess);
+        Assert.Equal("1.9", editor._fadeOutDuration.Text);
+        Click(editor._fadeOutDurationMoreSecond);
+        Assert.Equal("2.9", editor._fadeOutDuration.Text);
+        Click(editor._fadeOutDurationLessSecond);
+        Click(editor._fadeOutDurationLessSecond);
+        Click(editor._fadeOutDurationLessSecond);
+        Assert.Equal("0", editor._fadeOutDuration.Text); // never below zero
+        editor.NudgeDuration(fadeOut: true, direction: +1, coarse: true); // Shift-click
+        Assert.Equal("1", editor._fadeOutDuration.Text);
+
+        // A blank duration nudges from what it plays, the 5 s its placeholder shows.
+        Click(editor._fadeInDurationLess);
+        Assert.Equal("4.9", editor._fadeInDuration.Text);
+
+        Assert.False(editor.HasUnsavedEdits);
+        Assert.Equal(TimeSpan.FromSeconds(1), h.Store.Get(a, b)!.FadeOutDuration);
+        Assert.Equal(TimeSpan.FromSeconds(4.9), h.Store.Get(a, b)!.FadeInDuration);
+        // On the box's own line, the seconds in the cell beside: the editor is no taller for them.
+        static System.Drawing.Point InLayout(Control c) => new(c.Parent!.Left + c.Left, c.Parent.Top + c.Top);
+        Assert.Equal(InLayout(editor._fadeOutDuration).Y, InLayout(editor._fadeOutDurationMoreSecond).Y);
+        Assert.True(InLayout(editor._fadeOutDurationLessSecond).X > InLayout(editor._fadeOutDurationMore).X);
+    });
+
+    [Fact]
     public void Nudge_FromEnd_MovesTheNumberShown_SoPlusIsEarlierInTheTrack() => RunSta(() =>
     {
         using var h = new Harness();
@@ -1157,7 +1192,7 @@ public sealed partial class HeadlessFormTests
         // Ordinal: UI text comparison folds ⏹ and ⏸ together.
         Assert.DoesNotContain(transport.Controls.Cast<Control>(), c => string.Equals(c.Text, "⏹", StringComparison.Ordinal));
         Assert.Equal(
-            new[] { "⏮", "▶", "⏭", "⤳", "⏩", "🔀", "🔁", "Sync editor", "−5 s", "+5 s" },
+            new[] { "⏮", "▶", "⏭", "⤳", "⏩", "🔀", "🔁", "Sync editor" },
             transport.Controls.OfType<ButtonBase>().OrderBy(transport.GetColumn).Select(c => c.Text).ToArray());
     });
 
@@ -1347,13 +1382,17 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void TheTransportRow_PutsTheJumpButtonsEitherSideOfTheSeekBar() => RunSta(() =>
+    public void TheTransportRow_StacksTheJumpButtonsAfterTheSeekBar_BackBelowForward_AsThePluginDoes() => RunSta(() =>
     {
         using var h = new Harness();
         var row = (TableLayoutPanel)h.Form._seek.Parent!;
         var seek = row.GetColumn(h.Form._seek);
-        Assert.Equal(seek - 1, row.GetColumn(h.Form._back5));
-        Assert.Equal(seek + 1, row.GetColumn(h.Form._forward5));
+        var jumps = h.Form._forward5.Parent!;
+        Assert.Same(jumps, h.Form._back5.Parent);
+        Assert.Equal(seek + 1, row.GetColumn(jumps));
+        Assert.Equal(h.Form._forward5.Left, h.Form._back5.Left);
+        Assert.True(h.Form._back5.Top >= h.Form._forward5.Bottom, "−5 s is not below +5 s");
+        Assert.True(jumps.Bottom <= row.Height, "the jumps are cut off");
         Assert.Equal(seek + 2, row.GetColumn(h.Form._time.Parent!)); // with the seconds under it
     });
 

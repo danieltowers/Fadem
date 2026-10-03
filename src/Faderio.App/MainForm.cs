@@ -163,15 +163,16 @@ internal sealed class MainForm : Form
         _tips.SetToolTip(_syncEditor, Presenter.SyncEditorTip);
         _tips.SetToolTip(_transitionNow, "Transition now");
         _tips.SetToolTip(_cueTransition, "Cue transition: play from 5 s before it");
-        // Either side of the seek bar (interim transport issue 05): fixed five-second jumps.
-        _back5 = new Button { Text = "−5 s", Width = 48, Height = 28, Margin = new Padding(8, 8, 0, 4), Enabled = false };
-        _forward5 = new Button { Text = "+5 s", Width = 48, Height = 28, Margin = new Padding(0, 8, 2, 4), Enabled = false };
+        // Stacked after the seek bar, +5 s over −5 s, as in the plugin (interim transport issue
+        // 05): fixed five-second jumps.
+        _back5 = new Button { Text = "−5 s", Width = 48, Height = 23, Margin = new Padding(0, 1, 0, 0), Enabled = false };
+        _forward5 = new Button { Text = "+5 s", Width = 48, Height = 23, Margin = new Padding(0, 0, 0, 1), Enabled = false };
         _tips.SetToolTip(_back5, "Back 5 seconds");
         _tips.SetToolTip(_forward5, "Forward 5 seconds");
         _seek = new SeekBar
         {
             Dock = DockStyle.Fill,
-            Margin = new Padding(8, 6, 8, 4),
+            Margin = new Padding(8, 8, 8, 8),
         };
         _time = new Label
         {
@@ -191,8 +192,8 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Fill,
             Margin = new Padding(0),
         };
-        // Its own height, within the transport's 44 px: left to itself the table asks for 100.
-        var times = new TableLayoutPanel { Dock = DockStyle.Fill, Height = 36, ColumnCount = 1, RowCount = 2, Margin = new Padding(3, 4, 3, 4) };
+        // Its own height, within the transport's 50 px: left to itself the table asks for 100.
+        var times = new TableLayoutPanel { Dock = DockStyle.Fill, Height = 36, ColumnCount = 1, RowCount = 2, Margin = new Padding(3, 7, 3, 7) };
         times.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
         times.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
         times.Controls.Add(_time, 0, 0);
@@ -211,8 +212,8 @@ internal sealed class MainForm : Form
         };
         // A table, not anchors: the seek bar takes whatever width is left between the buttons
         // and the readout, at any window size.
-        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, ColumnCount = 12, RowCount = 1 };
-        foreach (var _ in Enumerable.Range(0, 9))
+        var transport = new TableLayoutPanel { Dock = DockStyle.Top, Height = 50, ColumnCount = 11, RowCount = 1 };
+        foreach (var _ in Enumerable.Range(0, 8))
         {
             transport.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         }
@@ -227,10 +228,16 @@ internal sealed class MainForm : Form
         transport.Controls.Add(_shuffle, 5, 0);
         transport.Controls.Add(_repeat, 6, 0);
         transport.Controls.Add(_syncEditor, 7, 0);
-        transport.Controls.Add(_back5, 8, 0);
-        transport.Controls.Add(_seek, 9, 0);
-        transport.Controls.Add(_forward5, 10, 0);
-        transport.Controls.Add(times, 11, 0);
+        var jumps = new TableLayoutPanel
+        {
+            ColumnCount = 1, RowCount = 2, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Anchor = AnchorStyles.Left, Margin = new Padding(0, 1, 2, 1),
+        };
+        jumps.Controls.Add(_forward5, 0, 0);
+        jumps.Controls.Add(_back5, 0, 1);
+        transport.Controls.Add(_seek, 8, 0);
+        transport.Controls.Add(jumps, 9, 0);
+        transport.Controls.Add(times, 10, 0);
 
         _queueList = new ListView
         {

@@ -22,6 +22,17 @@ public sealed class NudgeTests
     }
 
     [Fact]
+    public void ADuration_MovesATenthOrASecond_AndStopsAtZero()
+    {
+        using var tc = TestEngine.Create();
+        var four = TimeSpan.FromSeconds(4);
+
+        Assert.Equal(4.1, tc.Engine.NudgeDuration(four, Tenth).TotalSeconds, 9);
+        Assert.Equal(3.0, tc.Engine.NudgeDuration(four, TimeSpan.FromSeconds(-1)).TotalSeconds, 9);
+        Assert.Equal(TimeSpan.Zero, tc.Engine.NudgeDuration(TimeSpan.FromSeconds(0.05), -Tenth));
+    }
+
+    [Fact]
     public void ClampedToTheTrack_AtBothEnds()
     {
         using var tc = TestEngine.Create();
