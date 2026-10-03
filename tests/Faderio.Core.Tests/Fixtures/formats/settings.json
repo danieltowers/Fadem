@@ -6,5 +6,6 @@
   "replayGainEnabled": false,
   "shuffle": true,
   "repeat": "All",
+  "editorFollowsPlayback": true,
   "lastPlaylist": "Mix \u2020 \u2B50\uFE0F"
 }

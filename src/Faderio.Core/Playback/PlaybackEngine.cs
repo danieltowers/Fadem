@@ -608,6 +608,7 @@ public sealed partial class PlaybackEngine : IDisposable
                 CanTransitionNow: Transport == Transport.Playing && heardAlone && next is not null)
             {
                 CanCueTransition = Transport != Transport.Stopped && heardAlone && next is not null,
+                EditorFollow = attended is not null && IndexOf(currentRow) != Entries.Length - 1 ? next : null,
                 Settings = Settings,
                 Preview = preview,
                 Clip = clip,

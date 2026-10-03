@@ -79,6 +79,14 @@ internal sealed class TransitionEditorPanel : Panel
 
     private readonly ToolTip _historyTips = new();
 
+    /// <summary>The attended row the editor last followed playback to, held as the queue's
+    /// version is, to see the listener come to another; null while not following or stopped.</summary>
+    private RowId? _followed;
+
+    /// <summary>Whether following playback may open the editor now. A host whose editor is a page
+    /// in the lists' place lets it follow only while that page is shown.</summary>
+    internal Func<bool> CanFollow { get; set; } = () => true;
+
     /// <summary>A curve as the list shows it; none is "(global)", in playlist mode only.</summary>
     private sealed record CurveItem(FadeCurveKind? Curve)
     {
@@ -661,11 +669,12 @@ internal sealed class TransitionEditorPanel : Panel
         ShowLight();
     }
 
-    /// <summary>Called on every render: each capture button live only while its own track is
-    /// heard, as the engine says, the traffic light, and the preview's buttons and line, which
-    /// follow the preview.</summary>
+    /// <summary>Called on every render: the editor following playback, each capture button live
+    /// only while its own track is heard, as the engine says, the traffic light, and the preview's
+    /// buttons and line, which follow the preview.</summary>
     public void Refresh(PlayerView view)
     {
+        Follow(view);
         var choice = PlaylistChoice(view.OpenPlaylist);
         if (_editPlaylist.Text != choice)
         {
@@ -680,6 +689,28 @@ internal sealed class TransitionEditorPanel : Panel
         _previewStatus.Visible = view.Preview is not null; // no room kept for it otherwise
         ShowHistory(_undo, "Undo", view.NextUndo);
         ShowHistory(_redo, "Redo", view.NextRedo);
+    }
+
+    /// <summary>While the editor follows playback, each row the listener comes to opens it on the
+    /// engine's <see cref="PlayerView.EditorFollow"/>, as ✎ would, once: between rows the user can
+    /// open another. Switched on, it follows at once. The last row has nothing to follow to, so the
+    /// editor stays where it was. A preview is never ended by it: it follows once the preview has.</summary>
+    private void Follow(PlayerView view)
+    {
+        if (view.Preview is not null)
+        {
+            return;
+        }
+        var row = view.Settings.EditorFollowsPlayback ? view.Attended?.Row.Id : null;
+        if (row == _followed)
+        {
+            return;
+        }
+        _followed = row;
+        if (view.EditorFollow is { } adjacency && CanFollow())
+        {
+            Open(adjacency);
+        }
     }
 
     private void ShowCaptures()

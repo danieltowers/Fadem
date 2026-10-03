@@ -21,8 +21,8 @@ public sealed partial class PlaybackEngine
     /// not saved and why, and then nothing changes. With no library open there is nowhere to
     /// save them, so nothing changes. Settings the same as those in force are no change and
     /// no notice. Shuffle and repeat are the transport's (<see cref="SetShuffle"/>,
-    /// <see cref="SetRepeat"/>) and the last playlist is the engine's (playlists issue 01): the
-    /// ones in <paramref name="settings"/> are not used.</summary>
+    /// <see cref="SetRepeat"/>, <see cref="SetEditorFollowsPlayback"/>) and the last playlist is
+    /// the engine's (playlists issue 01): the ones in <paramref name="settings"/> are not used.</summary>
     public void ChangeSettings(PlayerSettings settings)
     {
         ThrowIfDisposed();
@@ -32,6 +32,7 @@ public sealed partial class PlaybackEngine
             var next = settings.Normalised() with
             {
                 Shuffle = _settings.Shuffle, Repeat = _settings.Repeat, LastPlaylist = _settings.LastPlaylist,
+                EditorFollowsPlayback = _settings.EditorFollowsPlayback,
             };
             var previous = _settings;
             if (next == previous || !KeepSettings(next, "settings"))
@@ -48,6 +49,22 @@ public sealed partial class PlaybackEngine
             if (previous.ReplayGainEnabled != next.ReplayGainEnabled)
             {
                 RampLiveVoicesToTheirGain();
+            }
+            Publish();
+        });
+    }
+
+    /// <summary>Whether the editor follows playback: saved and put in force as
+    /// <see cref="SetShuffle"/> is. Nothing plays differently; the view says what to follow to,
+    /// as <see cref="PlayerView.EditorFollow"/>.</summary>
+    public void SetEditorFollowsPlayback(bool on)
+    {
+        ThrowIfDisposed();
+        Run(() =>
+        {
+            if (_settings.EditorFollowsPlayback == on || !KeepSettings(_settings with { EditorFollowsPlayback = on }, "sync editor"))
+            {
+                return;
             }
             Publish();
         });

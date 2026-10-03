@@ -59,6 +59,7 @@ internal sealed class PluginView : UserControl
     internal readonly Button _cueTransition;
     internal readonly CheckBox _shuffle;
     internal readonly CheckBox _repeat;
+    internal readonly CheckBox _syncEditor;
     internal readonly Button _back5;
     internal readonly Button _forward5;
     internal readonly SeekBar _seek;
@@ -135,7 +136,11 @@ internal sealed class PluginView : UserControl
         _repeat = new CheckBox { Text = "🔁", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 35, Height = 28, Margin = new Padding(1, 6, 1, 4) };
         _back5 = new Button { Text = "−5 s", Width = 48, Height = 28, Enabled = false };
         _forward5 = new Button { Text = "+5 s", Width = 48, Height = 28, Enabled = false };
+        // On the track's line, not the buttons' row: there, in a sidebar, it wraps to a row of its
+        // own, and the editor's page loses that height.
+        _syncEditor = new CheckBox { Text = "Sync editor", AutoCheck = false, AutoSize = true, Dock = DockStyle.Right, Padding = new Padding(0, 4, 4, 0) };
         _tips = new ToolTip();
+        _tips.SetToolTip(_syncEditor, Presenter.SyncEditorTip);
         _tips.SetToolTip(_stop, "Stop, and let go of the audio device");
         _tips.SetToolTip(_transitionNow, "Transition now");
         _tips.SetToolTip(_cueTransition, "Cue transition: play from 5 s before it");
@@ -147,8 +152,7 @@ internal sealed class PluginView : UserControl
         _seconds = new Label { Text = Presenter.SecondsReadout(null), TextAlign = ContentAlignment.TopLeft, AutoSize = false, Dock = DockStyle.Fill, Margin = new Padding(0) };
         _attendedTrack = new Label
         {
-            Dock = DockStyle.Top,
-            Height = 26,
+            Dock = DockStyle.Fill,
             Font = new Font(Font.FontFamily, 11f),
             Padding = new Padding(6, 4, 6, 0),
             TextAlign = ContentAlignment.MiddleLeft,
@@ -264,6 +268,9 @@ internal sealed class PluginView : UserControl
             engine, notice, suggested => Dialogs.ChooseRenderPath(FindForm(), suggested),
             beforeSounding: StopMusicBeesPlayerIfSilent);
         _editor.Dock = DockStyle.Fill;
+        // In a sidebar the editor is a page over the lists: following playback never opens it
+        // there, so the queue is not taken away mid-listen; it follows while the page is shown.
+        _editor.CanFollow = () => ClientSize.Width >= NarrowWidth || _editor.Adjacency is not null;
         _editorTitle = PaneTitle.Create("Transition editor");
         // The playlists end 4 px above the strip; the queue and the editor end level with them.
         _editorPane = new Panel { Padding = new Padding(0, 0, 0, 4) };
@@ -287,7 +294,10 @@ internal sealed class PluginView : UserControl
         Controls.Add(statusStrip);
         Controls.Add(seekRow);
         Controls.Add(buttons);
-        Controls.Add(_attendedTrack);
+        var trackLine = new Panel { Dock = DockStyle.Top, Height = 26 };
+        trackLine.Controls.Add(_attendedTrack);
+        trackLine.Controls.Add(_syncEditor);
+        Controls.Add(trackLine);
         Resize += (_, _) => FitWidth();
         FitWidth();
 
@@ -306,6 +316,7 @@ internal sealed class PluginView : UserControl
         // The press asks for the state after the one the view holds now, not the one last shown.
         _shuffle.Click += (_, _) => _engine.SetShuffle(!_engine.View.Shuffle);
         _repeat.Click += (_, _) => _engine.SetRepeat(Presenter.NextRepeat(_engine.View.Repeat));
+        _syncEditor.Click += (_, _) => _engine.SetEditorFollowsPlayback(!_engine.View.Settings.EditorFollowsPlayback);
         _seek.SeekRequested += SeekTo;
         _back5.Click += (_, _) => _engine.SeekBy(TimeSpan.FromSeconds(-5));
         _forward5.Click += (_, _) => _engine.SeekBy(TimeSpan.FromSeconds(5));
@@ -345,6 +356,7 @@ internal sealed class PluginView : UserControl
         _shuffle.Checked = view.Shuffle;
         _repeat.Checked = view.Repeat != RepeatMode.Off;
         _repeat.Text = Presenter.RepeatGlyph(view.Repeat);
+        _syncEditor.Checked = view.Settings.EditorFollowsPlayback;
         ShowTip(_shuffle, Presenter.ShuffleTip(view.Shuffle));
         ShowTip(_repeat, Presenter.RepeatTip(view.Repeat));
 

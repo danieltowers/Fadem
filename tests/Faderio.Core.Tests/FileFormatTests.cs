@@ -102,6 +102,7 @@ public sealed class FileFormatTests : IDisposable
         ReplayGainEnabled = false,
         Shuffle = true,
         Repeat = RepeatMode.All,
+        EditorFollowsPlayback = true,
         LastPlaylist = Playlist,
     };
 

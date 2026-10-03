@@ -336,6 +336,9 @@ internal static class Presenter
         _ => "Repeat: off",
     };
 
+    /// <summary>The Sync editor box's tooltip: what following playback does.</summary>
+    public const string SyncEditorTip = "Each track that starts opens the editor on its transition into the next";
+
     public static string ShuffleTip(bool shuffle) => shuffle ? "Shuffle: on" : "Shuffle: off";
 
     /// <summary>The settings dialog's note beside the chosen output mode: the mode in use, when it

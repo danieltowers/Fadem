@@ -49,6 +49,11 @@ public sealed record PlayerSettings
     /// <summary>Repeat, off by default.</summary>
     public RepeatMode Repeat { get; init; } = RepeatMode.Off;
 
+    /// <summary>Whether the editor follows playback, off by default: each track the listener
+    /// comes to opens the editor on its this → next (<see cref="Faderio.Core.Playback.PlayerView.EditorFollow"/>).
+    /// The transport's, as shuffle is: <c>SetEditorFollowsPlayback</c> saves it.</summary>
+    public bool EditorFollowsPlayback { get; init; }
+
     /// <summary>The playlist open when this library was last used, which the next launch opens
     /// (D20); null before any has been. The engine keeps it: <c>ChangeSettings</c> keeps the one
     /// in force (playlists issue 01).</summary>

@@ -59,7 +59,8 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       and in the title; Esc puts the old name back. A name another playlist has is refused with
       "Not renamed: …" in the strip, and the old name stays.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
-- [ ] The transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, then −5 s, the seek bar, +5 s and the time; no ⏹.
+- [ ] The transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, a **Sync editor** checkbox, then −5 s, the seek
+      bar, +5 s and the time; no ⏹.
 - [ ] Between the buttons and the transport row, a line names the playing track in a larger
       font: its title and artist ("Title — Artist"), or its filename when untagged. It is blank
       at launch, keeps naming the track while paused, and goes blank when the queue is cleared or
@@ -209,6 +210,11 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] Between ⏭ and the shuffle toggle, the Transition now button (⤳) reads clearly and its
       tooltip says "Transition now". It is greyed out while stopped, while paused, on the last
       row with repeat off, and during a crossfade, and live otherwise.
+- [ ] **Sync editor** is unticked in a fresh library, and its tooltip says what it does. Ticked
+      while a row plays, the editor opens on that row's this → next at once; when the next
+      track comes in (once the outgoing one falls silent) it moves to that track's this → next.
+      On the last row it stays where it was. Opened on another boundary between tracks, the
+      editor stays there until the next track comes in. The tick survives a relaunch.
 - [ ] The status strip shows the latest notice and, at its right, a count ("3 notices").
       Saving the same boundary several times shows one "Saved … ×n", not n notices.
       A notice longer than the strip is clipped and never pushes the count off. Clicking the
@@ -414,7 +420,9 @@ which a background run cannot give.
       where this → next is authored (phase 5 issue 11), and row 1 marked at rest; the strip
       reading "Ready." and, at its right, "library · WASAPI shared at 48000 Hz on Speakers
       (…)", the device in use (phase 5 issue 13). In the
-      sidebar as shipped (284 px) the seven buttons fit one row, the playlists sit above the
+      sidebar as shipped (284 px) the buttons fit one row, with **Sync editor** at the right
+      end of the playing track's line above them; in the sidebar it moves the editor only while
+      the editor's page is open, never taking the queue away. The playlists sit above the
       queue, no column is off the edge, and the host line is cut short with its whole text as
       its tooltip.
 - [ ] **▶** plays: the meter shows the tone, the track's name appears above the transport, the

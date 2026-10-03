@@ -1157,8 +1157,35 @@ public sealed partial class HeadlessFormTests
         // Ordinal: UI text comparison folds ⏹ and ⏸ together.
         Assert.DoesNotContain(transport.Controls.Cast<Control>(), c => string.Equals(c.Text, "⏹", StringComparison.Ordinal));
         Assert.Equal(
-            new[] { "⏮", "▶", "⏭", "⤳", "⏩", "🔀", "🔁", "−5 s", "+5 s" },
+            new[] { "⏮", "▶", "⏭", "⤳", "⏩", "🔀", "🔁", "Sync editor", "−5 s", "+5 s" },
             transport.Controls.OfType<ButtonBase>().OrderBy(transport.GetColumn).Select(c => c.Text).ToArray());
+    });
+
+    [Fact]
+    public void SyncEditor_IsTheLibrarysSetting_AndTheEditorFollowsThePlayingRow() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 5, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 5, 0.2);
+        h.Form.AddPaths(new[] { a, b });
+        h.Form.PlayRowAt(0);
+        h.Output.Advance(44100);
+        h.Form.Render();
+        Assert.False(h.Form._syncEditor.Checked);
+        Assert.Equal(Presenter.SyncEditorTip, h.Form._tips.GetToolTip(h.Form._syncEditor));
+        Assert.Null(h.Form._editor.Adjacency);
+
+        Click(h.Form._syncEditor);
+        h.Form.Render();
+
+        Assert.True(h.Engine.View.Settings.EditorFollowsPlayback);
+        Assert.True(h.Form._syncEditor.Checked);
+        Assert.Equal(h.Engine.View.EditorFollow, h.Form._editor.Adjacency);
+        Assert.Equal(a, h.Form._editor.Adjacency!.Outgoing.FilePath);
+
+        Click(h.Form._syncEditor);
+        h.Form.Render();
+        Assert.False(h.Form._syncEditor.Checked);
     });
 
     [Fact]
@@ -1260,7 +1287,9 @@ public sealed partial class HeadlessFormTests
         h.Form.Render();
 
         Assert.InRange(h.Engine.View.Attended!.Playhead.Milliseconds, 3980, 4020);
-        Assert.Equal("0:04 / -0:04", h.Form._time.Text);
+        // Halfway can fall half a pixel short of 4 s on an odd travel, so 0:03 or 0:04.
+        Assert.Equal(Presenter.TimeReadout(h.Engine.View.Attended, held: false), h.Form._time.Text);
+        Assert.Contains(h.Form._time.Text, new[] { "0:03 / -0:05", "0:04 / -0:04" });
     });
 
     [Fact]
