@@ -82,6 +82,74 @@ public sealed class SeekBarTests
         Assert.False(GreyAt(2.5, bar.Height - 3));
     }
 
+    /// <summary>The bar drawn with nothing on it but the scale, and whether a pixel is marked.</summary>
+    private static Func<double, int, bool> Scale(double seconds)
+    {
+        using var bar = new SeekBar { Width = 500, Height = 30 };
+        var length = Length.FromFrames((long)(44100 * seconds), 44100);
+        bar.Show(Playhead.Zero, length);
+        var picture = new Bitmap(bar.Width, bar.Height);
+        bar.DrawToBitmap(picture, new Rectangle(0, 0, bar.Width, bar.Height));
+        return (at, y) =>
+        {
+            var x = SeekBar.Inset + (int)Math.Round(at / seconds * (bar.Width - 2 * SeekBar.Inset));
+            return picture.GetPixel(x, y).R < 225; // the background is 240
+        };
+    }
+
+    [Fact]
+    public void TheScale_TicksEveryHalfSecond_BelowTheGroove_AndEveryTenThroughIt()
+    {
+        var marked = Scale(20);
+        const int minorBand = 19, majorOnly = 22, aboveGroove = 12; // the groove is 13–16
+        Assert.True(marked(5, minorBand));
+        Assert.True(marked(5.5, minorBand));
+        Assert.False(marked(5.25, minorBand));
+        Assert.False(marked(5, majorOnly));
+        Assert.False(marked(5, aboveGroove));
+        Assert.True(marked(10, majorOnly));
+        Assert.True(marked(10, aboveGroove));
+        Assert.True(marked(20, majorOnly));
+    }
+
+    [Fact]
+    public void EachTenSeconds_IsLabelled_AboveTheGroove()
+    {
+        var marked = Scale(20);
+        bool Labelled(double at) => Enumerable.Range(0, 10).Any(y =>
+            Enumerable.Range(-6, 13).Any(dx => marked(at + dx * 20.0 / 488, y)));
+        Assert.True(Labelled(10));
+        Assert.False(Labelled(5));
+    }
+
+    [Fact]
+    public void OnALongerTrack_TheShortTicksStepASecond()
+    {
+        var marked = Scale(120); // half a second is two pixels, a second four
+        Assert.True(marked(61, 19));
+        Assert.True(marked(62, 19));
+        Assert.False(marked(61.5, 19));
+    }
+
+    [Fact]
+    public void OnALongTrack_TheShortTicksStepFiveSeconds()
+    {
+        var marked = Scale(600); // a second is under a pixel, five seconds four
+        Assert.True(marked(305, 19));
+        Assert.False(marked(305, 22));
+        Assert.False(marked(302, 19));
+        Assert.True(marked(310, 22));
+    }
+
+    [Fact]
+    public void OnAVeryLongTrack_ShortTicksTooCloseToSee_AreLeftOut()
+    {
+        var marked = Scale(1500); // five seconds is under two pixels; ten seconds is three
+        Assert.True(marked(750, 22));
+        Assert.True(marked(760, 22));
+        Assert.False(marked(752.5, 19));
+    }
+
     [Fact]
     public void PixelsMapToPlayheads_AcrossTheTravel()
     {

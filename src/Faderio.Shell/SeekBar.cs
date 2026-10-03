@@ -11,7 +11,10 @@ namespace Faderio.Shell;
 /// whose channel click paged by its <c>LargeChange</c> instead of jumping. Red marks, the full
 /// height of the bar, show where the track's fades begin and end, as the engine resolves them;
 /// between each pair a grey wedge drawn as the volume goes: rising for the fade-in, falling for
-/// the fade-out.
+/// the fade-out. A scale runs along the groove from 0: a short tick every half second below it,
+/// and every ten seconds a longer one through it, labelled m:ss above. Where half seconds would
+/// fall closer than <see cref="MinTickGap"/> the short ticks step a second instead, then five;
+/// a label that would overlap the one before it is left out.
 /// </summary>
 internal sealed class SeekBar : Control
 {
@@ -23,10 +26,24 @@ internal sealed class SeekBar : Control
     private const int ThumbHeight = 18;
     private static readonly TimeSpan KeyStep = TimeSpan.FromSeconds(1);
 
+    /// <summary>The scale: a minor tick every half second, coarsening to a second then five as the
+    /// track lengthens; a labelled major one every ten.</summary>
+    private static readonly int[] MinorTickSteps = { 500, 1000, 5000 };
+    private const int MajorTickMs = 10_000;
+    /// <summary>The fewest pixels between minor ticks: the finest step that keeps them this far
+    /// apart is drawn, and none if even five seconds would be a smear.</summary>
+    internal const int MinTickGap = 3;
+    private const int LabelGap = 4;
+    private readonly Font _labelFont;
+
     private Length? _length;
     private FadeMarks _marks = FadeMarks.None;
     private static readonly Color MarkColour = Color.FromArgb(220, 20, 20);
     private static readonly Color FadeShade = Color.FromArgb(200, 200, 200);
+    /// <summary>The time scale, kept lighter than the groove so it reads as a guide.</summary>
+    private static readonly Color MinorTickColour = Color.FromArgb(195, 195, 195);
+    private static readonly Color MajorTickColour = Color.FromArgb(150, 150, 150);
+    private static readonly Color LabelColour = Color.FromArgb(125, 125, 125);
     private bool _dragging;
     private bool _stepping;
 
@@ -38,6 +55,16 @@ internal sealed class SeekBar : Control
         AccessibleName = "Seek";
         Text = "Seek"; // the window text is what UI Automation names it by; it is never drawn
         Enabled = false;
+        _labelFont = new Font(Font.FontFamily, 6.5f);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _labelFont.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     /// <summary>A seek the user asked for: once per click, drag or run of arrow keys.</summary>
@@ -186,6 +213,48 @@ internal sealed class SeekBar : Control
         g.FillPolygon(shade, wedge);
     }
 
+    /// <summary>The time scale along the groove: minor ticks hang below it, major ticks cross it
+    /// with their m:ss label centred above.</summary>
+    private void DrawScale(Graphics g, int mid)
+    {
+        var length = _length!.Value.Milliseconds;
+        var travel = Width - 2 * Inset;
+        if (length <= 0 || travel <= 0)
+        {
+            return;
+        }
+        var step = MinorTickSteps.FirstOrDefault(ms => travel * (double)ms / length >= MinTickGap);
+        if (step == 0)
+        {
+            step = MajorTickMs;
+        }
+        var below = mid + TrackHeight / 2 + 1;
+        var above = mid - TrackHeight / 2 - 2;
+        var labelRight = int.MinValue;
+        using var minor = new Pen(MinorTickColour);
+        using var major = new Pen(MajorTickColour);
+        for (var ms = 0; ms <= length; ms += step)
+        {
+            var x = XOf(Playhead.FromMilliseconds(ms));
+            if (ms % MajorTickMs != 0)
+            {
+                g.DrawLine(minor, x, below, x, below + 2);
+                continue;
+            }
+            g.DrawLine(major, x, above, x, below + 5);
+            var label = Presenter.Fmt(TimeSpan.FromMilliseconds(ms));
+            var size = TextRenderer.MeasureText(g, label, _labelFont, Size.Empty, TextFormatFlags.NoPadding);
+            var left = Math.Max(0, Math.Min(Width - size.Width, x - size.Width / 2));
+            if (left < labelRight + LabelGap)
+            {
+                continue;
+            }
+            TextRenderer.DrawText(g, label, _labelFont, new System.Drawing.Point(left, above - size.Height),
+                LabelColour, TextFormatFlags.NoPadding);
+            labelRight = left + size.Width;
+        }
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
@@ -205,6 +274,7 @@ internal sealed class SeekBar : Control
         {
             return;
         }
+        DrawScale(g, mid);
         var x = XOf(Playhead);
         using (var played = new SolidBrush(SystemColors.Highlight))
         {
