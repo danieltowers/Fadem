@@ -273,6 +273,25 @@ public sealed class SeekBarTests
     }
 
     [Fact]
+    public void EachMark_HasARoundHandleAtItsFoot()
+    {
+        var bar = Faded();
+        using var picture = new Bitmap(bar.Width, bar.Height);
+        bar.DrawToBitmap(picture, new Rectangle(0, 0, bar.Width, bar.Height));
+        bool RedAt(int x, int y)
+        {
+            var pixel = picture.GetPixel(x, y);
+            return pixel.R > 180 && pixel.G < 80 && pixel.B < 80;
+        }
+        foreach (var at in new[] { 0.5, 1.5, 3.5, 4.5 })
+        {
+            var x = X(bar, at);
+            Assert.True(RedAt(x + 1, bar.Height - 4), $"no handle at {at} s"); // wider than the line
+            Assert.False(RedAt(x + 1, Top), $"the line at {at} s is as wide as the handle");
+        }
+    }
+
+    [Fact]
     public void APressNearAMark_DragsIt_AndRaisesTheMarkOnRelease_WithTheDrop()
     {
         var bar = Faded();
