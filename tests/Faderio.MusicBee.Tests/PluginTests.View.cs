@@ -212,6 +212,29 @@ public sealed partial class PluginTests
     });
 
     [Fact]
+    public void ADragOnTheSeekBarsFadeOutStartMark_MovesTheAttendedRowsFade() => RunSta(() =>
+    {
+        var (a, b) = AuthorLibrary(); // a fades out at 1.5 s for 1 s
+        ChooseLibrary(LibraryFolder);
+        Start();
+        Launched();
+        using var panel = new Panel { Size = new Size(900, 500) };
+        _plugin.OnDockablePanelCreated(panel);
+        var view = View(panel);
+        Click(view._playPause);
+        _output.Advance(4410);
+        view.Render();
+        int X(double seconds) => SeekBar.Inset + (int)Math.Round(seconds / 4 * (view._seek.Width - 2 * SeekBar.Inset));
+
+        Raise(view._seek, "OnMouseDown", new MouseEventArgs(MouseButtons.Left, 1, X(1.5), 1, 0));
+        Raise(view._seek, "OnMouseUp", new MouseEventArgs(MouseButtons.Left, 1, X(1), 1, 0));
+
+        var stored = _plugin.Host!.Engine.Transition(new Adjacency(TrackOf(a), TrackOf(b))).Global!;
+        Assert.InRange(stored.FadeOutPoint!.Position.TotalSeconds, 0.95, 1.05);
+        Assert.InRange((stored.FadeOutPoint.Position + stored.FadeOutDuration!.Value).TotalSeconds, 2.499, 2.501);
+    });
+
+    [Fact]
     public void ANotice_ShowsInTheStrip_WhileAViewIsAttached_AndIsABoxWithoutOne() => RunSta(() =>
     {
         AuthorLibrary();

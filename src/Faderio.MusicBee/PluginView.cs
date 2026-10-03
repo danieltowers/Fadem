@@ -318,6 +318,21 @@ internal sealed class PluginView : UserControl
         _repeat.Click += (_, _) => _engine.SetRepeat(Presenter.NextRepeat(_engine.View.Repeat));
         _syncEditor.Click += (_, _) => _engine.SetEditorFollowsPlayback(!_engine.View.Settings.EditorFollowsPlayback);
         _seek.SeekRequested += SeekTo;
+        // A mark or wedge dragged on the seek bar (phase 6 issue 11): the attended row's fade.
+        _seek.FadeMarkMoved += (mark, to) =>
+        {
+            if (_engine.View.Attended is { } attended)
+            {
+                _engine.MoveFadeMark(attended.Row.Id, mark, to);
+            }
+        };
+        _seek.FadeMoved += (side, from, to) =>
+        {
+            if (_engine.View.Attended is { } attended)
+            {
+                _engine.MoveFade(attended.Row.Id, side, from, to);
+            }
+        };
         _back5.Click += (_, _) => _engine.SeekBy(TimeSpan.FromSeconds(-5));
         _forward5.Click += (_, _) => _engine.SeekBy(TimeSpan.FromSeconds(5));
 

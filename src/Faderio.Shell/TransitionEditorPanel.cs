@@ -77,6 +77,9 @@ internal sealed class TransitionEditorPanel : Panel
     /// <summary>A box was typed in since the last save: leaving it, or Enter, saves.</summary>
     private bool _pending;
 
+    /// <summary>The <see cref="PlayerView.StoreVersion"/> the fields were last loaded at.</summary>
+    private long _loadedStore;
+
     private readonly ToolTip _historyTips = new();
 
     /// <summary>The attended row the editor last followed playback to, held as the queue's
@@ -575,12 +578,13 @@ internal sealed class TransitionEditorPanel : Panel
         }
     }
 
-    /// <summary>Loads the fields from the store: opening an adjacency, Undo and Redo. A stored
-    /// point loads exactly, so a draft nobody touched is the transition stored. In playlist mode
-    /// the fields hold the override, and the global values are their placeholders.</summary>
+    /// <summary>Loads the fields from the store: opening an adjacency, Undo and Redo, and a render
+    /// after anyone else wrote the store. A stored point loads exactly, so a draft nobody touched
+    /// is the transition stored. In playlist mode the fields hold the override, and the global values are their placeholders.</summary>
     private void Load(Adjacency adjacency)
     {
         _adjacency = adjacency;
+        _loadedStore = _engine.View.StoreVersion;
         _title.Text = adjacency.Name;
         ShowLayer();
         var layers = _engine.Transition(adjacency);
@@ -669,12 +673,18 @@ internal sealed class TransitionEditorPanel : Panel
         ShowLight();
     }
 
-    /// <summary>Called on every render: the editor following playback, each capture button live
+    /// <summary>Called on every render: the editor following playback, the fields loaded again
+    /// once the store has moved, unless a box is being typed in (phase 6 issue 11: a drag on the
+    /// seek bar saves the transition shown here), each capture button live
     /// only while its own track is heard, as the engine says, the traffic light, and the preview's
     /// buttons and line, which follow the preview.</summary>
     public void Refresh(PlayerView view)
     {
         Follow(view);
+        if (view.StoreVersion != _loadedStore && _adjacency is { } adjacency && !_pending)
+        {
+            Load(adjacency);
+        }
         var choice = PlaylistChoice(view.OpenPlaylist);
         if (_editPlaylist.Text != choice)
         {

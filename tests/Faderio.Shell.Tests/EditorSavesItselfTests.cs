@@ -146,6 +146,34 @@ public sealed class EditorSavesItselfTests
         Assert.False(editor._undo.Enabled); // nothing changed yet
     });
 
+    [Fact]
+    public void AnotherCallersSave_ShowsInTheEditor_OnTheNextRender() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        var (editor, ab) = Editing(tc);
+        editor.Refresh(tc.View);
+
+        tc.Engine.Author(ab, new TransitionSpec { FadeOutDuration = TimeSpan.FromSeconds(2) }); // a drag on the seek bar
+        editor.Refresh(tc.View);
+
+        Assert.Equal("2", editor._fadeOutDuration.Text);
+        Assert.False(editor.HasUnsavedEdits);
+    });
+
+    [Fact]
+    public void ABoxBeingTypedIn_IsKept_WhenAnotherCallerSaves() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        var (editor, ab) = Editing(tc);
+        editor.Refresh(tc.View);
+
+        editor._fadeInDuration.Text = "0.7";
+        tc.Engine.Author(ab, new TransitionSpec { FadeOutDuration = TimeSpan.FromSeconds(2) });
+        editor.Refresh(tc.View);
+
+        Assert.Equal("0.7", editor._fadeInDuration.Text);
+    });
+
     private static (TransitionEditorPanel Editor, Adjacency AB) Editing(TestEngine tc, Action<string>? notice = null)
     {
         var a = tc.TrackOfLength(Path.Combine(tc.TempDir, "a.wav"), 30);

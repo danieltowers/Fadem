@@ -235,4 +235,158 @@ public sealed class SeekBarTests
         bar.Show(Playhead.Zero, FiveSeconds);
         Assert.True(bar.Enabled);
     }
+
+    // ── Dragging the fades (phase 6 issue 11) ────────────────────────────────────────────
+
+    /// <summary>Marks at 0.5, 1.5, 3.5 and 4.5 s of the 5 s track: a fade-in, then a fade-out.</summary>
+    private static SeekBar Faded()
+    {
+        var bar = Bar();
+        bar.Show(Playhead.FromMilliseconds(1000), FiveSeconds,
+            new FadeMarks(Faderio.Core.Domain.Point.FromSeconds(0.5), Faderio.Core.Domain.Point.FromSeconds(1.5),
+                Faderio.Core.Domain.Point.FromSeconds(3.5), Faderio.Core.Domain.Point.FromSeconds(4.5)));
+        return bar;
+    }
+
+    private static int X(SeekBar bar, double seconds) =>
+        SeekBar.Inset + (int)Math.Round(seconds / 5 * (bar.Width - 2 * SeekBar.Inset));
+
+    /// <summary>Above the middle band (the groove and the thumb, 6–24 of 30) and below it.</summary>
+    private const int Top = 3, Bottom = 27;
+
+    private static MouseEventArgs At(int x, int y) => new(MouseButtons.Left, 1, x, y, 0);
+
+    private sealed class Raised
+    {
+        public List<Playhead> Seeks { get; } = new();
+        public List<(FadeMark Mark, Playhead To)> Marks { get; } = new();
+        public List<(FadeSide Side, Playhead From, Playhead To)> Fades { get; } = new();
+
+        public Raised(SeekBar bar)
+        {
+            bar.SeekRequested += Seeks.Add;
+            bar.FadeMarkMoved += (mark, to) => Marks.Add((mark, to));
+            bar.FadeMoved += (side, from, to) => Fades.Add((side, from, to));
+        }
+
+        public bool None => Seeks.Count == 0 && Marks.Count == 0 && Fades.Count == 0;
+    }
+
+    [Fact]
+    public void APressNearAMark_DragsIt_AndRaisesTheMarkOnRelease_WithTheDrop()
+    {
+        var bar = Faded();
+        var raised = new Raised(bar);
+
+        Raise(bar, "OnMouseDown", At(X(bar, 3.5) + 2, Top));
+        Raise(bar, "OnMouseMove", At(X(bar, 3.0) + 2, Top));
+        Assert.True(raised.None); // nothing before release
+
+        Raise(bar, "OnMouseUp", At(X(bar, 3.0) + 2, Top));
+        var (mark, to) = Assert.Single(raised.Marks);
+        Assert.Equal(FadeMark.FadeOutStart, mark);
+        Near(3000, to.Milliseconds); // where the mark was dropped, not where the mouse was
+        Assert.Empty(raised.Seeks);
+        Assert.Empty(raised.Fades);
+        Assert.Equal(1000, bar.Playhead.Milliseconds); // the thumb never moved
+    }
+
+    [Fact]
+    public void EachMark_IsFoundByItsOwnPlace()
+    {
+        var bar = Faded();
+        var raised = new Raised(bar);
+        foreach (var at in new[] { 0.5, 1.5, 3.5, 4.5 })
+        {
+            Raise(bar, "OnMouseDown", At(X(bar, at), Bottom));
+            Raise(bar, "OnMouseUp", At(X(bar, at) - 10, Bottom));
+        }
+        Assert.Equal(new[] { FadeMark.FadeInStart, FadeMark.FadeInEnd, FadeMark.FadeOutStart, FadeMark.FadeOutEnd },
+            raised.Marks.Select(m => m.Mark));
+    }
+
+    [Fact]
+    public void APressInAWedge_OutsideTheBand_SlidesTheFade_WithGrabAndDrop()
+    {
+        var bar = Faded();
+        var raised = new Raised(bar);
+
+        Raise(bar, "OnMouseDown", At(X(bar, 4.0), Bottom));
+        Raise(bar, "OnMouseMove", At(X(bar, 3.0), Bottom));
+        Assert.True(raised.None);
+        Raise(bar, "OnMouseUp", At(X(bar, 3.0), Bottom));
+
+        var (side, from, to) = Assert.Single(raised.Fades);
+        Assert.Equal(FadeSide.FadeOut, side);
+        Near(4000, from.Milliseconds);
+        Near(3000, to.Milliseconds);
+        Assert.Empty(raised.Seeks);
+        Assert.Empty(raised.Marks);
+    }
+
+    [Fact]
+    public void APressInTheMiddleBand_Seeks_EvenOnAMarkOrAWedge()
+    {
+        var bar = Faded();
+        var raised = new Raised(bar);
+
+        Raise(bar, "OnMouseDown", At(X(bar, 3.5), 15));
+        Raise(bar, "OnMouseUp", At(X(bar, 3.5), 15));
+        Raise(bar, "OnMouseDown", At(X(bar, 1.0), 22));
+        Raise(bar, "OnMouseUp", At(X(bar, 1.0), 22));
+
+        Assert.Equal(2, raised.Seeks.Count);
+        Near(3500, raised.Seeks[0].Milliseconds);
+        Assert.Empty(raised.Marks);
+        Assert.Empty(raised.Fades);
+    }
+
+    [Fact]
+    public void AClickOnAMark_ThatDoesNotMove_RaisesNothing()
+    {
+        var bar = Faded();
+        var raised = new Raised(bar);
+
+        Raise(bar, "OnMouseDown", At(X(bar, 1.5), Top));
+        Raise(bar, "OnMouseUp", At(X(bar, 1.5), Top));
+
+        Assert.True(raised.None);
+    }
+
+    [Fact]
+    public void TheCursor_IsSizeWEOverAMark_MoveOverAWedge_AndPlainElsewhere()
+    {
+        var bar = Faded();
+
+        Raise(bar, "OnMouseMove", new MouseEventArgs(MouseButtons.None, 0, X(bar, 4.5) - 3, Top, 0));
+        Assert.Equal(Cursors.SizeWE, bar.Cursor);
+        Raise(bar, "OnMouseMove", new MouseEventArgs(MouseButtons.None, 0, X(bar, 1.0), Bottom, 0));
+        Assert.Equal(Cursors.SizeAll, bar.Cursor);
+        Raise(bar, "OnMouseMove", new MouseEventArgs(MouseButtons.None, 0, X(bar, 4.5), 15, 0));
+        Assert.Equal(Cursors.Default, bar.Cursor);
+        Raise(bar, "OnMouseMove", new MouseEventArgs(MouseButtons.None, 0, X(bar, 2.5), Top, 0));
+        Assert.Equal(Cursors.Default, bar.Cursor);
+    }
+
+    [Fact]
+    public void WhileDragged_TheMarkIsDrawnUnderTheMouse_AndOnReleaseWhereTheViewPutsIt()
+    {
+        var bar = Faded();
+        bool RedAt(double seconds)
+        {
+            using var picture = new Bitmap(bar.Width, bar.Height);
+            bar.DrawToBitmap(picture, new Rectangle(0, 0, bar.Width, bar.Height));
+            var pixel = picture.GetPixel(X(bar, seconds), Top);
+            return pixel.R > 180 && pixel.G < 80 && pixel.B < 80;
+        }
+
+        Raise(bar, "OnMouseDown", At(X(bar, 4.5), Top));
+        Raise(bar, "OnMouseMove", At(X(bar, 4.0), Top));
+        Assert.True(RedAt(4.0));
+        Assert.False(RedAt(4.5));
+
+        Raise(bar, "OnMouseUp", At(X(bar, 4.0), Top));
+        Assert.True(RedAt(4.5)); // forgotten: the view's marks until the next render says otherwise
+        Assert.False(RedAt(4.0));
+    }
 }

@@ -1293,6 +1293,33 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
+    public void ADragOnTheSeekBarsFadeOutStartMark_MovesTheAttendedRowsFade() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 8, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 8, 0.2);
+        h.Form.AddPaths(new[] { a, b });
+        h.Store.Upsert(a, b, new TransitionSpec
+        {
+            FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(6), FromEnd: false),
+            FadeOutDuration = TimeSpan.FromSeconds(1),
+        });
+        h.Form.PlayRowAt(0);
+        h.Output.Advance(44100);
+        h.Form.Render();
+        var onMouseDown = typeof(Control).GetMethod("OnMouseDown", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var onMouseUp = typeof(Control).GetMethod("OnMouseUp", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        int X(double seconds) => SeekBar.Inset + (int)Math.Round(seconds / 8 * (h.Form._seek.Width - 2 * SeekBar.Inset));
+
+        onMouseDown.Invoke(h.Form._seek, new object[] { new MouseEventArgs(MouseButtons.Left, 1, X(6), 1, 0) });
+        onMouseUp.Invoke(h.Form._seek, new object[] { new MouseEventArgs(MouseButtons.Left, 1, X(5), 1, 0) });
+
+        var stored = h.Store.Get(a, b)!;
+        Assert.InRange(stored.FadeOutPoint!.Position.TotalSeconds, 4.95, 5.05);
+        Assert.InRange((stored.FadeOutPoint.Position + stored.FadeOutDuration!.Value).TotalSeconds, 6.999, 7.001);
+    });
+
+    [Fact]
     public void TheJumpButtons_MoveFiveSecondsEachWay_AndFollowTheSeekBarsEnabledState() => RunSta(() =>
     {
         using var h = new Harness();

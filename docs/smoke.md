@@ -77,6 +77,14 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       three-quarters of the length, playing or paused. Dragging the thumb moves it without
       moving the sound; letting go seeks there. At launch the bar is a plain grey groove with no
       thumb, and clicking it does nothing.
+- [ ] **Dragging the fades** (phase 6 issue 11). Playing a row with an authored fade-out (and a
+      fade-in from the row before), the editor open on its this → next: the cursor over a red
+      mark, above or below the groove, is ↔; over a grey wedge there it is the move cursor; on
+      the groove it stays the arrow. Dragging the fade-out's start mark left, the mark and its
+      wedge follow the mouse and the thumb stays put; on release the strip says "Saved …", the
+      wedge ends where it ended before, and the editor's fade-out point and duration show the
+      new values at once. Dragging the wedge right slides it whole; the editor's point moves,
+      the duration does not. A click on the groove under a mark still seeks.
 - [ ] **+5 s** twice moves the readout on ten seconds and **−5 s** back five, playing or paused;
       near the start −5 s stops at 0:00. Both are greyed out at launch, with the seek bar.
 - [ ] The time readout shows elapsed and remaining, and remaining never reads `0:00` mid-track.
@@ -296,6 +304,8 @@ sharp percussive transient; the realism check is the authored boundary from the 
 - [ ] With the hit's track playing, capture at a drum hit; play the boundary; the fade **starts
       on the hit**, not after it.
 - [ ] Seek back a few seconds and listen again; the point still lands on the hit.
+- [ ] Mid-song, drag the coming fade-out's start mark on the seek bar a few seconds earlier: the
+      transition begins where it was dropped.
 - [ ] Tick **From end**, capture the fade-out point on a drum hit (it saves). Play through into
       the next track; the fade starts on the hit.
 - [ ] During the crossfade, the time readout keeps following the outgoing track until it
@@ -431,6 +441,11 @@ which a background run cannot give.
       at the start, row 1 at rest.
 - [ ] **⏭** moves to row 2 from its start; **+5 s** and **−5 s** jump; a click in the middle
       of the seek bar lands at half the track; **⏮** past 3 s restarts the track.
+- [ ] **Dragging the fades** (phase 6 issue 11). With row 1 playing into an authored row 2 and the
+      editor open on it: the cursor is ↔ over a red mark above or below the groove and the move
+      cursor over a grey wedge there. A mark dragged follows the mouse, and on release the strip
+      says "Saved …" and the editor shows the new point and duration; a wedge dragged slides
+      whole, the editor's duration unchanged.
 - [ ] A double-click on a row plays that row from its start.
 - [ ] A click on another playlist opens it: it goes bold, the queue shows its rows.
 - [ ] A notice shows in the strip, not in a box: with faderio playing shared, an exclusive

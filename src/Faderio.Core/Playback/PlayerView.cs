@@ -208,6 +208,31 @@ public enum CaptureSide
     FadeIn,
 }
 
+/// <summary>One of the four <see cref="FadeMarks"/>, as the seek bar drags it (phase 6 issue 11):
+/// a start moves its fade's point and keeps its end, an end changes its fade's duration.</summary>
+public enum FadeMark
+{
+    FadeInStart,
+    FadeInEnd,
+    FadeOutStart,
+    FadeOutEnd,
+}
+
+public static class FadeMarkExtensions
+{
+    /// <summary>The fade <paramref name="mark"/> is an end of.</summary>
+    public static FadeSide Side(this FadeMark mark) =>
+        mark is FadeMark.FadeInStart or FadeMark.FadeInEnd ? FadeSide.FadeIn : FadeSide.FadeOut;
+}
+
+/// <summary>One of a row's two fades, as the seek bar slides its wedge (phase 6 issue 11): the
+/// fade-in from the row before, or the fade-out into the row after.</summary>
+public enum FadeSide
+{
+    FadeIn,
+    FadeOut,
+}
+
 /// <summary>Which of an adjacency's tracks the listener has in hand (phase 6 issue 07): the
 /// editor's traffic light. <see cref="Outgoing"/> while its outgoing track is heard, whether or
 /// not its incoming one is too; <see cref="Incoming"/> while only its incoming track is;

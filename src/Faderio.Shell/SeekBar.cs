@@ -15,6 +15,11 @@ namespace Faderio.Shell;
 /// and every ten seconds a longer one through it, labelled m:ss above. Where half seconds would
 /// fall closer than <see cref="MinTickGap"/> the short ticks step a second instead, then five;
 /// a label that would overlap the one before it is left out.
+/// <para>The marks and wedges are handles (phase 6 issue 11). A press within
+/// <see cref="MarkReach"/> of a mark drags that mark; a press inside a wedge drags the whole
+/// fade; either only above or below the middle band, the groove and the thumb's height, where a
+/// press always seeks. The dragged mark or wedge follows the mouse, held only while the button is
+/// down, and is raised once, on release, as playheads.</para>
 /// </summary>
 internal sealed class SeekBar : Control
 {
@@ -47,6 +52,22 @@ internal sealed class SeekBar : Control
     private bool _dragging;
     private bool _stepping;
 
+    /// <summary>How near a mark, in pixels either way, a press takes hold of it.</summary>
+    internal const int MarkReach = 4;
+
+    /// <summary>A mark or a wedge held since the press: the mark, or the fade the wedge shows,
+    /// and where the mouse pressed and now is. Null except while one is held.</summary>
+    private Hold? _hold;
+
+    private sealed class Hold
+    {
+        public FadeMark? Mark { get; init; }
+        public FadeSide Side { get; init; }
+        public int PressX { get; init; }
+        public int MouseX { get; set; }
+        public int Dx => MouseX - PressX;
+    }
+
     public SeekBar()
     {
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
@@ -70,6 +91,13 @@ internal sealed class SeekBar : Control
     /// <summary>A seek the user asked for: once per click, drag or run of arrow keys.</summary>
     public event Action<Playhead>? SeekRequested;
 
+    /// <summary>A mark dragged and dropped: where the mark was dropped.</summary>
+    public event Action<FadeMark, Playhead>? FadeMarkMoved;
+
+    /// <summary>A wedge dragged: the fade taken where the mouse pressed, dropped where it was
+    /// released.</summary>
+    public event Action<FadeSide, Playhead, Playhead>? FadeMoved;
+
     /// <summary>Where the thumb stands: the view's playhead, or the mouse's while dragging.</summary>
     public Playhead Playhead { get; private set; }
 
@@ -88,6 +116,7 @@ internal sealed class SeekBar : Control
         if (length is null)
         {
             _dragging = _stepping = false;
+            _hold = null;
         }
         if (!_dragging && !_stepping && playhead != Playhead)
         {
@@ -126,6 +155,11 @@ internal sealed class SeekBar : Control
             return;
         }
         Focus();
+        if (HandleAt(e.X, e.Y) is { } hold)
+        {
+            _hold = hold;
+            return;
+        }
         _dragging = true;
         MoveThumb(PlayheadAt(e.X));
     }
@@ -133,15 +167,100 @@ internal sealed class SeekBar : Control
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
+        if (_hold is { } hold)
+        {
+            hold.MouseX = e.X;
+            Invalidate();
+            return;
+        }
         if (_dragging)
         {
             MoveThumb(PlayheadAt(e.X));
+            return;
+        }
+        var hover = Live ? HandleAt(e.X, e.Y) : null;
+        Cursor = hover is null ? Cursors.Default : hover.Mark is null ? Cursors.SizeAll : Cursors.SizeWE;
+    }
+
+    /// <summary>The handle a press at (<paramref name="x"/>, <paramref name="y"/>) takes hold of: the
+    /// nearest mark within <see cref="MarkReach"/>, else the wedge it is inside; null in the
+    /// middle band, which seeks, and away from every fade.</summary>
+    private Hold? HandleAt(int x, int y)
+    {
+        if (Math.Abs(y - Height / 2) <= ThumbHeight / 2)
+        {
+            return null;
+        }
+        var nearest = Marks()
+            .Where(m => m.X is { } at && Math.Abs(at - x) <= MarkReach)
+            .OrderBy(m => Math.Abs(m.X!.Value - x))
+            .Select(m => (FadeMark?)m.Mark)
+            .FirstOrDefault();
+        if (nearest is { } mark)
+        {
+            return new Hold { Mark = mark, Side = mark.Side(), PressX = x, MouseX = x };
+        }
+        foreach (var (side, start, end) in new[]
+        {
+            (FadeSide.FadeIn, _marks.FadeInStart, _marks.FadeInEnd),
+            (FadeSide.FadeOut, _marks.FadeOutStart, _marks.FadeOutEnd),
+        })
+        {
+            if (start is { } from && end is { } to && x >= XOf(Playhead.At(from)) && x <= XOf(Playhead.At(to)))
+            {
+                return new Hold { Side = side, PressX = x, MouseX = x };
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Each mark and where it is drawn: where the view puts it, moved with the mouse
+    /// while it, or its wedge, is held. Null where the view has none.</summary>
+    private IEnumerable<(FadeMark Mark, int? X)> Marks()
+    {
+        foreach (var (mark, point) in new[]
+        {
+            (FadeMark.FadeInStart, _marks.FadeInStart),
+            (FadeMark.FadeInEnd, _marks.FadeInEnd),
+            (FadeMark.FadeOutStart, _marks.FadeOutStart),
+            (FadeMark.FadeOutEnd, _marks.FadeOutEnd),
+        })
+        {
+            int? x = point is { } p ? XOf(Playhead.At(p)) : null;
+            if (x is not null && _hold is { } hold && (hold.Mark == mark || (hold.Mark is null && hold.Side == mark.Side())))
+            {
+                x += hold.Dx;
+            }
+            yield return (mark, x);
         }
     }
 
     protected override void OnMouseUp(MouseEventArgs e)
     {
         base.OnMouseUp(e);
+        if (_hold is { } hold && e.Button == MouseButtons.Left)
+        {
+            hold.MouseX = e.X;
+            var dropX = hold.Mark is { } held ? Marks().First(m => m.Mark == held).X : null;
+            _hold = null;
+            Invalidate();
+            if (hold.Dx == 0)
+            {
+                return;
+            }
+            if (hold.Mark is { } mark)
+            {
+                if (dropX is { } x)
+                {
+                    FadeMarkMoved?.Invoke(mark, PlayheadAt(x));
+                }
+            }
+            else
+            {
+                FadeMoved?.Invoke(hold.Side, PlayheadAt(hold.PressX), PlayheadAt(hold.MouseX));
+            }
+            return;
+        }
         if (!_dragging || e.Button != MouseButtons.Left)
         {
             return;
@@ -194,14 +313,9 @@ internal sealed class SeekBar : Control
 
     /// <summary>A fade's wedge between its two marks, the full height of the bar at its loud end
     /// and nothing at its quiet one.</summary>
-    private void ShadeFade(Graphics g, Faderio.Core.Domain.Point? start, Faderio.Core.Domain.Point? end, bool rising)
+    private void ShadeFade(Graphics g, int? start, int? end, bool rising)
     {
-        if (start is not { } from || end is not { } to)
-        {
-            return;
-        }
-        var (x0, x1) = (XOf(Playhead.At(from)), XOf(Playhead.At(to)));
-        if (x1 <= x0)
+        if (start is not { } x0 || end is not { } x1 || x1 <= x0)
         {
             return;
         }
@@ -261,10 +375,11 @@ internal sealed class SeekBar : Control
         g.Clear(Parent?.BackColor ?? SystemColors.Control);
         var mid = Height / 2;
         var track = new Rectangle(Inset, mid - TrackHeight / 2, Math.Max(0, Width - 2 * Inset), TrackHeight);
-        if (Live)
+        var marks = Live ? Marks().ToDictionary(m => m.Mark, m => m.X) : null;
+        if (marks is not null)
         {
-            ShadeFade(g, _marks.FadeInStart, _marks.FadeInEnd, rising: true);
-            ShadeFade(g, _marks.FadeOutStart, _marks.FadeOutEnd, rising: false);
+            ShadeFade(g, marks[FadeMark.FadeInStart], marks[FadeMark.FadeInEnd], rising: true);
+            ShadeFade(g, marks[FadeMark.FadeOutStart], marks[FadeMark.FadeOutEnd], rising: false);
         }
         using (var groove = new SolidBrush(SystemColors.ControlDark))
         {
@@ -282,12 +397,11 @@ internal sealed class SeekBar : Control
         }
         using (var mark = new Pen(MarkColour, 2))
         {
-            foreach (var point in new[] { _marks.FadeInStart, _marks.FadeInEnd, _marks.FadeOutStart, _marks.FadeOutEnd })
+            foreach (var at in marks!.Values)
             {
-                if (point is { } p)
+                if (at is { } markX)
                 {
-                    var at = XOf(Playhead.At(p));
-                    g.DrawLine(mark, at, 0, at, Height);
+                    g.DrawLine(mark, markX, 0, markX, Height);
                 }
             }
         }
