@@ -154,6 +154,62 @@ public sealed class FadeDragTests
         Assert.Equal((10.0, 12.0), (Seconds(tc.View.Attended!.Marks.FadeOutStart), Seconds(tc.View.Attended.Marks.FadeOutEnd)));
     }
 
+    // ── The two fades never cross ───────────────────────────────────────────────────────
+
+    /// <summary>A, B, C: B fades in from 1 s to 4 s (A → B) and out from 8 s for 2 s (B → C),
+    /// with B playing.</summary>
+    private static (TestEngine Tc, string A, string B, string C) Middle(string name)
+    {
+        var tc = TestEngine.Create();
+        var a = TestAudio.WriteDcWav($"drag-{name}-a.wav", 12, 0.4);
+        var b = TestAudio.WriteDcWav($"drag-{name}-b.wav", 12, 0.1);
+        var c = TestAudio.WriteDcWav($"drag-{name}-c.wav", 12, 0.3);
+        tc.Add(a, b, c);
+        tc.Store.Upsert(a, b, Fade());
+        tc.Store.Upsert(b, c, Fade());
+        tc.Engine.PlayRow(tc.RowOf(b));
+        return (tc, a, b, c);
+    }
+
+    [Fact]
+    public void TheFadeOutStart_DraggedBeforeTheFadeInEnds_StopsWhereItEnds()
+    {
+        var (tc, _, b, c) = Middle("outbeforein");
+        using var _ = tc;
+
+        tc.Engine.MoveFadeMark(tc.RowOf(b), FadeMark.FadeOutStart, At(2));
+
+        Assert.Equal(Fade() with { FadeOutPoint = new FadePointSpec(S(4), false), FadeOutDuration = S(6) }, Stored(tc, b, c));
+    }
+
+    [Fact]
+    public void TheFadeOutWedge_DraggedBeforeTheFadeInEnds_StopsWhereItEnds()
+    {
+        var (tc, _, b, c) = Middle("outwedgebeforein");
+        using var _ = tc;
+
+        tc.Engine.MoveFade(tc.RowOf(b), FadeSide.FadeOut, At(9), At(1));
+
+        Assert.Equal(Fade() with { FadeOutPoint = new FadePointSpec(S(4), false) }, Stored(tc, b, c));
+    }
+
+    [Fact]
+    public void TheFadeIn_DraggedToEndAfterTheFadeOutStarts_StopsWhereItStarts()
+    {
+        var (tc, a, b, _) = Middle("inafterout");
+        using var _ = tc;
+
+        tc.Engine.MoveFadeMark(tc.RowOf(b), FadeMark.FadeInEnd, At(10));
+        Assert.Equal(Fade() with { FadeInDuration = S(7) }, Stored(tc, a, b));
+
+        tc.Engine.MoveFade(tc.RowOf(b), FadeSide.FadeIn, At(2), At(11));
+        Assert.Equal(Fade() with { FadeInPoint = new FadePointSpec(S(1), false), FadeInDuration = S(7) }, Stored(tc, a, b)); // already at the edge
+
+        tc.Engine.MoveFadeMark(tc.RowOf(b), FadeMark.FadeInEnd, At(5));
+        tc.Engine.MoveFade(tc.RowOf(b), FadeSide.FadeIn, At(2), At(11));
+        Assert.Equal(Fade() with { FadeInPoint = new FadePointSpec(S(4), false), FadeInDuration = S(4) }, Stored(tc, a, b));
+    }
+
     // ── From the end ─────────────────────────────────────────────────────────────────────
 
     [Fact]

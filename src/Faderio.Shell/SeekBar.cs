@@ -233,10 +233,33 @@ internal sealed class SeekBar : Control
             int? x = point is { } p ? XOf(Playhead.At(p)) : null;
             if (x is not null && _hold is { } hold && (hold.Mark == mark || (hold.Mark is null && hold.Side == mark.Side())))
             {
-                x += hold.Dx;
+                x += HeldDx(hold);
             }
             yield return (mark, x);
         }
+    }
+
+    /// <summary>How far the held mark or wedge is drawn from where the view puts it: as far as the
+    /// mouse went, but the fade-out's start stops at the fade-in's end and the fade-in's end at
+    /// the fade-out's start, as the engine stops them. Only the edge facing the other fade is
+    /// stopped; a fade-out's end or a fade-in's start moves freely.</summary>
+    private int HeldDx(Hold hold)
+    {
+        var dx = hold.Dx;
+        int? XAt(Faderio.Core.Domain.Point? point) => point is { } p ? XOf(Playhead.At(p)) : null;
+        if (XAt(_marks.FadeInEnd ?? _marks.FadeInStart) is not { } inEnd || XAt(_marks.FadeOutStart) is not { } outStart)
+        {
+            return dx;
+        }
+        if (hold.Mark is null or FadeMark.FadeOutStart && hold.Side == FadeSide.FadeOut)
+        {
+            return Math.Max(dx, inEnd - outStart);
+        }
+        if (hold.Mark is null or FadeMark.FadeInEnd && hold.Side == FadeSide.FadeIn)
+        {
+            return Math.Min(dx, outStart - inEnd);
+        }
+        return dx;
     }
 
     protected override void OnMouseUp(MouseEventArgs e)
@@ -248,7 +271,8 @@ internal sealed class SeekBar : Control
             var dropX = hold.Mark is { } held ? Marks().First(m => m.Mark == held).X : null;
             _hold = null;
             Invalidate();
-            if (hold.Dx == 0)
+            var dx = HeldDx(hold);
+            if (dx == 0)
             {
                 return;
             }
@@ -261,7 +285,7 @@ internal sealed class SeekBar : Control
             }
             else
             {
-                FadeMoved?.Invoke(hold.Side, PlayheadAt(hold.PressX), PlayheadAt(hold.MouseX));
+                FadeMoved?.Invoke(hold.Side, PlayheadAt(hold.PressX), PlayheadAt(hold.PressX + dx));
             }
             return;
         }

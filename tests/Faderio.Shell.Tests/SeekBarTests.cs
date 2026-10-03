@@ -329,6 +329,24 @@ public sealed class SeekBarTests
     }
 
     [Fact]
+    public void TheFadeOut_StopsWhereTheFadeInEnds_AndTheFadeInWhereTheFadeOutStarts()
+    {
+        var bar = Faded(); // in 0.5–1.5 s, out 3.5–4.5 s
+        var raised = new Raised(bar);
+
+        Raise(bar, "OnMouseDown", At(X(bar, 3.5), Top));
+        Raise(bar, "OnMouseUp", At(X(bar, 0.2), Top));
+        Raise(bar, "OnMouseDown", At(X(bar, 4.0), Bottom));
+        Raise(bar, "OnMouseUp", At(X(bar, 0.2), Bottom));
+        Raise(bar, "OnMouseDown", At(X(bar, 1.5), Top));
+        Raise(bar, "OnMouseUp", At(X(bar, 4.8), Top));
+
+        Near(1500, raised.Marks[0].To.Milliseconds); // the fade-out's start, at the fade-in's end
+        Near(4000 - 2000, raised.Fades[0].To.Milliseconds); // its wedge moved 2 s, as far as it could
+        Near(3500, raised.Marks[1].To.Milliseconds); // the fade-in's end, at the fade-out's start
+    }
+
+    [Fact]
     public void APressInAWedge_OutsideTheBand_SlidesTheFade_WithGrabAndDrop()
     {
         var bar = Faded();
