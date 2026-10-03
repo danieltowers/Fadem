@@ -229,10 +229,16 @@ public sealed partial class PluginTests : IDisposable
 
     /// <summary>Waits for <paramref name="folder"/>'s open playlist to load in
     /// <paramref name="plugin"/>.</summary>
-    private static PlayerView Launched(Plugin plugin, string folder) => Eventually(
-        () => plugin.Host!.Engine.View,
-        view => view.Library?.Path == folder && view.Adding is null && view.Queue.Count > 0,
-        "The open playlist never loaded.");
+    private static PlayerView Launched(Plugin plugin, string folder)
+    {
+        var view = Eventually(
+            () => plugin.Host!.Engine.View,
+            view => view.Library?.Path == folder && view.Adding is null && view.Queue.Count > 0,
+            "The open playlist never loaded.");
+        // The fake clock outruns any background: the next track opens inline (phase 6 issue 10).
+        TestEngine.PrepareInline(plugin.Host!.Engine);
+        return view;
+    }
 
     /// <summary>Polls <paramref name="read"/> until <paramref name="ready"/>, within
     /// <see cref="Patience"/>: the engine's loads and adds run in the background.</summary>

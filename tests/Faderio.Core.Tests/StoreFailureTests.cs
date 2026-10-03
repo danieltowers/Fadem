@@ -56,7 +56,7 @@ public sealed class StoreFailureTests
     {
         var sink = new RecordingSink();
         var output = new FakeAudioOutput();
-        var engine = new PlaybackEngine(output, store, sink) { StartAddWorker = work => work() };
+        var engine = new PlaybackEngine(output, store, sink) { StartAddWorker = work => work(), StartPrepareWorker = work => work() };
         return (engine, sink, output);
     }
 

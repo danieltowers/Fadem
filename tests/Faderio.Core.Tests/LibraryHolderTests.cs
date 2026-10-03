@@ -41,7 +41,7 @@ public sealed class LibraryHolderTests : IDisposable
     {
         var sink = new RecordingSink();
         var output = new FakeAudioOutput();
-        var engine = new PlaybackEngine(output, Library.Open(folder), sink, host: host) { StartAddWorker = work => work() };
+        var engine = new PlaybackEngine(output, Library.Open(folder), sink, host: host) { StartAddWorker = work => work(), StartPrepareWorker = work => work() };
         return (engine, sink, output);
     }
 

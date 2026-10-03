@@ -35,7 +35,7 @@ public sealed class SwitchingLibrariesTests : IDisposable
     {
         var sink = new RecordingSink();
         var output = new FakeAudioOutput();
-        var engine = new PlaybackEngine(output, library, sink, machine: machine) { StartAddWorker = work => work() };
+        var engine = new PlaybackEngine(output, library, sink, machine: machine) { StartAddWorker = work => work(), StartPrepareWorker = work => work() };
         return (engine, sink, output);
     }
 

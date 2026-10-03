@@ -142,6 +142,7 @@ public sealed class ClipLightTests
             output, new Faderio.Core.Transitions.JsonTransitionStore(Path.Combine(dir, "t.json")), new RecordingSink())
         {
             StartAddWorker = work => work(),
+            StartPrepareWorker = work => work(),
         };
         var step = TestAudio.WriteWav("step.wav", 3, f => f < Second ? 0.0 : 0.95);
         engine.Add(new[] { step }).Wait();

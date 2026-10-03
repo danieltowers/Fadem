@@ -45,6 +45,7 @@ public sealed class PostingSinkTests : IDisposable
         new(new FakeAudioOutput(), new JsonTransitionStore(Path.Combine(_tempDir, "transitions.json")), sink)
         {
             StartAddWorker = work => work(),
+            StartPrepareWorker = work => work(),
         };
 
     [Fact]

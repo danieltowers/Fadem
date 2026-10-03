@@ -52,6 +52,7 @@ public sealed partial class HeadlessFormTests
             Engine = new PlaybackEngine(Output, Library, sink, machine: new MachineSettingsStore(MachinePath))
             {
                 StartAddWorker = work => work(),
+                StartPrepareWorker = work => work(),
             };
             Form = new MainForm(Engine, sink, () => inUse, windowFile);
         }

@@ -21,7 +21,20 @@ internal interface ITrackSource : ISampleProvider, IDisposable
 /// </summary>
 internal static class TrackSources
 {
-    public static ITrackSource Open(string path)
+    /// <summary>The largest file held in memory when asked for: the compressed bytes, never the
+    /// decoded samples. Up to three are held at once, during a transition: its two tracks and the
+    /// one prepared after them. So a 32-bit process, the plugin's, shared with MusicBee
+    /// (ADR 0012), holds smaller files.</summary>
+    public static readonly long MemoryCap = (Environment.Is64BitProcess ? 256L : 64L) * 1024 * 1024;
+
+    /// <summary>Opens the file to be read from disk as it plays.</summary>
+    public static ITrackSource Open(string path) => Open(path, memoryCap: 0, CancellationToken.None);
+
+    /// <summary>Opens the file, first reading it whole into memory when it is no larger than
+    /// <paramref name="memoryCap"/>: it then plays without touching the disk again, and its file
+    /// is not held open. A larger file, or one there is no memory for, is read from disk as it
+    /// plays.</summary>
+    public static ITrackSource Open(string path, long memoryCap, CancellationToken cancelled)
     {
         if (!File.Exists(path))
         {
@@ -31,9 +44,10 @@ internal static class TrackSources
         var extension = Path.GetExtension(path).ToLowerInvariant();
         // Shared for delete: a track held open, the playing one or the next one opened when its
         // boundary was scheduled, never stops the user renaming or deleting its file.
-        var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        Stream file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
         try
         {
+            file = HeldInMemory(file, memoryCap, cancelled);
             WaveStream reader = extension switch
             {
                 ".wav" => new WaveFileReader(file),
@@ -54,6 +68,26 @@ internal static class TrackSources
             file.Dispose();
             throw;
         }
+    }
+
+    private static Stream HeldInMemory(Stream file, long memoryCap, CancellationToken cancelled)
+    {
+        if (file.Length > memoryCap)
+        {
+            return file;
+        }
+        MemoryFile memory;
+        try
+        {
+            memory = MemoryFile.ReadToEnd(file, cancelled);
+        }
+        catch (OutOfMemoryException)
+        {
+            file.Position = 0;
+            return file;
+        }
+        file.Dispose();
+        return memory;
     }
 }
 

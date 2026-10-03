@@ -26,6 +26,7 @@ public sealed class StoppingTheDeviceTests : IDisposable
             _output, new JsonTransitionStore(Path.Combine(_dir, "transitions.json")), new RecordingSink())
         {
             StartAddWorker = work => work(),
+            StartPrepareWorker = work => work(),
         };
     }
 

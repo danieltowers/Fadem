@@ -12,34 +12,53 @@ public sealed partial class PlaybackEngine
     private readonly record struct OpenedTrack(int Index, ITrackSource Source);
 
     /// <summary>A scheduled boundary: the outgoing voice's fade, or its end, and the incoming
-    /// voice's spawn. The incoming track was opened when the boundary was scheduled.</summary>
+    /// voice's spawn. The incoming track is being opened from when the boundary is scheduled
+    /// (<see cref="Prepare"/>).</summary>
     private sealed class BoundarySchedule
     {
         public required MixerVoice OutgoingVoice { get; init; }
         public required QueueEntry Incoming { get; init; }
+
+        /// <summary>The outgoing track's frames, as its source counted them: the source is gone
+        /// once the voice has ended.</summary>
+        public required long OutgoingFrames { get; init; }
+
+        /// <summary>As the boundary was scheduled: whether the rows after a failed incoming
+        /// track are tried again though marked.</summary>
+        public required bool RetryMarked { get; init; }
         public List<ScheduledEventHandle> Handles { get; } = new();
         public bool Triggered { get; set; }
 
-        /// <summary>Performs the boundary's outgoing fade + incoming spawn at the given timeline
-        /// frame; used both by the scheduled trigger event and directly when the outgoing voice
-        /// ends first: exactly at the trigger (the non-overlapping shape and the hard cut), or
-        /// before it, when its audio ended early.</summary>
-        public Action<long>? SpawnAt { get; set; }
+        /// <summary>The incoming side as authored. Null for a hard cut, and for a fade-out point
+        /// already passed: the incoming track then starts from 0:00 when the outgoing one runs
+        /// out.</summary>
+        public TransitionSpawn? Spawn { get; set; }
+
+        /// <summary>With a <see cref="Spawn"/>: the timeline frame the outgoing fade begins at,
+        /// its length and its curve.</summary>
+        public long Trigger { get; set; }
+        public long FadeFrames { get; set; }
+        public FadeCurveKind Curve { get; set; }
+
+        /// <summary>The fade-out point went by with the incoming track still being read: the
+        /// outgoing voice plays on, and the transition begins once the track is there
+        /// (<see cref="BeginLateTransition"/>).</summary>
+        public bool Late { get; set; }
     }
 
     // ── Opening tracks: the unreadable are marked and passed over ────────────────────────
 
     /// <summary>Opens the track at <paramref name="index"/>, or marks its row unreadable and says
-    /// why. The incoming track opened for the pending boundary is taken, not opened again. A
-    /// row that opens loses its mark.</summary>
+    /// why. The incoming track opened for the pending boundary is taken, not opened again; one
+    /// still being read is not waited for. A row that opens loses its mark. For a command, which
+    /// needs its track now: rendering takes only what is prepared (<see cref="TakePrepared"/>).</summary>
     private ITrackSource? TryOpen(int index, out string error)
     {
         var entry = _queue.Entries[index];
         error = "";
         ITrackSource source;
-        if (_prepared is { } prepared && prepared.Entry == entry)
+        if (TakePrepared(entry) is { } prepared)
         {
-            _prepared = null;
             source = prepared.Source;
         }
         else if (OpenTrackFile(entry.Track, out error) is { } opened)
@@ -55,14 +74,18 @@ public sealed partial class PlaybackEngine
         return source;
     }
 
-    /// <summary>The track's file opened at the engine rate, or null with why it cannot be read.</summary>
-    private ITrackSource? OpenTrackFile(Track track, out string error)
+    /// <summary>The track's file opened at the engine rate, or null with why it cannot be read.
+    /// Held in memory if no larger than <paramref name="memoryCap"/>: by default it is read from
+    /// disk as it plays. Touches nothing the lock guards, so a worker may call it.</summary>
+    private ITrackSource? OpenTrackFile(
+        Track track, out string error, long memoryCap = 0, CancellationToken cancelled = default)
     {
         error = "";
         ITrackSource source;
+        TrackFileOpening?.Invoke(track.FilePath);
         try
         {
-            source = NormalizedTrackSource.Wrap(TrackSources.Open(track.FilePath), _rate);
+            source = NormalizedTrackSource.Wrap(TrackSources.Open(track.FilePath, memoryCap, cancelled), _rate);
         }
         catch (Exception e)
         {
@@ -120,13 +143,6 @@ public sealed partial class PlaybackEngine
         }
     }
 
-    /// <summary>Closes the incoming track opened for a boundary that will not use it.</summary>
-    private void DropPrepared()
-    {
-        _prepared?.Source.Dispose();
-        _prepared = null;
-    }
-
     // ── Starting voices ──────────────────────────────────────────────────────────────────
 
     /// <summary>Makes the opened track a new voice starting at <paramref name="timelineStart"/>.
@@ -176,13 +192,26 @@ public sealed partial class PlaybackEngine
     // ── Scheduling the boundary after a voice ────────────────────────────────────────────
 
     /// <summary>Resolves and schedules the boundary after the voice's track: effective
-    /// transition → outgoing fade trigger + incoming spawn, all in mixer-frame positions. The
-    /// incoming track is opened now, not when the fade begins: if it cannot be, it is marked and
-    /// the boundary goes to the next readable row, with that adjacency's own transition, so a
-    /// fade into silence is never heard. <paramref name="retryMarked"/> when a new voice starts:
-    /// the queue has reached the rows after it again.</summary>
+    /// transition, authored fade-out trigger, incoming spawn. The reference pair anchors timeline
+    /// and source positions: (voice start, start offset) for a fresh voice, or (now, current
+    /// position) after a seek. A voice has exactly one boundary: the previous one is cancelled.
+    /// The incoming track starts being opened now, not when the fade begins: if it cannot be,
+    /// it is marked and the boundary goes to the next readable row, with that adjacency's own
+    /// transition, so a fade into silence is never heard. <paramref name="retryMarked"/> when a
+    /// new voice starts: the queue has reached the rows after it again.</summary>
     private void ScheduleBoundary(
         int index, MixerVoice voice, long referenceTimeline, long referencePosition, bool retryMarked)
+    {
+        _passedOver.Clear(); // a new search for the incoming row
+        ScheduleBoundary(
+            index, voice, referenceTimeline, referencePosition, retryMarked, _queue.IndexAfter(index, _settings.Repeat));
+    }
+
+    /// <summary><see cref="ScheduleBoundary(int, MixerVoice, long, long, bool)"/> with the
+    /// incoming row sought from <paramref name="first"/>: the row after the voice's own, or
+    /// after one that has just failed to open.</summary>
+    private void ScheduleBoundary(
+        int index, MixerVoice voice, long referenceTimeline, long referencePosition, bool retryMarked, int? first)
     {
         var total = voice.Source.TotalFrames;
         var outTrack = _queue.Entries[index].Track;
@@ -190,79 +219,74 @@ public sealed partial class PlaybackEngine
         long TimelineOf(long sourceFrame) => referenceTimeline + (sourceFrame - referencePosition);
 
         _pendingBoundary = null;
-        var opened = OpenFirstReadable(_queue.IndexAfter(index, _settings.Repeat), RowAfter, retryMarked);
-        DropPrepared();
-        if (opened is not { } next)
+        if (PrepareFirstReadable(first, retryMarked) is not { } incoming)
         {
             return; // the end of the queue: the track plays to its length, with no fade
         }
-        var incoming = _queue.Entries[next.Index];
-        _prepared = (incoming, next.Source);
-        var boundary = new BoundarySchedule { OutgoingVoice = voice, Incoming = incoming };
+        var boundary = new BoundarySchedule
+        {
+            OutgoingVoice = voice, Incoming = incoming, OutgoingFrames = total, RetryMarked = retryMarked,
+        };
         _pendingBoundary = boundary;
 
         var inTrack = incoming.Track;
         var global = _store?.Get(outTrack.FilePath, inTrack.FilePath);
         var transition = _resolver.Resolve(
             global, OverrideOf(outTrack.FilePath, inTrack.FilePath), TimeSpanOf(total), inTrack.Length.TimeSpan);
-        if (transition.IsHardCut || !TryComputeFade(referencePosition, total, transition, TimelineOf, out var trig, out var dur))
+        if (transition.IsHardCut || !TryComputeFade(referencePosition, total, transition, TimelineOf, out var trigger, out var fadeFrames))
         {
             // A hard cut, or an authored fade-out point already passed (e.g. manual seek): the
             // incoming track starts when the outgoing one runs out.
-            boundary.SpawnAt = at =>
-            {
-                if (!boundary.Triggered)
-                {
-                    boundary.Triggered = true;
-                    StartIncoming(incoming, at, null);
-                }
-            };
             return;
         }
-
-        var fadeCurve = transition.Curve;
-        var spawn = new TransitionSpawn(transition.FadeInPoint, transition.FadeInDuration, transition.Curve);
-        var outgoingVoice = voice;
-
-        void SpawnIncoming(long at)
-        {
-            if (boundary.Triggered)
-            {
-                return;
-            }
-            boundary.Triggered = true;
-            if (at < trig)
-            {
-                // The outgoing audio ended before its fade-out point: the boundary fires where
-                // it ended, as for a short file (ADR 0010), with the incoming side as authored.
-                StartIncoming(incoming, at, spawn);
-                return;
-            }
-            if (OpenIncoming(incoming) is { } opened)
-            {
-                Crossfade(outgoingVoice, trig, dur, fadeCurve, opened, spawn);
-            }
-        }
-
-        boundary.SpawnAt = SpawnIncoming;
-        boundary.Handles.Add(_mixer.Schedule(trig, () => SpawnIncoming(trig)));
+        boundary.Spawn = new TransitionSpawn(transition.FadeInPoint, transition.FadeInDuration, transition.Curve);
+        boundary.Trigger = trigger;
+        boundary.FadeFrames = fadeFrames;
+        boundary.Curve = transition.Curve;
+        boundary.Handles.Add(_mixer.Schedule(trigger, () => BeginTransition(boundary)));
     }
 
-    /// <summary>The boundary's incoming track, opened when it was scheduled. Should its file have
-    /// failed since, the next readable row takes its place. A queue change reschedules the
-    /// boundary, so the row is gone only if something forgot to.</summary>
-    private OpenedTrack? OpenIncoming(QueueEntry incoming) =>
-        _queue.IndexOf(incoming.Id) is var index and >= 0
-            ? OpenFirstReadable(index, RowAfter, retryMarked: true)
-            : null;
-
-    /// <summary>Starts the boundary's incoming track at <paramref name="at"/>, after the outgoing
-    /// voice has ended; with nothing readable to start, playback finishes once heard.</summary>
-    private void StartIncoming(QueueEntry incoming, long at, TransitionSpawn? spawn)
+    /// <summary>The boundary's fade-out point is reached: the outgoing voice fades from there and
+    /// the incoming track spawns under it. Rendering does not wait for a track still being read:
+    /// the boundary is late.</summary>
+    private void BeginTransition(BoundarySchedule boundary)
     {
-        if (OpenIncoming(incoming) is { } opened)
+        if (boundary.Triggered)
         {
-            StartTrack(opened, at, spawn);
+            return;
+        }
+        if (TakePrepared(boundary.Incoming) is not { } opened)
+        {
+            boundary.Late = true;
+            return;
+        }
+        boundary.Triggered = true;
+        Crossfade(boundary.OutgoingVoice, boundary.Trigger, boundary.FadeFrames, boundary.Curve, opened, boundary.Spawn!);
+    }
+
+    /// <summary>The outgoing voice ended at <paramref name="at"/> with its boundary yet to
+    /// trigger: at its end for a hard cut, or before its fade-out point when its audio ended
+    /// early, as for a short file (ADR 0010). The incoming track starts there, its side as
+    /// authored. With nothing to start, playback finishes once heard.</summary>
+    private void StartIncomingAt(BoundarySchedule boundary, long at)
+    {
+        boundary.Triggered = true;
+        if (TakePrepared(boundary.Incoming) is { } opened)
+        {
+            StartTrack(opened, at, boundary.Spawn);
+        }
+        else if (_prepared is { Source: null } preparing && preparing.Entry == boundary.Incoming)
+        {
+            // Still being read, and rendering does not wait: silence until it is there.
+            _awaited = new Awaited
+            {
+                Ended = boundary.OutgoingVoice,
+                EndedAt = at,
+                OutgoingFrames = boundary.OutgoingFrames,
+                RetryMarked = boundary.RetryMarked,
+                Incoming = boundary.Incoming,
+                Spawn = boundary.Spawn,
+            };
         }
     }
 
@@ -394,11 +418,23 @@ public sealed partial class PlaybackEngine
         {
             CancelBoundary(boundary);
             _pendingBoundary = null;
-            boundary.SpawnAt?.Invoke(endTimeline);
+            StartIncomingAt(boundary, endTimeline);
             if (_currentVoice is not null)
             {
                 _outgoingVoice = null; // the outgoing voice just ended; it was not cut mid-fade
                 _handoverAt = endTimeline;
+                return;
+            }
+            if (_awaited is not null)
+            {
+                // The ended voice stays current and in the view, at its length, as the last
+                // track's tail does, until the incoming track is there (StartAwaited).
+                _currentVoice = voice;
+                if (entry is not null)
+                {
+                    _voiceEntry[voice] = entry;
+                }
+                Publish();
                 return;
             }
         }
@@ -454,6 +490,7 @@ public sealed partial class PlaybackEngine
             _mixer.RemoveVoice(voice); // EndSuppressed: OnVoiceEnded only cleans up
         }
         DropPrepared();
+        _awaited = null;
         _currentVoice = null;
         _outgoingVoice = null;
         _finishAt = null;
@@ -518,6 +555,7 @@ public sealed partial class PlaybackEngine
             return;
         }
         CancelPendingBoundaryFor(incoming);
+        _awaited = null;
         _voiceEntry.Remove(incoming);
         _mixer.RemoveVoice(incoming);
         _outgoingVoice = null;
@@ -558,6 +596,7 @@ public sealed partial class PlaybackEngine
         }
         _finished = true;
         DropPrepared();
+        _awaited = null;
         _finishAt = null;
         _currentVoice = null;
         _outgoingVoice = null;
@@ -582,6 +621,7 @@ public sealed partial class PlaybackEngine
         }
         _voiceEntry.Clear();
         DropPrepared();
+        _awaited = null;
         _mixer.Reset();
         _currentVoice = null;
         _outgoingVoice = null;

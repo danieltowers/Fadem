@@ -31,7 +31,7 @@ public sealed class FadeOutEndTests
         library.Transitions!.Upsert(a, b, FadeOutAt(6, 2));
         var output = new FakeAudioOutput { SampleRate = engineRate };
         var sink = new RecordingSink();
-        using var engine = new PlaybackEngine(output, library, sink) { StartAddWorker = work => work() };
+        using var engine = new PlaybackEngine(output, library, sink) { StartAddWorker = work => work(), StartPrepareWorker = work => work() };
         engine.Add(new[] { a, b }).Wait();
 
         engine.Play();

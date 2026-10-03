@@ -373,6 +373,15 @@ public sealed partial class PlaybackEngine
     /// incoming track: cancel it and schedule again from the current voice's position.</summary>
     private void RescheduleCurrentBoundary()
     {
+        if (_awaited is { } awaited)
+        {
+            // The outgoing voice has ended and waits on its incoming track: that is what moves.
+            _passedOver.Clear();
+            AwaitFirstReadable(
+                awaited, IndexOf(awaited.Ended) is var ended and >= 0 ? _queue.IndexAfter(ended, _settings.Repeat) : null,
+                retryMarked: false);
+            return;
+        }
         if (_currentVoice is not { } voice || voice.IsFinished)
         {
             return; // nothing playing, or the last track's tail: it has no boundary to move
@@ -382,6 +391,12 @@ public sealed partial class PlaybackEngine
             if (boundary.Triggered || boundary.OutgoingVoice != voice)
             {
                 return; // in flight, or not this voice's: nothing to move
+            }
+            if (boundary.Late
+                && Candidates(_queue.IndexAfter(IndexOf(voice), _settings.Repeat), retryMarked: false).FirstOrDefault() == boundary.Incoming
+                && StaysLate(boundary))
+            {
+                return; // late, and still into the same row: it begins when that track is there
             }
             CancelBoundary(boundary);
             _pendingBoundary = null;

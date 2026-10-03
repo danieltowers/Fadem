@@ -73,7 +73,9 @@ public static class Renderer
 
         using var output = new WavFileAudioOutput(wavPath, sampleRate);
         var sink = new RecordingSink();
-        using var engine = new PlaybackEngine(output, store, sink, settings);
+        // A file is written faster than it would play: the incoming track is opened inline, or
+        // the boundary would be reached before a background open had finished.
+        using var engine = new PlaybackEngine(output, store, sink, settings) { StartPrepareWorker = work => work() };
 
         var report = engine.Add(new[] { adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath }).GetAwaiter().GetResult();
         if (report.Rejected.Count > 0)

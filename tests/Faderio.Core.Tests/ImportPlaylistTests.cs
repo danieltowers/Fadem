@@ -167,7 +167,7 @@ public sealed class ImportPlaylistTests
     public void WithNoLibrary_ImportIsRefused()
     {
         var sink = new RecordingSink();
-        using var engine = new PlaybackEngine(new FakeAudioOutput(), (Library?)null, sink) { StartAddWorker = work => work() };
+        using var engine = new PlaybackEngine(new FakeAudioOutput(), (Library?)null, sink) { StartAddWorker = work => work(), StartPrepareWorker = work => work() };
 
         engine.ImportPlaylists([Tone("nolib-a")]).Wait();
 

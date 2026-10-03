@@ -32,7 +32,7 @@ public sealed class ShuffleAndRepeatRememberedTests : IDisposable
     {
         var sink = new RecordingSink();
         var rng = rngSeed is null ? null : new Random(rngSeed.Value);
-        var engine = new PlaybackEngine(new FakeAudioOutput(), library, sink, rng) { StartAddWorker = work => work() };
+        var engine = new PlaybackEngine(new FakeAudioOutput(), library, sink, rng) { StartAddWorker = work => work(), StartPrepareWorker = work => work() };
         return (engine, sink);
     }
 

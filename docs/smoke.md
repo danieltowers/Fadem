@@ -336,6 +336,9 @@ sharp percussive transient; the realism check is the authored boundary from the 
       over 20 minutes long; it is clean throughout.
 - [ ] Add the whole `MUSIC` library (**Add folder…** on the `MUSIC` folder) while a track plays;
       the track plays on without a dropout, and adding never starts or stops playback.
+- [ ] Play a playlist whose files are on a network share, through several authored transitions
+      and a FLAC over 20 minutes long; no transition is choppy as its fade begins, and the strip
+      never says a track "was still being read" (ADR 0015).
 
 ## MusicBee — the plugin in the portable MusicBee
 

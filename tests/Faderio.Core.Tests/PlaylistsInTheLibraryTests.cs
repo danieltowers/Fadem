@@ -398,7 +398,7 @@ public sealed class PlaylistsInTheLibraryTests
     public void WithNoLibrary_PlaylistCommandsAreRefused_AndAddStillQueues()
     {
         var sink = new RecordingSink();
-        using var engine = new PlaybackEngine(new FakeAudioOutput(), (Library?)null, sink) { StartAddWorker = work => work() };
+        using var engine = new PlaybackEngine(new FakeAudioOutput(), (Library?)null, sink) { StartAddWorker = work => work(), StartPrepareWorker = work => work() };
         var a = Tone("nolib-a");
 
         engine.Add([a]).Wait();
@@ -436,6 +436,7 @@ public sealed class PlaylistsAcrossLaunchesTests : IDisposable
         var engine = new PlaybackEngine(new FakeAudioOutput(), Library.Open(folder), sink);
         engine.Launched.Wait(); // the launch's load runs on the engine's own worker
         engine.StartAddWorker = work => work();
+        engine.StartPrepareWorker = work => work();
         return (engine, sink);
     }
 

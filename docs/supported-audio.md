@@ -105,7 +105,9 @@ fixtures are two seconds long; long-file playback is not proven by the suite. Th
 longest file is about 26 minutes, and frame counts are 64-bit, so there is no arithmetic
 limit. The **Looks** half of [`docs/smoke.md`](smoke.md) checks that a 26-minute FLAC shows
 its length and seeks into its last minute. Opening that file pre-scans every FLAC frame header;
-ticket 15 measured it at about 250 ms, within the 500 ms budget.
+ticket 15 measured it at about 250 ms, within the 500 ms budget. A boundary's incoming track is
+opened by a worker, never while rendering, and held in memory
+([ADR 0015](adr/0015-rendering-never-opens-a-file.md)).
 
 ## Rejected
 

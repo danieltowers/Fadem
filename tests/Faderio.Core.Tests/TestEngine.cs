@@ -38,7 +38,8 @@ public sealed class TestEngine : IDisposable
         Store = Library.Transitions!;
         Output = new FakeAudioOutput { Latency = latency };
         Sink.OnChanged = _ => EmittedAtPublication.Add(Output.FramesEmitted.Count);
-        Engine = new PlaybackEngine(Output, Library, Sink, rng);
+        // The next track opens inline: the fake clock runs faster than any background could.
+        Engine = new PlaybackEngine(Output, Library, Sink, rng) { StartPrepareWorker = work => work() };
         if (!backgroundAdd)
         {
             Engine.StartAddWorker = work => work();
@@ -56,6 +57,11 @@ public sealed class TestEngine : IDisposable
             dir, settings, rngSeed is null ? null : new Random(rngSeed.Value), latency,
             backgroundAdd);
     }
+
+    /// <summary>Opens the next track inline in an engine a test did not build itself, as
+    /// <see cref="Create"/> does for its own: for a test outside this assembly, which cannot
+    /// reach the seam. Before the engine plays.</summary>
+    public static void PrepareInline(PlaybackEngine engine) => engine.StartPrepareWorker = work => work();
 
     public RenderedAudio Rendered => new(Output.Blocks);
 

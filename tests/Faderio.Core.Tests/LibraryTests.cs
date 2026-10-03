@@ -40,7 +40,7 @@ public sealed class LibraryTests : IDisposable
     {
         var sink = new RecordingSink();
         var output = new FakeAudioOutput();
-        var engine = new PlaybackEngine(output, library, sink) { StartAddWorker = work => work() };
+        var engine = new PlaybackEngine(output, library, sink) { StartAddWorker = work => work(), StartPrepareWorker = work => work() };
         return (engine, sink, output);
     }
 
@@ -246,7 +246,7 @@ public sealed class LibraryTests : IDisposable
     public void AnEngineWithNoLibrary_RefusesAuthoring_AndSaysSo()
     {
         var sink = new RecordingSink();
-        using var engine = new PlaybackEngine(new FakeAudioOutput(), store: null, sink) { StartAddWorker = work => work() };
+        using var engine = new PlaybackEngine(new FakeAudioOutput(), store: null, sink) { StartAddWorker = work => work(), StartPrepareWorker = work => work() };
         var adjacency = AddPair(engine, TestAudio.WriteDcWav("none-a.wav", 3, 0.4), TestAudio.WriteDcWav("none-b.wav", 3, 0.2));
 
         engine.Author(adjacency, Crossfade());

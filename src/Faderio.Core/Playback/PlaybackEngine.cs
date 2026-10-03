@@ -59,10 +59,6 @@ public sealed partial class PlaybackEngine : IDisposable
 
     private BoundarySchedule? _pendingBoundary;
 
-    /// <summary>The pending boundary's incoming track, opened when the boundary was scheduled
-    /// and taken when it starts (build issue 10).</summary>
-    private (QueueEntry Entry, ITrackSource Source)? _prepared;
-
     /// <summary>Rows whose file could not be opened the last time the queue reached them.</summary>
     private readonly HashSet<RowId> _unreadable = new();
     private bool _finished;
@@ -446,7 +442,7 @@ public sealed partial class PlaybackEngine : IDisposable
         }
         var snapshot = new Snapshot(
             _version, _queueVersion, TransportNow, _queue.Entries.ToImmutableArray(),
-            _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null, _finishAt is not null,
+            _queue.Current?.Id, attended, current, _handoverAt, _outgoingVoice is not null, _finishAt is not null || _awaited is not null,
             _settings.Shuffle, _settings.Repeat, Adding, _rate, _unreadable.ToImmutableHashSet(), _settings,
             _queueBase, _preview is null ? null : _mixer.Timeline, _previewOrigin, _preview?.Snap(), _clips.Snap())
         {
