@@ -160,29 +160,35 @@ internal sealed class PluginView : UserControl
             UseMnemonic = false,
         };
         // Two rows, so the transport fits a sidebar as well as the main panel: the buttons, then
-        // the seek bar between its jumps with the readout. A table, not anchors: the seek bar
-        // takes whatever width is left at any panel size.
+        // the seek bar with its jumps stacked after it, +5 s over −5 s, and the readout. A table,
+        // not anchors: the seek bar takes whatever width is left at any panel size.
         var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = true };
         buttons.Controls.AddRange(new Control[] { _prev, _playPause, _stop, _next, _transitionNow, _cueTransition, _shuffle, _repeat });
-        var seekRow = new TableLayoutPanel { Dock = DockStyle.Top, Height = 38, ColumnCount = 4, RowCount = 1 };
-        seekRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        var seekRow = new TableLayoutPanel { Dock = DockStyle.Top, Height = 50, ColumnCount = 3, RowCount = 1 };
         seekRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         seekRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         seekRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
-        _back5.Margin = new Padding(4, 4, 0, 4);
-        _forward5.Margin = new Padding(0, 4, 2, 4);
-        _seek.Margin = new Padding(6, 2, 6, 4);
+        _forward5.Height = _back5.Height = 23;
+        _forward5.Margin = new Padding(0, 0, 0, 1);
+        _back5.Margin = new Padding(0, 1, 0, 0);
+        var jumps = new TableLayoutPanel
+        {
+            ColumnCount = 1, RowCount = 2, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Anchor = AnchorStyles.Left, Margin = new Padding(0, 1, 2, 1),
+        };
+        jumps.Controls.Add(_forward5, 0, 0);
+        jumps.Controls.Add(_back5, 0, 1);
+        _seek.Margin = new Padding(6, 8, 6, 8);
         _seek.Dock = DockStyle.Fill;
-        seekRow.Controls.Add(_back5, 0, 0);
-        seekRow.Controls.Add(_seek, 1, 0);
-        seekRow.Controls.Add(_forward5, 2, 0);
-        // Its own height, within the row's 38 px: left to itself the table asks for 100.
-        var times = new TableLayoutPanel { Dock = DockStyle.Fill, Height = 34, ColumnCount = 1, RowCount = 2, Margin = new Padding(3, 2, 3, 2) };
+        seekRow.Controls.Add(_seek, 0, 0);
+        seekRow.Controls.Add(jumps, 1, 0);
+        // Its own height, within the row's 50 px: left to itself the table asks for 100.
+        var times = new TableLayoutPanel { Dock = DockStyle.Fill, Height = 34, ColumnCount = 1, RowCount = 2, Margin = new Padding(3, 8, 3, 8) };
         times.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
         times.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
         times.Controls.Add(_time, 0, 0);
         times.Controls.Add(_seconds, 0, 1);
-        seekRow.Controls.Add(times, 3, 0);
+        seekRow.Controls.Add(times, 2, 0);
 
         _queueList = new ListView
         {

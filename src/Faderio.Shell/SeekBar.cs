@@ -9,7 +9,7 @@ namespace Faderio.Shell;
 /// key-up. It speaks <see cref="Playhead"/> and <see cref="Length"/> at its edge: pixels never
 /// leave it. Disabled, with no thumb, while nothing is attended. Replaces a stock TrackBar,
 /// whose channel click paged by its <c>LargeChange</c> instead of jumping. Red marks, the full
-/// height of the bar with a round handle at the foot, show where the track's fades begin and end, as the engine resolves them;
+/// height of the bar with a square handle hung below, show where the track's fades begin and end, as the engine resolves them;
 /// between each pair a grey wedge drawn as the volume goes: rising for the fade-in, falling for
 /// the fade-out. A scale runs along the groove from 0: a short tick every half second below it,
 /// and every ten seconds a longer one through it, labelled m:ss above. Where half seconds would
@@ -55,8 +55,9 @@ internal sealed class SeekBar : Control
     /// <summary>How near a mark, in pixels either way, a press takes hold of it.</summary>
     internal const int MarkReach = 4;
 
-    /// <summary>The round handle at the foot of each mark.</summary>
-    private const int HandleDiameter = 5;
+    /// <summary>The square handle each mark hangs from, at the foot of the bar: the line ends
+    /// where it begins.</summary>
+    private const int HandleSize = 8;
 
     /// <summary>A mark or a wedge held since the press: the mark, or the fade the wedge shows,
     /// and where the mouse pressed and now is. Null except while one is held.</summary>
@@ -405,12 +406,10 @@ internal sealed class SeekBar : Control
             {
                 if (at is { } markX)
                 {
-                    g.DrawLine(mark, markX, 0, markX, Height);
-                    // Below the middle band, so a press on it drags the mark.
-                    var smoothing = g.SmoothingMode;
-                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                    g.FillEllipse(handle, markX - HandleDiameter / 2f, Height - 1 - HandleDiameter, HandleDiameter, HandleDiameter);
-                    g.SmoothingMode = smoothing;
+                    // Below the middle band, so a press on the handle drags the mark.
+                    var handleTop = Height - HandleSize;
+                    g.DrawLine(mark, markX, 0, markX, handleTop);
+                    g.FillRectangle(handle, markX - HandleSize / 2, handleTop, HandleSize, HandleSize);
                 }
             }
         }

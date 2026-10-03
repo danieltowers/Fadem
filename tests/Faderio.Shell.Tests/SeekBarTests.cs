@@ -273,7 +273,7 @@ public sealed class SeekBarTests
     }
 
     [Fact]
-    public void EachMark_HasARoundHandleAtItsFoot()
+    public void EachMark_HangsFromAnEightPixelSquareHandle_AtTheFootOfTheBar()
     {
         var bar = Faded();
         using var picture = new Bitmap(bar.Width, bar.Height);
@@ -286,8 +286,12 @@ public sealed class SeekBarTests
         foreach (var at in new[] { 0.5, 1.5, 3.5, 4.5 })
         {
             var x = X(bar, at);
-            Assert.True(RedAt(x + 1, bar.Height - 4), $"no handle at {at} s"); // wider than the line
-            Assert.False(RedAt(x + 1, Top), $"the line at {at} s is as wide as the handle");
+            var handle = Enumerable.Range(x - 6, 13).Where(px => RedAt(px, bar.Height - 1)).ToList();
+            Assert.Equal(8, handle.Count); // the handle's width, flush with the bottom
+            Assert.Equal(8, Enumerable.Range(0, bar.Height).Count(y => RedAt(x + 3, y))); // and its height: square
+            Assert.True(RedAt(x + 3, bar.Height - 8), $"the handle at {at} s does not reach up to the line");
+            Assert.False(RedAt(x + 3, bar.Height - 9), $"the handle at {at} s is taller than 8 px");
+            Assert.False(RedAt(x + 3, Top), $"the line at {at} s is as wide as the handle");
         }
     }
 

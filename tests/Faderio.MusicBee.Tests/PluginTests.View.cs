@@ -212,6 +212,26 @@ public sealed partial class PluginTests
     });
 
     [Fact]
+    public void TheJumps_AreStackedRightOfTheSeekBar_BackBelowForward() => RunSta(() =>
+    {
+        AuthorLibrary();
+        ChooseLibrary(LibraryFolder);
+        Start();
+        Launched();
+        using var panel = new Panel { Size = new Size(900, 500) };
+        _plugin.OnDockablePanelCreated(panel);
+        var view = View(panel);
+        view.Render();
+
+        Assert.Same(view._forward5.Parent, view._back5.Parent);
+        Assert.Equal(view._forward5.Left, view._back5.Left);
+        Assert.True(view._back5.Top >= view._forward5.Bottom, "−5 s is not below +5 s");
+        var jumps = view._back5.Parent!;
+        Assert.True(view._seek.Right <= jumps.Left, "the jumps are not right of the seek bar");
+        Assert.True(jumps.Bottom <= view._seek.Parent!.Height, "the jumps are cut off");
+    });
+
+    [Fact]
     public void ADragOnTheSeekBarsFadeOutStartMark_MovesTheAttendedRowsFade() => RunSta(() =>
     {
         var (a, b) = AuthorLibrary(); // a fades out at 1.5 s for 1 s
