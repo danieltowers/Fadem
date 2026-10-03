@@ -119,6 +119,21 @@ internal sealed class Host : IDisposable
 
     public PlaybackEngine Engine { get; }
 
+    /// <summary>Shows the settings dialog and says whether OK was pressed, for the views' ⚙;
+    /// null shows nothing.</summary>
+    internal Func<SettingsDialog, bool>? ShowSettings { get; set; }
+
+    /// <summary>The views' ⚙: the dialog Configure shows, and what its OK chose sent at once,
+    /// with no MusicBee Save to wait for.</summary>
+    public void OpenSettings()
+    {
+        if (ShowSettings is { } show)
+        {
+            Configure(show);
+            SaveSettings();
+        }
+    }
+
     /// <summary>This session's notices, as delivered: a record of messages already shown, not
     /// engine state. The views render it.</summary>
     public NoticeLog Notices { get; } = new();
@@ -139,7 +154,7 @@ internal sealed class Host : IDisposable
     /// <param name="stopMusicBeesPlayer">MusicBee's <c>Player_Stop</c>, for the view's starts.</param>
     public PluginView AttachView(Control panel, Action stopMusicBeesPlayer)
     {
-        var view = new PluginView(Engine, Notices, OnNoticed, _modeInUse, _deviceInUse, stopMusicBeesPlayer);
+        var view = new PluginView(Engine, Notices, OnNoticed, _modeInUse, _deviceInUse, stopMusicBeesPlayer, OpenSettings);
         _views.Add(view);
         view.Disposed += (_, _) => _views.Remove(view);
         panel.Controls.Add(view);

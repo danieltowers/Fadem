@@ -206,8 +206,12 @@ public partial class Plugin
 
     /// <summary>The first method to touch a Core type, compiled only once the resolver is in place.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void Start() =>
+    private void Start()
+    {
         _host = new Host(Path.Combine(_api.Setting_GetPersistentStoragePath(), "faderio"), _boxes!, _ui!, MusicBeesDevice, _outputs, _devices);
+        // The view's ⚙ shows the dialog as Configure does, read at each press so a test's stands.
+        _host.ShowSettings = dialog => ShowSettings(dialog);
+    }
 
     /// <summary>MusicBee's own output device, by the name its preferences show ("Primary Sound
     /// Driver" on DirectSound's default), or null when it cannot say (phase 5 issue 13): the

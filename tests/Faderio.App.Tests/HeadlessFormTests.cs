@@ -380,6 +380,8 @@ public sealed partial class HeadlessFormTests
         Assert.True(h.Form._seek.Enabled);
         Assert.Equal(3000, h.Form._seek.Playhead.Milliseconds);
         Assert.Equal("0:03 / -0:02", h.Form._time.Text);
+        Assert.Equal("3.0 / 5.0", h.Form._seconds.Text);
+        Assert.True(h.Form._seconds.Top >= h.Form._time.Bottom, "the seconds are not below the time"); // below it
         Assert.Equal(SystemColors.Info, h.Form._queueList.Items[1].BackColor);
         Assert.Equal(SystemColors.Window, h.Form._queueList.Items[0].BackColor);
     });
@@ -1295,7 +1297,7 @@ public sealed partial class HeadlessFormTests
         var seek = row.GetColumn(h.Form._seek);
         Assert.Equal(seek - 1, row.GetColumn(h.Form._back5));
         Assert.Equal(seek + 1, row.GetColumn(h.Form._forward5));
-        Assert.Equal(seek + 2, row.GetColumn(h.Form._time));
+        Assert.Equal(seek + 2, row.GetColumn(h.Form._time.Parent!)); // with the seconds under it
     });
 
     [Fact]

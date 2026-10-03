@@ -13,20 +13,40 @@ namespace Faderio.Shell.Tests;
 public sealed class PresenterTests
 {
     [Theory]
+    [InlineData(0, 245, "0.0 / 245.0")]
+    [InlineData(83.29, 245.06, "83.2 / 245.0")] // tenths, cut down as the m:ss readout is
+    [InlineData(183.4, 245, "183.4 / 245.0")]
+    public void SecondsReadout_IsTheProgressAndTheTotal_InSeconds(double progress, double total, string expected)
+    {
+        var track = TrackNamed("a.wav");
+        var voice = new VoiceView(new QueueRow(new RowId(1), track, IsCurrent: true),
+            Playhead.FromMilliseconds((int)Math.Round(progress * 1000)), new Length(TimeSpan.FromSeconds(total)));
+
+        Assert.Equal(expected, Presenter.SecondsReadout(voice));
+    }
+
+    [Theory]
+    [InlineData(10.0, "0:10 / -3:56")]
+    [InlineData(10.6, "0:10 / -3:56")] // the remainder alone would read -3:55 already
+    [InlineData(11.0, "0:11 / -3:55")]
+    public void TimeReadout_TheTwoTickTogether(double progress, string expected)
+    {
+        var voice = new VoiceView(new QueueRow(new RowId(1), TrackNamed("a.wav"), IsCurrent: true),
+            Playhead.FromMilliseconds((int)Math.Round(progress * 1000)), new Length(TimeSpan.FromSeconds(245.6)));
+
+        Assert.Equal(expected, Presenter.TimeReadout(voice, held: false));
+    }
+
+    [Fact]
+    public void SecondsReadout_WhileStopped_IsZeros() => Assert.Equal("0.0 / 0.0", Presenter.SecondsReadout(null));
+
+    [Theory]
     [InlineData(0, "0:00")]
     [InlineData(3.999, "0:03")]
     [InlineData(65, "1:05")]
     [InlineData(1560.5, "26:00")]
     public void Fmt_ShowsWholeSeconds(double seconds, string expected) =>
         Assert.Equal(expected, Presenter.Fmt(TimeSpan.FromSeconds(seconds)));
-
-    [Theory]
-    [InlineData(0.0, "0:00")]
-    [InlineData(0.4, "0:01")]
-    [InlineData(2.0, "0:02")]
-    [InlineData(17.001, "0:18")]
-    public void FmtRemaining_RoundsUp_SoItNeverReadsZeroMidTrack(double seconds, string expected) =>
-        Assert.Equal(expected, Presenter.FmtRemaining(new Length(TimeSpan.FromSeconds(seconds))));
 
     [Fact]
     public void FmtSeconds_IsDisplayOnly_ThreeDecimals()

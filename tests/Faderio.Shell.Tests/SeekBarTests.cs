@@ -52,6 +52,37 @@ public sealed class SeekBarTests
     }
 
     [Fact]
+    public void BetweenTheMarks_EachFadeIsShadedGrey_AsAWedge_RisingIn_AndFallingOut()
+    {
+        using var bar = Bar();
+        bar.Show(Playhead.FromMilliseconds(0), FiveSeconds,
+            new FadeMarks(Faderio.Core.Domain.Point.FromSeconds(0.5), Faderio.Core.Domain.Point.FromSeconds(1.5),
+                Faderio.Core.Domain.Point.FromSeconds(3.5), Faderio.Core.Domain.Point.FromSeconds(4.5)));
+
+        using var picture = new Bitmap(bar.Width, bar.Height);
+        bar.DrawToBitmap(picture, new Rectangle(0, 0, bar.Width, bar.Height));
+
+        bool GreyAt(double seconds, int y)
+        {
+            var x = SeekBar.Inset + (int)Math.Round(seconds / 5 * (bar.Width - 2 * SeekBar.Inset));
+            var pixel = picture.GetPixel(x, y);
+            return pixel.R == pixel.G && pixel.G == pixel.B && pixel.R < 225 && pixel.R > 150;
+        }
+        const int top = 4;
+        // The fade-in rises: low near its start, full height near its end.
+        Assert.False(GreyAt(0.6, top));
+        Assert.True(GreyAt(1.4, top));
+        Assert.True(GreyAt(0.6, bar.Height - 3));
+        // The fade-out falls: full height near its start, low near its end.
+        Assert.True(GreyAt(3.6, top));
+        Assert.False(GreyAt(4.4, top));
+        Assert.True(GreyAt(4.4, bar.Height - 3));
+        // Nothing between the fades.
+        Assert.False(GreyAt(2.5, top));
+        Assert.False(GreyAt(2.5, bar.Height - 3));
+    }
+
+    [Fact]
     public void PixelsMapToPlayheads_AcrossTheTravel()
     {
         var bar = Bar();

@@ -36,11 +36,6 @@ internal static class Presenter
 
     public static string Fmt(Length length) => Fmt(length.TimeSpan);
 
-    /// <summary>Remaining time rounds up: it reads "0:01" until the track is actually over, never
-    /// "0:00" while sound is still playing.</summary>
-    public static string FmtRemaining(Length remaining) =>
-        Fmt(TimeSpan.FromSeconds(Math.Ceiling(remaining.TimeSpan.TotalSeconds - 1e-9)));
-
     /// <summary>A point as the editor shows it. Display only: the captured <see cref="Point"/>
     /// is what gets saved, so this rounding never reaches the store (ticket 06).</summary>
     public static string FmtSeconds(Point? point) =>
@@ -277,11 +272,23 @@ internal static class Presenter
     public static string PlayPauseGlyph(Transport transport) => transport == Transport.Playing ? "⏸" : "▶";
 
     /// <summary>The main window's time readout for the attended voice, marked "Held" while a
-    /// preview holds the queue (build issue 16).</summary>
+    /// preview holds the queue (build issue 16). The remaining side is the engine's countdown,
+    /// so the two tick together.</summary>
     public static string TimeReadout(VoiceView? attended, bool held) =>
         attended is null
             ? "0:00 / -0:00"
-            : $"{(held ? "Held " : "")}{Fmt(attended.Playhead)} / -{FmtRemaining(attended.Remaining)}";
+            : $"{(held ? "Held " : "")}{Fmt(attended.Playhead)} / -{Fmt(attended.Countdown)}";
+
+    /// <summary>The line under the time readout: the attended voice's playhead and length in
+    /// seconds, to the tenth, so it reads against the fade points the editor shows in seconds.
+    /// Cut down to the tenth, as the m:ss readout cuts to the second.</summary>
+    public static string SecondsReadout(VoiceView? attended) =>
+        attended is null
+            ? "0.0 / 0.0"
+            : $"{Tenths(attended.Playhead.TimeSpan)} / {Tenths(attended.Length.TimeSpan)}";
+
+    private static string Tenths(TimeSpan time) =>
+        (Math.Floor(time.TotalSeconds * 10 + 1e-9) / 10).ToString("0.0", CultureInfo.InvariantCulture);
 
     /// <summary>The line above the transport: the attended voice's track, named as
     /// <see cref="FmtTrack"/> names it, so it is the track the readout and the seek bar are about.

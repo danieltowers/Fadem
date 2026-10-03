@@ -39,6 +39,7 @@ internal sealed class MainForm : Form
     internal readonly Button _back5;
     internal readonly Button _forward5;
     internal readonly Label _time;
+    internal readonly Label _seconds;
     internal readonly Label _attendedTrack;
     internal readonly Button _addFiles;
     internal readonly Button _addFolder;
@@ -172,10 +173,26 @@ internal sealed class MainForm : Form
         {
             Text = "0:00 / -0:00",
             Width = 170,
-            TextAlign = ContentAlignment.MiddleLeft,
+            TextAlign = ContentAlignment.BottomLeft,
             AutoSize = false,
             Dock = DockStyle.Fill,
+            Margin = new Padding(0),
         };
+        // The same in seconds, under it, to read against the editor's fade points.
+        _seconds = new Label
+        {
+            Text = Presenter.SecondsReadout(null),
+            TextAlign = ContentAlignment.TopLeft,
+            AutoSize = false,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0),
+        };
+        // Its own height, within the transport's 44 px: left to itself the table asks for 100.
+        var times = new TableLayoutPanel { Dock = DockStyle.Fill, Height = 36, ColumnCount = 1, RowCount = 2, Margin = new Padding(3, 4, 3, 4) };
+        times.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        times.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        times.Controls.Add(_time, 0, 0);
+        times.Controls.Add(_seconds, 0, 1);
         // The attended track's name, on its own line above the transport. It keeps its height
         // while stopped, so the transport does not jump when playback starts.
         _attendedTrack = new Label
@@ -208,7 +225,7 @@ internal sealed class MainForm : Form
         transport.Controls.Add(_back5, 7, 0);
         transport.Controls.Add(_seek, 8, 0);
         transport.Controls.Add(_forward5, 9, 0);
-        transport.Controls.Add(_time, 10, 0);
+        transport.Controls.Add(times, 10, 0);
 
         _queueList = new ListView
         {
@@ -503,6 +520,7 @@ internal sealed class MainForm : Form
         _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length, attended?.Marks);
         _back5.Enabled = _forward5.Enabled = _seek.Enabled;
         _time.Text = Presenter.TimeReadout(attended, held: view.Preview is not null);
+        _seconds.Text = Presenter.SecondsReadout(attended);
         var attendedTrack = Presenter.FmtAttendedTrack(attended);
         if (_attendedTrack.Text != attendedTrack)
         {

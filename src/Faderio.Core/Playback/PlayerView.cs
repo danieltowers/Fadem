@@ -37,6 +37,20 @@ public sealed record VoiceView(QueueRow Row, Playhead Playhead, Length Length)
     /// <summary>Never negative: <c>Playhead ≤ Length</c> by construction.</summary>
     public Length Remaining => new(Length.TimeSpan - Playhead.TimeSpan);
 
+    /// <summary>The remaining time as the readout counts it, in whole seconds: the length
+    /// rounded up, less the playhead cut down. It ticks on the same instant as the time taken,
+    /// the two always sum to the length rounded up, and it reads zero only once no sound is
+    /// left. Whole ticks, so no rounding error moves a tick.</summary>
+    public Length Countdown
+    {
+        get
+        {
+            var lengthUp = (Length.TimeSpan.Ticks + TimeSpan.TicksPerSecond - 1) / TimeSpan.TicksPerSecond;
+            var takenDown = Playhead.TimeSpan.Ticks / TimeSpan.TicksPerSecond;
+            return new(TimeSpan.FromSeconds(Math.Max(0, lengthUp - takenDown)));
+        }
+    }
+
     /// <summary>Where this track's fades begin and end, for the seek bar.</summary>
     public FadeMarks Marks { get; init; } = FadeMarks.None;
 }

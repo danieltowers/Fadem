@@ -379,6 +379,40 @@ public sealed partial class PluginTests
     }
 
     [Fact]
+    public void TheViewsSettingsButton_OpensTheDialog_AndOK_AppliesAtOnce() => RunSta(() =>
+    {
+        AuthorLibrary();
+        ChooseLibrary(LibraryFolder);
+        Start();
+        Launched();
+        using var panel = new System.Windows.Forms.Panel();
+        _plugin.OnDockablePanelCreated(panel);
+        var view = View(panel);
+        Assert.Equal("faderio settings", view._openSettings.ToolTipText);
+        Assert.Same(view._openSettings.Owner, view._status.Owner); // on the status strip
+
+        string? opened = null;
+        _plugin.ShowSettings = dialog =>
+        {
+            opened = dialog.Library;
+            dialog._blankSeconds.Value = 7;
+            return true;
+        };
+        view._openSettings.PerformClick();
+
+        Assert.Equal(LibraryFolder, opened);
+        // No MusicBee Save to wait for: OK is the apply.
+        Assert.Equal(7, new SettingsStore(LibrarySettingsFile).Settings.BlankDurationSeconds);
+        _plugin.SaveSettings(); // a later Preferences Save sends nothing again
+        _ui.Pump();
+        Assert.Equal("Saved settings.", view._status.Text);
+
+        _plugin.ShowSettings = _ => false; // Cancel
+        view._openSettings.PerformClick();
+        Assert.Equal(7, new SettingsStore(LibrarySettingsFile).Settings.BlankDurationSeconds);
+    });
+
+    [Fact]
     public void Configure_WhenTheEngineCouldNotStart_RepeatsWhy_AndOpensNoDialog()
     {
         // The engine's start fails as a missing dependency would: the output cannot be built.

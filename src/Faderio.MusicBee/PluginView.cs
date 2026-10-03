@@ -63,9 +63,11 @@ internal sealed class PluginView : UserControl
     internal readonly Button _forward5;
     internal readonly SeekBar _seek;
     internal readonly Label _time;
+    internal readonly Label _seconds;
     internal readonly ToolStripStatusLabel _status;
     internal readonly ToolStripStatusLabel _noticeCount;
     internal readonly ToolStripStatusLabel _host;
+    internal readonly ToolStripButton _openSettings;
     internal readonly EditTransitionMenu _editMenu;
     internal readonly ToolStripMenuItem _openTransitions;
     internal readonly ToolStripMenuItem _removeRows;
@@ -89,9 +91,10 @@ internal sealed class PluginView : UserControl
     /// <param name="outputModeInUse">The mode the output opened in, or null when none could be.</param>
     /// <param name="outputDeviceInUse">The device the output is on, by name, or null when none was found.</param>
     /// <param name="stopMusicBeesPlayer">MusicBee's <c>Player_Stop</c>, called before faderio starts to sound.</param>
+    /// <param name="openSettings">Opens faderio's settings dialog, as MusicBee's Configure does, and applies its OK.</param>
     public PluginView(
         PlaybackEngine engine, NoticeLog notices, Action<string> notice, Func<AudioOutputMode?> outputModeInUse,
-        Func<string?> outputDeviceInUse, Action stopMusicBeesPlayer)
+        Func<string?> outputDeviceInUse, Action stopMusicBeesPlayer, Action openSettings)
     {
         _engine = engine;
         _notices = notices;
@@ -113,7 +116,10 @@ internal sealed class PluginView : UserControl
         // Where MusicBee's window has no title of faderio's: the library, the mode in use and the
         // device. Cut short in a narrow panel, whole in its tooltip.
         _host = new ToolStripStatusLabel { ForeColor = SystemColors.GrayText, Margin = new Padding(8, 3, 0, 2), AutoSize = false, TextAlign = ContentAlignment.MiddleLeft };
-        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _host }, ShowItemToolTips = true, SizingGrip = false };
+        // faderio's settings without MusicBee's Preferences: at the strip's end, so it fits a sidebar.
+        _openSettings = new ToolStripButton("⚙") { ToolTipText = "faderio settings", Font = new Font("Segoe UI Symbol", 9f) };
+        _openSettings.Click += (_, _) => openSettings();
+        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _host, _openSettings }, ShowItemToolTips = true, SizingGrip = false };
 
         var symbols = new Font("Segoe UI Symbol", 9f);
         // Sized so the eight fit MusicBee's sidebar as shipped (284 px) on one row; narrower, the
@@ -136,7 +142,9 @@ internal sealed class PluginView : UserControl
         _tips.SetToolTip(_back5, "Back 5 seconds");
         _tips.SetToolTip(_forward5, "Forward 5 seconds");
         _seek = new SeekBar();
-        _time = new Label { Text = "0:00 / -0:00", TextAlign = ContentAlignment.MiddleLeft, AutoSize = false, Dock = DockStyle.Fill };
+        _time = new Label { Text = "0:00 / -0:00", TextAlign = ContentAlignment.BottomLeft, AutoSize = false, Dock = DockStyle.Fill, Margin = new Padding(0) };
+        // The same in seconds, under it, to read against the editor's fade points.
+        _seconds = new Label { Text = Presenter.SecondsReadout(null), TextAlign = ContentAlignment.TopLeft, AutoSize = false, Dock = DockStyle.Fill, Margin = new Padding(0) };
         _attendedTrack = new Label
         {
             Dock = DockStyle.Top,
@@ -164,7 +172,13 @@ internal sealed class PluginView : UserControl
         seekRow.Controls.Add(_back5, 0, 0);
         seekRow.Controls.Add(_seek, 1, 0);
         seekRow.Controls.Add(_forward5, 2, 0);
-        seekRow.Controls.Add(_time, 3, 0);
+        // Its own height, within the row's 38 px: left to itself the table asks for 100.
+        var times = new TableLayoutPanel { Dock = DockStyle.Fill, Height = 34, ColumnCount = 1, RowCount = 2, Margin = new Padding(3, 2, 3, 2) };
+        times.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        times.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        times.Controls.Add(_time, 0, 0);
+        times.Controls.Add(_seconds, 0, 1);
+        seekRow.Controls.Add(times, 3, 0);
 
         _queueList = new ListView
         {
@@ -346,6 +360,7 @@ internal sealed class PluginView : UserControl
         _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length, attended?.Marks);
         _back5.Enabled = _forward5.Enabled = _seek.Enabled;
         _time.Text = Presenter.TimeReadout(attended, held: view.Preview is not null);
+        _seconds.Text = Presenter.SecondsReadout(attended);
         var attendedTrack = Presenter.FmtAttendedTrack(attended);
         if (_attendedTrack.Text != attendedTrack)
         {

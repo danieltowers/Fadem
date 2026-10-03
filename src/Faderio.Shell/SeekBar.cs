@@ -9,7 +9,9 @@ namespace Faderio.Shell;
 /// key-up. It speaks <see cref="Playhead"/> and <see cref="Length"/> at its edge: pixels never
 /// leave it. Disabled, with no thumb, while nothing is attended. Replaces a stock TrackBar,
 /// whose channel click paged by its <c>LargeChange</c> instead of jumping. Red marks, the full
-/// height of the bar, show where the track's fades begin and end, as the engine resolves them.
+/// height of the bar, show where the track's fades begin and end, as the engine resolves them;
+/// between each pair a grey wedge drawn as the volume goes: rising for the fade-in, falling for
+/// the fade-out.
 /// </summary>
 internal sealed class SeekBar : Control
 {
@@ -24,6 +26,7 @@ internal sealed class SeekBar : Control
     private Length? _length;
     private FadeMarks _marks = FadeMarks.None;
     private static readonly Color MarkColour = Color.FromArgb(220, 20, 20);
+    private static readonly Color FadeShade = Color.FromArgb(200, 200, 200);
     private bool _dragging;
     private bool _stepping;
 
@@ -162,12 +165,38 @@ internal sealed class SeekBar : Control
         }
     }
 
+    /// <summary>A fade's wedge between its two marks, the full height of the bar at its loud end
+    /// and nothing at its quiet one.</summary>
+    private void ShadeFade(Graphics g, Faderio.Core.Domain.Point? start, Faderio.Core.Domain.Point? end, bool rising)
+    {
+        if (start is not { } from || end is not { } to)
+        {
+            return;
+        }
+        var (x0, x1) = (XOf(Playhead.At(from)), XOf(Playhead.At(to)));
+        if (x1 <= x0)
+        {
+            return;
+        }
+        var bottom = Height;
+        var wedge = rising
+            ? new[] { new System.Drawing.Point(x0, bottom), new System.Drawing.Point(x1, 0), new System.Drawing.Point(x1, bottom) }
+            : new[] { new System.Drawing.Point(x0, 0), new System.Drawing.Point(x0, bottom), new System.Drawing.Point(x1, bottom) };
+        using var shade = new SolidBrush(FadeShade);
+        g.FillPolygon(shade, wedge);
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
         g.Clear(Parent?.BackColor ?? SystemColors.Control);
         var mid = Height / 2;
         var track = new Rectangle(Inset, mid - TrackHeight / 2, Math.Max(0, Width - 2 * Inset), TrackHeight);
+        if (Live)
+        {
+            ShadeFade(g, _marks.FadeInStart, _marks.FadeInEnd, rising: true);
+            ShadeFade(g, _marks.FadeOutStart, _marks.FadeOutEnd, rising: false);
+        }
         using (var groove = new SolidBrush(SystemColors.ControlDark))
         {
             g.FillRectangle(groove, track);
