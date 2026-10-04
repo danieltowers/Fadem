@@ -73,7 +73,7 @@ public sealed partial class PlaybackEngine
     }
 
     /// <summary>Writes a library that opened to the machine's settings, as the one the next
-    /// launch opens. Returns why it could not be, worded for the user, or null.</summary>
+    /// launch opens and first among the known libraries (library chooser issue 01). Returns why it could not be, worded for the user, or null.</summary>
     private string? Remember(Library? library)
     {
         if (_machine is null || library is not { IsAvailable: true } ||
@@ -83,7 +83,7 @@ public sealed partial class PlaybackEngine
         }
         try
         {
-            _machine.Save(_machine.Settings with { Library = library.Folder });
+            _machine.Save(_machine.Settings.Opened(library.Folder));
         }
         catch (Exception e) when (IsStoreWriteFailure(e))
         {
@@ -91,5 +91,46 @@ public sealed partial class PlaybackEngine
                    $"the machine settings file could not be written ({e.Message}).";
         }
         return null;
+    }
+
+    /// <summary>The known libraries (library chooser issue 01): those that have opened on this
+    /// machine for this host, most recently opened first, the open one marked and each looked
+    /// for on disk now. Without a machine settings file, only the open library.</summary>
+    public IReadOnlyList<KnownLibrary> KnownLibraries()
+    {
+        ThrowIfDisposed();
+        var (settings, open) = Run(() =>
+            (_machine?.Settings ?? new MachineSettings { Library = _library?.Folder }, _library?.Folder));
+        return KnownLibrary.List(settings, open, Directory.Exists); // the disk, outside the lock
+    }
+
+    /// <summary>Takes <paramref name="folder"/> off the known libraries (library chooser issue
+    /// 01): its folder and its store are not touched. When it is the library a launch reopens,
+    /// a launch asks instead. The open library, and a folder not among them, are no change:
+    /// opening it would only put it back. Not saved, a notice says why.</summary>
+    public void ForgetLibrary(string folder)
+    {
+        ThrowIfDisposed();
+        Run(() =>
+        {
+            if (_machine is null || LibraryFolders.Same(folder, _library?.Folder))
+            {
+                return;
+            }
+            try
+            {
+                if (!_machine.Forget(folder))
+                {
+                    return;
+                }
+            }
+            catch (Exception e) when (IsStoreWriteFailure(e))
+            {
+                RaiseNotice($"Not removed from the list: {LibraryFolders.Name(folder)}. " +
+                            $"The machine settings file could not be written: {e.Message}");
+                return;
+            }
+            Publish();
+        });
     }
 }

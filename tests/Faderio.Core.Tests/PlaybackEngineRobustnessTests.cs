@@ -85,7 +85,7 @@ public sealed class PlaybackEngineRobustnessTests
     [Fact]
     public void ReplayGainDisabled_PlaysAtUnityGain()
     {
-        var settings = new Faderio.Core.Settings.PlayerSettings { ReplayGainEnabled = false };
+        var settings = new Faderio.Core.Settings.PlayerSettings { ReplayGainMode = Faderio.Core.Settings.ReplayGainMode.Off };
         using var tc = TestEngine.Create(settings);
         var a = TestAudio.WriteDcWav("a.wav", 2, 0.4);
         tc.Engine.AddTracks(new List<Track> { tc.TrackOf(a, replayGainDb: -6.0) });

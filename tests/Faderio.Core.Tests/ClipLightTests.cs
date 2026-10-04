@@ -174,7 +174,7 @@ public sealed class ClipLightTests
     [Fact]
     public void WithoutReplayGain_TheTrackPlaysAt0Point8_AndNothingClips()
     {
-        using var tc = TestEngine.Create(new() { ReplayGainEnabled = false }, latency: Latency);
+        using var tc = TestEngine.Create(new() { ReplayGainMode = Faderio.Core.Settings.ReplayGainMode.Off }, latency: Latency);
         var (_, _, c) = Tracks(tc);
         tc.Engine.AddTracks(new List<Track> { c });
         tc.Engine.Play();

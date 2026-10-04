@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Faderio.Core.Queue;
 
 namespace Faderio.Core.Settings;
@@ -10,6 +11,23 @@ public enum UnauthoredAdjacency
 
     /// <summary>Opted in: the default crossfade of <see cref="PlayerSettings.DefaultCrossfadeSeconds"/>.</summary>
     DefaultCrossfade,
+}
+
+/// <summary>Which ReplayGain a track plays at, as MusicBee offers it.</summary>
+public enum ReplayGainMode
+{
+    /// <summary>Every track at unity.</summary>
+    Off,
+
+    /// <summary>Each track at its track gain: the default.</summary>
+    Track,
+
+    /// <summary>Each track at its album gain, or its track gain when it has none.</summary>
+    Album,
+
+    /// <summary>Album gain for a track the queue plays beside another of its album, with shuffle
+    /// off; track gain otherwise.</summary>
+    Smart,
 }
 
 /// <summary>
@@ -40,8 +58,14 @@ public sealed record PlayerSettings
     /// seconds, 0 to 30. It applies only to a duration left blank; one typed in is kept.</summary>
     public int BlankDurationSeconds { get; init; } = 5;
 
-    /// <summary>ReplayGain track gain applied with symmetric clamping. On by default.</summary>
-    public bool ReplayGainEnabled { get; init; } = true;
+    /// <summary>Which ReplayGain tracks play at, clamped symmetrically: track gain by default.</summary>
+    public ReplayGainMode ReplayGainMode { get; init; } = ReplayGainMode.Track;
+
+    /// <summary>The on/off switch that came before <see cref="ReplayGainMode"/>: read from an
+    /// older file, where false means <see cref="ReplayGainMode.Off"/>, and never written.</summary>
+    [JsonPropertyName("replayGainEnabled")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? FormerReplayGainEnabled { get; init; }
 
     /// <summary>Shuffle, off by default.</summary>
     public bool Shuffle { get; init; }
@@ -69,5 +93,8 @@ public sealed record PlayerSettings
         DefaultCrossfadeSeconds = Compat.Clamp(DefaultCrossfadeSeconds, MinDefaultCrossfadeSeconds, MaxDefaultCrossfadeSeconds),
         BlankDurationSeconds = Compat.Clamp(BlankDurationSeconds, MinBlankDurationSeconds, MaxBlankDurationSeconds),
         Repeat = Compat.IsDefined(Repeat) ? Repeat : RepeatMode.Off,
+        ReplayGainMode = FormerReplayGainEnabled == false ? ReplayGainMode.Off
+            : Compat.IsDefined(ReplayGainMode) ? ReplayGainMode : ReplayGainMode.Track,
+        FormerReplayGainEnabled = null,
     };
 }

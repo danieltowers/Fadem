@@ -4,6 +4,7 @@ using Faderio.Core.Settings;
 using Faderio.Core.Tests;
 using MusicBeePlugin;
 using static MusicBeePlugin.Plugin;
+using ReplayGainMode = Faderio.Core.Settings.ReplayGainMode; // not MusicBee's own
 
 namespace Faderio.MusicBee.Tests;
 
@@ -170,7 +171,7 @@ public sealed partial class PluginTests
         Start();
         Launched();
 
-        Configure(browsed: OtherFolder, mode: AudioOutputMode.WaveOut);
+        Configure(chosen: OtherFolder, mode: AudioOutputMode.WaveOut);
         _plugin.SaveSettings();
         Launched(_plugin, OtherFolder);
         _plugin.Close(PluginCloseReason.MusicBeeClosing);
@@ -206,7 +207,7 @@ public sealed partial class PluginTests
         _musicBee.Choose("Play");
         _output.Advance(4410);
 
-        Configure(typed: OtherFolder);
+        Configure(chosen: OtherFolder);
         Assert.Equal(Transport.Playing, _output.State); // the choice waits for MusicBee's Save
 
         _plugin.SaveSettings();
@@ -226,7 +227,7 @@ public sealed partial class PluginTests
         Launched();
         var gone = Path.Combine(_dir, "gone");
 
-        Configure(typed: gone);
+        Configure(chosen: gone);
         _plugin.SaveSettings();
         _ui.Pump();
 
@@ -269,7 +270,7 @@ public sealed partial class PluginTests
         _musicBee.Choose("Play");
         _output.Advance(4410);
 
-        Configure(typed: OtherFolder, mode: AudioOutputMode.WaveOut, ok: false);
+        Configure(chosen: OtherFolder, mode: AudioOutputMode.WaveOut, ok: false);
         _plugin.SaveSettings();
         _plugin.SaveSettings();
 
@@ -329,7 +330,7 @@ public sealed partial class PluginTests
         Assert.Equal(Transport.Playing, _output.State); // a settings change stops nothing
         var saved = new SettingsStore(LibrarySettingsFile).Settings;
         Assert.Equal((UnauthoredAdjacency.DefaultCrossfade, 8, 3), (saved.UnauthoredAdjacency, saved.DefaultCrossfadeSeconds, saved.BlankDurationSeconds));
-        Assert.True(saved.ReplayGainEnabled); // not the dialog's: kept
+        Assert.Equal(ReplayGainMode.Track, saved.ReplayGainMode); // not the dialog's: kept
         _ui.Pump();
         Assert.Equal("Saved settings.", Assert.Single(_ui.Messages));
 
@@ -342,6 +343,35 @@ public sealed partial class PluginTests
     }
 
     [Fact]
+    public void TheReplayGainMode_OffersMusicBeesChoices_OpensOnTheLibrarys_AndIsSavedToItAtSave()
+    {
+        AuthorLibrary();
+        ChooseLibrary(LibraryFolder);
+        Start();
+        Launched();
+        _musicBee.Choose("Play");
+        _output.Advance(4410);
+
+        Configure(read: dialog =>
+        {
+            Assert.True(dialog._replayGain.Enabled);
+            Assert.Equal(
+                new[] { ReplayGainMode.Track, ReplayGainMode.Album, ReplayGainMode.Smart, ReplayGainMode.Off },
+                dialog._replayGain.Items.Cast<ReplayGainMode>());
+            Assert.Equal(ReplayGainMode.Track, dialog.ReplayGain);
+            dialog._replayGain.SelectedItem = ReplayGainMode.Smart;
+        });
+        Assert.Equal(ReplayGainMode.Track, _plugin.Host!.Engine.View.Settings.ReplayGainMode); // waits for Save
+        _plugin.SaveSettings();
+
+        Assert.Equal(Transport.Playing, _output.State);
+        Assert.Equal(ReplayGainMode.Smart, _plugin.Host!.Engine.View.Settings.ReplayGainMode);
+        Assert.Equal(ReplayGainMode.Smart, new SettingsStore(LibrarySettingsFile).Settings.ReplayGainMode);
+
+        Configure(ok: false, read: dialog => Assert.Equal(ReplayGainMode.Smart, dialog.ReplayGain));
+    }
+
+    [Fact]
     public void TheFadeDefaults_ChosenWithAnotherLibrary_GoToTheLibraryTheyWereShownFor()
     {
         AuthorLibrary();
@@ -350,7 +380,7 @@ public sealed partial class PluginTests
         Start();
         Launched();
 
-        Configure(typed: OtherFolder, read: dialog => dialog._blankSeconds.Value = 2);
+        Configure(chosen: OtherFolder, read: dialog => dialog._blankSeconds.Value = 2);
         _plugin.SaveSettings();
 
         Launched(_plugin, OtherFolder);
@@ -371,6 +401,7 @@ public sealed partial class PluginTests
             Assert.False(dialog._crossfade.Enabled);
             Assert.False(dialog._crossfadeSeconds.Enabled);
             Assert.False(dialog._blankSeconds.Enabled);
+            Assert.False(dialog._replayGain.Enabled);
         });
         _plugin.SaveSettings();
         _ui.Pump();
@@ -433,12 +464,12 @@ public sealed partial class PluginTests
     }
 
     /// <summary>Chooses faderio's Configure in MusicBee's plugin preferences: the dialog is filled
-    /// in (a folder typed or browsed to, a mode picked) and OK or Cancel pressed. Returns what
+    /// in (a library chosen, a mode picked) and OK or Cancel pressed. Returns what
     /// the dialog opened on.</summary>
     /// <param name="device">A device to pick by name, or with <paramref name="chooseMusicBees"/> MusicBee's own.</param>
     /// <param name="nowPlayingTab">The Now Playing tab's box to tick or clear (phase 6 issue 08).</param>
     private (string? Library, AudioOutputMode Mode, string? Device) Configure(
-        string? typed = null, string? browsed = null, AudioOutputMode? mode = null, bool ok = true,
+        string? chosen = null, AudioOutputMode? mode = null, bool ok = true,
         Action<SettingsDialog>? read = null, string? device = null, bool chooseMusicBees = false, bool? nowPlayingTab = null)
     {
         (string?, AudioOutputMode, string?)? opened = null;
@@ -454,14 +485,10 @@ public sealed partial class PluginTests
             {
                 dialog._outputDevice.SelectedItem = device;
             }
-            if (typed is not null)
+            if (chosen is not null)
             {
-                dialog._library.Text = typed;
-            }
-            if (browsed is not null)
-            {
-                dialog.ChooseFolder = _ => browsed;
-                Click(dialog._browse);
+                dialog.ChooseLibrary = _ => chosen;
+                Click(dialog._choose);
             }
             if (mode is { } picked)
             {

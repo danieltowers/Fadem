@@ -69,7 +69,7 @@ public sealed class ShuffleAndRepeatRememberedTests : IDisposable
     {
         var listening = new PlayerSettings
         {
-            UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade, DefaultCrossfadeSeconds = 9, ReplayGainEnabled = false,
+            UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade, DefaultCrossfadeSeconds = 9, ReplayGainMode = ReplayGainMode.Off,
         };
         using var tc = TestEngine.Create(listening);
 
@@ -122,14 +122,14 @@ public sealed class ShuffleAndRepeatRememberedTests : IDisposable
         tc.Engine.SetRepeat(RepeatMode.All);
 
         // The Settings… dialog does not show them, so what it sends has the defaults.
-        tc.Engine.ChangeSettings(new PlayerSettings { ReplayGainEnabled = false });
+        tc.Engine.ChangeSettings(new PlayerSettings { ReplayGainMode = ReplayGainMode.Off });
 
         Assert.True(tc.View.Shuffle);
         Assert.Equal(RepeatMode.All, tc.View.Repeat);
         var saved = new SettingsStore(tc.SettingsPath).Settings;
         Assert.True(saved.Shuffle);
         Assert.Equal(RepeatMode.All, saved.Repeat);
-        Assert.False(saved.ReplayGainEnabled);
+        Assert.Equal(ReplayGainMode.Off, saved.ReplayGainMode);
     }
 
     [Fact]

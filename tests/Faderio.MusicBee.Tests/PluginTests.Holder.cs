@@ -28,7 +28,7 @@ public sealed partial class PluginTests
             Assert.StartsWith("The library library could not be opened (it is open in faderio).", Assert.Single(_ui.Messages));
         } // faderio lets go
 
-        Configure(typed: LibraryFolder);
+        Configure(chosen: LibraryFolder);
         _plugin.SaveSettings();
 
         view = Launched();

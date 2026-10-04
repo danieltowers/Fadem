@@ -1611,11 +1611,11 @@ public sealed partial class HeadlessFormTests
             Assert.False(dialog._hardCut.Checked);
             Assert.Equal(8, dialog._seconds.Value);
             Assert.True(dialog._seconds.Enabled);
-            Assert.True(dialog._replayGain.Checked);
+            Assert.Equal("Track", dialog._replayGain.Text);
 
             dialog._outputMode.SelectedIndex = dialog._outputMode.FindStringExact("WaveOut");
             dialog._seconds.Value = 12;
-            dialog._replayGain.Checked = false;
+            dialog._replayGain.SelectedIndex = dialog._replayGain.FindStringExact("Off");
             return true;
         };
 
@@ -1626,7 +1626,7 @@ public sealed partial class HeadlessFormTests
         {
             UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade,
             DefaultCrossfadeSeconds = 12,
-            ReplayGainEnabled = false,
+            ReplayGainMode = ReplayGainMode.Off,
         };
         Assert.Equal(expected, h.Engine.View.Settings);
         Assert.Equal(expected, new SettingsStore(h.SettingsPath).Settings); // saved for the next launch
@@ -1660,13 +1660,13 @@ public sealed partial class HeadlessFormTests
         h.Form.ShowSettings = dialog =>
         {
             Assert.Equal(8, dialog._blankSeconds.Value);
-            dialog._replayGain.Checked = false;
+            dialog._replayGain.SelectedIndex = dialog._replayGain.FindStringExact("Off");
             return true;
         };
         Click(h.Form._settings);
 
         Assert.Equal(8, h.Engine.View.Settings.BlankDurationSeconds);
-        Assert.False(h.Engine.View.Settings.ReplayGainEnabled);
+        Assert.Equal(ReplayGainMode.Off, h.Engine.View.Settings.ReplayGainMode);
     });
 
     [Fact]
@@ -1744,8 +1744,8 @@ public sealed partial class HeadlessFormTests
         {
             dialog._outputMode.SelectedIndex = dialog._outputMode.FindStringExact("WaveOut");
             dialog._outputMode.SelectedIndex = dialog._outputMode.FindStringExact("WASAPI shared");
-            dialog._replayGain.Checked = false;
-            dialog._replayGain.Checked = true;
+            dialog._replayGain.SelectedIndex = dialog._replayGain.FindStringExact("Off");
+            dialog._replayGain.SelectedIndex = dialog._replayGain.FindStringExact("Track");
             Assert.False(dialog.MachineChanged || dialog.LibraryChanged);
             return true;
         };
@@ -1757,19 +1757,19 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void TheReplayGainCheckbox_IsOnByDefault_AndReachesChangeSettings() => RunSta(() =>
+    public void TheReplayGainList_IsTrackByDefault_AndReachesChangeSettings() => RunSta(() =>
     {
         using var h = new Harness();
         h.Form.ShowSettings = dialog =>
         {
-            Assert.True(dialog._replayGain.Checked);
-            dialog._replayGain.Checked = false;
+            Assert.Equal("Track", dialog._replayGain.Text);
+            dialog._replayGain.SelectedIndex = dialog._replayGain.FindStringExact("Off");
             return true;
         };
 
         Click(h.Form._settings);
 
-        Assert.Equal(new PlayerSettings { ReplayGainEnabled = false }, h.Engine.View.Settings);
+        Assert.Equal(new PlayerSettings { ReplayGainMode = ReplayGainMode.Off }, h.Engine.View.Settings);
     });
 
     [Fact]

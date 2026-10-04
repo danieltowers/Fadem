@@ -2,5 +2,9 @@
   "schemaVersion": 2,
   "outputMode": "WasapiExclusive",
   "library": "C:\\Music\\\u2B50\uFE0F Favourites",
+  "otherLibraries": [
+    "D:\\Gigs",
+    "E:\\faderio-old"
+  ],
   "outputDevice": "Speakers (C-Media(R) Audio)"
 }

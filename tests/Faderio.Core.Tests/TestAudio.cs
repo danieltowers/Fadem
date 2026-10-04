@@ -90,9 +90,9 @@ public static class TestAudio
     /// white noise, so the same seed is the same file. Mirrors ffmpeg's <c>anoisesrc</c> for
     /// the checked-in fixtures.</summary>
     /// <summary>A copy of the 2 s 44.1 kHz 16-bit stereo tone FLAC, tagged as a user's library
-    /// would be: title "Quiet Song", artist "Example Band", and the album and ReplayGain track gain given, if any
-    /// (playlists issue 06).</summary>
-    public static string WriteTaggedFlac(string name, string? album, string? replayGain)
+    /// would be: title "Quiet Song", artist "Example Band", and the album and ReplayGain track and album gains
+    /// given, if any (playlists issue 06).</summary>
+    public static string WriteTaggedFlac(string name, string? album, string? replayGain, string? albumGain = null)
     {
         Directory.CreateDirectory(Dir);
         var path = Path.Combine(Dir, $"{Path.GetFileNameWithoutExtension(name)}-{Interlocked.Increment(ref _fileCounter)}.flac");
@@ -105,6 +105,11 @@ public static class TestAudio
         {
             var xiph = (TagLib.Ogg.XiphComment)file.GetTag(TagLib.TagTypes.Xiph, create: true);
             xiph.SetField(TrackMetadataReader.ReplayGainTrackGainKey, replayGain);
+        }
+        if (albumGain is not null)
+        {
+            var xiph = (TagLib.Ogg.XiphComment)file.GetTag(TagLib.TagTypes.Xiph, create: true);
+            xiph.SetField(TrackMetadataReader.ReplayGainAlbumGainKey, albumGain);
         }
         file.Save();
         return path;

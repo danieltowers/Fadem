@@ -28,7 +28,7 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Null(store.LoadNotice);
         Assert.Equal(UnauthoredAdjacency.HardCut, store.Settings.UnauthoredAdjacency);
         Assert.Equal(5, store.Settings.DefaultCrossfadeSeconds);
-        Assert.True(store.Settings.ReplayGainEnabled);
+        Assert.Equal(ReplayGainMode.Track, store.Settings.ReplayGainMode);
     }
 
     [Fact]
@@ -38,13 +38,30 @@ public sealed class SettingsStoreTests : IDisposable
         {
             UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade,
             DefaultCrossfadeSeconds = 8,
-            ReplayGainEnabled = false,
+            ReplayGainMode = ReplayGainMode.Off,
         };
         new SettingsStore(_path).Save(settings);
 
         var reopened = new SettingsStore(_path);
         Assert.Null(reopened.LoadNotice);
         Assert.Equal(settings, reopened.Settings);
+    }
+
+    [Theory]
+    [InlineData(false, ReplayGainMode.Off)]
+    [InlineData(true, ReplayGainMode.Track)]
+    public void AnOlderFilesReplayGainSwitch_ReadsAsAMode_AndIsNotWrittenBack(bool enabled, ReplayGainMode mode)
+    {
+        File.WriteAllText(_path, $"{{ \"schemaVersion\": 1, \"replayGainEnabled\": {(enabled ? "true" : "false")} }}");
+
+        var store = new SettingsStore(_path);
+        Assert.Null(store.LoadNotice);
+        Assert.Equal(mode, store.Settings.ReplayGainMode);
+        store.Save(store.Settings);
+
+        var json = File.ReadAllText(_path);
+        Assert.DoesNotContain("replayGainEnabled", json);
+        Assert.Contains($"\"replayGainMode\": \"{mode}\"", json);
     }
 
     [Fact]

@@ -115,7 +115,7 @@ internal sealed class MainForm : Form
         ChoosePlaylists = ShowPlaylistDialog;
         ChooseExportPath = ShowExportDialog;
         ConfirmClear = ShowClearDialog;
-        ChooseLibrary = () => ShowLibraryDialog(this);
+        ChooseLibrary = () => LibraryChooser.Choose(this, _engine.KnownLibraries, _engine.ForgetLibrary);
         ShowSettings = dialog => dialog.ShowDialog(this) == DialogResult.OK;
         ShowNoticeList = ShowModeless;
         ShowTransitionManager = ShowModeless;
@@ -855,7 +855,7 @@ internal sealed class MainForm : Form
     /// it, since a headless form cannot show a dialog.</summary>
     internal Func<SettingsForm, bool> ShowSettings { get; set; }
 
-    /// <summary>The folder picked in the Open library dialog, or null. A test replaces it, since a
+    /// <summary>The folder chosen in the library chooser, or null. A test replaces it, since a
     /// headless form cannot show a dialog.</summary>
     internal Func<string?> ChooseLibrary { get; set; }
 
@@ -878,19 +878,6 @@ internal sealed class MainForm : Form
     {
         _editor.Commit();
         _editor.Close();
-    }
-
-    /// <summary>Asks for a library folder, starting in Music (D12): at the first launch, before
-    /// this window exists, and from Open library…. Null when cancelled.</summary>
-    internal static string? ShowLibraryDialog(IWin32Window? owner)
-    {
-        using var dialog = new FolderBrowserDialog
-        {
-            Description = "Choose a library folder: faderio keeps its transitions and settings in it",
-            UseDescriptionForTitle = true,
-            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic),
-        };
-        return dialog.ShowDialog(owner) == DialogResult.OK ? dialog.SelectedPath : null;
     }
 
     /// <summary>The dialog opens on the view's settings; OK sends each group the user changed to

@@ -119,6 +119,12 @@ internal sealed class Host : IDisposable
 
     public PlaybackEngine Engine { get; }
 
+    /// <summary>Shows the library chooser over the settings dialog and says whether a library
+    /// was chosen (library chooser issue 03). A test replaces it, since a headless dialog cannot
+    /// show another.</summary>
+    internal Func<LibraryChooser, Form, bool> ShowLibraryChooser { get; set; } =
+        (chooser, owner) => chooser.ShowDialog(owner) == DialogResult.OK;
+
     /// <summary>Shows the settings dialog and says whether OK was pressed, for the views' ⚙;
     /// null shows nothing.</summary>
     internal Func<SettingsDialog, bool>? ShowSettings { get; set; }
@@ -179,7 +185,14 @@ internal sealed class Host : IDisposable
         using var dialog = new SettingsDialog(
             shown.Library, shown.OutputMode, shown.OutputDevice, _devices(), _musicBeesDevice(), nowPlayingTab,
             libraryOpen, library.UnauthoredAdjacency == UnauthoredAdjacency.DefaultCrossfade, library.DefaultCrossfadeSeconds,
-            library.BlankDurationSeconds);
+            library.BlankDurationSeconds, library.ReplayGainMode);
+        dialog.ChooseLibrary = selected =>
+        {
+            // Remove is at once (library chooser D6): list upkeep, not a setting to wait for Save.
+            using var chooser = new LibraryChooser(
+                Engine.KnownLibraries, Engine.ForgetLibrary, start => Dialogs.ChooseLibraryFolder(dialog, start), selected);
+            return ShowLibraryChooser(chooser, dialog) ? chooser.Chosen : null;
+        };
         if (show(dialog))
         {
             _chosen = new MachineSettings { Library = dialog.Library, OutputMode = dialog.OutputMode, OutputDevice = dialog.OutputDevice };
@@ -190,6 +203,7 @@ internal sealed class Host : IDisposable
                     UnauthoredAdjacency = dialog.Crossfade ? UnauthoredAdjacency.DefaultCrossfade : UnauthoredAdjacency.HardCut,
                     DefaultCrossfadeSeconds = dialog.CrossfadeSeconds,
                     BlankDurationSeconds = dialog.BlankSeconds,
+                    ReplayGainMode = dialog.ReplayGain,
                 }
                 : null;
         }

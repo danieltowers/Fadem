@@ -15,8 +15,8 @@ public sealed partial class PlaybackEngine
     /// changed default crossfade reschedules the pending boundary if its transition has not
     /// started; one in flight plays out (the audible-time rule), and so does a fade-out point
     /// already passed: a crossfade switched on in a track's last N seconds leaves its boundary a
-    /// hard cut. A ReplayGain toggle reaches every live voice at once, each ramping to its own
-    /// tag's gain (build issue 13).
+    /// hard cut. A new ReplayGain mode reaches every live voice at once, each ramping to its own
+    /// tag's gain under the new mode (build issue 13).
     /// N out of range is brought into it. The outcome is a notice, as for authoring: saved, or
     /// not saved and why, and then nothing changes. With no library open there is nowhere to
     /// save them, so nothing changes. Settings the same as those in force are no change and
@@ -46,7 +46,7 @@ public sealed partial class PlaybackEngine
             {
                 RescheduleCurrentBoundary();
             }
-            if (previous.ReplayGainEnabled != next.ReplayGainEnabled)
+            if (previous.ReplayGainMode != next.ReplayGainMode)
             {
                 RampLiveVoicesToTheirGain();
             }
@@ -96,8 +96,8 @@ public sealed partial class PlaybackEngine
 
     /// <summary>Saves this machine's settings (library issue 03, D11). The output mode is
     /// saved for the next launch: the engine rate is fixed at launch (ADR 0008), so nothing
-    /// changes now. The library to reopen is the engine's to remember, so the one in
-    /// <paramref name="settings"/> is not used. The outcome is a notice, as for
+    /// changes now. The library to reopen and the known libraries are the engine's to
+    /// remember, so those in <paramref name="settings"/> are not used. The outcome is a notice, as for
     /// <see cref="ChangeSettings"/>; settings the same as those saved are no change and no
     /// notice. With no machine settings file in this run, nothing is saved.</summary>
     public void ChangeMachineSettings(MachineSettings settings)
@@ -106,7 +106,7 @@ public sealed partial class PlaybackEngine
         Run(() =>
         {
             var saved = _machine?.Settings ?? new MachineSettings();
-            var next = settings.Normalised() with { Library = saved.Library };
+            var next = settings.Normalised() with { Library = saved.Library, OtherLibraries = saved.OtherLibraries };
             if (next == saved)
             {
                 return;
@@ -135,21 +135,22 @@ public sealed partial class PlaybackEngine
     /// An untagged track's gain is 1 either way, so it does not move.</summary>
     private void RampLiveVoicesToTheirGain()
     {
-        void Ramp(MixerVoice voice, Track track, TransitionMixer mixer) =>
-            voice.RampBaseGain(BaseGain(track), mixer.Timeline, Frames(GainRampDuration));
+        void Ramp(MixerVoice voice, Track track, bool inAlbumRun, TransitionMixer mixer) =>
+            voice.RampBaseGain(BaseGain(track, inAlbumRun), mixer.Timeline, Frames(GainRampDuration));
 
         foreach (var voice in _mixer.Voices)
         {
             if (_voiceEntry.TryGetValue(voice, out var entry))
             {
-                Ramp(voice, entry.Track, _mixer);
+                Ramp(voice, entry.Track, InAlbumRun(entry), _mixer);
             }
         }
         if (_preview is { } run)
         {
             foreach (var voice in run.Voices.Where(v => !v.IsFinished))
             {
-                Ramp(voice, run.TrackOf(voice), _previewMixer); // a preview's voices too (build issue 16)
+                // A preview's voices too (build issue 16).
+                Ramp(voice, run.TrackOf(voice), ReplayGain.SameAlbum(run.Adjacency.Outgoing, run.Adjacency.Incoming), _previewMixer);
             }
         }
     }

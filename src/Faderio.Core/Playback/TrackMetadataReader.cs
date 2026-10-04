@@ -9,6 +9,7 @@ namespace Faderio.Core.Playback;
 internal static class TrackMetadataReader
 {
     public const string ReplayGainTrackGainKey = "REPLAYGAIN_TRACK_GAIN";
+    public const string ReplayGainAlbumGainKey = "REPLAYGAIN_ALBUM_GAIN";
 
     /// <summary>Title, artist, album and ReplayGain from the tags. Length and format are not read
     /// here: the probe issues both from the stream header (ADR 0010), so a track has exactly one
@@ -27,7 +28,8 @@ internal static class TrackMetadataReader
                 Album = tag.Album ?? "",
                 Length = length,
                 Format = format,
-                ReplayGainDb = ReadReplayGainDb(file),
+                ReplayGainDb = ReadReplayGainDb(file, ReplayGainTrackGainKey),
+                AlbumReplayGainDb = ReadReplayGainDb(file, ReplayGainAlbumGainKey),
             };
         }
         catch (Exception e) when (e is TagLib.CorruptFileException or TagLib.UnsupportedFormatException)
@@ -37,8 +39,9 @@ internal static class TrackMetadataReader
         }
     }
 
-    /// <summary>Reads REPLAYGAIN_TRACK_GAIN from whichever tag family the file carries.</summary>
-    public static double? ReadReplayGainDb(TagLib.File file)
+    /// <summary>Reads a ReplayGain gain, <paramref name="key"/> (track or album), from whichever
+    /// tag family the file carries.</summary>
+    public static double? ReadReplayGainDb(TagLib.File file, string key)
     {
         var id3v2 = file.GetTag(TagLib.TagTypes.Id3v2) as TagLib.Id3v2.Tag;
         if (id3v2 is not null)
@@ -46,7 +49,7 @@ internal static class TrackMetadataReader
             // REPLAYGAIN_TRACK_GAIN lives in a TXXX user-text frame, keyed by description. v2 asked
             // for it as a four-letter frame id and threw on every file carrying an ID3v2 tag; no
             // v2 test reached this line through a real file.
-            var frame = TagLib.Id3v2.UserTextInformationFrame.Get(id3v2, ReplayGainTrackGainKey, false);
+            var frame = TagLib.Id3v2.UserTextInformationFrame.Get(id3v2, key, false);
             var parsed = ReplayGain.ParseDb(frame?.Text is { Length: > 0 } text ? text[0] : null);
             if (parsed is not null)
             {
@@ -57,7 +60,7 @@ internal static class TrackMetadataReader
         var xiph = file.GetTag(TagLib.TagTypes.Xiph) as TagLib.Ogg.XiphComment;
         if (xiph is not null)
         {
-            var fields = xiph.GetField(ReplayGainTrackGainKey);
+            var fields = xiph.GetField(key);
             var parsed = ReplayGain.ParseDb(fields is { Length: > 0 } ? fields[0] : null);
             if (parsed is not null)
             {
@@ -68,7 +71,7 @@ internal static class TrackMetadataReader
         var ape = file.GetTag(TagLib.TagTypes.Ape) as TagLib.Ape.Tag;
         if (ape is not null)
         {
-            var item = ape.GetItem(ReplayGainTrackGainKey);
+            var item = ape.GetItem(key);
             var parsed = ReplayGain.ParseDb(item?.ToString());
             if (parsed is not null)
             {

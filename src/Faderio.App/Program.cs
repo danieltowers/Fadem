@@ -44,10 +44,17 @@ internal static class Program
         }
 
         // The library (library issue 02, D12): --library=<folder>, else the one remembered, else
-        // the user is asked. Cancelled, the app opens with no library: nothing is saved, and
-        // what is queued still plays.
+        // the user is asked, in the library chooser (library chooser issue 02), before the engine
+        // exists: so the list is Core's own query on the machine's settings, and a removal its
+        // own call. Cancelled, the app opens with no library: nothing is saved, and what is
+        // queued still plays.
         var launch = LibraryLaunch.Resolve(libraryArgument, machine?.Settings.Library, Directory.Exists);
-        var folder = launch.MustAsk ? MainForm.ShowLibraryDialog(owner: null) : launch.Folder;
+        var folder = launch.MustAsk
+            ? LibraryChooser.Choose(
+                owner: null,
+                () => KnownLibrary.List(machine?.Settings ?? new MachineSettings(), open: null, Directory.Exists),
+                known => Forget(machine, known, notify))
+            : launch.Folder;
         var library = folder is null ? null : Library.Open(folder);
 
         // The engine owns both settings files; only the output mode is read here, since the
@@ -87,5 +94,20 @@ internal static class Program
             });
         };
         Application.Run(form);
+    }
+
+    /// <summary>The launch chooser's Remove: the machine's settings forget the folder, or a
+    /// notice says why they could not. A run without them keeps no list to remove from.</summary>
+    private static void Forget(MachineSettingsStore? machine, string folder, Action<string> notify)
+    {
+        try
+        {
+            machine?.Forget(folder);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            notify($"Not removed from the list: {LibraryFolders.Name(folder)}. " +
+                   $"The machine settings file could not be written: {e.Message}");
+        }
     }
 }

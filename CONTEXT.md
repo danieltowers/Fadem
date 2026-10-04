@@ -18,6 +18,11 @@ transitions and its listening settings live inside it, and its tracks may live a
 disk. Opening a different library is opening a different world; nothing carries across.
 _Avoid_: Workspace, collection, instance, profile
 
+**Known libraries**:
+The libraries that have opened on this machine for one host, most recently opened first. The
+library chooser lists them; the user can take one off the list, which never touches its folder.
+_Avoid_: Recent libraries (they never expire), library history
+
 **Host**:
 The program playing a library: faderio itself, or MusicBee through the plugin. Both hosts run
 the same engine on the same library folder; each keeps its own machine settings. One host

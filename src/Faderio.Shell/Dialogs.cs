@@ -21,6 +21,18 @@ internal static class Dialogs
         return dialog.ShowDialog(owner) == DialogResult.OK ? dialog.FileName : null;
     }
 
+    /// <summary>The folder for the library chooser's Add folder… (library chooser issue 02),
+    /// starting in <paramref name="start"/>, else Music. Null when cancelled.</summary>
+    public static string? ChooseLibraryFolder(IWin32Window? owner, string? start)
+    {
+        using var dialog = new FolderBrowserDialog
+        {
+            Description = "Choose a library folder: faderio keeps its transitions and settings in it",
+            SelectedPath = start ?? Environment.GetFolderPath(Environment.SpecialFolder.MyMusic),
+        };
+        return dialog.ShowDialog(owner) == DialogResult.OK ? dialog.SelectedPath : null;
+    }
+
     /// <summary>A section's name, opening on <paramref name="initial"/>: blank for a new section.
     /// Null when cancelled.</summary>
     public static string? AskSectionName(IWin32Window? owner, string initial)

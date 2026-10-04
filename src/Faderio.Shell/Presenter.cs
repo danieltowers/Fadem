@@ -247,6 +247,19 @@ internal static class Presenter
         : (format.SampleRate / 1000.0).ToString("0.#", CultureInfo.InvariantCulture) + " kHz"
           + (format.BitDepth is { } depth ? $" / {depth}-bit" : "");
 
+    /// <summary>The ReplayGain modes in the order the settings list them, MusicBee's order.</summary>
+    public static IReadOnlyList<ReplayGainMode> ReplayGainModes { get; } =
+        [ReplayGainMode.Track, ReplayGainMode.Album, ReplayGainMode.Smart, ReplayGainMode.Off];
+
+    /// <summary>A ReplayGain mode as the settings list it.</summary>
+    public static string FmtReplayGainMode(ReplayGainMode mode) => mode switch
+    {
+        ReplayGainMode.Track => "Track",
+        ReplayGainMode.Album => "Album",
+        ReplayGainMode.Smart => "Smart (album gain on an album's run of tracks)",
+        _ => "Off",
+    };
+
     /// <summary>The Replay gain column (D25): the track gain to a tenth, "−7.2 dB" with a true minus
     /// and "+1.5 dB" with a plus; blank when untagged. Display only: playback reads the value.</summary>
     public static string FmtReplayGain(double? db)

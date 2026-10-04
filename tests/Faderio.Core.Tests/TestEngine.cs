@@ -90,7 +90,7 @@ public sealed class TestEngine : IDisposable
 
     /// <summary>A track with an engine-issued length, built without the probe: for tests that
     /// need ReplayGain or a deliberate length.</summary>
-    public Track TrackOf(string filePath, double? replayGainDb = null)
+    public Track TrackOf(string filePath, double? replayGainDb = null, double? albumReplayGainDb = null, string album = "")
     {
         using var source = TrackSources.Open(filePath);
         return new Track
@@ -99,6 +99,8 @@ public sealed class TestEngine : IDisposable
             Title = Path.GetFileNameWithoutExtension(filePath),
             Length = Length.FromFrames(source.TotalFrames, source.WaveFormat.SampleRate),
             ReplayGainDb = replayGainDb,
+            AlbumReplayGainDb = albumReplayGainDb,
+            Album = album,
         };
     }
 

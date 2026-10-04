@@ -99,7 +99,7 @@ public sealed class FileFormatTests : IDisposable
         UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade,
         DefaultCrossfadeSeconds = 7,
         BlankDurationSeconds = 3,
-        ReplayGainEnabled = false,
+        ReplayGainMode = ReplayGainMode.Off,
         Shuffle = true,
         Repeat = RepeatMode.All,
         EditorFollowsPlayback = true,
@@ -135,6 +135,7 @@ public sealed class FileFormatTests : IDisposable
     {
         OutputMode = AudioOutputMode.WasapiExclusive,
         Library = @"C:\Music\⭐️ Favourites",
+        OtherLibraries = [@"D:\Gigs", @"E:\faderio-old"],
         OutputDevice = "Speakers (C-Media(R) Audio)",
     };
 

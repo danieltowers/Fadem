@@ -235,7 +235,9 @@ public sealed partial class PlaybackEngine
         long TimelineOf(long sourceFrame) => sourceFrame - start;
 
         _previewMixer.Reset();
-        var outVoice = AddTrackVoice(_previewMixer, outSource, adjacency.Outgoing, 0, spawn: null, from: start);
+        var outVoice = AddTrackVoice(
+            _previewMixer, outSource, adjacency.Outgoing, ReplayGain.SameAlbum(adjacency.Outgoing, adjacency.Incoming), 0,
+            spawn: null, from: start);
         var run = new PreviewRun
         {
             Adjacency = adjacency,
@@ -292,7 +294,9 @@ public sealed partial class PlaybackEngine
     /// the voice falls silent at the preview's end, exactly, a tail after that.</summary>
     private void StartPreviewIncoming(PreviewRun run, long at, TransitionSpawn? spawn)
     {
-        var voice = AddTrackVoice(_previewMixer, run.IncomingSource!, run.Adjacency.Incoming, at, spawn);
+        var voice = AddTrackVoice(
+            _previewMixer, run.IncomingSource!, run.Adjacency.Incoming,
+            ReplayGain.SameAlbum(run.Adjacency.Outgoing, run.Adjacency.Incoming), at, spawn);
         run.IncomingSource = null;
         run.Incoming = voice;
         var fadeOutDone = run.Outgoing.FadeOutStart is { } fadeOut ? fadeOut + run.Outgoing.FadeOutFrames : at;

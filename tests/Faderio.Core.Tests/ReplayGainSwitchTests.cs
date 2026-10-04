@@ -16,7 +16,7 @@ public sealed class ReplayGainSwitchTests
 
     private static int At(double seconds) => (int)(seconds * Rate);
 
-    private static readonly PlayerSettings Off = new() { ReplayGainEnabled = false };
+    private static readonly PlayerSettings Off = new() { ReplayGainMode = ReplayGainMode.Off };
     private static readonly PlayerSettings On = new();
 
     /// <summary>The largest step between neighbouring samples of the left channel over the

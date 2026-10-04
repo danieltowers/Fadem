@@ -24,7 +24,7 @@ public sealed class ChangeSettingsTests
     public void ChangeSettings_SavesTheFile_AndTheViewCarriesThem()
     {
         using var tc = TestEngine.Create();
-        var chosen = Crossfade(8) with { ReplayGainEnabled = false };
+        var chosen = Crossfade(8) with { ReplayGainMode = ReplayGainMode.Off };
 
         tc.Engine.ChangeSettings(chosen);
 

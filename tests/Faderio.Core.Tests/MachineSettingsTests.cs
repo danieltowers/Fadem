@@ -50,7 +50,7 @@ public sealed class MachineSettingsTests : IDisposable
         var library = Library.Open(Folder("Music"));
         var machine = new MachineSettingsStore(MachinePath);
         var machineSettings = new MachineSettings { OutputMode = AudioOutputMode.WasapiExclusive, Library = library.Folder };
-        var librarySettings = Crossfade(12) with { ReplayGainEnabled = false };
+        var librarySettings = Crossfade(12) with { ReplayGainMode = ReplayGainMode.Off };
 
         machine.Save(machineSettings);
         library.Settings!.Save(librarySettings);
@@ -250,14 +250,15 @@ public sealed class MachineSettingsTests : IDisposable
     [Fact]
     public void TheOutputMode_IsTheMachines_AndStaysAcrossASwitch()
     {
+        var a = Folder("A");
         var b = Folder("B");
-        var (engine, _, _) = EngineOn(Library.Open(Folder("A")), new MachineSettingsStore(MachinePath));
+        var (engine, _, _) = EngineOn(Library.Open(a), new MachineSettingsStore(MachinePath));
         using var _ = engine;
 
         engine.ChangeMachineSettings(new MachineSettings { OutputMode = AudioOutputMode.WasapiExclusive });
         engine.OpenLibrary(b);
 
         Assert.Equal(AudioOutputMode.WasapiExclusive, engine.View.MachineSettings.OutputMode);
-        Assert.Equal(new MachineSettings { OutputMode = AudioOutputMode.WasapiExclusive, Library = b }, new MachineSettingsStore(MachinePath).Settings);
+        Assert.Equal(new MachineSettings { OutputMode = AudioOutputMode.WasapiExclusive, Library = b, OtherLibraries = [a] }, new MachineSettingsStore(MachinePath).Settings);
     }
 }

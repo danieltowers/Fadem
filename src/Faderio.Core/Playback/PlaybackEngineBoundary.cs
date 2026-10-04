@@ -154,7 +154,7 @@ public sealed partial class PlaybackEngine
     {
         var (index, source) = opened;
         var entry = _queue.Entries[index];
-        var voice = AddTrackVoice(_mixer, source, entry.Track, timelineStart, spawn, from);
+        var voice = AddTrackVoice(_mixer, source, entry.Track, InAlbumRun(entry), timelineStart, spawn, from);
         _voiceEntry[voice] = entry;
         _queue.SetCurrent(index);
         BecomeCurrent(voice, audibleAt ?? timelineStart);
@@ -165,28 +165,39 @@ public sealed partial class PlaybackEngine
     /// <summary>A track's voice on <paramref name="mixer"/>, as every boundary starts one: from its
     /// fade-in point with the authored fade-in, or from <paramref name="from"/> at full volume, at
     /// its ReplayGain, its playhead bounded by its length. The queue's voices and a preview's
-    /// (build issue 16) both start here.</summary>
+    /// (build issue 16) both start here. <paramref name="inAlbumRun"/>: it is heard beside
+    /// another track of its album, for <see cref="ReplayGainMode.Smart"/>.</summary>
     private MixerVoice AddTrackVoice(
-        TransitionMixer mixer, ITrackSource source, Track track, long timelineStart, TransitionSpawn? spawn,
+        TransitionMixer mixer, ITrackSource source, Track track, bool inAlbumRun, long timelineStart, TransitionSpawn? spawn,
         long? from = null)
     {
         var sourceStart = Compat.Clamp(
             from ?? (spawn is null ? 0 : Frames(spawn.FadeInPoint)), 0, Math.Max(source.TotalFrames - 1, 0));
         var fadeInFrames = spawn is null ? 0 : Math.Max(0, Frames(spawn.FadeInDuration));
         var voice = mixer.AddVoice(
-            source, track, timelineStart, sourceStart, BaseGain(track),
+            source, track, timelineStart, sourceStart, BaseGain(track, inAlbumRun),
             fadeInFrames, spawn?.Curve ?? FadeCurveKind.EqualPower);
         voice.LengthFrames = track.Length.Frames(_rate) > 0 ? track.Length.Frames(_rate) : source.TotalFrames;
         return voice;
     }
 
-    private double BaseGain(Track track)
+    private double BaseGain(Track track, bool inAlbumRun) =>
+        ReplayGain.DbFor(track, _settings.ReplayGainMode, inAlbumRun) is { } db
+            ? ReplayGain.DbToMultiplier(ReplayGain.ClampDb(db))
+            : 1.0;
+
+    /// <summary>Whether the queue plays the row beside another of its album: the row before it
+    /// or after it, with shuffle off, since shuffle plays neither next to it.</summary>
+    private bool InAlbumRun(QueueEntry entry)
     {
-        if (!_settings.ReplayGainEnabled || track.ReplayGainDb is not { } db)
+        var index = _queue.IndexOf(entry.Id);
+        if (_settings.Shuffle || index < 0)
         {
-            return 1.0;
+            return false;
         }
-        return ReplayGain.DbToMultiplier(ReplayGain.ClampDb(db));
+        var entries = _queue.Entries;
+        return (index > 0 && ReplayGain.SameAlbum(entry.Track, entries[index - 1].Track))
+            || (index + 1 < entries.Count && ReplayGain.SameAlbum(entry.Track, entries[index + 1].Track));
     }
 
     // ── Scheduling the boundary after a voice ────────────────────────────────────────────

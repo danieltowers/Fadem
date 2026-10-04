@@ -126,11 +126,11 @@ public sealed class QueueSectionsTests
     });
 
     /// <summary>A details list of the engine's queue, <paramref name="rows"/> tones long, each
-    /// item carrying its row's id as both hosts' queues do, laid out but never shown.</summary>
+    /// item carrying its row's id as both hosts' queues do, laid out but never shown. Its groups
+    /// need common controls 6, which <see cref="VisualStyles"/> turns on as the assembly loads.</summary>
     internal static ListView QueueOf(TestEngine tc, int rows)
     {
         tc.Engine.Add(Enumerable.Range(0, rows).Select(i => TestAudio.WriteDcWav($"sections-{i}.wav", 1, 0.2))).Wait();
-        Application.EnableVisualStyles(); // groups collapse only under common controls 6, as both hosts run
         var list = new ListView { View = View.Details, FullRowSelect = true, MultiSelect = true, Size = new Size(400, 300) };
         list.Columns.Add("Title", 120);
         foreach (var row in tc.View.Queue)

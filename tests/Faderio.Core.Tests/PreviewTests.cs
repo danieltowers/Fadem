@@ -636,11 +636,11 @@ public sealed class PreviewTests
         tc.Output.Advance(Second);
         Assert.Equal(0.4 * ReplayGain.DbToMultiplier(-6), tc.Rendered.DcLevel(tc.Rendered.Frames), 3);
 
-        tc.Engine.ChangeSettings(tc.View.Settings with { ReplayGainEnabled = false });
+        tc.Engine.ChangeSettings(tc.View.Settings with { ReplayGainMode = ReplayGainMode.Off });
         tc.Output.Advance(Second);
         Assert.Equal(0.4, tc.Rendered.DcLevel(tc.Rendered.Frames), 3);
 
-        tc.Engine.ChangeSettings(tc.View.Settings with { ReplayGainEnabled = true });
+        tc.Engine.ChangeSettings(tc.View.Settings with { ReplayGainMode = ReplayGainMode.Track });
         tc.Output.Advance(5 * Second); // B, from A's end at 20 s
         Assert.Equal(0.3 * ReplayGain.DbToMultiplier(+3), tc.Rendered.DcLevel(tc.Rendered.Frames), 3);
     }

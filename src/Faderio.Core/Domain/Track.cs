@@ -34,5 +34,8 @@ public sealed record Track
     /// <summary>ReplayGain track gain in dB, parsed from the file's tags. Null when untagged.</summary>
     public double? ReplayGainDb { get; init; }
 
+    /// <summary>ReplayGain album gain in dB, parsed from the file's tags. Null when untagged.</summary>
+    public double? AlbumReplayGainDb { get; init; }
+
     public override string ToString() => string.IsNullOrEmpty(Title) ? FilePath : Title;
 }

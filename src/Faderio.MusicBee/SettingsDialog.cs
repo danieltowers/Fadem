@@ -1,30 +1,33 @@
 using System.Drawing;
 using System.Windows.Forms;
 using Faderio.Core.Settings;
+using Faderio.Shell;
 using Faderio.Shell.Audio;
 
 namespace Faderio.MusicBee;
 
 /// <summary>
 /// The plugin's settings (phase 5 issue 04), opened from MusicBee's plugin preferences: the
-/// library folder, typed or picked, the output mode, which applies when MusicBee next starts,
+/// library, chosen from the known libraries in the shared chooser (library chooser issue 03),
+/// the output mode, which applies when MusicBee next starts,
 /// as standalone faderio's applies at its next launch, and the output device (issue 13), which
 /// applies when faderio next plays from stopped: MusicBee's own device, or one of this
 /// machine's by name. A saved device that is not there is listed as not found, so opening the
 /// dialog never loses it. Below them, whether faderio takes over MusicBee's Now Playing tab
-/// (phase 6 issue 08). Last, the open library's fade defaults, as standalone faderio's Settings
-/// has them: what a boundary nobody authored plays, and the blank duration. They are the
+/// (phase 6 issue 08). Last, the open library's fade defaults and ReplayGain mode, as standalone
+/// faderio's Settings has them: what a boundary nobody authored plays, the blank duration, and
+/// which ReplayGain tracks play at, with MusicBee's choices. They are the
 /// library's, saved in it, so with none open they are shown disabled. It holds nothing once
 /// closed: its caller reads <see cref="Library"/>, <see cref="OutputMode"/>,
 /// <see cref="OutputDevice"/>, <see cref="NowPlayingTab"/>, <see cref="Crossfade"/>,
-/// <see cref="CrossfadeSeconds"/> and <see cref="BlankSeconds"/>.
+/// <see cref="CrossfadeSeconds"/>, <see cref="BlankSeconds"/> and <see cref="ReplayGain"/>.
 /// <para>MusicBee loads every type here before the plugin's resolver exists, so no field holds
-/// a Core value: the mode list's items are boxed modes, named as they are drawn.</para>
+/// a Core value: the mode lists' items are boxed modes, named as they are drawn.</para>
 /// </summary>
 internal sealed class SettingsDialog : Form
 {
     internal readonly TextBox _library;
-    internal readonly Button _browse;
+    internal readonly Button _choose;
     internal readonly ComboBox _outputMode;
     internal readonly ComboBox _outputDevice;
     internal readonly CheckBox _nowPlayingTab;
@@ -32,6 +35,7 @@ internal sealed class SettingsDialog : Form
     internal readonly RadioButton _crossfade;
     internal readonly NumericUpDown _crossfadeSeconds;
     internal readonly NumericUpDown _blankSeconds;
+    internal readonly ComboBox _replayGain;
 
     /// <summary>The device each item of the list stands for: null for MusicBee's own.</summary>
     private readonly List<string?> _deviceNames = new();
@@ -48,9 +52,10 @@ internal sealed class SettingsDialog : Form
     /// <param name="crossfade">Whether a boundary nobody authored plays the default crossfade, not a hard cut.</param>
     /// <param name="crossfadeSeconds">The default crossfade's length.</param>
     /// <param name="blankSeconds">What a blank fade duration plays.</param>
+    /// <param name="replayGain">Which ReplayGain tracks play at.</param>
     public SettingsDialog(
         string? library, AudioOutputMode mode, string? device, IReadOnlyList<string> devices, string? musicBeesDevice, bool nowPlayingTab,
-        bool libraryOpen, bool crossfade, int crossfadeSeconds, int blankSeconds)
+        bool libraryOpen, bool crossfade, int crossfadeSeconds, int blankSeconds, ReplayGainMode replayGain)
     {
         Text = "faderio";
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -61,11 +66,13 @@ internal sealed class SettingsDialog : Form
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         Padding = new Padding(12);
-        ChooseFolder = ShowFolderDialog;
+        ChooseLibrary = start => Dialogs.ChooseLibraryFolder(this, start);
 
-        _library = new TextBox { Text = library ?? "", Width = 320, AccessibleName = "Library folder" };
-        _browse = new Button { Text = "Browse…", AutoSize = true };
-        _browse.Click += (_, _) => Browse();
+        // Read-only: a library is chosen, never typed, so the folder is always a full path. Out of
+        // the tab order, so the dialog opens with focus on Choose…, not on the folder all selected.
+        _library = new TextBox { Text = library ?? "", Width = 320, ReadOnly = true, TabStop = false, AccessibleName = "Library folder" };
+        _choose = new Button { Text = "Choose…", AutoSize = true };
+        _choose.Click += (_, _) => Choose();
 
         _outputMode = new ComboBox
         {
@@ -134,6 +141,18 @@ internal sealed class SettingsDialog : Form
         };
         var blank = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
         blank.Controls.AddRange(new Control[] { _blankSeconds, Seconds() });
+        _replayGain = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList, Width = 320, AccessibleName = "ReplayGain", FormattingEnabled = true,
+            Enabled = libraryOpen,
+        };
+        _replayGain.Format += (_, e) => e.Value = Presenter.FmtReplayGainMode((ReplayGainMode)e.ListItem!);
+        foreach (var each in Presenter.ReplayGainModes)
+        {
+            _replayGain.Items.Add(each);
+        }
+        _replayGain.SelectedItem = replayGain;
+
         var inLibrary = new Label
         {
             Text = libraryOpen ? "Saved in the open library, as standalone faderio's Settings." : "Open a library to set these.",
@@ -154,12 +173,12 @@ internal sealed class SettingsDialog : Form
         CancelButton = _cancel;
 
         var folder = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
-        folder.Controls.AddRange(new Control[] { _library, _browse });
+        folder.Controls.AddRange(new Control[] { _library, _choose });
 
         var rows = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Dock = DockStyle.Fill };
         rows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         rows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        rows.Controls.Add(Caption("Library folder:"), 0, 0);
+        rows.Controls.Add(Caption("Library:"), 0, 0);
         rows.Controls.Add(folder, 1, 0);
         rows.Controls.Add(Caption("Output mode:"), 0, 1);
         rows.Controls.Add(_outputMode, 1, 1);
@@ -174,12 +193,12 @@ internal sealed class SettingsDialog : Form
         rows.Controls.Add(boundaries, 1, 6);
         rows.Controls.Add(Caption("Blank fade durations:"), 0, 7);
         rows.Controls.Add(blank, 1, 7);
-        rows.Controls.Add(inLibrary, 1, 8);
-        rows.Controls.Add(buttons, 0, 9);
+        rows.Controls.Add(Caption("ReplayGain:"), 0, 8);
+        rows.Controls.Add(_replayGain, 1, 8);
+        rows.Controls.Add(inLibrary, 1, 9);
+        rows.Controls.Add(buttons, 0, 10);
         rows.SetColumnSpan(buttons, 2);
         Controls.Add(rows);
-
-        FormClosing += (_, e) => e.Cancel = DialogResult == DialogResult.OK && !Accepts();
     }
 
     /// <summary>The folder chosen, or null when the box is blank.</summary>
@@ -202,54 +221,26 @@ internal sealed class SettingsDialog : Form
     /// <summary>What a blank fade duration plays, in whole seconds.</summary>
     public int BlankSeconds => (int)_blankSeconds.Value;
 
+    /// <summary>Which ReplayGain tracks play at.</summary>
+    public ReplayGainMode ReplayGain => (ReplayGainMode)_replayGain.SelectedItem!;
+
     private void AddDevice(string? name, string text)
     {
         _deviceNames.Add(name);
         _outputDevice.Items.Add(text);
     }
 
-    /// <summary>The folder picked in the Browse dialog, or null when cancelled. A test replaces
+    /// <summary>The library chosen for Choose…, with the one chosen so far selected, or null
+    /// when cancelled: the host's library chooser, else a plain folder browser. A test replaces
     /// it, since a headless dialog cannot show another.</summary>
-    internal Func<string?, string?> ChooseFolder { get; set; }
+    internal Func<string?, string?> ChooseLibrary { get; set; }
 
-    private void Browse()
+    private void Choose()
     {
-        if (ChooseFolder(Library) is { } folder)
+        if (ChooseLibrary(Library) is { } folder)
         {
             _library.Text = folder;
         }
-    }
-
-    /// <summary>Whether OK can close: a typed folder must be a full path. One that does not
-    /// exist is let through, and the engine says so when it tries to open it.</summary>
-    private bool Accepts()
-    {
-        if (Library is not { } folder)
-        {
-            return true;
-        }
-        try
-        {
-            if (Path.IsPathRooted(folder) && Path.GetFullPath(folder) is not null)
-            {
-                return true;
-            }
-        }
-        catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
-        {
-        }
-        MessageBox.Show(this, $"\"{folder}\" is not a folder's full path.", "faderio", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        return false;
-    }
-
-    private string? ShowFolderDialog(string? start)
-    {
-        using var dialog = new FolderBrowserDialog
-        {
-            Description = "Choose a library folder: faderio keeps its transitions and settings in it",
-            SelectedPath = start ?? Environment.GetFolderPath(Environment.SpecialFolder.MyMusic),
-        };
-        return dialog.ShowDialog(this) == DialogResult.OK ? dialog.SelectedPath : null;
     }
 
     private static Label Seconds() => new() { Text = "s", AutoSize = true, Margin = new Padding(0, 6, 0, 0) };

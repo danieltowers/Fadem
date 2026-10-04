@@ -3,7 +3,7 @@
   "unauthoredAdjacency": "DefaultCrossfade",
   "defaultCrossfadeSeconds": 7,
   "blankDurationSeconds": 3,
-  "replayGainEnabled": false,
+  "replayGainMode": "Off",
   "shuffle": true,
   "repeat": "All",
   "editorFollowsPlayback": true,

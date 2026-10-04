@@ -53,6 +53,17 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       (or the mode in use), and nothing asked for a folder. **Open library…** sits between
       **Export playlist…** and **Settings…**; choosing another folder in it empties the queue and
       the editor and puts that folder's name in the title.
+- [ ] **The library chooser** (library chooser issue 02). **Open library…** opens "Choose a
+      library": the known libraries by Name and Folder, most recently opened first, the open one
+      reading *open* and selected, and under the list "Removing a library from the list leaves
+      its folder as it is." Its buttons are **Add folder…** and **Remove from list** on the left,
+      **Open** and **Cancel** on the right. Remove is greyed on the open row. A library whose
+      folder was deleted reads *not found* in grey, Open greyed; **Remove from list** takes it
+      off at once and `settings.json`'s `otherLibraries` no longer names it. Double-clicking
+      another row opens it, and the next **Open library…** lists it first. **Add folder…** shows
+      the folder browser; a folder picked there opens. With `--machine=` on a fresh folder and no
+      `--library=`, the launch shows the chooser with an empty list and "No library has opened
+      yet. Add folder… picks one: …"; Cancel opens faderio with no library.
 - [ ] Above the queue, beside the sidebar, the open playlist's name reads in a larger font, and
       the title bar starts with the same name. Double-click it, or press F2 in the queue: it
       becomes a text box holding the name, all selected. Enter renames it there, in the sidebar
@@ -253,7 +264,8 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] **Settings…** opens a dialog with OK and Cancel showing the four settings in two
       groups. **This machine**: the output mode with "Applies at the next launch." under it.
       **This library**: *Hard cut* or *Crossfade for N s*, with N greyed out under *Hard cut*;
-      **Blank fade durations** in seconds (0 to 30, live under either choice); and ReplayGain. Launched into a fallback as above, it also reads "In use now: WASAPI
+      **Blank fade durations** in seconds (0 to 30, live under either choice); and **ReplayGain:**, a list of Track,
+      Album, Smart (album gain on an album's run of tracks) and Off, on Track by default. Launched into a fallback as above, it also reads "In use now: WASAPI
       shared" (or WaveOut) under the mode chosen.
 - [ ] A setting changed and saved with OK is still set after a restart; Cancel keeps nothing.
       Changing only the output mode says "Saved machine settings."; only a library setting,
@@ -342,8 +354,10 @@ sharp percussive transient; the realism check is the authored boundary from the 
 - [ ] With *Crossfade for 8 s* on in **Settings…**, two tracks with no authored transition
       crossfade over 8 s. Switched on mid-track, the very next boundary crossfades.
 - [ ] On a track with a ReplayGain tag (the library has two; tag one with rsgain or foobar2000
-      if needed), toggling ReplayGain in **Settings…** mid-track changes the level at once,
-      with no click. An untagged track does not change.
+      if needed), choosing Off in **Settings…** mid-track changes the level at once,
+      with no click, and Track brings it back. An untagged track does not change. On a track
+      tagged with a different album gain, Album changes the level to it; Smart does too while
+      the rows beside it are of the same album, with shuffle off.
 - [ ] Author an overlap of two loud masters, or play a boosted track: the clip light comes on
       as you hear the clip, not before, and names what you heard. Clear queue leaves it
       on; clicking it clears it.
@@ -551,16 +565,26 @@ which a background run cannot give.
       opened (it is open in faderio). Nothing is saved until a library opens; what is queued
       still plays.", the strip the same with **1 notice**, the host line "library (could not be
       opened) · …", and an empty queue; `.faderio\host.lock` in the library reads "faderio".
-      faderio closed, then Configure… and Preferences' **Save** on the same folder: the
+      faderio closed, then Configure…'s **Choose…** on the same library and Preferences' **Save**: the
       playlists and queue fill, no new notice, the file reads "MusicBee". The reverse, standalone
       faderio launched on the library MusicBee holds, reads "… (it is open in MusicBee) …" in
       its strip; MusicBee closed and Open library… on the folder opens it.
 - [ ] **Edit → Edit Preferences → Plugins** lists faderio with a **Configure…** button, which
       opens faderio's dialog, owned by MusicBee's main window. It shows the settings file's
-      library folder, its output mode by name ("WASAPI shared") and its output device (phase 5
-      issue 13): "MusicBee's device" first, with MusicBee's device named in brackets when it is
+      library folder in a read-only box captioned **Library:**, with **Choose…** after it, its
+      output mode by name ("WASAPI shared") and its output device (phase 5 issue 13):
+      "MusicBee's device" first, with MusicBee's device named in brackets when it is
       one faderio can open, then every active render device by name; with "The mode applies
       when MusicBee next starts; the device when faderio next plays from stopped."
+- [ ] Configure…'s **ReplayGain:** lists Track, Album, Smart and Off, opens on the library's
+      mode, is greyed with no library open, and a mode chosen with OK and Preferences' **Save**
+      changes the playing track's level at once; standalone's **Settings…** then shows it.
+- [ ] **Choose…** (library chooser issue 03) opens the same "Choose a library" as standalone's
+      **Open library…**, owned by faderio's dialog, listing the plugin's own known libraries
+      (never standalone's), the open one selected. A row chosen with **Open** fills the box and
+      nothing switches; Preferences' **Save** opens it, and **Choose…** again lists it first.
+      Choosing again before Save selects the choice waiting. **Remove from list** is written to
+      `AppData\faderio\settings.json` at once, even if Preferences is then closed without Save.
 - [ ] **The output device** (phase 5 issue 13). Another device chosen (a second render device,
       say the Steam virtual speakers) and OK: the file is unchanged, and Configure… again opens
       on it. Preferences' **Save** writes `"outputDevice"` to the file and the strip reads

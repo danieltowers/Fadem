@@ -25,6 +25,18 @@ public sealed class TrackMetadataTests
     }
 
     [Fact]
+    public void ATaggedFlac_CarriesItsAlbumGain_BesideItsTrackGain()
+    {
+        using var tc = TestEngine.Create();
+        var path = TestAudio.WriteTaggedFlac("tagged", "First Album", "-7.20 dB", albumGain: "-5.10 dB");
+
+        var track = Assert.Single(tc.Add(path)).Track;
+
+        Assert.Equal(-7.2, track.ReplayGainDb!.Value, 6);
+        Assert.Equal(-5.1, track.AlbumReplayGainDb!.Value, 6);
+    }
+
+    [Fact]
     public void AFileWhoseTagsNameNoAlbum_HasAnEmptyAlbum()
     {
         using var tc = TestEngine.Create();
