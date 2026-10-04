@@ -364,6 +364,6 @@ public sealed class PresenterTests
 
     [Fact]
     public void ColumnHeading_NamesEachColumn() =>
-        Assert.Equal(["#", "Title", "Artist", "Album", "Length", "Format", "Replay gain", "Path"],
+        Assert.Equal(["#", "Title", "Artist", "Album", "Length", "Format", "Track gain", "Path"],
             ShellCompat.Values<QueueColumn>().Select(Presenter.ColumnHeading));
 }

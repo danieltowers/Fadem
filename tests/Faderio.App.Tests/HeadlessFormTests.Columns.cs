@@ -9,8 +9,9 @@ namespace Faderio.App.Tests;
 /// <summary>The queue's configurable columns (playlists issue 06, D25), on the headless main window.</summary>
 public sealed partial class HeadlessFormTests
 {
+    /// <summary>The headings by column, leaving out the speaker's: the last, shown first.</summary>
     private static string[] Headings(MainForm form) =>
-        form._queueList.Columns.Cast<ColumnHeader>().Select(c => c.Text).ToArray();
+        form._queueList.Columns.Cast<ColumnHeader>().SkipLast(1).Select(c => c.Text).ToArray();
 
     private static string ColumnsFile(Harness h) => Path.Combine(h.Library.StoreFolder, ColumnLayout.FileName);
 
@@ -33,7 +34,7 @@ public sealed partial class HeadlessFormTests
         Assert.False(File.Exists(ColumnsFile(h)));
         Assert.Equal(["#", "Title", "Artist", "Length", ""], Headings(h.Form));
         var menu = OpenColumnMenu(h.Form);
-        Assert.Equal(["#", "Title", "Artist", "Album", "Length", "Format", "Replay gain", "Path"], menu.Keys);
+        Assert.Equal(["#", "Title", "Artist", "Album", "Length", "Format", "Track gain", "Path"], menu.Keys);
         Assert.Equal([true, true, true, false, true, false, false, false], menu.Values.Select(i => i.Checked));
         Assert.False(menu["#"].Enabled); // always shown
     });
@@ -44,19 +45,19 @@ public sealed partial class HeadlessFormTests
         using var h = new Harness();
         h.Form.AddPaths([TestAudio.WriteTaggedFlac("tagged", "First Album", "-7.20 dB"), TestAudio.WriteDcWav("plain.wav", 1, 0.2)]);
 
-        OpenColumnMenu(h.Form)["Replay gain"].PerformClick();
+        OpenColumnMenu(h.Form)["Track gain"].PerformClick();
         OpenColumnMenu(h.Form)["Album"].PerformClick();
 
-        Assert.Equal(["#", "Title", "Artist", "Album", "Length", "Replay gain", ""], Headings(h.Form));
+        Assert.Equal(["#", "Title", "Artist", "Album", "Length", "Track gain", ""], Headings(h.Form));
         Assert.Equal("First Album", Cell(h.Form, 0, "Album"));
-        Assert.Equal("−7.2 dB", Cell(h.Form, 0, "Replay gain"));
-        Assert.Equal("", Cell(h.Form, 1, "Replay gain")); // untagged: blank
+        Assert.Equal("−7.2 dB", Cell(h.Form, 0, "Track gain"));
+        Assert.Equal("", Cell(h.Form, 1, "Track gain")); // untagged: blank
         Assert.True(OpenColumnMenu(h.Form)["Album"].Checked);
         Assert.True(ColumnLayout.Load(ColumnsFile(h))[QueueColumn.Album].Visible); // written at once
 
         OpenColumnMenu(h.Form)["Album"].PerformClick();
 
-        Assert.Equal(["#", "Title", "Artist", "Length", "Replay gain", ""], Headings(h.Form));
+        Assert.Equal(["#", "Title", "Artist", "Length", "Track gain", ""], Headings(h.Form));
         Assert.False(ColumnLayout.Load(ColumnsFile(h))[QueueColumn.Album].Visible);
     });
 
@@ -86,7 +87,7 @@ public sealed partial class HeadlessFormTests
         OpenColumnMenu(h.Form)["Path"].PerformClick();
 
         Assert.Equal([1], h.Form._queueList.SelectedIndices.Cast<int>());
-        Assert.Equal(h.Form._queueList.Columns.Count - 1, h.Form.EditColumn);
+        Assert.Equal(h.Form._queueList.Columns.Count - 2, h.Form.EditColumn); // the speaker's is shown first
         Assert.Equal(["✎", "✎", ""], EditGlyphs(h.Form._queueList));
         Assert.True(h.Form._queueList.Items[0].SubItems[h.Form.EditColumn].Font.Bold); // still styled
         ClickEditButton(h.Form._queueList, 1);
@@ -174,7 +175,7 @@ public sealed partial class HeadlessFormTests
     private static void ShowAllEight(Harness h)
     {
         _ = h.Form._queueList.Handle;
-        foreach (var heading in new[] { "Album", "Format", "Replay gain", "Path" })
+        foreach (var heading in new[] { "Album", "Format", "Track gain", "Path" })
         {
             OpenColumnMenu(h.Form)[heading].PerformClick();
         }

@@ -345,7 +345,7 @@ public sealed partial class HeadlessFormTests
         h.Form.AddPaths(new[] { b, a });
 
         Assert.Same(first, h.Form._queueList.Items[0]);
-        Assert.Equal(new[] { "🔈 1", "2", "3" }, h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
+        Assert.Equal(new[] { "1", "2", "3" }, h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
         Assert.Equal(h.Engine.View.Queue.Select(r => r.Id), h.Form._queueList.Items.Cast<ListViewItem>().Select(MainForm.RowOf));
     });
 
@@ -383,7 +383,7 @@ public sealed partial class HeadlessFormTests
         Assert.Equal("0:03 / -0:02", h.Form._time.Text);
         Assert.Equal("3.0 / 5.0", h.Form._seconds.Text);
         Assert.True(h.Form._seconds.Top >= h.Form._time.Bottom, "the seconds are not below the time"); // below it
-        Assert.Equal(new[] { "1", "🔊 2" }, h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
+        Assert.Equal(new[] { "1", "2" }, h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
     });
 
     [Fact]
@@ -445,14 +445,14 @@ public sealed partial class HeadlessFormTests
         Assert.Equal("⚠ 2", marked.Text);
         Assert.Equal(SystemColors.GrayText, marked.ForeColor);
         Assert.Contains("Unreadable", marked.ToolTipText);
-        Assert.Equal("🔊 1", h.Form._queueList.Items[0].Text);
+        Assert.Equal("1", h.Form._queueList.Items[0].Text);
         Assert.Equal(SystemColors.WindowText, h.Form._queueList.Items[0].ForeColor);
 
         File.Move(b + ".away", b);
         h.Form.PlayRowAt(1); // a double-click tries it
         h.Form.Render();
 
-        Assert.Equal("🔊 2", marked.Text); // now playing
+        Assert.Equal("2", marked.Text); // now playing
         Assert.Equal(SystemColors.WindowText, marked.ForeColor);
         Assert.Equal("", marked.ToolTipText);
     });
@@ -933,7 +933,7 @@ public sealed partial class HeadlessFormTests
         Assert.Equal(new[] { paths[1], paths[3] }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
         Assert.Equal(new[] { Path.GetFileNameWithoutExtension(paths[1]), Path.GetFileNameWithoutExtension(paths[3]) },
             Titles(h.Form._queueList));
-        Assert.Equal(new[] { "🔈 1", "2" }, h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
+        Assert.Equal(new[] { "1", "2" }, h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
     });
 
     [Fact]
@@ -973,7 +973,7 @@ public sealed partial class HeadlessFormTests
 
         Assert.Equal(b, h.Engine.View.Attended!.Row.Track.FilePath);
         Assert.Equal("0:00 / -0:05", h.Form._time.Text);
-        Assert.Equal("🔊 1", h.Form._queueList.Items[0].Text);
+        Assert.Equal("1", h.Form._queueList.Items[0].Text);
     });
 
     [Fact]
@@ -1074,7 +1074,7 @@ public sealed partial class HeadlessFormTests
         Assert.Equal(DragDropEffects.Move, effect);
         Assert.Equal(new[] { paths[1], paths[3], paths[0], paths[2] }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
         Assert.Equal(new[] { "two", "four", "one", "three" }, Titles(list).Select(t => t.Split('-')[0]));
-        Assert.Equal(new[] { "1", "2", "🔈 3", "4" }, list.Items.Cast<ListViewItem>().Select(i => i.Text)); // the attended row moved
+        Assert.Equal(new[] { "1", "2", "3", "4" }, list.Items.Cast<ListViewItem>().Select(i => i.Text)); // the attended row moved
         Assert.Equal(new[] { 2, 3 }, list.SelectedIndices.Cast<int>());
         Assert.False(IsSetVisible(h.Form._dropLine));
     });
@@ -1271,26 +1271,29 @@ public sealed partial class HeadlessFormTests
         var b = TestAudio.WriteDcWav("beta.wav", 1, 0.2);
         h.Form.AddPaths(new[] { a, b });
         h.Form.Render();
-        string[] Labels() => h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text).ToArray();
+        // The speaker's own cell: the last, shown first.
+        string[] Labels() => h.Form._queueList.Items.Cast<ListViewItem>()
+            .Select(i => i.SubItems[h.Form._queueList.Columns.Count - 1].Text).ToArray();
         Color[] Backs() => h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.BackColor).ToArray();
 
-        Assert.Equal(new[] { "🔈 1", "2" }, Labels()); // at launch
+        Assert.Equal(0, h.Form._queueList.Columns[h.Form._queueList.Columns.Count - 1].DisplayIndex); // at the far left
+        Assert.Equal(new[] { "🔈", "" }, Labels()); // at launch
         Assert.Equal(new[] { SystemColors.Window, SystemColors.Window }, Backs());
 
         h.Form.PlayRowAt(1);
         h.Form.Render();
-        Assert.Equal(new[] { "1", "🔊 2" }, Labels());
+        Assert.Equal(new[] { "", "🔊" }, Labels());
         Assert.Equal(new[] { SystemColors.Window, SystemColors.Window }, Backs());
 
         Click(h.Form._playPause); // pause
         h.Form.Render();
-        Assert.Equal(new[] { "1", "🔊 2" }, Labels());
+        Assert.Equal(new[] { "", "🔊" }, Labels());
 
         Click(h.Form._playPause);
         h.Output.Advance(44100 * 2); // the queue runs out
         h.Form.Render();
         Assert.Equal(Transport.Stopped, h.Engine.View.Transport);
-        Assert.Equal(new[] { "🔈 1", "2" }, Labels());
+        Assert.Equal(new[] { "🔈", "" }, Labels());
         Assert.True(h.Form._queueList.OwnerDraw); // a selected row grey, not blue
     });
 
@@ -1950,13 +1953,13 @@ public sealed partial class HeadlessFormTests
     private static void ClickEditButton(ListView list, int index)
     {
         _ = list.Handle;
-        var cell = list.Items[index].SubItems[list.Columns.Count - 1].Bounds;
+        var cell = list.Items[index].SubItems[list.Columns.Count - 2].Bounds; // before the speaker's
         var args = new MouseEventArgs(MouseButtons.Left, 1, cell.X + cell.Width / 2, cell.Y + cell.Height / 2, 0);
         typeof(Control).GetMethod("OnMouseClick", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { args });
     }
 
     private static string[] EditGlyphs(ListView list) =>
-        list.Items.Cast<ListViewItem>().Select(i => i.SubItems[list.Columns.Count - 1].Text).ToArray();
+        list.Items.Cast<ListViewItem>().Select(i => i.SubItems[list.Columns.Count - 2].Text).ToArray();
 
     [Fact]
     public void TheRowButton_OpensThisToNext_AsTheMenuDoes() => RunSta(() =>
@@ -1979,7 +1982,7 @@ public sealed partial class HeadlessFormTests
         using var h = new Harness();
         ThreeQueued(h);
 
-        Assert.Equal(h.Form.EditColumn, h.Form._queueList.Columns.Count - 1);
+        Assert.Equal(h.Form.EditColumn, h.Form._queueList.Columns.Count - 2); // the speaker's is shown first
         Assert.Equal(new[] { "✎", "✎", "" }, EditGlyphs(h.Form._queueList));
 
         h.Engine.SetRepeat(RepeatMode.All); // the last row has a this → next, but no button (D9)

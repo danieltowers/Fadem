@@ -82,7 +82,8 @@ internal sealed class PluginView : UserControl
 
     /// <summary>The queue's columns, fixed: the App's layout and menu can follow when a later
     /// issue needs them.</summary>
-    private static readonly QueueColumn[] Columns = [QueueColumn.Number, QueueColumn.Title, QueueColumn.Artist, QueueColumn.Length];
+    private static readonly QueueColumn[] Columns =
+        [QueueColumn.Number, QueueColumn.Title, QueueColumn.Artist, QueueColumn.Length, QueueColumn.ReplayGain];
 
     /// <summary>The ✎ column, after the queue's own: the editor button on every row but the last.</summary>
     internal int EditColumn => Columns.Length;
@@ -214,9 +215,10 @@ internal sealed class PluginView : UserControl
         foreach (var column in Columns)
         {
             var header = _queueList.Columns.Add(Presenter.ColumnHeading(column), WidthOf(column));
-            header.TextAlign = column == QueueColumn.Length ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+            header.TextAlign = column is QueueColumn.Length or QueueColumn.ReplayGain ? HorizontalAlignment.Right : HorizontalAlignment.Left;
         }
         _queueList.Columns.Add("", EditColumnWidth, HorizontalAlignment.Center);
+        QueueRowStyle.AddMarkColumn(_queueList); // the speaker, shown at the far left
         _queueList.Resize += (_, _) => FitTitle();
         _editMenu = new EditTransitionMenu(SelectedAdjacencies, Edit);
         // The manager lists the whole store, not the queue, so the item is always live: on the
@@ -472,6 +474,7 @@ internal sealed class PluginView : UserControl
                 item.SubItems.Add(Presenter.QueueCell(column, row.Track));
             }
             item.SubItems.Add(""); // the ✎ cell, styled at render
+            item.SubItems.Add(""); // the speaker's cell, likewise
             _queueList.Items.Add(item);
             item.Selected = selected.Contains(row.Id);
         }
@@ -537,6 +540,7 @@ internal sealed class PluginView : UserControl
         QueueColumn.Number => 40,
         QueueColumn.Title => 240,
         QueueColumn.Artist => 140,
+        QueueColumn.ReplayGain => 64,
         _ => 60,
     };
 
@@ -551,12 +555,14 @@ internal sealed class PluginView : UserControl
     {
         // A list being disposed has given its columns up already, and can still be resized:
         // with groups shown, MusicBee closing once resized it after (phase 6 issue 09).
-        if (_queueList.IsDisposed || _queueList.Disposing || _queueList.Columns.Count < 4)
+        if (_queueList.IsDisposed || _queueList.Disposing || _queueList.Columns.Count < 5)
         {
             return;
         }
-        var (number, title, artist, length) = (_queueList.Columns[0], _queueList.Columns[1], _queueList.Columns[2], _queueList.Columns[3]);
-        var free = _queueList.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - number.Width - length.Width - EditColumnWidth;
+        var (number, title, artist, length, gain) =
+            (_queueList.Columns[0], _queueList.Columns[1], _queueList.Columns[2], _queueList.Columns[3], _queueList.Columns[4]);
+        var free = _queueList.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - number.Width - length.Width - gain.Width
+            - EditColumnWidth - QueueRowStyle.MarkColumnWidth;
         var artistWidth = Math.Max(MinArtistWidth, Math.Min(WidthOf(QueueColumn.Artist), free - MinTitleWidth));
         if (artist.Width != artistWidth)
         {

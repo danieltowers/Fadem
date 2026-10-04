@@ -112,10 +112,10 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       At the 960 px minimum width it is still in view, with no sideways scroll bar.
 - [ ] A fresh library shows the queue's default four columns: #, Title, Artist, Length. A
       right-click on the header (not on a row) shows a checklist of #, Title, Artist, Album,
-      Length, Format, Replay gain and Path, with # ticked and greyed out. Ticking Path adds a Path
-      column showing each row's full path; ticking Album, Format and Replay gain shows, for a
+      Length, Format, Track gain and Path, with # ticked and greyed out. Ticking Path adds a Path
+      column showing each row's full path; ticking Album, Format and Track gain shows, for a
       tagged FLAC, its album, "44.1 kHz / 16-bit" and "−7.2 dB" (blank where untagged). ✎ stays
-      the rightmost column. With Album, Format, Replay gain and Path ticked at the default size,
+      the rightmost column. With Album, Format, Track gain and Path ticked at the default size,
       ✎ is still in view with no sideways scroll bar: Path, Album and Artist give way, in that
       order. Widening the window gives Artist, then Album, then Path their widths back. Only at
       the 960 px minimum with all eight ticked does the list scroll sideways to ✎. Dragging a header moves it (never before # or after ✎), and a dragged width holds.

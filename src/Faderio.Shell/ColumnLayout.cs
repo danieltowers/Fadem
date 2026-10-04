@@ -53,13 +53,13 @@ internal sealed class ColumnLayout
 
     private static readonly ColumnSetting[] DefaultColumns =
     [
-        new(QueueColumn.Number, true, 48),
+        new(QueueColumn.Number, true, 40),
         new(QueueColumn.Title, true, 320),
         new(QueueColumn.Artist, true, 200),
         new(QueueColumn.Album, false, 200),
         new(QueueColumn.Length, true, 70),
         new(QueueColumn.Format, false, 110),
-        new(QueueColumn.ReplayGain, false, 84),
+        new(QueueColumn.ReplayGain, false, 64),
         new(QueueColumn.Path, false, 360),
     ];
 

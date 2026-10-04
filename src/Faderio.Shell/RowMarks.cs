@@ -4,7 +4,7 @@ namespace Faderio.Shell;
 
 /// <summary>
 /// How a queue marks its attended row, the same in both hosts (phase 5 issue 10): a speaker in
-/// the row's first column, sounding while it plays or is paused, and at rest while nothing
+/// a column of its own at the far left, sounding while it plays or is paused, and at rest while nothing
 /// sounds (interim transport 03). The row itself stays the window's white; selected rows are a
 /// darker grey than the window, not the system's blue.
 /// </summary>

@@ -4,7 +4,9 @@ namespace Faderio.Shell;
 
 /// <summary>
 /// How a queue row looks in either host (phase 5 issue 11): the attended row's speaker
-/// (<see cref="RowMarks"/>), an unreadable row's grey, the row's label and tip, and the editor
+/// (<see cref="RowMarks"/>) in a column of its own, shown at the far left but kept last, after
+/// the ✎ cell, so every other cell keeps its index (<see cref="AddMarkColumn"/>); an unreadable
+/// row's grey, the row's label and tip, and the editor
 /// button cell, ✎ on every row but the last, bold while this → next is authored and grey and
 /// plain while it is not. A render runs on every tick, so each cell's look is set only when it
 /// changes. The fonts are this style's: the list's own size draws the pencil at eight pixels.
@@ -15,6 +17,13 @@ internal sealed class QueueRowStyle : IDisposable
 {
     private readonly Font _buttonFont = new("Segoe UI Symbol", 11f);
     private readonly Font _authoredFont;
+    private readonly Font _markFont = new("Segoe UI Symbol", 12f);
+
+    /// <summary>The speaker's column: wide enough for its glyph, and no wider.</summary>
+    public const int MarkColumnWidth = 26;
+
+    /// <summary>The rows' height: tall enough for the speaker.</summary>
+    private const int RowHeight = 22;
 
     /// <summary>The pencil's fonts: the list's own size draws it at eight pixels.</summary>
     public QueueRowStyle()
@@ -24,7 +33,7 @@ internal sealed class QueueRowStyle : IDisposable
 
     /// <summary>Styles every row <paramref name="list"/> shows for the queue in
     /// <paramref name="view"/>, as far as both reach; <paramref name="editColumn"/> is the ✎
-    /// cell's index.</summary>
+    /// cell's index, and the speaker's cell is the one after it.</summary>
     public void Apply(ListView list, PlayerView view, int editColumn)
     {
         for (var i = 0; i < list.Items.Count && i < view.Queue.Count; i++)
@@ -63,7 +72,20 @@ internal sealed class QueueRowStyle : IDisposable
         {
             button.Font = font;
         }
-        var label = Presenter.RowLabel(index + 1, row.IsUnreadable, RowMarks.Of(row.IsCurrent, view.Transport));
+        if (editColumn + 1 < item.SubItems.Count)
+        {
+            var markCell = item.SubItems[editColumn + 1];
+            var mark = RowMarks.Of(row.IsCurrent, view.Transport) ?? "";
+            if (markCell.Text != mark)
+            {
+                markCell.Text = mark;
+            }
+            if (markCell.Font != _markFont)
+            {
+                markCell.Font = _markFont;
+            }
+        }
+        var label = Presenter.RowLabel(index + 1, row.IsUnreadable);
         if (item.Text != label)
         {
             item.Text = label;
@@ -86,6 +108,10 @@ internal sealed class QueueRowStyle : IDisposable
     public static void Draw(ListView list)
     {
         list.OwnerDraw = true;
+        // An image list's height sets the rows': the list has no other.
+        var rows = new ImageList { ImageSize = new Size(1, RowHeight) };
+        list.SmallImageList = rows;
+        list.Disposed += (_, _) => rows.Dispose();
         list.DrawColumnHeader += (_, e) => e.DrawDefault = true;
         list.DrawItem += (_, _) => { }; // a details view draws by cell
         list.DrawSubItem += (_, e) =>
@@ -94,8 +120,12 @@ internal sealed class QueueRowStyle : IDisposable
             {
                 return;
             }
-            // The first cell's bounds span the whole row: its column's width bounds it.
-            var bounds = new Rectangle(e.Bounds.X, e.Bounds.Y, list.Columns[e.ColumnIndex].Width, e.Bounds.Height);
+            // The first cell's bounds span the whole row, from wherever the row starts: its left is
+            // after every column shown before it, and its column's width bounds it.
+            var column = list.Columns[e.ColumnIndex];
+            var left = e.ColumnIndex != 0 ? e.Bounds.X
+                : item.Bounds.X + list.Columns.Cast<ColumnHeader>().Where(c => c.DisplayIndex < column.DisplayIndex).Sum(c => c.Width);
+            var bounds = new Rectangle(left, e.Bounds.Y, column.Width, e.Bounds.Height);
             var back = item.Selected ? RowMarks.Selected : cell.BackColor;
             using (var brush = new SolidBrush(back))
             {
@@ -117,10 +147,19 @@ internal sealed class QueueRowStyle : IDisposable
         };
     }
 
+    /// <summary>Adds the speaker's column after every other, the ✎ button's included, and shows it
+    /// first: at the far left, while each other cell keeps its index.</summary>
+    public static void AddMarkColumn(ListView list)
+    {
+        var mark = list.Columns.Add("", MarkColumnWidth, HorizontalAlignment.Center);
+        mark.DisplayIndex = 0;
+    }
+
     /// <summary>After the list, which draws with the fonts.</summary>
     public void Dispose()
     {
         _buttonFont.Dispose();
         _authoredFont.Dispose();
+        _markFont.Dispose();
     }
 }

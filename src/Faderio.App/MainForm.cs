@@ -255,9 +255,9 @@ internal sealed class MainForm : Form
         BuildColumns();
         _queueList.ColumnWidthChanging += (_, e) =>
         {
-            if (e.ColumnIndex == EditColumn)
+            if (e.ColumnIndex >= EditColumn) // the editor button's, or the speaker's
             {
-                e.NewWidth = _queueList.Columns[EditColumn].Width;
+                e.NewWidth = _queueList.Columns[e.ColumnIndex].Width;
                 e.Cancel = true;
             }
             else if (e.NewWidth < ColumnLayout.MinWidth)
@@ -274,7 +274,7 @@ internal sealed class MainForm : Form
             e.Cancel = true;
             if (e.Header?.Tag is QueueColumn column)
             {
-                var to = e.NewDisplayIndex;
+                var to = Math.Max(0, e.NewDisplayIndex - 1); // the speaker's column is shown first
                 BeginInvoke(() => MoveColumn(column, to));
             }
         };
@@ -625,6 +625,7 @@ internal sealed class MainForm : Form
                 item.SubItems.Add(Presenter.QueueCell(column.Column, row.Track));
             }
             item.SubItems.Add(""); // the editor button, drawn by Render
+            item.SubItems.Add(""); // the speaker, likewise
             _queueList.Items.Add(item);
             item.Selected = selected.Contains(row.Id);
         }
@@ -654,6 +655,7 @@ internal sealed class MainForm : Form
             // The editor button (interim transport 07): fixed at the far right, never one of the
             // columns a user shows, sizes or moves.
             _queueList.Columns.Add("", 28, HorizontalAlignment.Center);
+            QueueRowStyle.AddMarkColumn(_queueList); // the speaker, shown at the far left
             _queueList.AllowColumnReorder = true;
         }
         finally
@@ -982,9 +984,9 @@ internal sealed class MainForm : Form
 
     internal static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
 
-    /// <summary>The queue's last column: each row's editor button (interim transport 07), after
-    /// every column shown (playlists issue 06).</summary>
-    internal int EditColumn => _queueList.Columns.Count - 1;
+    /// <summary>Each row's editor button (interim transport 07), after every column shown
+    /// (playlists issue 06), and before only the speaker's, which is shown at the far left.</summary>
+    internal int EditColumn => _queueList.Columns.Count - 2;
 
     private const int MinTitleWidth = 100;
 
