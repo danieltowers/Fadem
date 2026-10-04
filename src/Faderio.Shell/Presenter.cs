@@ -215,8 +215,10 @@ internal static class Presenter
         _ => $"{clip.Count} clips · latest: {clip.Latest.Name}",
     };
 
-    /// <summary>A queue row's number, marked ⚠ while its file is unreadable (build issue 10).</summary>
-    public static string RowLabel(int number, bool unreadable) => unreadable ? $"⚠ {number}" : number.ToString();
+    /// <summary>A queue row's number, marked ⚠ while its file is unreadable (build issue 10), after
+    /// <paramref name="mark"/>, the attended row's speaker, if any.</summary>
+    public static string RowLabel(int number, bool unreadable, string? mark = null) =>
+        (mark is null ? "" : mark + " ") + (unreadable ? $"⚠ {number}" : number.ToString());
 
     /// <summary>A queue column's heading, as the header and its menu name it (playlists issue 06).</summary>
     public static string ColumnHeading(QueueColumn column) => column switch

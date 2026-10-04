@@ -77,9 +77,10 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       at launch, keeps naming the track while paused, and goes blank when the queue is cleared or
       runs out. The transport does not move when it fills or empties. A name too long for the
       window ends in "…" and shows whole in its tooltip.
-- [ ] At launch the first row carries the marker, dimmed (a greyer yellow than while playing).
-      Playing or paused, the marker is the full pale yellow. When the queue runs out it goes
-      back to the first row, dimmed, and ▶ plays that row.
+- [ ] At launch the first row carries the marker, at rest: 🔈 before its number in the #
+      column. Playing or paused, the marker is 🔊. No row is shaded yellow. When the queue runs
+      out it goes back to the first row, 🔈, and ▶ plays that row. A selected row is a darker
+      grey, not blue, whether or not the queue has focus, and its ✎ is whole, not "✎…".
 - [ ] Pause, click a different row, press ▶: that row plays from 0:00 and carries the marker.
       With the playing row, no row or several rows selected, ▶ resumes where it paused.
 - [ ] The seek bar has visible travel across the width of the transport area, not a stub.
@@ -444,7 +445,7 @@ which a background run cannot give.
       "faderio" header, the transport row ⏮ ▶ ⏹ ⏭ ⤳ 🔀 🔁, then −5 s, the seek bar, +5 s and
       "0:00 / -0:00"; **Playlists** listing the library's playlists with the open one bold on
       yellow; the queue with #, Title, Artist, Length and a ✎ on every row but the last, bold
-      where this → next is authored (phase 5 issue 11), and row 1 marked at rest; the strip
+      where this → next is authored (phase 5 issue 11), and row 1 marked at rest (🔈); the strip
       reading "Ready." and, at its right, "library · WASAPI shared at 48000 Hz on Speakers
       (…)", the device in use (phase 5 issue 13). In the
       sidebar as shipped (284 px) the buttons fit one row, with **Sync editor** at the right

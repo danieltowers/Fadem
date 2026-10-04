@@ -248,6 +248,7 @@ internal sealed class MainForm : Form
             HideSelection = false,
             ShowItemToolTips = true,
         };
+        QueueRowStyle.Draw(_queueList); // a selected row grey, not blue
         // The columns (playlists issue 06): the default four until the library's own layout is
         // read, at the first render.
         _columns = ColumnLayout.Default;

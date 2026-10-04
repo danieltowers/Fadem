@@ -48,7 +48,7 @@ public sealed partial class PluginTests
         Assert.Equal(
             new[] { Path.GetFileNameWithoutExtension(a), Path.GetFileNameWithoutExtension(b) },
             view._queueList.Items.Cast<ListViewItem>().Select(i => i.SubItems[1].Text));
-        Assert.Equal(new[] { "1", "2" }, view._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
+        Assert.Equal(new[] { "🔈 1", "2" }, view._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
         Assert.Equal("library · WASAPI shared at 44100 Hz", view._host.Text);
     });
 
@@ -138,7 +138,8 @@ public sealed partial class PluginTests
         Assert.Equal(Transport.Playing, _output.State);
         view.Render();
         Assert.Equal("⏸", view._playPause.Text);
-        Assert.Equal(RowMarksSounding, view._queueList.Items[0].SubItems[0].BackColor);
+        Assert.Equal(RowMarksSounding + " 1", view._queueList.Items[0].Text);
+        Assert.True(view._queueList.OwnerDraw); // a selected row grey, not blue
 
         Click(view._playPause);
 
@@ -337,7 +338,7 @@ public sealed partial class PluginTests
 
     private static PluginView View(Panel panel) => Assert.IsType<PluginView>(Assert.Single(panel.Controls.Cast<Control>()));
 
-    private static Color RowMarksSounding => RowMarks.Sounding;
+    private static string RowMarksSounding => RowMarks.Sounding;
 
     /// <summary>WinForms wants an STA thread; xunit does not give one.</summary>
     private static void RunSta(Action body)

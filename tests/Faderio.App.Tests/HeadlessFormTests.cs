@@ -345,7 +345,7 @@ public sealed partial class HeadlessFormTests
         h.Form.AddPaths(new[] { b, a });
 
         Assert.Same(first, h.Form._queueList.Items[0]);
-        Assert.Equal(new[] { "1", "2", "3" }, h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
+        Assert.Equal(new[] { "🔈 1", "2", "3" }, h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
         Assert.Equal(h.Engine.View.Queue.Select(r => r.Id), h.Form._queueList.Items.Cast<ListViewItem>().Select(MainForm.RowOf));
     });
 
@@ -383,8 +383,7 @@ public sealed partial class HeadlessFormTests
         Assert.Equal("0:03 / -0:02", h.Form._time.Text);
         Assert.Equal("3.0 / 5.0", h.Form._seconds.Text);
         Assert.True(h.Form._seconds.Top >= h.Form._time.Bottom, "the seconds are not below the time"); // below it
-        Assert.Equal(SystemColors.Info, h.Form._queueList.Items[1].BackColor);
-        Assert.Equal(SystemColors.Window, h.Form._queueList.Items[0].BackColor);
+        Assert.Equal(new[] { "1", "🔊 2" }, h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
     });
 
     [Fact]
@@ -446,14 +445,14 @@ public sealed partial class HeadlessFormTests
         Assert.Equal("⚠ 2", marked.Text);
         Assert.Equal(SystemColors.GrayText, marked.ForeColor);
         Assert.Contains("Unreadable", marked.ToolTipText);
-        Assert.Equal("1", h.Form._queueList.Items[0].Text);
+        Assert.Equal("🔊 1", h.Form._queueList.Items[0].Text);
         Assert.Equal(SystemColors.WindowText, h.Form._queueList.Items[0].ForeColor);
 
         File.Move(b + ".away", b);
         h.Form.PlayRowAt(1); // a double-click tries it
         h.Form.Render();
 
-        Assert.Equal("2", marked.Text);
+        Assert.Equal("🔊 2", marked.Text); // now playing
         Assert.Equal(SystemColors.WindowText, marked.ForeColor);
         Assert.Equal("", marked.ToolTipText);
     });
@@ -934,7 +933,7 @@ public sealed partial class HeadlessFormTests
         Assert.Equal(new[] { paths[1], paths[3] }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
         Assert.Equal(new[] { Path.GetFileNameWithoutExtension(paths[1]), Path.GetFileNameWithoutExtension(paths[3]) },
             Titles(h.Form._queueList));
-        Assert.Equal(new[] { "1", "2" }, h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
+        Assert.Equal(new[] { "🔈 1", "2" }, h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
     });
 
     [Fact]
@@ -974,7 +973,7 @@ public sealed partial class HeadlessFormTests
 
         Assert.Equal(b, h.Engine.View.Attended!.Row.Track.FilePath);
         Assert.Equal("0:00 / -0:05", h.Form._time.Text);
-        Assert.Equal(SystemColors.Info, h.Form._queueList.Items[0].BackColor);
+        Assert.Equal("🔊 1", h.Form._queueList.Items[0].Text);
     });
 
     [Fact]
@@ -1075,7 +1074,7 @@ public sealed partial class HeadlessFormTests
         Assert.Equal(DragDropEffects.Move, effect);
         Assert.Equal(new[] { paths[1], paths[3], paths[0], paths[2] }, h.Engine.View.Queue.Select(r => r.Track.FilePath));
         Assert.Equal(new[] { "two", "four", "one", "three" }, Titles(list).Select(t => t.Split('-')[0]));
-        Assert.Equal(new[] { "1", "2", "3", "4" }, list.Items.Cast<ListViewItem>().Select(i => i.Text));
+        Assert.Equal(new[] { "1", "2", "🔈 3", "4" }, list.Items.Cast<ListViewItem>().Select(i => i.Text)); // the attended row moved
         Assert.Equal(new[] { 2, 3 }, list.SelectedIndices.Cast<int>());
         Assert.False(IsSetVisible(h.Form._dropLine));
     });
@@ -1265,32 +1264,34 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void TheMarker_RestsDimmedWhenStopped_AndIsFullWhilePlayingOrPaused() => RunSta(() =>
+    public void TheMarker_IsASpeakerAtRestWhenStopped_AndSoundingWhilePlayingOrPaused_OnWhiteRows() => RunSta(() =>
     {
         using var h = new Harness();
         var a = TestAudio.WriteDcWav("alpha.wav", 1, 0.4);
         var b = TestAudio.WriteDcWav("beta.wav", 1, 0.2);
         h.Form.AddPaths(new[] { a, b });
         h.Form.Render();
+        string[] Labels() => h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.Text).ToArray();
         Color[] Backs() => h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.BackColor).ToArray();
 
-        Assert.NotEqual(SystemColors.Window, RowMarks.Resting);
-        Assert.NotEqual(SystemColors.Info, RowMarks.Resting);
-        Assert.Equal(new[] { RowMarks.Resting, SystemColors.Window }, Backs()); // at launch
+        Assert.Equal(new[] { "🔈 1", "2" }, Labels()); // at launch
+        Assert.Equal(new[] { SystemColors.Window, SystemColors.Window }, Backs());
 
         h.Form.PlayRowAt(1);
         h.Form.Render();
-        Assert.Equal(new[] { SystemColors.Window, SystemColors.Info }, Backs());
+        Assert.Equal(new[] { "1", "🔊 2" }, Labels());
+        Assert.Equal(new[] { SystemColors.Window, SystemColors.Window }, Backs());
 
         Click(h.Form._playPause); // pause
         h.Form.Render();
-        Assert.Equal(new[] { SystemColors.Window, SystemColors.Info }, Backs());
+        Assert.Equal(new[] { "1", "🔊 2" }, Labels());
 
         Click(h.Form._playPause);
         h.Output.Advance(44100 * 2); // the queue runs out
         h.Form.Render();
         Assert.Equal(Transport.Stopped, h.Engine.View.Transport);
-        Assert.Equal(new[] { RowMarks.Resting, SystemColors.Window }, Backs());
+        Assert.Equal(new[] { "🔈 1", "2" }, Labels());
+        Assert.True(h.Form._queueList.OwnerDraw); // a selected row grey, not blue
     });
 
     [Fact]

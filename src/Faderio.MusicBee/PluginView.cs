@@ -35,7 +35,7 @@ internal sealed class PluginView : UserControl
     private readonly Func<string?> _outputDeviceInUse;
     private readonly Action _stopMusicBeesPlayer;
     private readonly System.Windows.Forms.Timer _timer;
-    private readonly ToolTip _tips;
+    internal readonly ToolTip _tips;
     private readonly QueueRowStyle _rowStyle = new();
     private readonly Panel _editorBar;
 
@@ -68,7 +68,7 @@ internal sealed class PluginView : UserControl
     internal readonly ToolStripStatusLabel _status;
     internal readonly ToolStripStatusLabel _noticeCount;
     internal readonly ToolStripStatusLabel _host;
-    internal readonly ToolStripButton _openSettings;
+    internal readonly Button _openSettings;
     internal readonly EditTransitionMenu _editMenu;
     internal readonly ToolStripMenuItem _openTransitions;
     internal readonly ToolStripMenuItem _removeRows;
@@ -117,10 +117,7 @@ internal sealed class PluginView : UserControl
         // Where MusicBee's window has no title of faderio's: the library, the mode in use and the
         // device. Cut short in a narrow panel, whole in its tooltip.
         _host = new ToolStripStatusLabel { ForeColor = SystemColors.GrayText, Margin = new Padding(8, 3, 0, 2), AutoSize = false, TextAlign = ContentAlignment.MiddleLeft };
-        // faderio's settings without MusicBee's Preferences: at the strip's end, so it fits a sidebar.
-        _openSettings = new ToolStripButton("⚙") { ToolTipText = "faderio settings", Font = new Font("Segoe UI Symbol", 9f) };
-        _openSettings.Click += (_, _) => openSettings();
-        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _host, _openSettings }, ShowItemToolTips = true, SizingGrip = false };
+        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _host }, ShowItemToolTips = true, SizingGrip = false };
 
         var symbols = new Font("Segoe UI Symbol", 9f);
         // Sized so the eight fit MusicBee's sidebar as shipped (284 px) on one row; narrower, the
@@ -139,7 +136,17 @@ internal sealed class PluginView : UserControl
         // On the track's line, not the buttons' row: there, in a sidebar, it wraps to a row of its
         // own, and the editor's page loses that height.
         _syncEditor = new CheckBox { Text = "Sync editor", AutoCheck = false, AutoSize = true, Dock = DockStyle.Right, Padding = new Padding(0, 4, 4, 0) };
+        // faderio's settings without MusicBee's Preferences: at the top right, after Sync editor on
+        // the track's line, so it fits a sidebar. Flat, as a strip's button, at half as big again.
+        _openSettings = new Button
+        {
+            Text = "⚙", Font = new Font("Segoe UI Symbol", 13.5f), FlatStyle = FlatStyle.Flat, Dock = DockStyle.Right,
+            Width = 28, Padding = new Padding(0), Margin = new Padding(0), UseMnemonic = false, AccessibleName = "faderio settings",
+        };
+        _openSettings.FlatAppearance.BorderSize = 0;
+        _openSettings.Click += (_, _) => openSettings();
         _tips = new ToolTip();
+        _tips.SetToolTip(_openSettings, "faderio settings");
         _tips.SetToolTip(_syncEditor, Presenter.SyncEditorTip);
         _tips.SetToolTip(_stop, "Stop, and let go of the audio device");
         _tips.SetToolTip(_transitionNow, "Transition now");
@@ -199,6 +206,7 @@ internal sealed class PluginView : UserControl
             HideSelection = false,
             ShowItemToolTips = true,
         };
+        QueueRowStyle.Draw(_queueList); // a selected row grey, not blue
         // Rows drag to a new place, as in the App (phase 6 issue 02). Files dropped from
         // MusicBee's track list, or from Explorer, are both a shell drag of the files (issue 01),
         // and land where they are dropped (issue 03).
@@ -303,6 +311,7 @@ internal sealed class PluginView : UserControl
         var trackLine = new Panel { Dock = DockStyle.Top, Height = 26 };
         trackLine.Controls.Add(_attendedTrack);
         trackLine.Controls.Add(_syncEditor);
+        trackLine.Controls.Add(_openSettings); // docked first, so rightmost
         Controls.Add(trackLine);
         Resize += (_, _) => FitWidth();
         FitWidth();

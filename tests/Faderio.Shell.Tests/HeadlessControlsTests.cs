@@ -119,8 +119,9 @@ public sealed class HeadlessControlsTests
             style.Apply(rows[i], view.Queue[i], i, view, editColumn: 2);
         }
 
-        Assert.Equal("1", rows[0].Text);
-        Assert.Equal(RowMarks.Resting, rows[0].SubItems[1].BackColor); // the attended row, at rest
+        Assert.Equal(RowMarks.Resting + " 1", rows[0].Text); // the attended row, at rest
+        Assert.Equal("2", rows[1].Text);
+        Assert.Equal(SystemColors.Window, rows[0].SubItems[1].BackColor); // no yellow
         Assert.Equal(SystemColors.Window, rows[1].SubItems[1].BackColor);
         Assert.Equal("✎", rows[0].SubItems[2].Text);
         Assert.True(rows[0].SubItems[2].Font.Bold);
