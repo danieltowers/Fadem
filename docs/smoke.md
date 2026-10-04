@@ -177,9 +177,9 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       number shown by 0.1, Shift-click by 1; with **From end** ticked, + makes the from-end number
       bigger. They stop at 0 and at the track's length, and are greyed out while the box is blank
       or not a number.
-- [ ] Each **duration** box has the same four, on its own line: **−** and **+** beside it, **−1**
-      and **+1** to their right, where a point has Capture. They stop at 0; a blank duration
-      moves from the grey value it plays. The editor is no taller for them: Render still shows.
+- [ ] Each **duration** box has the same four, laid out as a point's: **−** and **+** beside it,
+      **−1** and **+1** under them. They stop at 0; a blank duration moves from the grey value it
+      plays. At the default 1240×660 the editor scrolls to reach Render.
 - [ ] **Preview** and **Stop preview** sit together in the editor, Stop preview greyed out
       until a preview runs. While one runs, Preview reads **Preview again**, and the line under
       them shows the phase and each voice's position ("Pre-roll · outgoing 2:25", then

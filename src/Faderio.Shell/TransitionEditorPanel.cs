@@ -216,11 +216,11 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeOutPoint = Field(layout, ref row, TransitionField.FadeOutPoint, "Fade-out point (s)", _fadeOutFromEnd, out _captureOut, "Capture", out _captureOutHint);
         (_fadeOutLess, _fadeOutMore, _fadeOutLessSecond, _fadeOutMoreSecond) = NudgeButtons(_fadeOutPoint);
         _fadeOutDuration = Field(layout, ref row, TransitionField.FadeOutDuration, "Fade-out duration (s)", null, out _, null, out _);
-        (_fadeOutDurationLess, _fadeOutDurationMore, _fadeOutDurationLessSecond, _fadeOutDurationMoreSecond) = NudgeButtons(_fadeOutDuration, duration: true);
+        (_fadeOutDurationLess, _fadeOutDurationMore, _fadeOutDurationLessSecond, _fadeOutDurationMoreSecond) = NudgeButtons(_fadeOutDuration, "Shorter", "Longer");
         _fadeInPoint = Field(layout, ref row, TransitionField.FadeInPoint, "Fade-in point (s)", null, out _captureIn, "Capture", out _captureInHint);
         (_fadeInLess, _fadeInMore, _fadeInLessSecond, _fadeInMoreSecond) = NudgeButtons(_fadeInPoint);
         _fadeInDuration = Field(layout, ref row, TransitionField.FadeInDuration, "Fade-in duration (s)", null, out _, null, out _);
-        (_fadeInDurationLess, _fadeInDurationMore, _fadeInDurationLessSecond, _fadeInDurationMoreSecond) = NudgeButtons(_fadeInDuration, duration: true);
+        (_fadeInDurationLess, _fadeInDurationMore, _fadeInDurationLessSecond, _fadeInDurationMoreSecond) = NudgeButtons(_fadeInDuration, "Shorter", "Longer");
 
         _curve = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill, Enabled = false };
         ListCurves();
@@ -421,12 +421,11 @@ internal sealed class TransitionEditorPanel : Panel
         return box;
     }
 
-    /// <summary>Puts − and + beside a box, in the box's own cell (interim transport issue 06), and
-    /// −1 and +1, which always move a whole second: under them for a point, whose row grows to
-    /// hold them while the button beside it (Capture) keeps the box's height; for a
-    /// <paramref name="duration"/>, which has no Capture, in the cell beside, so its row keeps its
-    /// height. Durations have them since phase 6, D8 reversed by the user (2026-10-03).</summary>
-    private static (Button Less, Button More, Button LessSecond, Button MoreSecond) NudgeButtons(TextBox box, bool duration = false)
+    /// <summary>Puts − and + beside a point's or a duration's box, in the box's own cell (interim
+    /// transport issue 06), and under them −1 and +1, which always move a whole second. The row
+    /// grows to hold them; the button beside it (a point's Capture) keeps the box's height.
+    /// Durations have them since phase 6, D8 reversed by the user (2026-10-03).</summary>
+    private static (Button Less, Button More, Button LessSecond, Button MoreSecond) NudgeButtons(TextBox box, string down = "Earlier", string up = "Later")
     {
         var layout = (TableLayoutPanel)box.Parent!;
         var cell = layout.GetPositionFromControl(box);
@@ -440,32 +439,6 @@ internal sealed class TransitionEditorPanel : Panel
         strip.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 33));
         strip.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 33));
         var boxHeight = layout.RowStyles[cell.Row].Height - box.Margin.Vertical;
-        if (duration)
-        {
-            strip.RowCount = 1;
-            strip.RowStyles.Add(new RowStyle(SizeType.Absolute, boxHeight));
-            var seconds = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = box.Margin, Padding = new Padding(0) };
-            seconds.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 33));
-            seconds.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 33));
-            seconds.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); // the rest of the cell, empty
-            seconds.RowStyles.Add(new RowStyle(SizeType.Absolute, boxHeight));
-            lessSecond.Margin = moreSecond.Margin = less.Margin;
-            seconds.Controls.Add(lessSecond, 0, 0);
-            seconds.Controls.Add(moreSecond, 1, 0);
-            layout.Controls.Remove(box);
-            box.Margin = new Padding(0);
-            strip.Controls.Add(box, 0, 0);
-            strip.Controls.Add(less, 1, 0);
-            strip.Controls.Add(more, 2, 0);
-            layout.Controls.Add(strip, cell.Column, cell.Row);
-            if (layout.GetControlFromPosition(cell.Column + 1, cell.Row) is { } unused)
-            {
-                layout.Controls.Remove(unused); // Field's hidden button: a duration captures nothing
-            }
-            layout.Controls.Add(seconds, cell.Column + 1, cell.Row);
-            Tips(less, more, lessSecond, moreSecond, "Shorter", "Longer");
-            return (less, more, lessSecond, moreSecond);
-        }
         strip.RowStyles.Add(new RowStyle(SizeType.Absolute, boxHeight));
         strip.RowStyles.Add(new RowStyle(SizeType.Absolute, SecondRowHeight));
         layout.Controls.Remove(box);
@@ -482,7 +455,7 @@ internal sealed class TransitionEditorPanel : Panel
             beside.Dock = DockStyle.Top;
             beside.Height = (int)boxHeight;
         }
-        Tips(less, more, lessSecond, moreSecond, "Earlier", "Later");
+        Tips(less, more, lessSecond, moreSecond, down, up);
         return (less, more, lessSecond, moreSecond);
     }
 

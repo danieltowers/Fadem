@@ -658,10 +658,9 @@ public sealed partial class HeadlessFormTests
         Assert.False(editor.HasUnsavedEdits);
         Assert.Equal(TimeSpan.FromSeconds(1), h.Store.Get(a, b)!.FadeOutDuration);
         Assert.Equal(TimeSpan.FromSeconds(4.9), h.Store.Get(a, b)!.FadeInDuration);
-        // On the box's own line, the seconds in the cell beside: the editor is no taller for them.
-        static System.Drawing.Point InLayout(Control c) => new(c.Parent!.Left + c.Left, c.Parent.Top + c.Top);
-        Assert.Equal(InLayout(editor._fadeOutDuration).Y, InLayout(editor._fadeOutDurationMoreSecond).Y);
-        Assert.True(InLayout(editor._fadeOutDurationLessSecond).X > InLayout(editor._fadeOutDurationMore).X);
+        // Below the tenths' buttons, in the same column, as a point's are.
+        Assert.Equal(editor._fadeOutDurationLess.Left, editor._fadeOutDurationLessSecond.Left);
+        Assert.True(editor._fadeOutDurationLessSecond.Top > editor._fadeOutDurationLess.Bottom - 1);
     });
 
     [Fact]
