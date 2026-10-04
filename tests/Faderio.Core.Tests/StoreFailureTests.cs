@@ -39,6 +39,17 @@ public sealed class StoreFailureTests
         public void RenamePlaylist(string oldName, string newName) => throw Failure;
 
         public void RemovePlaylist(string playlistName) => throw Failure;
+
+        /// <summary>Ignored: every write fails at once, held or not.</summary>
+        public bool Holding { get; set; }
+
+        public void WriteHeld()
+        {
+        }
+
+        public void DropHeld()
+        {
+        }
     }
 
     private static TransitionSpec Crossfade() => new()

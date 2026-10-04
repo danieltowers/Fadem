@@ -52,6 +52,16 @@ public static class Renderer
 
         public void RemovePlaylist(string playlistName) => throw ReadOnly();
 
+        public bool Holding { get; set; }
+
+        public void WriteHeld()
+        {
+        }
+
+        public void DropHeld()
+        {
+        }
+
         private static InvalidOperationException ReadOnly() => new("A render never writes the store.");
     }
 

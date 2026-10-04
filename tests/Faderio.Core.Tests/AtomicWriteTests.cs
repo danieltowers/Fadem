@@ -10,7 +10,7 @@ namespace Faderio.Core.Tests;
 /// <summary>
 /// Every file the engine writes is written beside its target and moved over it in one step, so a
 /// write that fails leaves the old file as it was (phase 5 issue 01). net48 has no overwriting
-/// move and does it with <c>File.Replace</c>; these run on both targets, so the guarantee is the
+/// move and calls MoveFileEx itself, as .NET 8's does; these run on both targets, so the guarantee is the
 /// same in both hosts. The JSON writes (store and settings) and the playlist write each create a
 /// missing file, replace an existing one, and survive a failure midway. Moving a corrupt file
 /// aside replaces an earlier one the same way.
@@ -62,6 +62,26 @@ public sealed class AtomicWriteTests : IDisposable
 
         Assert.Equal(new Doc("b", 2), JsonSerializer.Deserialize<Doc>(File.ReadAllText(path)));
         Assert.Single(Directory.GetFiles(_dir));
+    }
+
+    [Fact]
+    public void Json_AReadOnlyFile_IsRefusedAsAccessDenied_AndLeftAsItWas()
+    {
+        // What the engine catches as a store that cannot be written, on both targets.
+        var path = Path.Combine(_dir, "readonly.json");
+        AtomicJson.Write(path, new Doc("a", 1), Options);
+        File.SetAttributes(path, FileAttributes.ReadOnly);
+        try
+        {
+            Assert.Throws<UnauthorizedAccessException>(() => AtomicJson.Write(path, new Doc("b", 2), Options));
+
+            Assert.Equal(new Doc("a", 1), JsonSerializer.Deserialize<Doc>(File.ReadAllText(path)));
+            Assert.Empty(Leftovers());
+        }
+        finally
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+        }
     }
 
     [Fact]

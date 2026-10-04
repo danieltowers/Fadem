@@ -247,6 +247,7 @@ public sealed partial class PlaybackEngine : IDisposable
         PlayerView? view = null;
         string[]? notices = null;
         var saveDue = false;
+        HeldWrite? held = null;
         try
         {
             _depth++;
@@ -265,6 +266,8 @@ public sealed partial class PlaybackEngine : IDisposable
                 {
                     saveDue = _saveRequested;
                     _saveRequested = false;
+                    held = _heldWrite;
+                    _heldWrite = null;
                     if (_viewDirty)
                     {
                         _viewDirty = false;
@@ -282,6 +285,13 @@ public sealed partial class PlaybackEngine : IDisposable
         {
             Monitor.Exit(_sync);
         }
+        var failure = held is null ? null : WriteHeld(held);
+        if (failure is not null)
+        {
+            // Put back below: what the change raised and published is not so.
+            notices = notices?.Take(held!.NoticeIndex).ToArray();
+            view = null;
+        }
         if (notices is not null)
         {
             foreach (var notice in notices)
@@ -292,6 +302,10 @@ public sealed partial class PlaybackEngine : IDisposable
         if (view is not null)
         {
             _sink.Changed(view);
+        }
+        if (failure is not null)
+        {
+            PutBack(held!, failure);
         }
         if (saveDue)
         {

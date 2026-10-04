@@ -249,7 +249,7 @@ public sealed partial class PlaybackEngine
             var before = _store.GetOverride(name, adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
             try
             {
-                _store.UpsertOverride(name, adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath, partial);
+                Hold(adjacency, "Not saved", () => _store.UpsertOverride(name, adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath, partial));
             }
             catch (Exception e) when (IsStoreWriteFailure(e))
             {
@@ -304,7 +304,7 @@ public sealed partial class PlaybackEngine
         bool removed;
         try
         {
-            removed = _store.RemoveOverride(playlist, adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
+            removed = Hold(adjacency, "Not removed", () => _store.RemoveOverride(playlist, adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath));
         }
         catch (Exception e) when (IsStoreWriteFailure(e))
         {
@@ -366,7 +366,7 @@ public sealed partial class PlaybackEngine
             var before = _store.Get(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
             try
             {
-                _store.Upsert(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath, spec);
+                Hold(adjacency, "Not saved", () => _store.Upsert(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath, spec));
             }
             catch (Exception e) when (IsStoreWriteFailure(e))
             {
@@ -406,7 +406,7 @@ public sealed partial class PlaybackEngine
         bool removed;
         try
         {
-            removed = _store.Remove(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath);
+            removed = Hold(adjacency, "Not removed", () => _store.Remove(adjacency.Outgoing.FilePath, adjacency.Incoming.FilePath));
         }
         catch (Exception e) when (IsStoreWriteFailure(e))
         {
@@ -440,6 +440,79 @@ public sealed partial class PlaybackEngine
         }
         return authored;
     }
+
+    /// <summary>A change to the store made under the lock and not yet on disk. The command's
+    /// outermost run writes it once the lock is released, so rendering, which waits on the lock,
+    /// never waits on the disk; a write that fails puts the change back, so a save that fails
+    /// still changes nothing. <see cref="NoticeIndex"/> is where the change's own notices begin,
+    /// for a failure to drop them; the history and the store version are as they were before it.</summary>
+    private sealed record HeldWrite(
+        ITransitionStore Store, Adjacency Adjacency, string Failed, int NoticeIndex,
+        List<HistoryEntry> Undo, List<HistoryEntry> Redo, long StoreVersion);
+
+    /// <summary>The command's held change, if it made one. Under the lock.</summary>
+    private HeldWrite? _heldWrite;
+
+    /// <summary>Makes <paramref name="change"/> to the store in memory only, and takes its write
+    /// for after the lock. <paramref name="failed"/> heads the notice if that write fails.</summary>
+    private T Hold<T>(Adjacency adjacency, string failed, Func<T> change)
+    {
+        var store = _store!;
+        _heldWrite ??= new HeldWrite(
+            store, adjacency, failed, _pendingNotices.Count, _undo.ToList(), _redo.ToList(), _storeVersion);
+        store.Holding = true;
+        try
+        {
+            return change();
+        }
+        finally
+        {
+            store.Holding = false;
+        }
+    }
+
+    private void Hold(Adjacency adjacency, string failed, Action change) => Hold(adjacency, failed, () =>
+    {
+        change();
+        return 0;
+    });
+
+    /// <summary>Writes the change a command held, off the lock: null once it is on disk, or why
+    /// it could not be written.</summary>
+    private static Exception? WriteHeld(HeldWrite held)
+    {
+        try
+        {
+            held.Store.WriteHeld();
+            return null;
+        }
+        catch (Exception e) when (IsStoreWriteFailure(e))
+        {
+            return e;
+        }
+    }
+
+    /// <summary>A held change could not be written: the store, the history, the store version
+    /// and the pending boundary go back to what they were, and the notice says why. The version
+    /// too, since the command's view was never delivered: an editor that sees it unmoved keeps
+    /// the draft that failed to save.</summary>
+    private void PutBack(HeldWrite held, Exception failure) => Run(() =>
+    {
+        held.Store.DropHeld();
+        if (ReferenceEquals(held.Store, _store))
+        {
+            _undo.Clear();
+            _undo.AddRange(held.Undo);
+            _redo.Clear();
+            _redo.AddRange(held.Redo);
+            _authoredPairs.Clear();
+            _storeVersion = held.StoreVersion;
+            _storeWritten = false;
+            RescheduleIfPending(held.Adjacency);
+        }
+        Publish(); // the command's own view was never delivered
+        RaiseStoreWriteFailure(held.Failed, held.Adjacency, failure);
+    });
 
     /// <summary>A transition was saved or removed: the rows' authored marks are published again.</summary>
     private void StoreChanged()

@@ -58,7 +58,7 @@ public sealed partial class PlaybackEngine
             var entry = from[from.Count - 1];
             try
             {
-                Write(entry, target(entry));
+                Hold(entry.Adjacency, failed, () => Write(entry, target(entry)));
             }
             catch (Exception e) when (IsStoreWriteFailure(e))
             {

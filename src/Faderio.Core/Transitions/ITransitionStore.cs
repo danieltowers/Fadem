@@ -35,6 +35,19 @@ public interface ITransitionStore
     /// <summary>Removes every override of the playlist: a playlist delete (D17). Nothing to remove
     /// is no write.</summary>
     void RemovePlaylist(string playlistName);
+
+    /// <summary>While true, a change is kept in memory and its file write is held back:
+    /// <see cref="WriteHeld"/> writes every held change at once, and <see cref="DropHeld"/>
+    /// forgets them. The engine holds its changes so that it never writes the file under its
+    /// lock, which rendering waits on.</summary>
+    bool Holding { get; set; }
+
+    /// <summary>Writes the changes held, if any. Throws as a write does when it fails, and the
+    /// changes stay held.</summary>
+    void WriteHeld();
+
+    /// <summary>Forgets the changes held: the store is again what was last written.</summary>
+    void DropHeld();
 }
 
 /// <summary>The store file claims a schema version this build does not understand.</summary>

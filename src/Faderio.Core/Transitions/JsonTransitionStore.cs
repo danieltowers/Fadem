@@ -24,7 +24,26 @@ public sealed class JsonTransitionStore : ITransitionStore
     };
 
     private readonly string _path;
-    private StoreFileModel _model = new();
+
+    /// <summary>What is read. Never changed in place: a change replaces it with a changed copy,
+    /// so a write made off the engine lock serialises a model no one is changing.</summary>
+    private volatile StoreFileModel _model = new();
+
+    /// <summary>What the file holds, as far as this store knows.</summary>
+    private StoreFileModel _written = new();
+
+    /// <summary>Guards <see cref="_model"/>'s replacement and <see cref="_written"/>.</summary>
+    private readonly object _sync = new();
+
+    /// <summary>Taken across a whole file write, so two writes never land out of order. Taken
+    /// before <see cref="_sync"/>, never inside it.</summary>
+    private readonly object _writeGate = new();
+
+    /// <inheritdoc/>
+    public bool Holding { get; set; }
+
+    /// <summary>Runs just before the file is written: a test's way to act during a write.</summary>
+    internal Action? Writing { get; set; }
 
     public JsonTransitionStore(string path)
     {
@@ -160,16 +179,68 @@ public sealed class JsonTransitionStore : ITransitionStore
         }
 
         _model = model;
+        _written = model;
     }
 
     /// <summary>Applies a change to a copy and keeps the copy only once it is on disk, so a
-    /// write that fails changes nothing and the caller can truthfully say "not saved".</summary>
+    /// write that fails changes nothing and the caller can truthfully say "not saved". While
+    /// <see cref="Holding"/>, the copy is kept at once and written by <see cref="WriteHeld"/>.</summary>
     private void Commit(Action<StoreFileModel> change)
     {
-        var next = _model.Copy();
-        change(next);
-        AtomicJson.Write(_path, next, JsonOptions);
-        _model = next;
+        if (Holding)
+        {
+            lock (_sync)
+            {
+                var held = _model.Copy();
+                change(held);
+                _model = held;
+            }
+            return;
+        }
+        lock (_writeGate)
+        {
+            var next = _model.Copy();
+            change(next);
+            Write(next);
+            lock (_sync)
+            {
+                _model = next;
+                _written = next;
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public void WriteHeld()
+    {
+        lock (_writeGate)
+        {
+            var model = _model;
+            if (ReferenceEquals(model, _written))
+            {
+                return;
+            }
+            Write(model);
+            lock (_sync)
+            {
+                _written = model;
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public void DropHeld()
+    {
+        lock (_sync)
+        {
+            _model = _written;
+        }
+    }
+
+    private void Write(StoreFileModel model)
+    {
+        Writing?.Invoke();
+        AtomicJson.Write(_path, model, JsonOptions);
     }
 }
 
