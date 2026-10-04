@@ -404,7 +404,12 @@ public sealed partial class PlaybackEngine
         var index = IndexOf(voice);
         if (index >= 0)
         {
-            ScheduleBoundary(index, voice, _mixer.Timeline, voice.Source.Position, retryMarked: false);
+            ScheduleBoundary(index, voice, _mixer.Timeline, voice.Source.Position, retryMarked: false, UnheardFrames);
         }
     }
+
+    /// <summary>How far decoding is ahead of the listener: the frames the device holds. None
+    /// while a preview holds the queue, whose clock stands still.</summary>
+    private long UnheardFrames =>
+        _preview is null ? Math.Max(0, _mixer.Timeline - (_output.FramesEmitted.Count + _queueBase)) : 0;
 }

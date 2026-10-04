@@ -64,6 +64,41 @@ public sealed class AuthoringWhilePlayingTests
     }
 
     [Fact]
+    public void AFadeOutPointDecodedButNotYetHeard_FadesFromWhereDecodingIs()
+    {
+        // The device holds 0.3 s: at 1.5 s decoded, 1.2 s is heard. A fade-out point dropped at
+        // 1.35 s is ahead of the listener, so it fades now, not as a hard cut at the track's end.
+        using var tc = TestEngine.Create(latency: Rate * 3 / 10);
+        var a = TestAudio.WriteToneWav("a.wav", 4, 1000);
+        var b = TestAudio.WriteToneWav("b.wav", 4, 2000);
+        tc.Play(a, b);
+        tc.Output.Advance(Rate * 3 / 2);
+
+        tc.Engine.Author(tc.AdjacencyOf(a, b), Crossfade(1.35));
+        tc.Output.Advance(Rate * 2);
+
+        // Rendered frames: the fade runs from 1.5 s to 2.5 s.
+        Assert.True(tc.Rendered.ToneAmplitude(2000, Rate * 2) > 0.1, "b is fading in by 2.0 s");
+        Assert.True(tc.Rendered.ToneAmplitude(1000, Rate * 26 / 10) < 0.05, "a is gone by 2.6 s");
+    }
+
+    [Fact]
+    public void AFadeOutPointAlreadyHeard_IsStillAHardCut()
+    {
+        using var tc = TestEngine.Create(latency: Rate * 3 / 10);
+        var a = TestAudio.WriteToneWav("a.wav", 4, 1000);
+        var b = TestAudio.WriteToneWav("b.wav", 4, 2000);
+        tc.Play(a, b);
+        tc.Output.Advance(Rate * 3 / 2);
+
+        tc.Engine.Author(tc.AdjacencyOf(a, b), Crossfade(1.1)); // heard at 1.2 s: behind the listener
+        tc.Output.Advance(Rate * 2);
+
+        Assert.True(tc.Rendered.ToneAmplitude(2000, Rate * 3) < 0.05, "no b before a ends");
+        Assert.Equal(0.4, tc.Rendered.ToneAmplitude(1000, Rate * 3), 2);
+    }
+
+    [Fact]
     public void ASaveThatCannotBeWritten_LeavesNothingToUndo()
     {
         using var tc = TestEngine.Create();

@@ -198,20 +198,24 @@ public sealed partial class PlaybackEngine
     /// The incoming track starts being opened now, not when the fade begins: if it cannot be,
     /// it is marked and the boundary goes to the next readable row, with that adjacency's own
     /// transition, so a fade into silence is never heard. <paramref name="retryMarked"/> when a
-    /// new voice starts: the queue has reached the rows after it again.</summary>
+    /// new voice starts: the queue has reached the rows after it again. <paramref name="unheard"/>
+    /// is how far decoding is ahead of the listener in the voice: a fade-out point within it is
+    /// still ahead of what is heard, so the fade begins where decoding is rather than not at all.</summary>
     private void ScheduleBoundary(
-        int index, MixerVoice voice, long referenceTimeline, long referencePosition, bool retryMarked)
+        int index, MixerVoice voice, long referenceTimeline, long referencePosition, bool retryMarked, long unheard = 0)
     {
         _passedOver.Clear(); // a new search for the incoming row
         ScheduleBoundary(
-            index, voice, referenceTimeline, referencePosition, retryMarked, _queue.IndexAfter(index, _settings.Repeat));
+            index, voice, referenceTimeline, referencePosition, retryMarked, _queue.IndexAfter(index, _settings.Repeat),
+            unheard);
     }
 
     /// <summary><see cref="ScheduleBoundary(int, MixerVoice, long, long, bool)"/> with the
     /// incoming row sought from <paramref name="first"/>: the row after the voice's own, or
     /// after one that has just failed to open.</summary>
     private void ScheduleBoundary(
-        int index, MixerVoice voice, long referenceTimeline, long referencePosition, bool retryMarked, int? first)
+        int index, MixerVoice voice, long referenceTimeline, long referencePosition, bool retryMarked, int? first,
+        long unheard = 0)
     {
         var total = voice.Source.TotalFrames;
         var outTrack = _queue.Entries[index].Track;
@@ -233,7 +237,7 @@ public sealed partial class PlaybackEngine
         var global = _store?.Get(outTrack.FilePath, inTrack.FilePath);
         var transition = _resolver.Resolve(
             global, OverrideOf(outTrack.FilePath, inTrack.FilePath), TimeSpanOf(total), inTrack.Length.TimeSpan);
-        if (transition.IsHardCut || !TryComputeFade(referencePosition, total, transition, TimelineOf, out var trigger, out var fadeFrames))
+        if (transition.IsHardCut || !TryComputeFade(referencePosition, unheard, total, transition, TimelineOf, out var trigger, out var fadeFrames))
         {
             // A hard cut, or an authored fade-out point already passed (e.g. manual seek): the
             // incoming track starts when the outgoing one runs out.
@@ -303,6 +307,7 @@ public sealed partial class PlaybackEngine
 
     private bool TryComputeFade(
         long referencePosition,
+        long unheard,
         long total,
         EffectiveTransition transition,
         Func<long, long> timelineOf,
@@ -320,10 +325,12 @@ public sealed partial class PlaybackEngine
             return true;
         }
         var point = Compat.Clamp(Frames(transition.FadeOutPoint), 0, total);
-        if (point < referencePosition)
+        if (point < referencePosition - unheard)
         {
-            return false; // the fade-out point lies behind us; do not force it after a seek
+            return false; // the fade-out point lies behind the listener; do not force it after a seek
         }
+        // Decoded past but not yet heard: the fade begins where decoding is, a buffer late at most.
+        point = Math.Max(point, referencePosition);
         trigger = timelineOf(point);
         if (point + duration >= total)
         {

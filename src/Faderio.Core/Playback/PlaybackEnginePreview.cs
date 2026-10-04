@@ -228,7 +228,7 @@ public sealed partial class PlaybackEngine
         var total = outSource.TotalFrames;
         var transition = _resolver.Resolve(global, playlistOverride, TimeSpanOf(total), adjacency.Incoming.Length.TimeSpan);
         // Where the queue would begin the transition, in the outgoing track.
-        var begins = !transition.IsHardCut && TryComputeFade(0, total, transition, f => f, out var planned, out _)
+        var begins = !transition.IsHardCut && TryComputeFade(0, 0, total, transition, f => f, out var planned, out _)
             ? planned
             : total;
         var start = Math.Max(0, begins - Frames(PreviewPreRoll));
@@ -245,7 +245,7 @@ public sealed partial class PlaybackEngine
         };
         _preview = run;
 
-        if (transition.IsHardCut || !TryComputeFade(start, total, transition, TimelineOf, out var trigger, out var fadeFrames))
+        if (transition.IsHardCut || !TryComputeFade(start, 0, total, transition, TimelineOf, out var trigger, out var fadeFrames))
         {
             // A hard cut: the incoming track starts when the outgoing one runs out.
             run.SpawnAt = at =>
