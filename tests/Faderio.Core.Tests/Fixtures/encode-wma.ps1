@@ -2,7 +2,8 @@
 # runtime, as Windows Media Player rips with), reached through MusicBee's basswma.dll. Called
 # by generate.sh; must run in 32-bit PowerShell, because MusicBee's BASS is 32-bit:
 #   C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe -File encode-wma.ps1 in.f32 out.wma rate channels bitrate [flags]
-# flags are BASS_WMA_ENCODE_*: 0 for WMA 9 Standard, 0x4000 (16384) for WMA 9 Pro.
+# flags are BASS_WMA_ENCODE_*: 0 for WMA 9 Standard, 0x4000 (16384) for WMA 9 Pro, and with
+# 0x8000 (24-bit) 49152. A bitrate of 100 or less is VBR quality, and 100 is WMA 9 Lossless.
 param([string]$In, [string]$Out, [int]$Rate, [int]$Channels, [int]$Bitrate, [int]$Flags = 0)
 $ErrorActionPreference = 'Stop'
 if ([Environment]::Is64BitProcess) { throw 'run in 32-bit PowerShell: MusicBee''s BASS is 32-bit' }

@@ -57,8 +57,8 @@ ffmpeg's files lose the source's last partial block; their length is likewise wh
 ## What is promised
 
 WMA 9 Standard (`wmav2`) at 44.1 and 48 kHz, mono and stereo. Mono at 48 kHz rests on ffmpeg's
-fixture alone, since Windows' encoder offers none. WMA 9 Pro, Lossless and Voice are rejected at
-add time, naming the codec: they are unmeasured. On a Windows N edition without the Media Feature
+fixture alone, since Windows' encoder offers none. WMA 9 Lossless joined it the same day (the
+addendum). WMA 9 Pro and Voice are rejected at add time, naming the codec: they are unmeasured. On a Windows N edition without the Media Feature
 Pack, where the runtime is missing, a WMA is rejected at add time with that reason.
 
 ## Consequences
@@ -69,3 +69,19 @@ Pack, where the runtime is missing, a WMA is rejected at add time with that reas
   BASS. They are not in the production chain.
 - M4A could follow the same route through Media Foundation, if its samples after a seek are
   the decode from the start with stamps close enough to name them. Unmeasured.
+
+## Addendum: WMA 9 Lossless (2026-10-05)
+
+Measured when a library's Lossless files were rejected. Windows' encoder, the only one that
+writes it, writes it in stereo only: 44.1 kHz at 16-bit, as Windows Media Player rips a CD, and
+44.1, 48 and 96 kHz at 24-bit. Those four cells are promised.
+
+- **The runtime's default output is not the file's.** It decodes 24-bit Lossless to 16-bit and
+  96 kHz to 48 kHz. The reader asks for the stream's own rate, channels and depth from the
+  formats the runtime offers, and reads 24-bit PCM. Standard is unchanged: 16-bit, as before.
+- **The decode is the source**, sample for sample, from sample 0, with no codec tail: its length
+  is the source's own count.
+- **A seek can land after the time asked for**, up to 0.4 s on the fixtures, where Standard lands
+  on it. The reader asks again earlier, by 0.5, 1 and 2 s, then from the start of the file, until
+  it lands before the target; the index places it as before.
+

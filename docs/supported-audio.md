@@ -46,6 +46,7 @@ cell, and a missing fixture is a red cell.
 | MP3, constant bitrate with no Xing/Info/VBRI header | 44.1, 48 kHz | n/a | mono, stereo | the five `Mp3_*` theories, variant `CbrBare`: the length is the audio bytes over the frame size, whole frames, no frame scan | proven, 4 cells (ticket 14) |
 | MP3, variable bitrate with a Xing header | 44.1, 48 kHz | n/a | mono, stereo | the same eight theories as `CbrInfo`, variant `Vbr`: as `CbrInfo` | proven, 4 cells, 8 theories each (ticket 14; trimmed in issue 18) |
 | WMA 9 Standard (`wmav2`) | 44.1, 48 kHz | n/a (decodes to 16-bit PCM) | mono, stereo | the five `Wma_*` theories over `WmaCells()`, on files from Windows' own encoder (as Windows Media Player rips) and from ffmpeg's: the length is a full decode at add time, codec tail included | proven, 7 cells: 3 from Windows' encoder, 4 from ffmpeg's; mono 48 kHz is ffmpeg's alone, as Windows' encoder offers none ([phase 6 issue 12](../.scratch/202609-faderio-phase-6-musicbee-improvements-round-1/issues/12-wma-plays-and-authors-exactly-in-both-hosts.md), [ADR 0016](adr/0016-wma-through-the-windows-media-format-runtime.md)) |
+| WMA 9 Lossless | 44.1 kHz at 16 or 24-bit; 48 and 96 kHz at 24-bit | 16, 24 (as listed) | stereo | the five `WmaLossless_*` theories over `WmaLosslessCells()`, and `WmaRuntimeTests.Lossless_DecodesToTheSourceExactly`: the decode is the source, sample for sample, from sample 0, and its length the source's | proven, 4 cells: every cell Windows' encoder, the only one there is, can write; 44.1 kHz 16-bit is a Windows Media Player CD rip (ADR 0016, addendum) |
 
 Every promised cell seeks to 1 ms; no cell is pinned. A variable-bitrate MP3 without a Xing
 header is not a row: the probe would have to scan every frame, and no library file is one
@@ -130,7 +131,8 @@ particular:
 | Sample rates other than 44.1, 48 and 96 kHz | Unproven. The resampler would very likely cope, but "very likely" is not a row. | A row per rate; WAV rows are free to generate. |
 | AIFF | A reader exists but nobody has a file. Unproven. | One row and an ffmpeg fixture. |
 | M4A / AAC | Ticket 02 measured seek error up to 15 ms through Media Foundation, which also misreports the length. The promise is 1 ms. | A decoder that seeks it exactly. WMA's route ([ADR 0016](adr/0016-wma-through-the-windows-media-format-runtime.md)) may work through Media Foundation: unmeasured. |
-| WMA 9 Pro, Lossless and Voice; WMA 1 | Unmeasured: only WMA 9 Standard has fixtures. Rejected by codec. | A fixture each (`Fixtures/encode-wma.ps1` takes Windows' encoder flags) and the five theories. |
+| WMA 9 Pro and Voice; WMA 1 | Unmeasured. Rejected by codec. | A fixture each (`Fixtures/encode-wma.ps1` takes Windows' encoder flags) and the five theories. |
+| WMA 9 Lossless in mono, or 16-bit at 48 or 96 kHz | Windows' encoder will not write them, so there is no fixture. | A file of one, from another encoder, as a fixture. |
 | WMA on a Windows N edition without the Media Feature Pack | The Windows Media Format runtime is not installed. Rejected with that reason. | Installing the Media Feature Pack. |
 | Ogg Vorbis | NVorbis 0.10.5 cannot seek into any file paged by ffmpeg's defaults (ticket 07). The reader is deleted rather than kept broken. | A research ticket on a decoder that seeks any Ogg, if the format is ever wanted. |
 | Opus, DSD, anything else | No reader, no row. | A row. |

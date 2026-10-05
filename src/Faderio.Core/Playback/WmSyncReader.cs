@@ -11,8 +11,8 @@ namespace Faderio.Core.Playback;
 /// wrappers: the reader is created by a flat function, not registered, and a wrapper would try
 /// to marshal it between the threads that open, seek and read a track (ADR 0015). The engine
 /// never calls one reader from two threads at once.
-/// <para>Times are the runtime's: 100 ns units. Output is the runtime's default for the stream,
-/// PCM at the file's own rate and channel count.</para>
+/// <para>Times are the runtime's: 100 ns units. Output is PCM at the file's own rate, channel
+/// count and, for WMA Lossless, bit depth, chosen from what the runtime offers.</para>
 /// </summary>
 internal sealed unsafe class WmSyncReader : IDisposable
 {
@@ -24,12 +24,13 @@ internal sealed unsafe class WmSyncReader : IDisposable
     /// <summary>Held for the reader's life: the runtime calls back into it.</summary>
     private StreamAdapter? _adapter;
 
-    private WmSyncReader(IntPtr reader, uint output, WmPcmFormat format, ushort codec)
+    private WmSyncReader(IntPtr reader, uint output, WmPcmFormat format, ushort codec, int encodedBits)
     {
         _reader = reader;
         _output = output;
         Format = format;
         CodecTag = codec;
+        EncodedBits = encodedBits;
     }
 
     /// <summary>What the runtime decodes to.</summary>
@@ -38,6 +39,10 @@ internal sealed unsafe class WmSyncReader : IDisposable
     /// <summary>The audio stream's WAVEFORMATEX format tag as encoded: 0x161 is WMA 9 Standard
     /// (wmav2), 0x162 Pro, 0x163 Lossless, 0x0A Voice.</summary>
     public ushort CodecTag { get; }
+
+    /// <summary>The bit depth the stream was encoded from: WMA Lossless's 16 or 24, which it
+    /// decodes back to. A lossy codec's says nothing about its audio.</summary>
+    public int EncodedBits { get; }
 
     /// <summary>Why the runtime cannot be used here, or null when it can: Windows N and KN
     /// editions lack it without the Media Feature Pack.</summary>
@@ -113,7 +118,13 @@ internal sealed unsafe class WmSyncReader : IDisposable
             {
                 ushort stream;
                 Check(((delegate* unmanaged[Stdcall]<IntPtr, uint, ushort*, int>)Slot(reader, 20))(reader, output, &stream));
-                return new WmSyncReader(reader, output, format, CodecOf(reader, stream));
+                var encoded = EncodedOf(reader, stream);
+                var native = new WmPcmFormat(encoded.Rate, encoded.Channels, Math.Max(16, encoded.Bits));
+                if (format != native && SelectOutput(reader, output, native))
+                {
+                    format = native;
+                }
+                return new WmSyncReader(reader, output, format, encoded.Tag, encoded.Bits);
             }
         }
         throw new InvalidDataException("The file has no audio stream.");
@@ -193,9 +204,35 @@ internal sealed unsafe class WmSyncReader : IDisposable
         return new WmPcmFormat(w.Rate, w.Channels, w.Bits);
     }
 
-    /// <summary>The encoded format tag of stream <paramref name="stream"/>, from the reader's
-    /// profile (IWMProfile).</summary>
-    private static ushort CodecOf(IntPtr reader, ushort stream)
+    /// <summary>Asks for <paramref name="native"/> when the runtime offers it. Its default is
+    /// not always the file's own: 24-bit WMA Lossless decodes to 16-bit, and 96 kHz to 48 kHz.</summary>
+    private static bool SelectOutput(IntPtr reader, uint output, WmPcmFormat native)
+    {
+        uint count;
+        Check(((delegate* unmanaged[Stdcall]<IntPtr, uint, uint*, int>)Slot(reader, 17))(reader, output, &count));
+        for (uint i = 0; i < count; i++)
+        {
+            IntPtr props;
+            Check(((delegate* unmanaged[Stdcall]<IntPtr, uint, uint, IntPtr*, int>)Slot(reader, 18))(reader, output, i, &props));
+            try
+            {
+                if (PcmFormat(props) == native)
+                {
+                    Check(((delegate* unmanaged[Stdcall]<IntPtr, uint, IntPtr, int>)Slot(reader, 16))(reader, output, props));
+                    return true;
+                }
+            }
+            finally
+            {
+                Release(props);
+            }
+        }
+        return false;
+    }
+
+    /// <summary>Stream <paramref name="stream"/>'s format as encoded, from the reader's profile
+    /// (IWMProfile).</summary>
+    private static Wave EncodedOf(IntPtr reader, ushort stream)
     {
         var profile = QueryInterface(reader, IidProfile);
         try
@@ -207,7 +244,7 @@ internal sealed unsafe class WmSyncReader : IDisposable
                 var props = QueryInterface(config, IidMediaProps);
                 try
                 {
-                    return WaveFormatOf(props)?.Tag ?? 0;
+                    return WaveFormatOf(props) ?? throw new InvalidDataException("The audio stream has no wave format.");
                 }
                 finally
                 {

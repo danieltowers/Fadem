@@ -150,3 +150,11 @@ the reason. Recorded in ADR 0016. A file with no index (another machine, or chan
 decoded in full when opened, under the lock for a direct play: about 0.75 s for 4 minutes, 5 s
 for 26. Left: the MusicBee Looks items and the Sounds half.
 
+
+### 2026-10-05, WMA 9 Lossless
+
+Measured after the user's Lossless files were rejected, and promised: stereo, 44.1 kHz at 16 or
+24-bit, 48 and 96 kHz at 24-bit, every cell Windows' encoder writes. The reader now asks the
+runtime for the file's own rate and depth (its default turned 24-bit into 16 and 96 kHz into
+48), and asks earlier when a Lossless seek lands past its target (up to 0.4 s). The decode is the
+source, sample for sample. ADR 0016's addendum. The user checked it in MusicBee: it works.

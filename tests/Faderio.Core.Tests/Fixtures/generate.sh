@@ -12,6 +12,8 @@
 #   noise-<variant>-<rate>-<ch>.mp3
 #   tone-<encoder>-<rate>-<ch>.wma          as above, WMA 9 Standard
 #   noise-<encoder>-<rate>-<ch>.wma
+#   tone-windowslossless-<rate>-<bits>-2.wma   as above, WMA 9 Lossless
+#   noise-windowslossless-<rate>-<bits>-2.wma
 #
 # FLAC: 16/24-bit x 44.1/48/96 kHz x mono/stereo, twelve cells. "-sample_fmt s32" makes
 # ffmpeg's FLAC encoder write 24-bit.
@@ -36,6 +38,11 @@
 #             basswma.dll by encode-wma.ps1, which needs MusicBee installed and runs in 32-bit
 #             PowerShell. It is fed the same lavfi PCM as raw float. It offers mono only up to
 #             48 kbps at 44.1 kHz and not at all at 48 kHz, so it has three cells, not four.
+# WMA 9 Lossless comes only from Windows' encoder (ffmpeg decodes it but cannot write it), at VBR
+# quality 100, and only in stereo: 44.1 kHz at 16-bit, as Windows Media Player rips a CD, and
+# 44.1, 48 and 96 kHz at 24-bit (BASS_WMA_ENCODE_PRO | BASS_WMA_ENCODE_24BIT). It refuses mono,
+# and 16-bit at 48 and 96 kHz. Four cells.
+#
 # Two more outside the grid: tone-windowspro-44100-2.wma, WMA 9 Pro from Windows' encoder,
 # which the add-time probe rejects by its codec; and long-ffmpeg-44100-1.wma, 10 minutes of the
 # pink noise at ffmpeg's lowest bitrate, 24 kbps mono (2 MB), for a seek deep into a long file.
@@ -112,6 +119,14 @@ for rate in 44100 48000; do
 done
 ffmpeg -y -loglevel error -f lavfi -i "$(tone 44100)" -ac 2 -f f32le "$f32"
 "$ps32" -NoProfile -ExecutionPolicy Bypass -File encode-wma.ps1 "$(cygpath -w "$f32")" tone-windowspro-44100-2.wma 44100 2 128000 16384
+for cell in 44100-16 44100-24 48000-24 96000-24; do
+  rate=${cell%-*}; bits=${cell#*-}
+  flags=0; [ "$bits" = 24 ] && flags=49152
+  for signal in tone noise; do
+    ffmpeg -y -loglevel error -f lavfi -i "$($signal $rate)" -ac 2 -f f32le "$f32"
+    "$ps32" -NoProfile -ExecutionPolicy Bypass -File encode-wma.ps1 "$(cygpath -w "$f32")" "$signal-windowslossless-$rate-$bits-2.wma" $rate 2 100 $flags
+  done
+done
 rm -f "$f32"
 ffmpeg -y -loglevel error -f lavfi -i "anoisesrc=color=pink:sample_rate=44100:duration=600:seed=42:amplitude=0.5"   -ac 1 -c:a wmav2 -b:a 24k long-ffmpeg-44100-1.wma
 

@@ -42,10 +42,10 @@ internal sealed class WmaTrackReader : ITrackSource
         var name = Path.GetFileName(path);
         var index = indexes.For(path, file, cancelled);
         var reader = WmSyncReader.Open(file, name);
-        if (reader.Format.BitsPerSample != 16)
+        if (reader.Format.BitsPerSample is not (16 or 24))
         {
             reader.Dispose();
-            throw new InvalidDataException($"Windows Media decoded {name} to {reader.Format.BitsPerSample}-bit, not 16.");
+            throw new InvalidDataException($"Windows Media decoded {name} to {reader.Format.BitsPerSample}-bit, not 16 or 24.");
         }
         return new WmaTrackReader(file, name, index, reader);
     }
@@ -75,9 +75,20 @@ internal sealed class WmaTrackReader : ITrackSource
             var n = Math.Min(count - frames, (_pendingBytes - _pendingAt) / BlockAlign);
             var samples = n * channels;
             var target = offset + frames * channels;
-            for (var i = 0; i < samples; i++)
+            if (_reader.Format.BitsPerSample == 16)
             {
-                buffer[target + i] = BitConverter.ToInt16(_pending, _pendingAt + i * 2) / 32768f;
+                for (var i = 0; i < samples; i++)
+                {
+                    buffer[target + i] = BitConverter.ToInt16(_pending, _pendingAt + i * 2) / 32768f;
+                }
+            }
+            else
+            {
+                for (var i = 0; i < samples; i++)
+                {
+                    var at = _pendingAt + i * 3;
+                    buffer[target + i] = (_pending[at] | _pending[at + 1] << 8 | (sbyte)_pending[at + 2] << 16) / 8388608f;
+                }
             }
             _pendingAt += n * BlockAlign;
             frames += n;
@@ -116,12 +127,16 @@ internal sealed class WmaTrackReader : ITrackSource
     /// sample of a decode from the start in two, and the one after is whole (measured).</summary>
     private const int SamplesToPlaceASeek = 8;
 
+    /// <summary>How much earlier than the sample before the target a seek asks again, each time
+    /// it lands after the target, in the runtime's 100 ns units. WMA Lossless lands up to 0.4 s
+    /// after the time asked for (measured); Standard lands on it.</summary>
+    private static readonly long[] AskEarlierBy = { 0, 5_000_000, 10_000_000, 20_000_000 };
+
     /// <summary>Asks the runtime for the sample before the one <paramref name="target"/> is in,
-    /// so it lands before the target however far off its stamps are. What it delivers is a
-    /// decode from the start, sample for sample, but the first is cut wherever the runtime
-    /// landed and a later one may be split in two. So the samples are placed by the first after
-    /// the first that the index names: stamped as one of its samples, and ending where the next
-    /// starts.</summary>
+    /// or earlier until it lands before the target. What it delivers is a decode from the start,
+    /// but the first sample is cut wherever the runtime landed and a later one may be split in
+    /// two. So the samples are placed by the first after the first that the index names: stamped
+    /// as one of its samples, and ending where the next starts.</summary>
     private bool SeekByIndex(long target)
     {
         var at = _index.SampleAt(target) - 1;
@@ -129,14 +144,42 @@ internal sealed class WmaTrackReader : ITrackSource
         {
             return false; // the first samples are as quick to reach from the start
         }
-        _reader.SetRange(_index.Stamps[at]);
+        foreach (var earlier in AskEarlierBy)
+        {
+            // Never before the file's first stamp, and the first ask there is the last.
+            var ask = Math.Max(_index.Stamps[0], _index.Stamps[at] - earlier);
+            switch (Place(ask, target))
+            {
+                case Placed.OnTheTarget:
+                    return true;
+                case Placed.Unrecognised:
+                    return false;
+            }
+            if (ask == _index.Stamps[0])
+            {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private enum Placed
+    {
+        OnTheTarget,
+        AfterTheTarget,
+        Unrecognised,
+    }
+
+    private Placed Place(long ask, long target)
+    {
+        _reader.SetRange(ask);
         _pendingAt = _pendingBytes = 0;
         long before = 0; // frames delivered before the sample in hand
         for (var read = 0; read < SamplesToPlaceASeek; read++)
         {
             if (!_reader.Next(ref _next, out var stamp, out var bytes))
             {
-                return false;
+                return Placed.AfterTheTarget; // landed too near the end to place anything
             }
             var frames = bytes / BlockAlign;
             if (read > 0 && _index.SampleStamped(stamp) is { } named && _index.IsStart(_index.Starts[named] + frames))
@@ -144,17 +187,17 @@ internal sealed class WmaTrackReader : ITrackSource
                 var first = _index.Starts[named] - before;
                 if (first > target)
                 {
-                    return false;
+                    return Placed.AfterTheTarget;
                 }
                 Append(bytes);
                 _position = first;
                 Discard(target - first);
-                return true;
+                return Placed.OnTheTarget;
             }
             Append(bytes);
             before += frames;
         }
-        return false;
+        return Placed.Unrecognised;
     }
 
     /// <summary>Adds the sample in <see cref="_next"/> to what is pending.</summary>

@@ -84,6 +84,12 @@ public class RealInputMatrixTests
         where !(encoder == "windows" && rate == 48000 && channels == 1)
         select new object[] { encoder, rate, channels };
 
+    /// <summary>WMA 9 Lossless, from Windows' encoder, the only one that writes it: stereo, at
+    /// 44.1 kHz 16-bit (a Windows Media Player rip) and 44.1, 48 and 96 kHz 24-bit.</summary>
+    public static IEnumerable<object[]> WmaLosslessCells() =>
+        from cell in new[] { (44100, 16), (44100, 24), (48000, 24), (96000, 24) }
+        select new object[] { cell.Item1, cell.Item2 };
+
     private static string FixturePath(string name)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", name);
@@ -96,6 +102,9 @@ public class RealInputMatrixTests
 
     private static string WmaFixture(string signal, string encoder, int rate, int channels) =>
         FixturePath($"{signal}-{encoder}-{rate}-{channels}.wma");
+
+    private static string WmaLosslessFixture(string signal, int rate, int bits) =>
+        FixturePath($"{signal}-windowslossless-{rate}-{bits}-2.wma");
 
     private static string Mp3Fixture(string signal, Mp3Variant variant, int rate, int channels) =>
         FixturePath($"{signal}-{variant.ToString().ToLowerInvariant()}-{rate}-{channels}.mp3");
@@ -517,4 +526,32 @@ public class RealInputMatrixTests
         var target = WmaLastBlockTarget(path);
         AssertLanded(Landing(path, target), target);
     }
+
+    // ── WMA Lossless cells, checked-in fixtures ──────────────────────────────────────────
+
+    [Theory, MemberData(nameof(WmaLosslessCells))]
+    public void WmaLossless_ReadsToCompletion(int rate, int bits) =>
+        AssertComplete(WmaLosslessFixture("tone", rate, bits));
+
+    [Theory, MemberData(nameof(WmaLosslessCells))]
+    public void WmaLossless_ToneIsPure(int rate, int bits) =>
+        AssertPure(WmaLosslessFixture("tone", rate, bits));
+
+    [Theory, MemberData(nameof(WmaLosslessCells))]
+    public void WmaLossless_HeaderLengthEqualsDecoded(int rate, int bits)
+    {
+        // Counted by the same decode as Standard's, and it is the source's own count: Lossless
+        // has no codec tail and loses nothing.
+        var path = WmaLosslessFixture("tone", rate, bits);
+        AssertHeaderLengthEqualsDecoded(path);
+        AssertDecodedFrames(path, SourceFrames(rate));
+    }
+
+    [Theory, MemberData(nameof(WmaLosslessCells))]
+    public void WmaLossless_SeekBeforeFirstRead_LandsWithin1ms(int rate, int bits) =>
+        AssertLanded(Landing(WmaLosslessFixture("noise", rate, bits), SeekTarget), SeekTarget);
+
+    [Theory, MemberData(nameof(WmaLosslessCells))]
+    public void WmaLossless_SeekIntoLastBlock_LandsWithin1ms(int rate, int bits) =>
+        AssertLanded(Landing(WmaLosslessFixture("noise", rate, bits), LastBlockTarget), LastBlockTarget);
 }

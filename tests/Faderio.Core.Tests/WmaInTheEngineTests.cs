@@ -68,6 +68,18 @@ public sealed class WmaInTheEngineTests : IDisposable
     }
 
     [Fact]
+    public void WmaLossless_At96kHz24Bit_IsQueued_WithTheSourcesLength()
+    {
+        var (engine, _) = EngineOn(Library.Open(Folder("Library")));
+
+        var report = engine.Add(new[] { Fixture("tone-windowslossless-96000-24-2.wma") }).Result;
+
+        var row = Assert.Single(report.Added);
+        Assert.Equal(Length.FromFrames(192000, 96000), row.Track.Length);
+        engine.Dispose();
+    }
+
+    [Fact]
     public void WmaPro_IsRejected_NamingItsCodec()
     {
         var (engine, _) = EngineOn(Library.Open(Folder("Library")));

@@ -60,8 +60,13 @@ public static class SupportedAudio
     private static readonly int[] WmaRates = { 44100, 48000 };
     private static readonly string[] Extensions = { ".wav", ".flac", ".mp3", ".wma" };
 
-    /// <summary>The one WMA codec promised (issue 12): Pro, Lossless and Voice are unmeasured.</summary>
+    /// <summary>WMA 9 Lossless's cells, as rate and depth, all stereo: what Windows' encoder
+    /// writes, the only encoder of it there is. Mono and 16-bit above 44.1 kHz it refuses.</summary>
+    private static readonly (int Rate, int Bits)[] WmaLosslessCells = { (44100, 16), (44100, 24), (48000, 24), (96000, 24) };
+
+    /// <summary>The WMA codecs promised (issue 12): Pro and Voice are unmeasured.</summary>
     internal const string WmaStandard = "WMA 9 Standard";
+    internal const string WmaLossless = "WMA 9 Lossless";
 
     /// <summary>Whether a file's extension names a promised format, in any case. Adding a folder
     /// takes only these and ignores the rest silently; a file named on its own is probed whatever
@@ -84,9 +89,14 @@ public static class SupportedAudio
                 return null;
             case AudioFormat.Mp3:
                 return Mp3Rates.Contains(shape.SampleRate) ? null : RejectedProperty.SampleRate;
-            case AudioFormat.Wma:
-                if (shape.Codec != WmaStandard) return RejectedProperty.Codec;
+            case AudioFormat.Wma when shape.Codec == WmaStandard:
                 return WmaRates.Contains(shape.SampleRate) ? null : RejectedProperty.SampleRate;
+            case AudioFormat.Wma when shape.Codec == WmaLossless:
+                if (shape.Channels != 2) return RejectedProperty.Channels;
+                if (!WmaLosslessCells.Any(c => c.Rate == shape.SampleRate)) return RejectedProperty.SampleRate;
+                return WmaLosslessCells.Contains((shape.SampleRate, shape.BitDepth ?? 0)) ? null : RejectedProperty.BitDepth;
+            case AudioFormat.Wma:
+                return RejectedProperty.Codec;
             default:
                 return RejectedProperty.Format;
         }
@@ -94,10 +104,13 @@ public static class SupportedAudio
 
     public static string Describe(RejectedProperty property, AudioShape? shape) => property switch
     {
+        RejectedProperty.Channels when shape?.Codec == WmaLossless => $"{WmaLossless} is promised in stereo only.",
+        RejectedProperty.BitDepth when shape?.Codec == WmaLossless =>
+            $"{shape.BitDepth}-bit is not a promised depth for {WmaLossless} at {shape.SampleRate} Hz; only 24-bit is.",
         RejectedProperty.Channels => $"{shape?.Channels} channels is not promised; only mono and stereo are.",
         RejectedProperty.SampleRate => $"{shape?.SampleRate} Hz is not a promised rate for {shape?.Format}.",
         RejectedProperty.BitDepth => $"{shape?.BitDepth}-bit is not a promised depth; only 16 and 24-bit PCM are.",
-        RejectedProperty.Codec => $"{shape?.Codec} is not a promised codec; only {WmaStandard} is.",
+        RejectedProperty.Codec => $"{shape?.Codec} is not a promised codec; only {WmaStandard} and {WmaLossless} are.",
         RejectedProperty.Format => "Not a promised format; only WAV, FLAC, MP3 and WMA are.",
         _ => "The file could not be read.",
     };
@@ -265,8 +278,10 @@ internal static class AudioProbe
             AudioShape shape;
             using (var reader = WmSyncReader.Open(stream, Path.GetFileName(path)))
             {
-                shape = new AudioShape(AudioFormat.Wma, reader.Format.SampleRate, null, reader.Format.Channels,
-                    WmaCodec(reader.CodecTag));
+                var codec = WmaCodec(reader.CodecTag);
+                // A lossless stream's depth is its audio's; a lossy one's says nothing.
+                shape = new AudioShape(AudioFormat.Wma, reader.Format.SampleRate,
+                    codec == SupportedAudio.WmaLossless ? reader.EncodedBits : null, reader.Format.Channels, codec);
             }
             if (SupportedAudio.Check(shape) is { } property)
             {
@@ -287,7 +302,7 @@ internal static class AudioProbe
         0x0160 => "WMA 1",
         0x0161 => SupportedAudio.WmaStandard,
         0x0162 => "WMA 9 Pro",
-        0x0163 => "WMA 9 Lossless",
+        0x0163 => SupportedAudio.WmaLossless,
         0x000A => "WMA 9 Voice",
         _ => $"WMA codec 0x{tag:X4}",
     };

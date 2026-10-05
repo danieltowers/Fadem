@@ -19,13 +19,21 @@ namespace Faderio.Core.Tests;
 /// </summary>
 public sealed class WmaRuntimeTests
 {
+    /// <summary>WMA 9 Standard from both encoders, then WMA 9 Lossless from Windows': encoder,
+    /// rate, channels and the depth the runtime decodes to.</summary>
     public static IEnumerable<object[]> Cells() =>
-        from encoder in new[] { "windows", "ffmpeg" }
-        from rate in new[] { 44100, 48000 }
-        from channels in new[] { 1, 2 }
-        where !(encoder == "windows" && rate == 48000 && channels == 1)
-        select new object[] { encoder, rate, channels };
+        (from encoder in new[] { "windows", "ffmpeg" }
+         from rate in new[] { 44100, 48000 }
+         from channels in new[] { 1, 2 }
+         where !(encoder == "windows" && rate == 48000 && channels == 1)
+         select new object[] { encoder, rate, channels, 16 })
+        .Concat(LosslessCells());
 
+    public static IEnumerable<object[]> LosslessCells() =>
+        from cell in new[] { (44100, 16), (44100, 24), (48000, 24), (96000, 24) }
+        select new object[] { "windowslossless", cell.Item1, 2, cell.Item2 };
+
+    /// <summary>WMA 9 Standard from Windows' encoder.</summary>
     public static IEnumerable<object[]> WindowsCells() => Cells().Where(c => (string)c[0] == "windows");
 
     private static string Fixture(string name)
@@ -35,8 +43,10 @@ public sealed class WmaRuntimeTests
         return path;
     }
 
-    private static string Noise(string encoder, int rate, int channels) =>
-        Fixture($"noise-{encoder}-{rate}-{channels}.wma");
+    private static string Noise(string encoder, int rate, int channels, int bits = 16) =>
+        Fixture(encoder == "windowslossless"
+            ? $"noise-{encoder}-{rate}-{bits}-{channels}.wma"
+            : $"noise-{encoder}-{rate}-{channels}.wma");
 
     private const long Millisecond = 10_000;
 
@@ -55,7 +65,10 @@ public sealed class WmaRuntimeTests
             var left = new float[bytes / align];
             for (var f = 0; f < left.Length; f++)
             {
-                left[f] = BitConverter.ToInt16(buffer, f * align) / 32768f;
+                var at = f * align;
+                left[f] = reader.Format.BitsPerSample == 16
+                    ? BitConverter.ToInt16(buffer, at) / 32768f
+                    : (buffer[at] | buffer[at + 1] << 8 | (sbyte)buffer[at + 2] << 16) / 8388608f;
             }
             yield return new Sample(stamp, start, left);
             start += left.Length;
@@ -80,23 +93,38 @@ public sealed class WmaRuntimeTests
     }
 
     [Theory, MemberData(nameof(Cells))]
-    public void TheRuntime_DecodesWma9Standard_To16BitPcmAtTheFilesRate(string encoder, int rate, int channels)
+    public void TheRuntime_DecodesToPcmAtTheFilesOwnRateAndDepth(string encoder, int rate, int channels, int bits)
     {
-        using var file = File.OpenRead(Noise(encoder, rate, channels));
+        // Its default is not always the file's own: 24-bit Lossless decoded to 16-bit, and
+        // 96 kHz to 48 kHz, until the reader asked for what the stream was encoded from.
+        using var file = File.OpenRead(Noise(encoder, rate, channels, bits));
         using var reader = WmSyncReader.Open(file, "noise");
 
-        Assert.Equal(0x161, reader.CodecTag);
-        Assert.Equal(new WmPcmFormat(rate, channels, 16), reader.Format);
+        Assert.Equal(encoder == "windowslossless" ? 0x163 : 0x161, reader.CodecTag);
+        Assert.Equal(new WmPcmFormat(rate, channels, bits), reader.Format);
+    }
+
+    [Theory, MemberData(nameof(LosslessCells))]
+    public void Lossless_DecodesToTheSourceExactly(string encoder, int rate, int channels, int bits)
+    {
+        // From sample 0, no codec tail, no sample lost, to the depth's last bit: the source is the
+        // 24-bit FLAC of the same noise, which a 16-bit cell matches to its own last bit.
+        var source = TestAudio.LeftChannel(TrackSources.Open(Fixture($"noise-{rate}-24-{channels}.flac")));
+        var decoded = TestAudio.LeftChannel(TrackSources.Open(Noise(encoder, rate, channels, bits)));
+
+        Assert.Equal(source.Length, decoded.Length);
+        var step = bits == 16 ? 1.0 / 32768 : 1.0 / 8388608;
+        Assert.All(Enumerable.Range(0, source.Length), i => Assert.InRange(Math.Abs(source[i] - decoded[i]), 0, step));
     }
 
     [Theory, MemberData(nameof(Cells))]
-    public void Stamps_AreWholeMilliseconds(string encoder, int rate, int channels)
+    public void Stamps_AreWholeMilliseconds(string encoder, int rate, int channels, int bits)
     {
-        Assert.All(Sequential(Noise(encoder, rate, channels)), s => Assert.Equal(0, s.Stamp % Millisecond));
+        Assert.All(Sequential(Noise(encoder, rate, channels, bits)), s => Assert.Equal(0, s.Stamp % Millisecond));
     }
 
     [Theory, MemberData(nameof(WindowsCells))]
-    public void ASeek_OnWindowsEncodedWma_LandsUpTo2msAfterItsStamp_SoStampsAreNotTheSample(string encoder, int rate, int channels)
+    public void ASeek_OnWindowsEncodedWma_LandsUpTo2msAfterItsStamp_SoStampsAreNotTheSample(string encoder, int rate, int channels, int bits)
     {
         var path = Noise(encoder, rate, channels);
         var sequential = Sequential(path);
@@ -120,13 +148,13 @@ public sealed class WmaRuntimeTests
     }
 
     [Theory, MemberData(nameof(Cells))]
-    public void ASeek_DeliversADecodeFromTheStart_WhoseWholeSamplesAreStampedWithin1msOfIt(string encoder, int rate, int channels)
+    public void ASeek_DeliversADecodeFromTheStart_WhoseWholeSamplesAreStampedWithin1msOfIt(string encoder, int rate, int channels, int bits)
     {
         // The index's premise. After the first sample, cut where the runtime landed, comes the
         // decode from the start sample for sample, except that a seek can split one of its
         // samples in two: the halves' stamps are far from any of its stamps, so the index never
         // takes one for a sample it knows.
-        var path = Noise(encoder, rate, channels);
+        var path = Noise(encoder, rate, channels, bits);
         var sequential = Sequential(path);
         var reference = sequential.SelectMany(s => s.Left).ToArray();
         var byStart = sequential.ToDictionary(s => s.Start);
@@ -136,10 +164,19 @@ public sealed class WmaRuntimeTests
             using var file = File.OpenRead(path);
             using var reader = WmSyncReader.Open(file, "noise");
             reader.SetRange(target * 10_000_000 / rate);
-            var first = Samples(reader).First();
-            var (landed, _) = TestAudio.Locate(reference, first.Left.AsSpan(0, Math.Min(512, first.Left.Length)),
-                (int)target - rate / 10, (int)target + rate / 10);
-            foreach (var after in Samples(reader, landed + first.Left.Length).Take(10))
+            // Placed by the second sample: the first can be a few frames, too few to locate, and
+            // Lossless can land up to 0.4 s after the time asked for.
+            var delivered = Samples(reader).Take(11).ToList();
+            if (delivered.Count < 2)
+            {
+                continue; // a target in the last sample
+            }
+            var second = delivered[1];
+            // Within 0.4 s after the target at worst (Lossless); a block of 512 still locates.
+            var (landed, _) = TestAudio.Locate(reference, second.Left.AsSpan(0, Math.Min(512, second.Left.Length)),
+                (int)target - rate / 10, (int)target + rate / 2);
+            var start = landed;
+            foreach (var after in delivered.Skip(1).Select(d => { var placed = d with { Start = start }; start += d.Left.Length; return placed; }))
             {
                 Assert.Equal(reference.AsSpan((int)after.Start, after.Left.Length).ToArray(), after.Left);
                 if (byStart.TryGetValue(after.Start, out var same) && same.Left.Length == after.Left.Length)
@@ -158,19 +195,21 @@ public sealed class WmaRuntimeTests
     }
 
     [Theory, MemberData(nameof(Cells))]
-    public void TheReader_SeeksToTheSample(string encoder, int rate, int channels)
+    public void TheReader_SeeksToTheSample(string encoder, int rate, int channels, int bits)
     {
         // The matrix proves 1 ms through the normaliser; in the file's own frames the index
         // places every seek exactly, deep or near the start.
-        var path = Noise(encoder, rate, channels);
+        var path = Noise(encoder, rate, channels, bits);
         var reference = TestAudio.LeftChannel(TrackSources.Open(path));
         foreach (var target in Targets(rate, reference.Length).Prepend(rate / 50))
         {
             using var source = TrackSources.Open(path);
             source.Position = target;
             Assert.Equal(target, source.Position);
-            // Near the start, decoding from it is the quick way; past that, the index places it.
-            Assert.Equal(target < rate / 5 ? 1 : 0, ((WmaTrackReader)source).SeeksFromTheStart);
+            // In the first two samples, decoding from the start is the quick way; past them, the
+            // index places it.
+            Assert.True((target < rate / 5 ? 1 : 0) == ((WmaTrackReader)source).SeeksFromTheStart,
+                $"a seek to {target} decoded from the start: {((WmaTrackReader)source).SeeksFromTheStart}");
             var block = new float[1024 * channels];
             Assert.Equal(1024, source.Read(block, 0, 1024));
             var left = Enumerable.Range(0, 1024).Select(f => block[f * channels]).ToArray();
@@ -331,7 +370,18 @@ public sealed class WmaRuntimeTests
         Assert.Null(result);
         Assert.NotNull(rejection);
         Assert.Equal(RejectedProperty.Codec, rejection!.Property);
-        Assert.Equal("WMA 9 Pro is not a promised codec; only WMA 9 Standard is.", rejection.Detail);
+        Assert.Equal("WMA 9 Pro is not a promised codec; only WMA 9 Standard and WMA 9 Lossless are.", rejection.Detail);
+    }
+
+    [Theory]
+    [InlineData(48000, 16, 2, RejectedProperty.BitDepth)]
+    [InlineData(96000, 16, 2, RejectedProperty.BitDepth)]
+    [InlineData(32000, 24, 2, RejectedProperty.SampleRate)]
+    [InlineData(44100, 16, 1, RejectedProperty.Channels)]
+    public void LosslessOutsideItsFourCells_IsRejected(int rate, int bits, int channels, RejectedProperty property)
+    {
+        var shape = new AudioShape(AudioFormat.Wma, rate, bits, channels, SupportedAudio.WmaLossless);
+        Assert.Equal(property, SupportedAudio.Check(shape));
     }
 
     [Theory]
