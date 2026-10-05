@@ -47,6 +47,16 @@ public sealed class TransitionSpecSerialisationTests : IDisposable
     }
 
     [Fact]
+    public void SCurve_RoundTripsByName()
+    {
+        var store = new JsonTransitionStore(_path);
+        store.Upsert(@"C:\a.wav", @"C:\b.wav", new TransitionSpec { Curve = FadeCurveKind.SCurve });
+
+        Assert.Contains("\"SCurve\"", File.ReadAllText(_path));
+        Assert.Equal(FadeCurveKind.SCurve, new JsonTransitionStore(_path).Get(@"C:\a.wav", @"C:\b.wav")!.Curve);
+    }
+
+    [Fact]
     public void V2File_WithIntegerCurveAndIsEmpty_StillLoads()
     {
         // The shape v2 actually wrote (ticket 05 survey): PascalCase parameters, "IsEmpty"

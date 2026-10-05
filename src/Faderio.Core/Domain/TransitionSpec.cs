@@ -7,6 +7,9 @@ public enum FadeCurveKind
 {
     EqualPower,
     Linear,
+
+    /// <summary>Equal-power, eased in and out: flat at both ends of the fade.</summary>
+    SCurve,
 }
 
 /// <summary>A position within a track, measured from the start or from the end.</summary>
@@ -37,7 +40,7 @@ public sealed record TransitionSpec
     public TimeSpan? FadeOutDuration { get; init; }
     public TimeSpan? FadeInDuration { get; init; }
 
-    /// <summary>Equal-power by default; linear selectable. Individually optional.</summary>
+    /// <summary>Equal-power by default; linear or S-curve selectable. Individually optional.</summary>
     public FadeCurveKind? Curve { get; init; }
 
     /// <summary>All four parameters absent. A curve alone shapes fades nobody placed, so a

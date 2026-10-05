@@ -45,6 +45,27 @@ public sealed class FadeMarksTests
     }
 
     [Fact]
+    public void EachSide_CarriesItsTransitionsCurve_EqualPowerWhereItHasNone()
+    {
+        using var tc = TestEngine.Create();
+        var a = TestAudio.WriteDcWav("a.wav", 12, 0.4);
+        var b = TestAudio.WriteDcWav("b.wav", 12, 0.2);
+        var c = TestAudio.WriteDcWav("c.wav", 12, 0.3);
+        tc.Add(a, b, c);
+        tc.Store.Upsert(a, b, Fade(8, 2, fadeInPoint: 1, fadeIn: 3) with { Curve = FadeCurveKind.SCurve });
+        tc.Store.Upsert(b, c, Fade(9, 2, fadeInPoint: 0, fadeIn: 2) with { Curve = null });
+
+        tc.Engine.PlayRow(tc.RowOf(b));
+        var marks = tc.View.Attended!.Marks;
+        Assert.Equal(FadeCurveKind.SCurve, marks.FadeInCurve);     // from a → b
+        Assert.Equal(FadeCurveKind.EqualPower, marks.FadeOutCurve); // b → c names none
+
+        tc.Store.Upsert(b, c, Fade(9, 2, fadeInPoint: 0, fadeIn: 2)); // linear
+        tc.Engine.PlayRow(tc.RowOf(b));
+        Assert.Equal(FadeCurveKind.Linear, tc.View.Attended!.Marks.FadeOutCurve);
+    }
+
+    [Fact]
     public void AHardCut_HasNoMarks_AndNorDoesStopped()
     {
         using var tc = TestEngine.Create();

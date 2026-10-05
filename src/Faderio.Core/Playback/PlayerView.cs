@@ -59,9 +59,12 @@ public sealed record VoiceView(QueueRow Row, Playhead Playhead, Length Length)
 /// Where a track's fades begin and end within it, as the transitions into and out of its row
 /// resolve: the fade-in from the row before (by ⏮'s rule), the fade-out into the row after (by
 /// ⏭'s). Each side is null where the transition is a hard cut, there is no row on that side, or
-/// it has no fade on this track; an end is cut short at the track's end.
+/// it has no fade on this track; an end is cut short at the track's end. Each side's curve is
+/// its transition's, for the seek bar to draw the wedge's shape by; equal-power where it has none.
 /// </summary>
-public sealed record FadeMarks(Point? FadeInStart, Point? FadeInEnd, Point? FadeOutStart, Point? FadeOutEnd)
+public sealed record FadeMarks(
+    Point? FadeInStart, Point? FadeInEnd, Point? FadeOutStart, Point? FadeOutEnd,
+    FadeCurveKind FadeInCurve = FadeCurveKind.EqualPower, FadeCurveKind FadeOutCurve = FadeCurveKind.EqualPower)
 {
     public static FadeMarks None { get; } = new(null, null, null, null);
 }

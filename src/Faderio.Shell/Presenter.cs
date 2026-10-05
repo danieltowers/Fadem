@@ -64,7 +64,12 @@ internal static class Presenter
     }
 
     /// <summary>A fade curve as the editor's list names it.</summary>
-    public static string FmtCurve(FadeCurveKind curve) => curve == FadeCurveKind.Linear ? "Linear" : "Equal-power";
+    public static string FmtCurve(FadeCurveKind curve) => curve switch
+    {
+        FadeCurveKind.Linear => "Linear",
+        FadeCurveKind.SCurve => "S-curve",
+        _ => "Equal-power",
+    };
 
     /// <summary>A curve as the list names it in playlist mode, where none falls through to the
     /// global transition's.</summary>

@@ -79,6 +79,36 @@ public sealed class CrossfadeShapeTests
     }
 
     [Fact]
+    public void SCurve_KeepsCombinedPowerConstant_ButEasesInAndOut()
+    {
+        using var tc = TestEngine.Create();
+        var a = TestAudio.WriteToneWav("a.wav", 4, FA);
+        var b = TestAudio.WriteToneWav("b.wav", 4, FB);
+        tc.Add(a, b);
+        tc.Store.Upsert(a, b, Crossfade(1.0, FadeCurveKind.SCurve));
+        tc.Engine.Play();
+        tc.Output.Advance(44100 * 3);
+
+        // Still equal-power: sin² + cos² = 1 on the eased t.
+        foreach (var t in new[] { 0.1, 0.25, 0.5, 0.75, 0.9 })
+        {
+            var (gA, gB) = Gains(tc.Rendered, 44100 + (long)(44100 * t));
+            Assert.InRange(gA * gA + gB * gB, 0.85, 1.15);
+        }
+
+        // Eased: at t = 0.1 the incoming is at ~0.04, where equal-power has it at ~0.16; at
+        // t = 0.9 the outgoing is as near silent. Mid-overlap both sit at cos(π/4) ≈ 0.707.
+        var (earlyA, earlyB) = Gains(tc.Rendered, 44100 + 4410);
+        Assert.InRange(earlyB, 0.0, 0.08);
+        Assert.InRange(earlyA, 0.95, 1.05);
+        var (lateA, _) = Gains(tc.Rendered, 44100 + 39690);
+        Assert.InRange(lateA, 0.0, 0.08);
+        var (midA, midB) = Gains(tc.Rendered, 44100 + 22050);
+        Assert.InRange(midA, 0.6, 0.8);
+        Assert.InRange(midB, 0.6, 0.8);
+    }
+
+    [Fact]
     public void MixedOverlap_IncomingAlreadyAtFull_WhileOutgoingFades()
     {
         // d_i = 0: the incoming track plays at full volume while the outgoing fades.

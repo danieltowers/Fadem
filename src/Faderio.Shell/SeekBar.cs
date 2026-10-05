@@ -340,20 +340,35 @@ internal sealed class SeekBar : Control
     }
 
     /// <summary>A fade's wedge between its two marks, the full height of the bar at its loud end
-    /// and nothing at its quiet one.</summary>
-    private void ShadeFade(Graphics g, int? start, int? end, bool rising)
+    /// and nothing at its quiet one, its top edge shaped by the curve: straight for linear, bowed
+    /// for equal-power, an S for the S-curve. A picture to tell them apart, not the gain.</summary>
+    private void ShadeFade(Graphics g, int? start, int? end, bool rising, FadeCurveKind curve)
     {
         if (start is not { } x0 || end is not { } x1 || x1 <= x0)
         {
             return;
         }
         var bottom = Height;
-        var wedge = rising
-            ? new[] { new System.Drawing.Point(x0, bottom), new System.Drawing.Point(x1, 0), new System.Drawing.Point(x1, bottom) }
-            : new[] { new System.Drawing.Point(x0, 0), new System.Drawing.Point(x0, bottom), new System.Drawing.Point(x1, bottom) };
+        const int Steps = 24;
+        var outline = new List<System.Drawing.Point> { new(rising ? x1 : x0, bottom) };
+        for (var i = 0; i <= Steps; i++)
+        {
+            var u = i / (double)Steps;
+            var loud = Shape(curve, rising ? u : 1 - u);
+            outline.Add(new System.Drawing.Point(x0 + (int)Math.Round((x1 - x0) * u), (int)Math.Round(bottom * (1 - loud))));
+        }
+        var wedge = outline.ToArray();
         using var shade = new SolidBrush(FadeShade);
         g.FillPolygon(shade, wedge);
     }
+
+    /// <summary>How loud a fade-in draws at <paramref name="u"/> of its way across.</summary>
+    private static double Shape(FadeCurveKind curve, double u) => curve switch
+    {
+        FadeCurveKind.Linear => u,
+        FadeCurveKind.SCurve => Math.Sin((1 - Math.Cos(u * Math.PI)) / 2 * Math.PI / 2),
+        _ => Math.Sin(u * Math.PI / 2),
+    };
 
     /// <summary>The time scale along the groove: minor ticks hang below it, major ticks cross it
     /// with their m:ss label centred above.</summary>
@@ -406,8 +421,8 @@ internal sealed class SeekBar : Control
         var marks = Live ? Marks().ToDictionary(m => m.Mark, m => m.X) : null;
         if (marks is not null)
         {
-            ShadeFade(g, marks[FadeMark.FadeInStart], marks[FadeMark.FadeInEnd], rising: true);
-            ShadeFade(g, marks[FadeMark.FadeOutStart], marks[FadeMark.FadeOutEnd], rising: false);
+            ShadeFade(g, marks[FadeMark.FadeInStart], marks[FadeMark.FadeInEnd], rising: true, _marks.FadeInCurve);
+            ShadeFade(g, marks[FadeMark.FadeOutStart], marks[FadeMark.FadeOutEnd], rising: false, _marks.FadeOutCurve);
         }
         using (var groove = new SolidBrush(SystemColors.ControlDark))
         {

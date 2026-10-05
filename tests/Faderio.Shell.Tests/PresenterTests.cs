@@ -252,6 +252,12 @@ public sealed class PresenterTests
     [Fact]
     public void FmtCurve_WithNoCurve_IsTheGlobalOne() => Assert.Equal("(global)", Presenter.FmtCurve((FadeCurveKind?)null));
 
+    [Theory]
+    [InlineData(FadeCurveKind.EqualPower, "Equal-power")]
+    [InlineData(FadeCurveKind.Linear, "Linear")]
+    [InlineData(FadeCurveKind.SCurve, "S-curve")]
+    public void FmtCurve_NamesEachCurve(FadeCurveKind curve, string expected) => Assert.Equal(expected, Presenter.FmtCurve(curve));
+
     // ── The transition manager (playlists issue 05) ─────────────────────────────────────
 
     private static Track TrackNamed(string path, string title = "", string artist = "") =>

@@ -523,17 +523,20 @@ public sealed partial class PlaybackEngine : IDisposable
         var length = voice.Entry.Track.Length.TimeSpan;
         Point? Clamped(TimeSpan at) => Point.FromTimeSpan(at < length ? at : length);
         Point? inStart = null, inEnd = null, outStart = null, outEnd = null;
+        FadeCurveKind inCurve = FadeCurveKind.EqualPower, outCurve = FadeCurveKind.EqualPower;
         if (adjacencies.Previous is { } before && Resolved(before) is { IsHardCut: false } fadeIn)
         {
             inStart = Clamped(fadeIn.FadeInPoint);
             inEnd = fadeIn.FadeInDuration > TimeSpan.Zero ? Clamped(fadeIn.FadeInPoint + fadeIn.FadeInDuration) : null;
+            inCurve = fadeIn.Curve;
         }
         if (adjacencies.Next is { } after && Resolved(after) is { IsHardCut: false } fadeOut && fadeOut.FadeOutDuration > TimeSpan.Zero)
         {
             outStart = Clamped(fadeOut.FadeOutPoint);
             outEnd = Clamped(fadeOut.FadeOutPoint + fadeOut.FadeOutDuration);
+            outCurve = fadeOut.Curve;
         }
-        return voice with { Marks = new FadeMarks(inStart, inEnd, outStart, outEnd) };
+        return voice with { Marks = new FadeMarks(inStart, inEnd, outStart, outEnd, inCurve, outCurve) };
     }
 
     private EffectiveTransition Resolved(Adjacency adjacency)
