@@ -111,7 +111,8 @@ public sealed class HeadlessControlsTests
         using var style = new QueueRowStyle();
         using var list = new ListView { View = View.Details };
         list.Columns.Add("#"); list.Columns.Add("Title"); list.Columns.Add("");
-        var rows = view.Queue.Select(r => new ListViewItem(new[] { "", r.Track.Title, "" }) { UseItemStyleForSubItems = false }).ToList();
+        QueueRowStyle.AddMarkColumn(list);
+        var rows = view.Queue.Select(r => new ListViewItem(new[] { "", r.Track.Title, "", "" }) { UseItemStyleForSubItems = false }).ToList();
         list.Items.AddRange(rows.ToArray());
 
         for (var i = 0; i < rows.Count; i++)
@@ -119,8 +120,10 @@ public sealed class HeadlessControlsTests
             style.Apply(rows[i], view.Queue[i], i, view, editColumn: 2);
         }
 
-        Assert.Equal(RowMarks.Resting + " 1", rows[0].Text); // the attended row, at rest
-        Assert.Equal("2", rows[1].Text);
+        Assert.Equal("1", rows[0].Text);
+        Assert.Equal(RowMarks.Resting, rows[0].SubItems[3].Text); // the attended row, at rest, in the speaker's cell
+        Assert.Equal("", rows[1].SubItems[3].Text);
+        Assert.Equal(0, list.Columns[3].DisplayIndex); // shown at the far left
         Assert.Equal(SystemColors.Window, rows[0].SubItems[1].BackColor); // no yellow
         Assert.Equal(SystemColors.Window, rows[1].SubItems[1].BackColor);
         Assert.Equal("✎", rows[0].SubItems[2].Text);

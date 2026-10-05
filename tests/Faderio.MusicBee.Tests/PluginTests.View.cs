@@ -48,7 +48,12 @@ public sealed partial class PluginTests
         Assert.Equal(
             new[] { Path.GetFileNameWithoutExtension(a), Path.GetFileNameWithoutExtension(b) },
             view._queueList.Items.Cast<ListViewItem>().Select(i => i.SubItems[1].Text));
-        Assert.Equal(new[] { "🔈 1", "2" }, view._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
+        Assert.Equal(new[] { "1", "2" }, view._queueList.Items.Cast<ListViewItem>().Select(i => i.Text));
+        // The speaker's column, last, shown first; Track gain after Length.
+        var speaker = view._queueList.Columns[view._queueList.Columns.Count - 1];
+        Assert.Equal(0, speaker.DisplayIndex);
+        Assert.Equal("🔈", view._queueList.Items[0].SubItems[speaker.Index].Text);
+        Assert.Equal("Track gain", view._queueList.Columns[4].Text);
         Assert.Equal("library · WASAPI shared at 44100 Hz", view._host.Text);
     });
 
@@ -138,7 +143,7 @@ public sealed partial class PluginTests
         Assert.Equal(Transport.Playing, _output.State);
         view.Render();
         Assert.Equal("⏸", view._playPause.Text);
-        Assert.Equal(RowMarksSounding + " 1", view._queueList.Items[0].Text);
+        Assert.Equal(RowMarksSounding, view._queueList.Items[0].SubItems[view._queueList.Columns.Count - 1].Text);
         Assert.True(view._queueList.OwnerDraw); // a selected row grey, not blue
 
         Click(view._playPause);
