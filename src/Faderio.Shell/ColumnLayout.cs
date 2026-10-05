@@ -24,7 +24,7 @@ internal sealed record ColumnSetting(QueueColumn Column, bool Visible, int Width
 
 /// <summary>
 /// The queue's columns (playlists issue 06, D25): every column in its order, shown or not, each
-/// with its width, in the library's <c>.faderio/columns.json</c>. View state, not the engine's, so
+/// with its width, in the library's <c>.faderio/columns.json</c> (the plugin's own beside it). View state, not the engine's, so
 /// the shell owns the file, as it does <c>window.json</c>: read when a library opens, written on
 /// every change. A file that is missing, unreadable or of another shape is the default four, and
 /// none of that is worth a notice. <c>#</c> is always shown and always first, since the list draws
@@ -101,22 +101,25 @@ internal sealed class ColumnLayout
     /// <summary>Whether two layouts show the same columns in the same order at the same widths.</summary>
     public bool Same(ColumnLayout other) => Columns.SequenceEqual(other.Columns);
 
-    /// <summary>Where <paramref name="library"/> keeps its layout; none without a library that
-    /// opened, whose columns are the default and are not written.</summary>
-    public static string? FileIn(LibraryView? library) =>
-        library is { IsAvailable: true } ? System.IO.Path.Combine(library.Path, Library.StoreFolderName, FileName) : null;
+    /// <summary>Where <paramref name="library"/> keeps a host's layout, in
+    /// <paramref name="fileName"/>; none without a library that opened, whose columns are the
+    /// default and are not written.</summary>
+    public static string? FileIn(LibraryView? library, string fileName = FileName) =>
+        library is { IsAvailable: true } ? System.IO.Path.Combine(library.Path, Library.StoreFolderName, fileName) : null;
 
-    /// <summary>The layout in <paramref name="path"/>, or the default when there is none to use.</summary>
-    public static ColumnLayout Load(string path)
+    /// <summary>The layout in <paramref name="path"/>, or <paramref name="fallback"/> (the
+    /// default when none is given) when there is none to use.</summary>
+    public static ColumnLayout Load(string path, ColumnLayout? fallback = null)
     {
+        fallback ??= Default;
         try
         {
             var file = JsonSerializer.Deserialize<ColumnsFile>(File.ReadAllText(path), JsonOptions);
-            return file?.Columns is { Count: > 0 } columns && columns.All(c => c is not null) ? new(columns) : Default;
+            return file?.Columns is { Count: > 0 } columns && columns.All(c => c is not null) ? new(columns) : fallback;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException or NotSupportedException)
         {
-            return Default;
+            return fallback;
         }
     }
 

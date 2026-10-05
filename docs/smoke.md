@@ -459,6 +459,13 @@ which a background run cannot give.
       the editor's page is open, never taking the queue away. The playlists sit above the
       queue, no column is off the edge, and the host line is cut short with its whole text as
       its tooltip.
+- [ ] **The queue's columns**, as the App's: a library with no layout of the plugin's shows #,
+      Title, Artist, Length and Track gain. A right-click on the queue's header (not a row)
+      shows the checklist of #, Title, Artist, Album, Length, Format, Track gain and Path, #
+      ticked and greyed; ticking one adds its column, unticking hides it. Dragging a header moves
+      it, never before # or after ✎; the speaker stays at the far left and ✎ at the far right.
+      After a restart the layout is as it was left. It is the plugin's own, in
+      `<library>\.faderio\musicbee-columns.json`, apart from the App's `columns.json`.
 - [ ] **▶** plays: the meter shows the tone, the track's name appears above the transport, the
       button reads ⏸, the readout and the thumb move, row 1 is marked. **⏸** pauses (meter 0,
       ▶ again); **▶** resumes; **⏹** stops: meter 0, the name blank, "0:00 / -0:00", the thumb

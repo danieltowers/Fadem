@@ -80,13 +80,15 @@ internal sealed class PluginView : UserControl
 
     private long _shownQueue = -1;
 
-    /// <summary>The queue's columns, fixed: the App's layout and menu can follow when a later
-    /// issue needs them.</summary>
-    private static readonly QueueColumn[] Columns =
-        [QueueColumn.Number, QueueColumn.Title, QueueColumn.Artist, QueueColumn.Length, QueueColumn.ReplayGain];
+    /// <summary>The queue's columns, as the App's: a right-click on the header ticks which show,
+    /// and a header drags to a new place. The speaker at the far left and ✎ at the far right stay.
+    /// The plugin keeps its own layout in each library, apart from the App's.</summary>
+    internal readonly QueueColumns _columns;
+
+    internal const string ColumnsFileName = "musicbee-columns.json";
 
     /// <summary>The ✎ column, after the queue's own: the editor button on every row but the last.</summary>
-    internal int EditColumn => Columns.Length;
+    internal int EditColumn => _columns.EditColumn;
 
     /// <param name="notices">The session's notices, the composition's: it outlives this view.</param>
     /// <param name="notice">The host's one notice route, for the editor's own: the log and every strip.</param>
@@ -213,14 +215,11 @@ internal sealed class PluginView : UserControl
         // MusicBee's track list, or from Explorer, are both a shell drag of the files (issue 01),
         // and land where they are dropped (issue 03).
         _queueDrag = new QueueDrag(_queueList, engine, (paths, before) => _ = _engine.Add(paths, before));
-        foreach (var column in Columns)
-        {
-            var header = _queueList.Columns.Add(Presenter.ColumnHeading(column), WidthOf(column));
-            header.TextAlign = column is QueueColumn.Length or QueueColumn.ReplayGain ? HorizontalAlignment.Right : HorizontalAlignment.Left;
-        }
-        _queueList.Columns.Add("", EditColumnWidth, HorizontalAlignment.Center);
-        QueueRowStyle.AddMarkColumn(_queueList); // the speaker, shown at the far left
-        _queueList.Resize += (_, _) => FitTitle();
+        // #, Title, Artist, Length and Track gain until the library's own layout is read, at the
+        // first render; Artist narrower than the App's, for a sidebar.
+        _columns = new QueueColumns(
+            _queueList, ColumnLayout.Default.Toggle(QueueColumn.ReplayGain).Resize(QueueColumn.Artist, 140), ColumnsFileName,
+            ColumnsRebuilt, () => Render(_engine.View));
         _editMenu = new EditTransitionMenu(SelectedAdjacencies, Edit);
         // The manager lists the whole store, not the queue, so the item is always live: on the
         // one selected row's track, else the store's first (the App's Transitions… button).
@@ -234,8 +233,13 @@ internal sealed class PluginView : UserControl
         {
             _openTransitions, new ToolStripSeparator(), _sections.Menu.Root, new ToolStripSeparator(), _removeRows, _clearQueue,
         });
-        menu.Opening += (_, _) =>
+        menu.Opening += (_, e) =>
         {
+            // A right-click on the header asks for the columns rather than the rows.
+            if (_columns.OpenedOnHeader(e))
+            {
+                return;
+            }
             _editMenu.Refresh();
             _sections.MenuOpening();
             _removeRows.Enabled = _queueList.SelectedItems.Count > 0;
@@ -364,6 +368,7 @@ internal sealed class PluginView : UserControl
             _timer.Dispose();
             _tips.Dispose();
             _rowStyle.Dispose(); // after the list, which draws with its fonts
+            _columns.Dispose(); // a width still settling is written
             _sections.Dispose(); // after the list, which draws its stripes
             _noticeList?.Dispose();
             _manager?.Dispose();
@@ -393,9 +398,14 @@ internal sealed class PluginView : UserControl
         ShowTip(_shuffle, Presenter.ShuffleTip(view.Shuffle));
         ShowTip(_repeat, Presenter.RepeatTip(view.Repeat));
 
+        if (_columns.Open(view.Library))
+        {
+            // Another library, or the first render: the layout left is written, and this one read.
+            _shownQueue = -1;
+        }
         if (view.QueueVersion != _shownQueue)
         {
-            RebuildRows(view);
+            RebuildRows(view, _queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToHashSet());
             _shownQueue = view.QueueVersion;
         }
         _rowStyle.Apply(_queueList, view, EditColumn);
@@ -454,9 +464,8 @@ internal sealed class PluginView : UserControl
 
     /// <summary>Rows the list already shows in the same places are kept and only the new ones
     /// made, as the App's list does: a background add publishes once per file.</summary>
-    private void RebuildRows(PlayerView view)
+    private void RebuildRows(PlayerView view, HashSet<RowId> selected)
     {
-        var selected = _queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToHashSet();
         _queueList.BeginUpdate();
         var kept = 0;
         while (kept < _queueList.Items.Count && kept < view.Queue.Count && RowOf(_queueList.Items[kept]) == view.Queue[kept].Id)
@@ -469,13 +478,7 @@ internal sealed class PluginView : UserControl
         }
         foreach (var row in view.Queue.Skip(kept))
         {
-            var item = new ListViewItem((++kept).ToString()) { Tag = row.Id, UseItemStyleForSubItems = false };
-            foreach (var column in Columns.Skip(1))
-            {
-                item.SubItems.Add(Presenter.QueueCell(column, row.Track));
-            }
-            item.SubItems.Add(""); // the ✎ cell, styled at render
-            item.SubItems.Add(""); // the speaker's cell, likewise
+            var item = _columns.Row(++kept, row); // the ✎ and speaker cells styled at render
             _queueList.Items.Add(item);
             item.Selected = selected.Contains(row.Id);
         }
@@ -536,44 +539,11 @@ internal sealed class PluginView : UserControl
         _playlists.Visible = _queuePane.Visible = !open;
     }
 
-    private static int WidthOf(QueueColumn column) => column switch
+    /// <summary>The columns were made again, and the list emptied: every row is made again.</summary>
+    private void ColumnsRebuilt(HashSet<RowId> selected)
     {
-        QueueColumn.Number => 40,
-        QueueColumn.Title => 240,
-        QueueColumn.Artist => 140,
-        QueueColumn.ReplayGain => 64,
-        _ => 60,
-    };
-
-    private const int MinTitleWidth = 100;
-    private const int MinArtistWidth = 60;
-    private const int EditColumnWidth = 28;
-
-    /// <summary>The title takes what the other columns leave, and where that would squeeze it
-    /// below its least, Artist gives way to its floor, as the App's columns do: in a sidebar the
-    /// list keeps its columns rather than scrolling sideways.</summary>
-    private void FitTitle()
-    {
-        // A list being disposed has given its columns up already, and can still be resized:
-        // with groups shown, MusicBee closing once resized it after (phase 6 issue 09).
-        if (_queueList.IsDisposed || _queueList.Disposing || _queueList.Columns.Count < 5)
-        {
-            return;
-        }
-        var (number, title, artist, length, gain) =
-            (_queueList.Columns[0], _queueList.Columns[1], _queueList.Columns[2], _queueList.Columns[3], _queueList.Columns[4]);
-        var free = _queueList.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - number.Width - length.Width - gain.Width
-            - EditColumnWidth - QueueRowStyle.MarkColumnWidth;
-        var artistWidth = Math.Max(MinArtistWidth, Math.Min(WidthOf(QueueColumn.Artist), free - MinTitleWidth));
-        if (artist.Width != artistWidth)
-        {
-            artist.Width = artistWidth;
-        }
-        var titleWidth = Math.Max(MinTitleWidth, free - artistWidth);
-        if (title.Width != titleWidth)
-        {
-            title.Width = titleWidth;
-        }
+        RebuildRows(_engine.View, selected);
+        _shownQueue = _engine.View.QueueVersion;
     }
 
     private static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
