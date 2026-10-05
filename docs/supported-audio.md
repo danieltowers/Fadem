@@ -34,8 +34,8 @@ Each row is proven by five theories over its `*Cells()` member data, one per ass
 second seek landing inside the decoder's last block (the seek the package FLAC decoder silently
 dropped, ticket 15): `<Format>_ReadsToCompletion`, `<Format>_ToneIsPure`,
 `<Format>_HeaderLengthEqualsDecoded`, `<Format>_SeekBeforeFirstRead_LandsWithin1ms` and
-`<Format>_SeekIntoLastBlock_LandsWithin1ms`. WAV cells are generated at test time; FLAC and
-MP3 cells are checked-in fixtures from `Fixtures/generate.sh`, a tone and a pink-noise file per
+`<Format>_SeekIntoLastBlock_LandsWithin1ms`. WAV cells are generated at test time; FLAC, MP3
+and WMA cells are checked-in fixtures from `Fixtures/generate.sh`, a tone and a pink-noise file per
 cell, and a missing fixture is a red cell.
 
 | Format | Sample rates | Bit depths | Channels | Proven by | Status |
@@ -45,6 +45,7 @@ cell, and a missing fixture is a red cell.
 | MP3, constant bitrate with a Xing/Info header | 44.1, 48 kHz | n/a (decodes to PCM) | mono, stereo | the five `Mp3_*` theories over `Mp3Cells()`, variant `CbrInfo`, and over `TaggedMp3Cells()` `Mp3_TaggedDecode_IsTheSourceFromItsFirstSample`, `Mp3_LameEncoderString_IsTrimmedLikeFfmpegsLavc` and `Mp3_TagFailingValidation_KeepsWholeFrames`: with a valid LAME tag the length is the source count (the tag's frame count less its delay and padding); otherwise the tag's frame count, whole frames | proven, 4 cells, 8 theories each (ticket 14; trimmed in [issue 18](../.scratch/202609-faderio-phase-1-build/issues/18-trim-tagged-mp3s.md)) |
 | MP3, constant bitrate with no Xing/Info/VBRI header | 44.1, 48 kHz | n/a | mono, stereo | the five `Mp3_*` theories, variant `CbrBare`: the length is the audio bytes over the frame size, whole frames, no frame scan | proven, 4 cells (ticket 14) |
 | MP3, variable bitrate with a Xing header | 44.1, 48 kHz | n/a | mono, stereo | the same eight theories as `CbrInfo`, variant `Vbr`: as `CbrInfo` | proven, 4 cells, 8 theories each (ticket 14; trimmed in issue 18) |
+| WMA 9 Standard (`wmav2`) | 44.1, 48 kHz | n/a (decodes to 16-bit PCM) | mono, stereo | the five `Wma_*` theories over `WmaCells()`, on files from Windows' own encoder (as Windows Media Player rips) and from ffmpeg's: the length is a full decode at add time, codec tail included | proven, 7 cells: 3 from Windows' encoder, 4 from ffmpeg's; mono 48 kHz is ffmpeg's alone, as Windows' encoder offers none ([phase 6 issue 12](../.scratch/202609-faderio-phase-6-musicbee-improvements-round-1/issues/12-wma-plays-and-authors-exactly-in-both-hosts.md), [ADR 0016](adr/0016-wma-through-the-windows-media-format-runtime.md)) |
 
 Every promised cell seeks to 1 ms; no cell is pinned. A variable-bitrate MP3 without a Xing
 header is not a row: the probe would have to scan every frame, and no library file is one
@@ -79,6 +80,13 @@ engine's notice).
 The `LAME`-string and failing-tag files are crafted at test time from the checked-in fixtures
 (`CraftedMp3`), because `lame.exe` is not available to the generator.
 
+**WMA length and seeks** ([ADR 0016](adr/0016-wma-through-the-windows-media-format-runtime.md)).
+No WMA header gives the decoded length, so the probe decodes the file once when it is added,
+about 0.3% of its duration, and issues what decodes: Windows' files include 17 to 43 ms of
+codec tail past the music, and ffmpeg's lose the source's last partial block. The same decode
+is the file's index, kept in `<library>\.faderio\wma-index\`, which places every seek on the
+exact sample in milliseconds (`WmaRuntimeTests`).
+
 **Sample rate policy.** The engine runs at the output device's rate, fixed at launch
 ([ADR 0008](adr/0008-engine-runs-at-the-device-rate.md)). A file at any other promised rate
 is resampled once, on the way in. Authoring exactness is the same at every promised rate:
@@ -94,8 +102,9 @@ whole frame, [build issue 21](../.scratch/202609-faderio-phase-1-build/issues/21
 a final frame under 16 bytes that was never decoded, and a frame header found by chance inside a
 frame that made every later seek land late,
 [build issue 22](../.scratch/202609-faderio-phase-1-build/issues/22-flacs-ending-in-a-tiny-frame-raise-a-false-notice.md))
-and leaves the decode and the exact seek to the package. Windows Media Foundation is
-not in the production chain: its FLAC decoder is undocumented and landed seeks on the next block
+and leaves the decode and the exact seek to the package. WMA through the Windows Media Format
+runtime (`wmvcore.dll`, closed, part of Windows) behind `WmaTrackReader`, in both hosts. Windows
+Media Foundation is not in the production chain: its FLAC decoder is undocumented and landed seeks on the next block
 boundary. Every decoder that remains is open source, so a red cell can be read to its cause,
 except the Windows ACM codec behind NAudio's MP3 wrapper; the one number faderio takes from it,
 its decoder delay, is pinned by `Mp3DecoderOffsetTests`.
@@ -120,13 +129,15 @@ particular:
 | 8-bit, 32-bit integer and 32-bit float PCM | Studio intermediates, not library formats. Unproven. | A row each, if anyone has one. |
 | Sample rates other than 44.1, 48 and 96 kHz | Unproven. The resampler would very likely cope, but "very likely" is not a row. | A row per rate; WAV rows are free to generate. |
 | AIFF | A reader exists but nobody has a file. Unproven. | One row and an ffmpeg fixture. |
-| M4A / AAC, WMA | Ticket 02 measured seek error up to 15 ms and 71 ms and both misreport their own length. The promise is 1 ms. | Only a decoder that seeks them exactly; Media Foundation does not. For WMA in the plugin, MusicBee's BASS seeks exactly only by decoding from the start ([research](research/wma-through-musicbee-bass.md), `MusicBeeBassWmaTests`); its own seek misses by up to 1.6 ms. |
+| M4A / AAC | Ticket 02 measured seek error up to 15 ms through Media Foundation, which also misreports the length. The promise is 1 ms. | A decoder that seeks it exactly. WMA's route ([ADR 0016](adr/0016-wma-through-the-windows-media-format-runtime.md)) may work through Media Foundation: unmeasured. |
+| WMA 9 Pro, Lossless and Voice; WMA 1 | Unmeasured: only WMA 9 Standard has fixtures. Rejected by codec. | A fixture each (`Fixtures/encode-wma.ps1` takes Windows' encoder flags) and the five theories. |
+| WMA on a Windows N edition without the Media Feature Pack | The Windows Media Format runtime is not installed. Rejected with that reason. | Installing the Media Feature Pack. |
 | Ogg Vorbis | NVorbis 0.10.5 cannot seek into any file paged by ffmpeg's defaults (ticket 07). The reader is deleted rather than kept broken. | A research ticket on a decoder that seeks any Ogg, if the format is ever wanted. |
 | Opus, DSD, anything else | No reader, no row. | A row. |
 
 **How rejection works.** The engine probes the file when it is added (`AudioProbe`, with this
 table as code in `SupportedAudio`): it opens it, reads the header and checks format, sample
-rate, bit depth and channel count against this table. A file
+rate, bit depth and channel count (and a WMA's codec) against this table. A file
 that fails is never queued; a queued track is a track that will play. The engine reports a
 structured reason (the four probed properties and which one disqualified the file) and the
 shell formats it and points here. Failures during playback (a corrupt frame, the device gone)

@@ -85,7 +85,7 @@ public sealed partial class PlaybackEngine
         TrackFileOpening?.Invoke(track.FilePath);
         try
         {
-            source = NormalizedTrackSource.Wrap(TrackSources.Open(track.FilePath, memoryCap, cancelled), _rate);
+            source = NormalizedTrackSource.Wrap(TrackSources.Open(track.FilePath, memoryCap, cancelled, _wmaIndexes), _rate);
         }
         catch (Exception e)
         {

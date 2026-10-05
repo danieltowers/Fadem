@@ -24,6 +24,10 @@ public sealed partial class PlaybackEngine : IDisposable
     /// library and its settings.</summary>
     private ITransitionStore? _store;
     private Library? _library;
+
+    /// <summary>Each WMA file's index, built once by the probe that adds it (issue 12) and kept in
+    /// the open library's store, for every open after.</summary>
+    private readonly WmaIndexStore _wmaIndexes = new();
     private readonly IEngineSink _sink;
     private readonly TransitionResolver _resolver;
     private SettingsStore? _settingsStore;
@@ -92,6 +96,10 @@ public sealed partial class PlaybackEngine : IDisposable
     private bool _viewDirty;
     private readonly List<string> _pendingNotices = new();
 
+    /// <summary>WMA indexes go in the library's store when it has one, else in memory only.</summary>
+    private void KeepWmaIndexesIn(Library? library) =>
+        _wmaIndexes.Folder = library is { IsAvailable: true } ? Path.Combine(library.StoreFolder, "wma-index") : null;
+
     /// <summary>An engine on a store and settings of its own, outside any library: the renderer's,
     /// and the tests'. A null store is no library.</summary>
     public PlaybackEngine(
@@ -142,6 +150,8 @@ public sealed partial class PlaybackEngine : IDisposable
         _output = output;
         _host = host;
         _library = Hold(library);
+        ResolvePath = ResolveFromDisk;
+        KeepWmaIndexesIn(library);
         // A library's stores are read once it is held: a refused one has none.
         if (library is not null)
         {

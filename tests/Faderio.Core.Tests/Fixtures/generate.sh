@@ -10,7 +10,7 @@
 #   noise-<rate>-<bits>-<ch>.flac           pink noise         seek landing by cross-correlation
 #   tone-<variant>-<rate>-<ch>.mp3          as above, MP3
 #   noise-<variant>-<rate>-<ch>.mp3
-#   tone-<encoder>-<rate>-<ch>.wma          as above, WMA: research, not a promised row
+#   tone-<encoder>-<rate>-<ch>.wma          as above, WMA 9 Standard
 #   noise-<encoder>-<rate>-<ch>.wma
 #
 # FLAC: 16/24-bit x 44.1/48/96 kHz x mono/stereo, twelve cells. "-sample_fmt s32" makes
@@ -28,7 +28,7 @@
 # frames. Two more kinds of tag are crafted from these at test time by CraftedMp3, because
 # lame.exe is not available here: a "LAME" encoder string, and tags that fail each check.
 #
-# WMA (research into MusicBee's BASS, MusicBeeBassWmaTests; not in docs/supported-audio.md):
+# WMA (issue 12; first made for the research into MusicBee's BASS, MusicBeeBassWmaTests):
 # WMA 9 Standard x 44.1/48 kHz x mono/stereo, 128 kbps stereo, from two encoders, because real
 # WMA files come from Windows Media Player and ffmpeg's muxer is not it:
 #   ffmpeg    ffmpeg's wmav2 encoder; 64 kbps mono.
@@ -36,6 +36,9 @@
 #             basswma.dll by encode-wma.ps1, which needs MusicBee installed and runs in 32-bit
 #             PowerShell. It is fed the same lavfi PCM as raw float. It offers mono only up to
 #             48 kbps at 44.1 kHz and not at all at 48 kHz, so it has three cells, not four.
+# Two more outside the grid: tone-windowspro-44100-2.wma, WMA 9 Pro from Windows' encoder,
+# which the add-time probe rejects by its codec; and long-ffmpeg-44100-1.wma, 10 minutes of the
+# pink noise at ffmpeg's lowest bitrate, 24 kbps mono (2 MB), for a seek deep into a long file.
 #
 # The FLAC noise fixtures double as the MP3s' source PCM: the same lavfi expression and seed,
 # encoded losslessly. Mp3DecoderOffsetTests and the tagged cells correlate against them, so the
@@ -107,7 +110,10 @@ for rate in 44100 48000; do
     done
   done
 done
+ffmpeg -y -loglevel error -f lavfi -i "$(tone 44100)" -ac 2 -f f32le "$f32"
+"$ps32" -NoProfile -ExecutionPolicy Bypass -File encode-wma.ps1 "$(cygpath -w "$f32")" tone-windowspro-44100-2.wma 44100 2 128000 16384
 rm -f "$f32"
+ffmpeg -y -loglevel error -f lavfi -i "anoisesrc=color=pink:sample_rate=44100:duration=600:seed=42:amplitude=0.5"   -ac 1 -c:a wmav2 -b:a 24k long-ffmpeg-44100-1.wma
 
 ffmpeg -y -loglevel error -f lavfi -i "anoisesrc=color=pink:sample_rate=44100:duration=1.5:seed=42:amplitude=0.5" \
   -af apad=whole_len=92160 -ac 2 -sample_fmt s16 silent-tail-44100-16-2.flac

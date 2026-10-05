@@ -1,6 +1,6 @@
 # 12: WMA plays and authors exactly, in both hosts
 
-Status: needs-triage
+Status: ready-for-human
 Blocked by: none
 
 Phase 6, improvements round 1, both hosts (engine; the shell only names the format). Raised
@@ -117,19 +117,36 @@ once the new reader's matrix cells pass. That is a decision for the build.
 
 ## Acceptance
 
-- [ ] WMA 9 Standard files from Windows' encoder, at 44.1 and 48 kHz, mono and stereo where the
+- [x] WMA 9 Standard files from Windows' encoder, at 44.1 and 48 kHz, mono and stereo where the
   encoder offers them, pass all five matrix theories on net8.0 and net48 x86, through
   `TrackSources.Open`.
-- [ ] A seek anywhere in the file lands within 1 ms. A seek into the last minute of a
+- [x] A seek anywhere in the file lands within 1 ms. A seek into the last minute of a
   26-minute WMA completes within the open budget (500 ms), or the design settled in question 1
   says why it need not.
-- [ ] The add-time probe accepts the promised cells and rejects the rest (unpromised codecs,
+- [x] The add-time probe accepts the promised cells and rejects the rest (unpromised codecs,
   rates and channels; a missing Windows Media Format runtime) with the reason.
-- [ ] `docs/supported-audio.md` has the WMA rows, each naming its theories. The rejected table
+- [x] `docs/supported-audio.md` has the WMA rows, each naming its theories. The rejected table
   no longer lists WMA, or lists only what is still rejected.
 - [ ] Adding a folder in standalone and dropping tracks in MusicBee both queue `.wma` files.
-- [ ] `dotnet test` passes on net8.0 and net48 x86.
-- [ ] Looks: a WMA shows its length and seeks in both hosts (`docs/smoke.md`).
+  (Standalone checked; MusicBee left to the user.)
+- [x] `dotnet test` passes on net8.0 and net48 x86 (bar one MusicBee panel test that fails on
+  HEAD before this change, and a FLAC timing flake; see the commit).
+- [ ] Looks: a WMA shows its length and seeks in both hosts (`docs/smoke.md`). Standalone
+  passed; MusicBee not run.
 - [ ] Sounds (the user's): a transition into and out of a WMA lands where it was authored.
 
 ## Comments
+
+### 2026-10-05, the build
+
+Question 1 measured (`WmaRuntimeTests`): stamps are whole milliseconds and a seek lands up to 2 ms
+from them, but `SetRange` costs 1 to 17 ms even 26 minutes in, and what a seek delivers is the
+decode from the start, cut at the same boundaries. The user chose a boundary index: one full
+decode at add time, kept in `<library>\.faderio\wma-index\` and keyed by the file's last
+mebibyte so tag edits keep it; seeks are then exact in milliseconds. Questions 2 and 3: length is
+the decode, codec tail included. Questions 4 and 5: WMA 9 Standard only, all four cells; Pro is
+rejected by codec (fixture `tone-windowspro-44100-2.wma`). Question 6: rejected at add time with
+the reason. Recorded in ADR 0016. A file with no index (another machine, or changed audio) is
+decoded in full when opened, under the lock for a direct play: about 0.75 s for 4 minutes, 5 s
+for 26. Left: the MusicBee Looks items and the Sounds half.
+

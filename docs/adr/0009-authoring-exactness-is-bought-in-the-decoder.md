@@ -51,7 +51,9 @@ header and is unaffected; the engine's open of the incoming voice carries the co
 500 ms on a 26-minute file. Over budget, the pre-scan moves to the background at add time.
 
 M4A and WMA, measured at 15 ms and 71 ms, have no way back to the promised table short of a
-decoder that seeks them exactly.
+decoder that seeks them exactly. (Amended 2026-10-05: WMA found one, the Windows Media Format
+runtime, exact through an index of its samples built by one decode at add time,
+[ADR 0016](0016-wma-through-the-windows-media-format-runtime.md). M4A still has none.)
 
 Every decoder left in the chain is open source and readable when a matrix cell goes red.
 

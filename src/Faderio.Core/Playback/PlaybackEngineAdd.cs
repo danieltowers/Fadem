@@ -67,7 +67,7 @@ public sealed partial class PlaybackEngine
 
     /// <summary>Test seam: how one path becomes a track or a rejection. The probe and the tag read
     /// (ADR 0007, ADR 0010) by default. Always called off the engine lock.</summary>
-    internal Func<string, (Track? Track, Rejection? Rejection)> ResolvePath { get; set; } = ResolveFromDisk;
+    internal Func<string, (Track? Track, Rejection? Rejection)> ResolvePath { get; set; }
 
     /// <summary>Test seam: how a folder becomes the files it adds, in order.
     /// <see cref="FolderContents.List"/> by default. Always called off the engine lock.</summary>
@@ -353,9 +353,9 @@ public sealed partial class PlaybackEngine
         }
     }
 
-    private static (Track? Track, Rejection? Rejection) ResolveFromDisk(string path)
+    private (Track? Track, Rejection? Rejection) ResolveFromDisk(string path)
     {
-        var rejection = AudioProbe.Probe(path, out var probed);
+        var rejection = AudioProbe.Probe(path, out var probed, _wmaIndexes);
         return rejection is not null ? (null, rejection) : (TrackMetadataReader.Read(path, probed!.Length, probed.Shape), null);
     }
 

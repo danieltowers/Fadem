@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Runtime.InteropServices;
 using System.Text;
 using Faderio.Core.Domain;
 
@@ -9,14 +10,16 @@ public enum AudioFormat
     Wav,
     Flac,
     Mp3,
+    Wma,
 }
 
-/// <summary>The four properties the add-time probe reads from a file's header. Together they
-/// pick a row in <c>docs/supported-audio.md</c>, or fail to.</summary>
-public sealed record AudioShape(AudioFormat Format, int SampleRate, int? BitDepth, int Channels)
+/// <summary>The properties the add-time probe reads from a file's header. Together they pick a
+/// row in <c>docs/supported-audio.md</c>, or fail to. <see cref="Codec"/> names a WMA's codec,
+/// which the format alone does not (issue 12).</summary>
+public sealed record AudioShape(AudioFormat Format, int SampleRate, int? BitDepth, int Channels, string? Codec = null)
 {
     public override string ToString() =>
-        $"{Format} {SampleRate} Hz" + (BitDepth is { } b ? $" {b}-bit" : "") + $" {Channels} ch";
+        (Codec ?? $"{Format}") + $" {SampleRate} Hz" + (BitDepth is { } b ? $" {b}-bit" : "") + $" {Channels} ch";
 }
 
 /// <summary>Which probed property disqualified a file. <see cref="File"/> means the header could
@@ -28,6 +31,7 @@ public enum RejectedProperty
     SampleRate,
     BitDepth,
     Channels,
+    Codec,
 }
 
 /// <summary>A file refused at add time, with the reason (ADR 0007). Structured so the shell
@@ -53,7 +57,11 @@ public static class SupportedAudio
     private static readonly int[] PcmRates = { 44100, 48000, 96000 };
     private static readonly int[] PcmDepths = { 16, 24 };
     private static readonly int[] Mp3Rates = { 44100, 48000 };
-    private static readonly string[] Extensions = { ".wav", ".flac", ".mp3" };
+    private static readonly int[] WmaRates = { 44100, 48000 };
+    private static readonly string[] Extensions = { ".wav", ".flac", ".mp3", ".wma" };
+
+    /// <summary>The one WMA codec promised (issue 12): Pro, Lossless and Voice are unmeasured.</summary>
+    internal const string WmaStandard = "WMA 9 Standard";
 
     /// <summary>Whether a file's extension names a promised format, in any case. Adding a folder
     /// takes only these and ignores the rest silently; a file named on its own is probed whatever
@@ -76,6 +84,9 @@ public static class SupportedAudio
                 return null;
             case AudioFormat.Mp3:
                 return Mp3Rates.Contains(shape.SampleRate) ? null : RejectedProperty.SampleRate;
+            case AudioFormat.Wma:
+                if (shape.Codec != WmaStandard) return RejectedProperty.Codec;
+                return WmaRates.Contains(shape.SampleRate) ? null : RejectedProperty.SampleRate;
             default:
                 return RejectedProperty.Format;
         }
@@ -86,21 +97,24 @@ public static class SupportedAudio
         RejectedProperty.Channels => $"{shape?.Channels} channels is not promised; only mono and stereo are.",
         RejectedProperty.SampleRate => $"{shape?.SampleRate} Hz is not a promised rate for {shape?.Format}.",
         RejectedProperty.BitDepth => $"{shape?.BitDepth}-bit is not a promised depth; only 16 and 24-bit PCM are.",
-        RejectedProperty.Format => "Not a promised format; only WAV, FLAC and MP3 are.",
+        RejectedProperty.Codec => $"{shape?.Codec} is not a promised codec; only {WmaStandard} is.",
+        RejectedProperty.Format => "Not a promised format; only WAV, FLAC, MP3 and WMA are.",
         _ => "The file could not be read.",
     };
 }
 
 /// <summary>
-/// Reads a file's header — never its audio — to decide promised or rejected and to issue its
-/// length (ADR 0010). WAV: the fmt and data chunks. FLAC: STREAMINFO. MP3: <see cref="Mp3Header"/>,
-/// whole frames less the encoder's delay and padding when a valid LAME tag gives them. The
+/// Reads a file's header to decide promised or rejected and to issue its length (ADR 0010). WAV:
+/// the fmt and data chunks. FLAC: STREAMINFO. MP3: <see cref="Mp3Header"/>, whole frames less
+/// the encoder's delay and padding when a valid LAME tag gives them. WMA, the one format whose
+/// audio it reads: the Windows Media Format runtime's header, then, for a promised file, one full
+/// decode, the <see cref="WmaIndex"/>, since no header gives the decoded length (issue 12). The
 /// real-input matrix asserts on every promised cell that the length issued here equals what the
 /// decoder delivers.
 /// </summary>
 internal static class AudioProbe
 {
-    internal static Rejection? Probe(string path, out ProbeResult? result)
+    internal static Rejection? Probe(string path, out ProbeResult? result, WmaIndexStore? wmaIndexes = null)
     {
         result = null;
         ProbeResult probed;
@@ -110,8 +124,12 @@ internal static class AudioProbe
             {
                 return new Rejection(path, null, RejectedProperty.File, "The file does not exist.");
             }
-            using var stream = File.OpenRead(path);
             var extension = Path.GetExtension(path).ToLowerInvariant();
+            if (extension == ".wma")
+            {
+                return ProbeWma(path, wmaIndexes ?? new WmaIndexStore(), out result);
+            }
+            using var stream = File.OpenRead(path);
             var parsed = extension switch
             {
                 ".wav" => ProbeWav(stream),
@@ -231,6 +249,48 @@ internal static class AudioProbe
             stream.Seek(length, SeekOrigin.Current);
         }
     }
+
+    // ── WMA ──────────────────────────────────────────────────────────────────────────────
+
+    private static Rejection? ProbeWma(string path, WmaIndexStore indexes, out ProbeResult? result)
+    {
+        result = null;
+        if (WmSyncReader.Unavailable is { } missing)
+        {
+            return new Rejection(path, null, RejectedProperty.Format, missing);
+        }
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+            AudioShape shape;
+            using (var reader = WmSyncReader.Open(stream, Path.GetFileName(path)))
+            {
+                shape = new AudioShape(AudioFormat.Wma, reader.Format.SampleRate, null, reader.Format.Channels,
+                    WmaCodec(reader.CodecTag));
+            }
+            if (SupportedAudio.Check(shape) is { } property)
+            {
+                return new Rejection(path, shape, property, SupportedAudio.Describe(property, shape));
+            }
+            result = new ProbeResult(shape, indexes.For(path, stream, CancellationToken.None).TotalFrames);
+            return null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or COMException)
+        {
+            return new Rejection(path, null, RejectedProperty.File, e.Message);
+        }
+    }
+
+    /// <summary>The codec a WMA stream's format tag names.</summary>
+    private static string WmaCodec(ushort tag) => tag switch
+    {
+        0x0160 => "WMA 1",
+        0x0161 => SupportedAudio.WmaStandard,
+        0x0162 => "WMA 9 Pro",
+        0x0163 => "WMA 9 Lossless",
+        0x000A => "WMA 9 Voice",
+        _ => $"WMA codec 0x{tag:X4}",
+    };
 
     // ── MP3 ──────────────────────────────────────────────────────────────────────────────
 

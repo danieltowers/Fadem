@@ -77,3 +77,12 @@ so nothing migrated.
 This also qualifies [ADR 0009](0009-authoring-exactness-is-bought-in-the-decoder.md)'s "every
 decoder left in the chain is open source": MP3's is NAudio's open wrapper over the closed ACM
 codec, as it always was, and trimming now takes one number from it, pinned by a test.
+
+## Addendum: a WMA's length is counted by decoding it (2026-10-05)
+
+No WMA header gives the decoded length: the ASF header's duration is in milliseconds, and
+Windows' encoder leaves 17 to 43 ms of codec tail that decodes. So the probe decodes a promised
+WMA once and issues what it delivers, tail included, as an untagged MP3's padding is. The same
+decode is the index that places its seeks
+([ADR 0016](0016-wma-through-the-windows-media-format-runtime.md)). "Issued from the header"
+does not hold for WMA; "issued once, at add time, equal to the decode" does.

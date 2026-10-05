@@ -1,5 +1,9 @@
 # Can MusicBee's BASS play WMA to faderio's 1 ms promise?
 
+Superseded for the product by [ADR 0016](../adr/0016-wma-through-the-windows-media-format-runtime.md):
+faderio calls the Windows Media Format runtime itself, in both hosts. This stays as the record
+of MusicBee's BASS.
+
 Research requested on 2026-10-05 after "we certainly need WMA". WMA is rejected
 ([ADR 0007](../adr/0007-audio-is-promised-or-rejected.md)) because Windows Media Foundation, the
 decoder ticket 02 measured, missed seeks by up to 71 ms and misreported length. The plugin has

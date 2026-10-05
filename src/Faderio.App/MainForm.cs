@@ -918,7 +918,7 @@ internal sealed class MainForm : Form
         using var dialog = new OpenFileDialog
         {
             Title = "Add audio files",
-            Filter = "Promised audio (WAV, FLAC, MP3)|*.wav;*.flac;*.mp3|All files|*.*",
+            Filter = "Promised audio (WAV, FLAC, MP3, WMA)|*.wav;*.flac;*.mp3;*.wma|All files|*.*",
             Multiselect = true,
         };
         return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileNames : Array.Empty<string>();
@@ -928,7 +928,7 @@ internal sealed class MainForm : Form
     {
         using var dialog = new FolderBrowserDialog
         {
-            Description = "Add every WAV, FLAC and MP3 in a folder and its subfolders",
+            Description = "Add every WAV, FLAC, MP3 and WMA in a folder and its subfolders",
             UseDescriptionForTitle = true,
         };
         return dialog.ShowDialog(this) == DialogResult.OK ? new[] { dialog.SelectedPath } : Array.Empty<string>();

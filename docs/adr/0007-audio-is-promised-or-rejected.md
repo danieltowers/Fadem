@@ -42,3 +42,7 @@ being left unmeasured.
 
 M4A, WMA, AIFF, Ogg, more than two channels, 8- and 32-bit PCM and rates other than 44.1, 48 and
 96 kHz are rejected today. Each has a named way back in the table; none is out of scope.
+
+Amended 2026-10-05: WMA 9 Standard came back by its way, a decoder that seeks it exactly
+([ADR 0016](0016-wma-through-the-windows-media-format-runtime.md)). Its probe is the first to
+read audio, not only a header: one full decode at add time.

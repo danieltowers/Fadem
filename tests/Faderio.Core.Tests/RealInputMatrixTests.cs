@@ -74,6 +74,16 @@ public class RealInputMatrixTests
         where (Mp3Variant)cell[0] != Mp3Variant.CbrBare
         select cell;
 
+    /// <summary>WMA 9 Standard from both encoders real files come from (issue 12): Windows' own,
+    /// as Windows Media Player rips, and ffmpeg's. Windows' encoder offers no mono at 48 kHz, so
+    /// that cell is ffmpeg's alone.</summary>
+    public static IEnumerable<object[]> WmaCells() =>
+        from encoder in new[] { "windows", "ffmpeg" }
+        from rate in new[] { 44100, 48000 }
+        from channels in new[] { 1, 2 }
+        where !(encoder == "windows" && rate == 48000 && channels == 1)
+        select new object[] { encoder, rate, channels };
+
     private static string FixturePath(string name)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", name);
@@ -83,6 +93,9 @@ public class RealInputMatrixTests
 
     private static string FlacFixture(string signal, int rate, int bits, int channels) =>
         FixturePath($"{signal}-{rate}-{bits}-{channels}.flac");
+
+    private static string WmaFixture(string signal, string encoder, int rate, int channels) =>
+        FixturePath($"{signal}-{encoder}-{rate}-{channels}.wma");
 
     private static string Mp3Fixture(string signal, Mp3Variant variant, int rate, int channels) =>
         FixturePath($"{signal}-{variant.ToString().ToLowerInvariant()}-{rate}-{channels}.mp3");
@@ -125,12 +138,13 @@ public class RealInputMatrixTests
         return (frames, left);
     }
 
-    private static void AssertComplete(string path)
+    private static void AssertComplete(string path, long shortBy = 0)
     {
         using var source = OpenNormalised(path);
         var (frames, _) = Drain(source);
-        // The fixture is 2 s; a lossy encoder pads it to whole frames (LAME: up to two of 1152).
-        Assert.InRange(source.TotalFrames, ExpectedFrames, ExpectedFrames + 2 * 1152);
+        // The fixture is 2 s; a lossy encoder pads it to whole frames (LAME: up to two of 1152),
+        // or, ffmpeg's WMA, drops the last partial one (shortBy).
+        Assert.InRange(source.TotalFrames, ExpectedFrames - shortBy, ExpectedFrames + 2 * 1152);
         // Exactly, resampled or not: the normaliser rounds the length once and the resampler
         // delivers that many (measured in ticket 14; v2 needed a 100-frame allowance here).
         Assert.True(frames == source.TotalFrames,
@@ -452,4 +466,55 @@ public class RealInputMatrixTests
     [Theory, MemberData(nameof(Mp3Cells))]
     public void Mp3_SeekIntoLastBlock_LandsWithin1ms(Mp3Variant variant, int rate, int channels) =>
         AssertLanded(Landing(Mp3Fixture("noise", variant, rate, channels), LastBlockTarget), LastBlockTarget);
+
+    // ── WMA cells, checked-in fixtures (issue 12) ────────────────────────────────────────
+
+    /// <summary>ffmpeg's WMA loses the source's last partial 2048-sample block; in engine frames
+    /// at 48 kHz, less.</summary>
+    private const long WmaShortBy = 2048;
+
+    /// <summary>Inside the last block of what decodes as the source: 100 frames from its end, or
+    /// from the decode's where ffmpeg's is shorter. Windows' files decode a codec tail of up to
+    /// 43 ms past the source, which is not the noise and locates nowhere reliably.</summary>
+    private static long WmaLastBlockTarget(string path)
+    {
+        using var source = OpenNormalised(path);
+        return Math.Min(source.TotalFrames, ExpectedFrames) - 100;
+    }
+
+    [Theory, MemberData(nameof(WmaCells))]
+    public void Wma_ReadsToCompletion(string encoder, int rate, int channels) =>
+        AssertComplete(WmaFixture("tone", encoder, rate, channels), encoder == "ffmpeg" ? WmaShortBy : 0);
+
+    [Theory, MemberData(nameof(WmaCells))]
+    public void Wma_ToneIsPure(string encoder, int rate, int channels) =>
+        AssertPure(WmaFixture("tone", encoder, rate, channels));
+
+    [Theory, MemberData(nameof(WmaCells))]
+    public void Wma_HeaderLengthEqualsDecoded(string encoder, int rate, int channels)
+    {
+        // No WMA header gives the decoded length (the ASF header's is in milliseconds, and
+        // Windows' files decode a codec tail past it), so the probe decodes the file once and
+        // counts it, tail included, as MP3's untagged padding is (ADR 0010).
+        var path = WmaFixture("tone", encoder, rate, channels);
+        AssertHeaderLengthEqualsDecoded(path);
+        AssertDecodedFrames(path, TestAudio.LeftChannel(TrackSources.Open(path)).Length);
+    }
+
+    [Theory, MemberData(nameof(WmaCells))]
+    public void Wma_SeekBeforeFirstRead_LandsWithin1ms(string encoder, int rate, int channels)
+    {
+        // The runtime's own seek lands up to 2 ms from where its millisecond stamps say, and
+        // Media Foundation missed by up to 71 ms (ticket 02). The reader places it by the file's
+        // index (WmaIndex).
+        AssertLanded(Landing(WmaFixture("noise", encoder, rate, channels), SeekTarget), SeekTarget);
+    }
+
+    [Theory, MemberData(nameof(WmaCells))]
+    public void Wma_SeekIntoLastBlock_LandsWithin1ms(string encoder, int rate, int channels)
+    {
+        var path = WmaFixture("noise", encoder, rate, channels);
+        var target = WmaLastBlockTarget(path);
+        AssertLanded(Landing(path, target), target);
+    }
 }

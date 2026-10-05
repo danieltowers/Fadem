@@ -188,7 +188,6 @@ public sealed class AudioProbeTests
     [Theory]
     [InlineData("x.ogg")]
     [InlineData("x.m4a")]
-    [InlineData("x.wma")]
     [InlineData("x.aiff")]
     public void UnpromisedFormat_IsRejected_BeforeAnyDecoderIsTouched(string name)
     {

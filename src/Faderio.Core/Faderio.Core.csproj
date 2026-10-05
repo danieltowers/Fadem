@@ -6,6 +6,8 @@
     <TargetFrameworks>net8.0;net48</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- The Windows Media Format runtime is called through its COM vtables (WmSyncReader). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

@@ -38,7 +38,7 @@ public sealed partial class PlaybackEngine
         ThrowIfDisposed();
         var path = Path.GetFullPath(track.FilePath);
         var pairs = Run(() => StoredPairs().Where(p => p.Outgoing == path || p.Incoming == path).ToList());
-        var tracks = new StoreTracks(View.Queue.Select(r => r.Track).Prepend(track));
+        var tracks = new StoreTracks(View.Queue.Select(r => r.Track).Prepend(track), ResolveFromDisk);
         return pairs
             .Select(p => new StoredAdjacency(
                 new Adjacency(tracks.Of(p.Outgoing), tracks.Of(p.Incoming)), IsOutgoing: p.Outgoing == path, p.Layers))
@@ -55,7 +55,7 @@ public sealed partial class PlaybackEngine
     {
         ThrowIfDisposed();
         var paths = Run(() => StoredPairs().SelectMany(p => new[] { p.Outgoing, p.Incoming }).Distinct().ToList());
-        var tracks = new StoreTracks(View.Queue.Select(r => r.Track));
+        var tracks = new StoreTracks(View.Queue.Select(r => r.Track), ResolveFromDisk);
         return paths
             .Select(tracks.Of)
             .OrderBy(t => t.ToString(), StringComparer.CurrentCultureIgnoreCase)
@@ -94,9 +94,11 @@ public sealed partial class PlaybackEngine
     private sealed class StoreTracks
     {
         private readonly Dictionary<string, Track> _found = new();
+        private readonly Func<string, (Track? Track, Rejection? Rejection)> _resolve;
 
-        public StoreTracks(IEnumerable<Track> known)
+        public StoreTracks(IEnumerable<Track> known, Func<string, (Track? Track, Rejection? Rejection)> resolve)
         {
+            _resolve = resolve;
             foreach (var track in known)
             {
                 _found.TryAdd(Path.GetFullPath(track.FilePath), track);
@@ -107,7 +109,7 @@ public sealed partial class PlaybackEngine
         {
             if (!_found.TryGetValue(path, out var track))
             {
-                track = ResolveFromDisk(path).Track ?? new Track { FilePath = path, Gone = true };
+                track = _resolve(path).Track ?? new Track { FilePath = path, Gone = true };
                 _found[path] = track;
             }
             return track;

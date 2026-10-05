@@ -39,6 +39,7 @@ public sealed partial class PlaybackEngine
             StopOutput();
             EmptyQueue();
             _library = library;
+            KeepWmaIndexesIn(library);
             _store = library.Transitions;
             ClearHistory(); // its steps name the store left
             _settingsStore = library.Settings;

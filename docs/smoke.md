@@ -296,6 +296,12 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] Adding the library's longest FLAC (about 26 minutes) shows its full length in the time
       readout, and seeking into its last minute lands there. Length is not proven by the test
       suite; this is where it is checked.
+- [ ] **WMA** (phase 6 issue 12). Adding a folder holding a `.wma` (WMA 9 Standard) queues it
+      with its length in its row; played, the readout counts and a click three-quarters along
+      the seek bar lands there. A 26-minute WMA added the same way shows its full length, and
+      seeking into its last minute lands there at once. Adding a WMA 9 Pro file
+      (`tests/Faderio.Core.Tests/Fixtures/tone-windowspro-44100-2.wma`) queues nothing and
+      the strip names its codec.
 - [ ] **Sections** (phase 6 issue 09). With four rows and none selected, the queue menu's
       **Section** is greyed out. On the second row, **Section → Start a section here…** asks
       "Section name:" in a small dialog; "Intro" and OK shows a header "Intro" behind a swatch of its
@@ -459,6 +465,8 @@ which a background run cannot give.
       at the start, row 1 at rest.
 - [ ] **⏭** moves to row 2 from its start; **+5 s** and **−5 s** jump; a click in the middle
       of the seek bar lands at half the track; **⏮** past 3 s restarts the track.
+- [ ] **WMA** (phase 6 issue 12). A `.wma` dropped into the queue shows its length in its row;
+      played, a click in the middle of the seek bar lands at half the track.
 - [ ] **Dragging the fades** (phase 6 issue 11). With row 1 playing into an authored row 2 and the
       editor open on it: the cursor is ↔ over a red mark above or below the groove and the move
       cursor over a grey wedge there. A mark dragged follows the mouse, and on release the strip

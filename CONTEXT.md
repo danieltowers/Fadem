@@ -214,7 +214,8 @@ _Avoid_: Unreadable (a queued track's), deleted
 
 **Probe**:
 Reading a file's header when it is added to decide whether it is promised or rejected. The
-probe decides before the file is queued and never after.
+probe decides before the file is queued and never after. A promised WMA is also decoded once, for
+its length and its index (ADR 0016).
 _Avoid_: Validate, scan, check
 
 ### Output

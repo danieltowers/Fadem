@@ -33,8 +33,10 @@ internal static class TrackSources
     /// <summary>Opens the file, first reading it whole into memory when it is no larger than
     /// <paramref name="memoryCap"/>: it then plays without touching the disk again, and its file
     /// is not held open. A larger file, or one there is no memory for, is read from disk as it
-    /// plays.</summary>
-    public static ITrackSource Open(string path, long memoryCap, CancellationToken cancelled)
+    /// plays. A WMA's index is taken from <paramref name="wmaIndexes"/>, the engine's, or built
+    /// now when it has none (issue 12).</summary>
+    public static ITrackSource Open(
+        string path, long memoryCap, CancellationToken cancelled, WmaIndexStore? wmaIndexes = null)
     {
         if (!File.Exists(path))
         {
@@ -48,6 +50,12 @@ internal static class TrackSources
         try
         {
             file = HeldInMemory(file, memoryCap, cancelled);
+            if (extension == ".wma")
+            {
+                // The Windows Media Format runtime, in both hosts; Media Foundation missed seeks by
+                // up to 71 ms (ticket 02). Exact by its index (WmaTrackReader).
+                return WmaTrackReader.Open(path, file, wmaIndexes ?? new WmaIndexStore(), cancelled);
+            }
             WaveStream reader = extension switch
             {
                 ".wav" => new WaveFileReader(file),
