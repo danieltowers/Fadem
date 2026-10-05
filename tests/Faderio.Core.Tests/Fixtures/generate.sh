@@ -10,6 +10,8 @@
 #   noise-<rate>-<bits>-<ch>.flac           pink noise         seek landing by cross-correlation
 #   tone-<variant>-<rate>-<ch>.mp3          as above, MP3
 #   noise-<variant>-<rate>-<ch>.mp3
+#   tone-<encoder>-<rate>-<ch>.wma          as above, WMA: research, not a promised row
+#   noise-<encoder>-<rate>-<ch>.wma
 #
 # FLAC: 16/24-bit x 44.1/48/96 kHz x mono/stereo, twelve cells. "-sample_fmt s32" makes
 # ffmpeg's FLAC encoder write 24-bit.
@@ -25,6 +27,15 @@
 # probe trims by (issue 18): their length is the source's 88200 or 96000 samples, not whole
 # frames. Two more kinds of tag are crafted from these at test time by CraftedMp3, because
 # lame.exe is not available here: a "LAME" encoder string, and tags that fail each check.
+#
+# WMA (research into MusicBee's BASS, MusicBeeBassWmaTests; not in docs/supported-audio.md):
+# WMA 9 Standard x 44.1/48 kHz x mono/stereo, 128 kbps stereo, from two encoders, because real
+# WMA files come from Windows Media Player and ffmpeg's muxer is not it:
+#   ffmpeg    ffmpeg's wmav2 encoder; 64 kbps mono.
+#   windows   Windows' own encoder (the Windows Media Format runtime), reached through MusicBee's
+#             basswma.dll by encode-wma.ps1, which needs MusicBee installed and runs in 32-bit
+#             PowerShell. It is fed the same lavfi PCM as raw float. It offers mono only up to
+#             48 kbps at 44.1 kHz and not at all at 48 kHz, so it has three cells, not four.
 #
 # The FLAC noise fixtures double as the MP3s' source PCM: the same lavfi expression and seed,
 # encoded losslessly. Mp3DecoderOffsetTests and the tagged cells correlate against them, so the
@@ -58,7 +69,7 @@ cd "$(dirname "$0")"
 tone()  { echo "aevalsrc='0.5*sin(2*PI*1000*t)':s=$1:d=2"; }
 noise() { echo "anoisesrc=color=pink:sample_rate=$1:duration=2:seed=42:amplitude=0.5"; }
 
-rm -f tone-*.flac noise-*.flac tone-*.mp3 noise-*.mp3 silent-tail-*.flac false-header-*.flac
+rm -f tone-*.flac noise-*.flac tone-*.mp3 noise-*.mp3 tone-*.wma noise-*.wma silent-tail-*.flac false-header-*.flac
 
 for rate in 44100 48000 96000; do
   for bits in 16 24; do
@@ -81,6 +92,23 @@ for rate in 44100 48000; do
   done
 done
 
+ps32=/c/Windows/SysWOW64/WindowsPowerShell/v1.0/powershell.exe
+f32=$(mktemp)
+for rate in 44100 48000; do
+  for ch in 1 2; do
+    kbps=128; [ "$ch" = 1 ] && kbps=64
+    winbps=128000; [ "$ch" = 1 ] && winbps=48000
+    for signal in tone noise; do
+      src=$($signal $rate)
+      ffmpeg -y -loglevel error -f lavfi -i "$src" -ac $ch -c:a wmav2 -b:a ${kbps}k "$signal-ffmpeg-$rate-$ch.wma"
+      [ "$rate-$ch" = 48000-1 ] && continue
+      ffmpeg -y -loglevel error -f lavfi -i "$src" -ac $ch -f f32le "$f32"
+      "$ps32" -NoProfile -ExecutionPolicy Bypass -File encode-wma.ps1 "$(cygpath -w "$f32")"         "$signal-windows-$rate-$ch.wma" $rate $ch $winbps
+    done
+  done
+done
+rm -f "$f32"
+
 ffmpeg -y -loglevel error -f lavfi -i "anoisesrc=color=pink:sample_rate=44100:duration=1.5:seed=42:amplitude=0.5" \
   -af apad=whole_len=92160 -ac 2 -sample_fmt s16 silent-tail-44100-16-2.flac
 
@@ -91,4 +119,4 @@ printf '\xF8\xFF\x08\x89\x2C\x09' | dd of="$raw" bs=1 seek=$((70120 * 2)) conv=n
 ffmpeg -y -loglevel error -f s16le -ar 44100 -ac 1 -i "$raw" false-header-44100-16-1.flac
 rm -f "$raw"
 
-ls -l *.flac *.mp3
+ls -l *.flac *.mp3 *.wma

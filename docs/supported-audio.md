@@ -120,7 +120,7 @@ particular:
 | 8-bit, 32-bit integer and 32-bit float PCM | Studio intermediates, not library formats. Unproven. | A row each, if anyone has one. |
 | Sample rates other than 44.1, 48 and 96 kHz | Unproven. The resampler would very likely cope, but "very likely" is not a row. | A row per rate; WAV rows are free to generate. |
 | AIFF | A reader exists but nobody has a file. Unproven. | One row and an ffmpeg fixture. |
-| M4A / AAC, WMA | Ticket 02 measured seek error up to 15 ms and 71 ms and both misreport their own length. The promise is 1 ms. | Only a decoder that seeks them exactly; Media Foundation, the one that exists, does not. Nobody has asked. |
+| M4A / AAC, WMA | Ticket 02 measured seek error up to 15 ms and 71 ms and both misreport their own length. The promise is 1 ms. | Only a decoder that seeks them exactly; Media Foundation does not. For WMA in the plugin, MusicBee's BASS seeks exactly only by decoding from the start ([research](research/wma-through-musicbee-bass.md), `MusicBeeBassWmaTests`); its own seek misses by up to 1.6 ms. |
 | Ogg Vorbis | NVorbis 0.10.5 cannot seek into any file paged by ffmpeg's defaults (ticket 07). The reader is deleted rather than kept broken. | A research ticket on a decoder that seeks any Ogg, if the format is ever wanted. |
 | Opus, DSD, anything else | No reader, no row. | A row. |
 

@@ -45,8 +45,11 @@
   </ItemGroup>
   <!-- PluginRuntimeTests proves the net48 build itself; Compat holds what the tests use that
        net48 lacks, as Core's Compat/Net48 does for the engine. -->
-  <ItemGroup Condition="'$(TargetFramework)' != 'net48'">
+  <ItemGroup Condition="'$(TargetFramework)' != 'net48'">
     <Compile Remove="PluginRuntimeTests.cs;Compat/**" />
+    <!-- The MusicBee BASS research loads MusicBee's 32-bit DLLs, which a 64-bit net8.0 test host
+         cannot. -->
+    <Compile Remove="MusicBeeBass.cs;MusicBeeBassWmaTests.cs" />
   </ItemGroup>
 
 </Project>
