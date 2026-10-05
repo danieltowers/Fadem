@@ -130,8 +130,9 @@ internal sealed class PluginView : UserControl
         _next = new Button { Text = "⏭", Font = symbols, Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
         _transitionNow = new Button { Text = "⤳", Font = new Font("Segoe UI Symbol", 13f), Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
         _cueTransition = new Button { Text = "⏩", Font = symbols, Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
-        _shuffle = new CheckBox { Text = "🔀", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 35, Height = 28, Margin = new Padding(4, 6, 1, 4) };
-        _repeat = new CheckBox { Text = "🔁", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 35, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        // Hidden: shuffle and repeat are not what faderio is for, but kept wired up.
+        _shuffle = new CheckBox { Text = "🔀", Visible = false, Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 35, Height = 28, Margin = new Padding(4, 6, 1, 4) };
+        _repeat = new CheckBox { Text = "🔁", Visible = false, Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 35, Height = 28, Margin = new Padding(1, 6, 1, 4) };
         _back5 = new Button { Text = "−5 s", Width = 48, Height = 28, Enabled = false };
         _forward5 = new Button { Text = "+5 s", Width = 48, Height = 28, Enabled = false };
         // On the track's line, not the buttons' row: there, in a sidebar, it wraps to a row of its

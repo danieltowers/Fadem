@@ -153,10 +153,11 @@ internal sealed class MainForm : Form
         // Arrows draw small in this font; at 13 pt the wave arrow reads as clearly as ⏭.
         _transitionNow = new Button { Text = "⤳", Font = new Font("Segoe UI Symbol", 13f), Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _cueTransition = new Button { Text = "⏩", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
+        // Hidden: shuffle and repeat are not what faderio is for, but kept wired up.
         // Push buttons that stay pressed in while on. They never check themselves: what they
         // show is always the view's, set in Render.
-        _shuffle = new CheckBox { Text = "🔀", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 44, Height = 28, Margin = new Padding(10, 8, 2, 4) };
-        _repeat = new CheckBox { Text = "🔁", Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 44, Height = 28, Margin = new Padding(2, 8, 2, 4) };
+        _shuffle = new CheckBox { Text = "🔀", Visible = false, Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 44, Height = 28, Margin = new Padding(10, 8, 2, 4) };
+        _repeat = new CheckBox { Text = "🔁", Visible = false, Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 44, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         // A plain checkbox, unlike the toggles: it plays nothing, it only moves the editor.
         _syncEditor = new CheckBox { Text = "Sync editor", AutoCheck = false, AutoSize = true, Margin = new Padding(10, 12, 2, 4) };
         _tips = new ToolTip();
