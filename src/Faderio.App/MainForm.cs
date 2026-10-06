@@ -89,7 +89,7 @@ internal sealed class MainForm : Form
     internal readonly QueueColumns _columns;
 
     /// <summary>The colours the window is drawn in (studio theme issue 01).</summary>
-    internal Faderio.Shell.Theme.Palette Palette { get; init; } = Faderio.Shell.Theme.Palette.Studio;
+    internal Faderio.Shell.Theme.Palette Palette { get; }
 
     /// <summary>The header's menu: a tick for each column.</summary>
     internal ContextMenuStrip _columnMenu => _columns.Menu;
@@ -98,9 +98,13 @@ internal sealed class MainForm : Form
     /// the output adapter's, for the settings dialog.</param>
     /// <param name="windowFile">The machine's window.json: where the window opens, and where it
     /// is written when the window closes. Null keeps no geometry: the window opens centred.</param>
-    public MainForm(PlaybackEngine engine, PostingSink sink, Func<AudioOutputMode?> outputModeInUse, string? windowFile = null)
+    /// <param name="palette">The colours to draw in (studio theme): the built-in ones when none.</param>
+    public MainForm(
+        PlaybackEngine engine, PostingSink sink, Func<AudioOutputMode?> outputModeInUse, string? windowFile = null,
+        Faderio.Shell.Theme.Palette? palette = null)
     {
         _engine = engine;
+        Palette = palette ?? Faderio.Shell.Theme.Palette.Studio;
         _outputModeInUse = outputModeInUse;
         _windowFile = windowFile;
         ChooseFiles = ShowFilesDialog;
@@ -126,7 +130,7 @@ internal sealed class MainForm : Form
         _addProgress = new ToolStripStatusLabel { Available = false };
         _cancelAdd = new ToolStripButton("Cancel") { Available = false, DisplayStyle = ToolStripItemDisplayStyle.Text };
         // The clip light (build issue 17): dark until the engine latches a clip.
-        _clip = new ToolStripStatusLabel { ForeColor = SystemColors.GrayText, Margin = new Padding(8, 3, 0, 2) };
+        _clip = new ToolStripStatusLabel { ForeColor = Palette.Dim, Margin = new Padding(8, 3, 0, 2) };
         var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _addProgress, _cancelAdd, _clip }, ShowItemToolTips = true };
 
         _addFiles = new Button { Text = "Add files…", Width = 90, Height = 28, Margin = new Padding(4, 8, 4, 0) };
@@ -242,7 +246,8 @@ internal sealed class MainForm : Form
             HideSelection = false,
             ShowItemToolTips = true,
         };
-        QueueRowStyle.Draw(_queueList); // a selected row grey, not blue
+        QueueRowStyle.Draw(_queueList, Palette); // a selected row raised, not blue
+        _rowStyle.Palette = Palette;
         // The columns (playlists issue 06): the default four until the library's own layout is
         // read, at the first render.
         _columns = new QueueColumns(_queueList, ColumnLayout.Default, ColumnLayout.FileName, selected =>
@@ -316,8 +321,8 @@ internal sealed class MainForm : Form
         _queueDrag = new QueueDrag(_queueList, engine, (paths, before) => _ = _engine.Add(paths, before));
 
         _editor = new TransitionEditorPanel(engine, ShowNotice, suggested => Dialogs.ChooseRenderPath(this, suggested));
-        _playlists = new PlaylistSidebar(engine, LeaveEditor);
-        _playlistName = new PlaylistNameBar(engine);
+        _playlists = new PlaylistSidebar(engine, LeaveEditor) { Palette = Palette };
+        _playlistName = new PlaylistNameBar(engine) { Palette = Palette };
 
         // Docking order: the side panels and bottom strip first, then the name over the queue,
         // between them, and the fill-docked list last.
@@ -389,6 +394,7 @@ internal sealed class MainForm : Form
             _engine.Dispose();
         };
 
+        Faderio.Shell.Theme.StudioTheme.Apply(this, Palette); // the studio look (studio theme issue 02)
         PlaceWindow();
         Render(_engine.View);
     }
@@ -426,6 +432,7 @@ internal sealed class MainForm : Form
             Text = title;
         }
         _playPause.Text = Presenter.PlayPauseGlyph(view.Transport);
+        Faderio.Shell.Theme.StudioTheme.Light(_playPause, view.Transport == Transport.Playing);
         _transitionNow.Enabled = view.CanTransitionNow;
         _cueTransition.Enabled = view.CanCueTransition;
         _shuffle.Checked = view.Shuffle;
@@ -484,7 +491,7 @@ internal sealed class MainForm : Form
         _clip.Text = text;
         _clip.ToolTipText = Presenter.ClipTip(clip);
         _clip.BackColor = clip is null ? Color.Empty : Color.Firebrick;
-        _clip.ForeColor = clip is null ? SystemColors.GrayText : Color.White;
+        _clip.ForeColor = clip is null ? Palette.Dim : Color.White;
         _clip.AutoSize = true;
         var width = Math.Min(_clip.GetPreferredSize(Size.Empty).Width, MaxClipWidth);
         _clip.AutoSize = false;

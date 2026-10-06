@@ -174,9 +174,12 @@ internal sealed class Host : IDisposable
         try
         {
             // The elements, states and components that answer, found by probing (studio theme spec).
+            // The chrome is element 2's, the colour MusicBee draws its own bars in, so the view
+            // meets them without a seam; the wells sit a step darker, at element 16's border, and
+            // the edges are derived darker still.
             int Read(int element, int state, int component) => ReadSkin?.Invoke(element, state, component) ?? 0;
             palette = Palette.From(new SkinColours(
-                Chrome: Read(0, 0, 1), Well: Read(2, 0, 1), Edge: Read(16, 0, 0), Key: Read(7, 0, 1),
+                Chrome: Read(2, 0, 1), Well: Read(16, 0, 0), Edge: 0, Key: Read(7, 0, 1),
                 Text: Read(0, 0, 3), Dim: Read(7, 3, 3), Accent: Read(7, 4, 3)));
         }
         catch (Exception e) when (e is not OutOfMemoryException)
@@ -192,10 +195,7 @@ internal sealed class Host : IDisposable
 
     public PluginView AttachView(Control panel, Action stopMusicBeesPlayer)
     {
-        var view = new PluginView(Engine, Notices, OnNoticed, _modeInUse, _deviceInUse, stopMusicBeesPlayer, OpenSettings)
-        {
-            Palette = ReadPalette(),
-        };
+        var view = new PluginView(Engine, Notices, OnNoticed, _modeInUse, _deviceInUse, stopMusicBeesPlayer, OpenSettings, ReadPalette());
         _views.Add(view);
         view.Disposed += (_, _) => _views.Remove(view);
         panel.Controls.Add(view);

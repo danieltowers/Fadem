@@ -88,7 +88,7 @@ internal sealed class PluginView : UserControl
     internal const string ColumnsFileName = "musicbee-columns.json";
 
     /// <summary>The colours MusicBee's skin gives this view (studio theme issue 01).</summary>
-    internal Faderio.Shell.Theme.Palette Palette { get; init; } = Faderio.Shell.Theme.Palette.Studio;
+    internal Faderio.Shell.Theme.Palette Palette { get; }
 
     /// <summary>The ✎ column, after the queue's own: the editor button on every row but the last.</summary>
     internal int EditColumn => _columns.EditColumn;
@@ -101,8 +101,9 @@ internal sealed class PluginView : UserControl
     /// <param name="openSettings">Opens faderio's settings dialog, as MusicBee's Configure does, and applies its OK.</param>
     public PluginView(
         PlaybackEngine engine, NoticeLog notices, Action<string> notice, Func<AudioOutputMode?> outputModeInUse,
-        Func<string?> outputDeviceInUse, Action stopMusicBeesPlayer, Action openSettings)
+        Func<string?> outputDeviceInUse, Action stopMusicBeesPlayer, Action openSettings, Faderio.Shell.Theme.Palette? palette = null)
     {
+        Palette = palette ?? Faderio.Shell.Theme.Palette.Studio;
         _engine = engine;
         _notices = notices;
         _outputModeInUse = outputModeInUse;
@@ -113,16 +114,14 @@ internal sealed class PluginView : UserControl
         ShowTransitionManager = ShowModeless;
 
         Dock = DockStyle.Fill;
-        // Light whatever MusicBee's skin: unset, both colours are ambient and a dark skin's
-        // panel turns the view's labels and buttons dark-on-dark.
-        BackColor = SystemColors.Control;
-        ForeColor = SystemColors.ControlText;
+        // Never ambient: unset, a dark skin's panel would turn the view's labels and buttons
+        // dark-on-dark. The studio theme sets both from the skin's palette, at the end.
 
         _status = new SpringLabel("Ready.") { TextAlign = ContentAlignment.MiddleLeft };
         _noticeCount = new ToolStripStatusLabel { Available = false, IsLink = true, ToolTipText = "Show this session's notices" };
         // Where MusicBee's window has no title of faderio's: the library, the mode in use and the
         // device. Cut short in a narrow panel, whole in its tooltip.
-        _host = new ToolStripStatusLabel { ForeColor = SystemColors.GrayText, Margin = new Padding(8, 3, 0, 2), AutoSize = false, TextAlign = ContentAlignment.MiddleLeft };
+        _host = new ToolStripStatusLabel { ForeColor = Palette.Dim, Margin = new Padding(8, 3, 0, 2), AutoSize = false, TextAlign = ContentAlignment.MiddleLeft };
         var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _host }, ShowItemToolTips = true, SizingGrip = false };
 
         var symbols = new Font("Segoe UI Symbol", 9f);
@@ -213,7 +212,8 @@ internal sealed class PluginView : UserControl
             HideSelection = false,
             ShowItemToolTips = true,
         };
-        QueueRowStyle.Draw(_queueList); // a selected row grey, not blue
+        QueueRowStyle.Draw(_queueList, Palette); // a selected row raised, not blue
+        _rowStyle.Palette = Palette;
         // Rows drag to a new place, as in the App (phase 6 issue 02). Files dropped from
         // MusicBee's track list, or from Explorer, are both a shell drag of the files (issue 01),
         // and land where they are dropped (issue 03).
@@ -307,7 +307,7 @@ internal sealed class PluginView : UserControl
         _editorBar = new Panel { Dock = DockStyle.Top, Height = 30, Padding = new Padding(4, 2, 4, 2), Visible = false };
         _editorBar.Controls.Add(_closeEditor);
         _closeEditor.Click += (_, _) => CloseEditor();
-        _playlists = new PlaylistSidebar(engine, LeaveEditor);
+        _playlists = new PlaylistSidebar(engine, LeaveEditor) { Palette = Palette };
 
         // Docking order: the strip and the editor's bar first, then the playlists, then the
         // editor (at the right, or filling the lists' place), and the list last.
@@ -377,6 +377,7 @@ internal sealed class PluginView : UserControl
             _manager?.Dispose();
         };
 
+        Faderio.Shell.Theme.StudioTheme.Apply(this, Palette); // the studio look, in the skin's colours
         ShowNotices();
         Render(_engine.View);
     }
@@ -392,6 +393,7 @@ internal sealed class PluginView : UserControl
             return;
         }
         _playPause.Text = Presenter.PlayPauseGlyph(view.Transport);
+        Faderio.Shell.Theme.StudioTheme.Light(_playPause, view.Transport == Transport.Playing);
         _transitionNow.Enabled = view.CanTransitionNow;
         _cueTransition.Enabled = view.CanCueTransition;
         _shuffle.Checked = view.Shuffle;

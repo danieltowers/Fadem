@@ -68,11 +68,9 @@ internal static class Program
 
         // The title follows the library and the mode in use; the form renders both.
         var form = new MainForm(engine, sink, () => output.Mode,
-            machineFolder is null ? null : Path.Combine(machineFolder, "window.json"))
-        {
+            machineFolder is null ? null : Path.Combine(machineFolder, "window.json"),
             // The plugin's last read of MusicBee's skin, else the built-in (studio theme issue 01).
-            Palette = Faderio.Shell.Theme.Palette.ForMachine(machineFolder),
-        };
+            Faderio.Shell.Theme.Palette.ForMachine(machineFolder));
         output.ModeChanged += () => form.BeginInvoke(() => form.Render());
         form.Shown += (_, _) =>
         {

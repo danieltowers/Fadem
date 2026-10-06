@@ -29,6 +29,9 @@ internal sealed class PlaylistSidebar : Panel
 
     /// <param name="leaveEditor">Saves a box being typed in and empties the editor before the
     /// open playlist changes.</param>
+    /// <summary>The colours its rows are drawn in (studio theme issue 02), or none for the system's.</summary>
+    public Theme.Palette? Palette { get; set; }
+
     public PlaylistSidebar(PlaybackEngine engine, Action leaveEditor)
     {
         _engine = engine;
@@ -146,10 +149,15 @@ internal sealed class PlaylistSidebar : Panel
             {
                 item.Font = font;
             }
-            var back = open ? SystemColors.Info : SystemColors.Window;
+            var back = open ? Palette?.Raised ?? SystemColors.Info : Palette?.Well ?? SystemColors.Window;
             if (item.BackColor != back)
             {
                 item.BackColor = back;
+            }
+            var fore = Palette?.Text ?? SystemColors.WindowText;
+            if (item.ForeColor != fore)
+            {
+                item.ForeColor = fore;
             }
         }
     }

@@ -6,7 +6,9 @@ namespace Faderio.Shell.Tests;
 
 /// <summary>
 /// Studio theme issue 01: the palette a skin's answers give. The Duophonic answers are those the
-/// user's MusicBee gave a probe on 2026-10-06; MusicBee answers 0 where the skin has no colour.
+/// user's MusicBee gave a probe on 2026-10-06, as the plugin maps them: its bars' colour as the
+/// chrome, the border as the wells, and no edge of its own. MusicBee answers 0 where the skin has
+/// no colour.
 /// </summary>
 public sealed class PaletteTests : IDisposable
 {
@@ -20,7 +22,7 @@ public sealed class PaletteTests : IDisposable
     private static int Argb(int rgb) => unchecked((int)0xFF000000) | rgb;
 
     internal static readonly SkinColours Duophonic = new(
-        Chrome: Argb(0x232323), Well: Argb(0x1C1C1C), Edge: Argb(0x121212), Key: Argb(0x2C2C2C),
+        Chrome: Argb(0x1C1C1C), Well: Argb(0x121212), Edge: 0, Key: Argb(0x2C2C2C),
         Text: Argb(0xE1E1E1), Dim: Argb(0x6D6D6D), Accent: Argb(0xCD5C5C));
 
     private static string Hex(Color c) => Palette.Hex(c);
@@ -31,7 +33,7 @@ public sealed class PaletteTests : IDisposable
         var p = Palette.From(Duophonic);
 
         Assert.Equal(
-            ["#232323", "#1C1C1C", "#121212", "#2C2C2C", "#E1E1E1", "#6D6D6D", "#CD5C5C"],
+            ["#1C1C1C", "#121212", "#0F0F0F", "#2C2C2C", "#E1E1E1", "#6D6D6D", "#CD5C5C"],
             new[] { p.Chrome, p.Well, p.Edge, p.Key, p.Text, p.Dim, p.Accent }.Select(Hex));
         Assert.True(p.IsDark);
         Assert.Equal("#3D3D3D", Hex(p.Raised)); // the key, 8% toward white

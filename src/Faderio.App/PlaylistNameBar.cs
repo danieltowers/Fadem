@@ -12,6 +12,9 @@ namespace Faderio.App;
 /// </summary>
 internal sealed class PlaylistNameBar : Panel
 {
+    /// <summary>The colours the name is drawn in (studio theme issue 02), or none for the system's.</summary>
+    public Faderio.Shell.Theme.Palette? Palette { get; set; }
+
     private readonly PlaybackEngine _engine;
     private readonly Font _nameFont;
     private readonly ToolTip _tip;
@@ -81,7 +84,7 @@ internal sealed class PlaylistNameBar : Panel
         {
             _name.Text = text;
         }
-        var color = view.OpenPlaylist is null ? SystemColors.GrayText : SystemColors.ControlText;
+        var color = view.OpenPlaylist is null ? Palette?.Dim ?? SystemColors.GrayText : Palette?.Text ?? SystemColors.ControlText;
         if (_name.ForeColor != color)
         {
             _name.ForeColor = color;

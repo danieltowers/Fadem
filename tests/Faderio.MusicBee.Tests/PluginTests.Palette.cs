@@ -42,7 +42,8 @@ public sealed partial class PluginTests
 
         var view = PaletteView(panel);
 
-        Assert.Equal("#232323", Palette.Hex(view.Palette.Chrome));
+        Assert.Equal("#1C1C1C", Palette.Hex(view.Palette.Chrome)); // MusicBee's own bars
+        Assert.Equal("#121212", Palette.Hex(view.Palette.Well));
         Assert.Equal("#CD5C5C", Palette.Hex(view.Palette.Accent));
         Assert.True(Palette.Load(file)!.Same(view.Palette));
     });
@@ -55,5 +56,25 @@ public sealed partial class PluginTests
         var view = PaletteView(panel);
 
         Assert.True(view.Palette.Same(Palette.Studio));
+    });
+
+    [Fact]
+    public void TheView_IsInTheSkinsColours_WithNoSystemColourLeft() => RunSta(() =>
+    {
+        AnswerDuophonic();
+        using var panel = new Panel { Size = new Size(900, 500) };
+
+        var view = PaletteView(panel);
+        view.Render();
+        IEnumerable<Control> All(Control c) => new[] { c }.Concat(c.Controls.Cast<Control>().SelectMany(All));
+
+        Assert.Empty(All(view).Where(c => c.BackColor.IsSystemColor || c.ForeColor.IsSystemColor).Select(c => $"{c.GetType().Name} '{c.Text}'"));
+        Assert.Equal("#1C1C1C", Palette.Hex(view.BackColor)); // MusicBee's own bars: no seam
+        Assert.Equal("#121212", Palette.Hex(view._queueList.BackColor));
+        Assert.All(All(view).OfType<Button>(), b => Assert.Equal(FlatStyle.Flat, b.FlatStyle));
+
+        Click(view._playPause);
+        view.Render();
+        Assert.True(StudioTheme.IsLit(view._playPause));
     });
 }

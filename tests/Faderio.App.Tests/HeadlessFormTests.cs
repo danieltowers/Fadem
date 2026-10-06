@@ -443,17 +443,17 @@ public sealed partial class HeadlessFormTests
 
         var marked = h.Form._queueList.Items[1];
         Assert.Equal("⚠ 2", marked.Text);
-        Assert.Equal(SystemColors.GrayText, marked.ForeColor);
+        Assert.Equal(h.Form.Palette.Dim, marked.ForeColor);
         Assert.Contains("Unreadable", marked.ToolTipText);
         Assert.Equal("1", h.Form._queueList.Items[0].Text);
-        Assert.Equal(SystemColors.WindowText, h.Form._queueList.Items[0].ForeColor);
+        Assert.Equal(h.Form.Palette.Text, h.Form._queueList.Items[0].ForeColor);
 
         File.Move(b + ".away", b);
         h.Form.PlayRowAt(1); // a double-click tries it
         h.Form.Render();
 
         Assert.Equal("2", marked.Text); // now playing
-        Assert.Equal(SystemColors.WindowText, marked.ForeColor);
+        Assert.Equal(h.Form.Palette.Text, marked.ForeColor);
         Assert.Equal("", marked.ToolTipText);
     });
 
@@ -1264,7 +1264,7 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void TheMarker_IsASpeakerAtRestWhenStopped_AndSoundingWhilePlayingOrPaused_OnWhiteRows() => RunSta(() =>
+    public void TheMarker_IsASpeakerAtRestWhenStopped_AndSoundingWhilePlayingOrPaused_OnUnshadedRows() => RunSta(() =>
     {
         using var h = new Harness();
         var a = TestAudio.WriteDcWav("alpha.wav", 1, 0.4);
@@ -1278,12 +1278,12 @@ public sealed partial class HeadlessFormTests
 
         Assert.Equal(0, h.Form._queueList.Columns[h.Form._queueList.Columns.Count - 1].DisplayIndex); // at the far left
         Assert.Equal(new[] { "🔈", "" }, Labels()); // at launch
-        Assert.Equal(new[] { SystemColors.Window, SystemColors.Window }, Backs());
+        Assert.Equal(new[] { h.Form.Palette.Well, h.Form.Palette.Well }, Backs());
 
         h.Form.PlayRowAt(1);
         h.Form.Render();
         Assert.Equal(new[] { "", "🔊" }, Labels());
-        Assert.Equal(new[] { SystemColors.Window, SystemColors.Window }, Backs());
+        Assert.Equal(new[] { h.Form.Palette.Well, h.Form.Palette.Well }, Backs());
 
         Click(h.Form._playPause); // pause
         h.Form.Render();
@@ -2005,9 +2005,9 @@ public sealed partial class HeadlessFormTests
 
         var cells = h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.SubItems[h.Form.EditColumn]).ToArray();
         Assert.True(cells[0].Font.Bold);
-        Assert.Equal(SystemColors.WindowText, cells[0].ForeColor);
+        Assert.Equal(h.Form.Palette.Text, cells[0].ForeColor);
         Assert.False(cells[1].Font.Bold);
-        Assert.Equal(SystemColors.GrayText, cells[1].ForeColor);
+        Assert.Equal(h.Form.Palette.Dim, cells[1].ForeColor);
 
         h.Engine.Unauthor(h.Engine.AdjacenciesOf(h.Engine.View.Queue[0].Id).Next!);
 
@@ -2339,7 +2339,7 @@ public sealed partial class HeadlessFormTests
         using var h = new Harness();
 
         Assert.Equal("● No clips", h.Form._clip.Text);
-        Assert.Equal(SystemColors.GrayText, h.Form._clip.ForeColor);
+        Assert.Equal(h.Form.Palette.Dim, h.Form._clip.ForeColor);
         Assert.Equal("Lights when the output goes beyond full scale.", h.Form._clip.ToolTipText);
     });
 
@@ -2368,7 +2368,7 @@ public sealed partial class HeadlessFormTests
 
         Assert.Null(h.Engine.View.Clip);
         Assert.Equal("● No clips", h.Form._clip.Text);
-        Assert.Equal(SystemColors.GrayText, h.Form._clip.ForeColor);
+        Assert.Equal(h.Form.Palette.Dim, h.Form._clip.ForeColor);
     });
 
     [Fact]
@@ -2539,12 +2539,12 @@ public sealed partial class HeadlessFormTests
     private static string[] Names(PlaylistSidebar sidebar) =>
         sidebar._list.Items.Cast<ListViewItem>().Select(i => i.Text).ToArray();
 
-    /// <summary>The name the sidebar highlights: bold, on the marker's yellow.</summary>
+    /// <summary>The name the sidebar highlights: bold, raised (studio theme issue 02).</summary>
     private static string Highlighted(PlaylistSidebar sidebar)
     {
         var open = sidebar._list.Items.Cast<ListViewItem>().Where(i => i.Font.Bold).ToList();
         Assert.Single(open);
-        Assert.Equal(SystemColors.Info, open[0].BackColor);
+        Assert.Equal(sidebar.Palette!.Raised, open[0].BackColor);
         return open[0].Text;
     }
 

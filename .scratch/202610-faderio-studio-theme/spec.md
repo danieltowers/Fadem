@@ -57,9 +57,9 @@ The look is drawn only from a **palette**: ten roles, never a hard-coded colour.
 
 | Role | Used for | In MusicBee, read from (`Setting_GetSkinElementColour`) | Duophonic gives |
 |---|---|---|---|
-| Chrome | window, toolbars, seek bar ground | element 0 (sub-panel), default, background | `#232323` |
-| Well | queue, playlists, editor fields | element 2, default, background | `#1C1C1C` |
-| Edge | wells' hairlines, key edges, groove | element 16, default, border | `#121212` |
+| Chrome | window, toolbars, seek bar ground | element 2, default, background: the colour MusicBee draws its own bars in | `#1C1C1C` |
+| Well | queue, playlists, editor fields | element 16, default, border | `#121212` |
+| Edge | wells' hairlines, key edges, groove | Chrome, 45% toward black | `#0F0F0F` |
 | Key | button face | element 7 (input control), default, background | `#2C2C2C` |
 | Text | text | element 0, default, foreground | `#E1E1E1` |
 | Dim | headers, scale, disabled, unreadable | element 7, state 3, foreground | `#6D6D6D` |
@@ -70,7 +70,9 @@ The look is drawn only from a **palette**: ten roles, never a hard-coded colour.
 
 These values were measured on 2026-10-06 by a temporary probe in the installed plugin. The probe
 called every element from −12 to 40, every state from 0 to 12 and every component from 0 to 6.
-Only elements −1, 0, 2, 7, 10, 14, 15, 16 and 17 answer; every other combination is black. The
+(The first mapping took Chrome from element 0, `#232323`. In MusicBee that left a seam: MusicBee
+draws its own bars in element 2's `#1C1C1C`. Issue 02 moved the mapping one step darker.) Only
+elements −1, 0, 2, 7, 10, 14, 15, 16 and 17 answer; every other combination is black. The
 plugin's `MusicBeeInterface.cs` names only five elements and two states, so the spec names the
 numbers it found. State 4's foreground (`#CD5C5C`, indian red) is the skin's one colour that is
 not grey. It is the accent.
@@ -128,7 +130,7 @@ Replace the "stock look" assumptions in `docs/smoke.md`'s Looks halves.
   `palette.json` exists. No white or system-grey surface is left on the main window or any
   dialog.
 - **MusicBee:** in the user's Duophonic skin, faderio's panel blends with MusicBee's chrome
-  (`#232323`) with indian-red LEDs and readout. Switch to a light skin: the panel follows, after
+  (`#1C1C1C`) with indian-red LEDs and readout. Switch to a light skin: the panel follows, after
   a restart if MusicBee needs one, and that is recorded.
 
 ## Decisions (accepted by the user, 2026-10-06)

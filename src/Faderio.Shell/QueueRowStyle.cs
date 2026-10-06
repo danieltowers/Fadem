@@ -25,6 +25,9 @@ internal sealed class QueueRowStyle : IDisposable
     /// <summary>The rows' height: tall enough for the speaker.</summary>
     private const int RowHeight = 22;
 
+    /// <summary>The colours rows are drawn in (studio theme issue 02), or none for the system's.</summary>
+    public Theme.Palette? Palette { get; set; }
+
     /// <summary>The pencil's fonts: the list's own size draws it at eight pixels.</summary>
     public QueueRowStyle()
     {
@@ -46,8 +49,9 @@ internal sealed class QueueRowStyle : IDisposable
     /// <paramref name="row"/>.</summary>
     public void Apply(ListViewItem item, QueueRow row, int index, PlayerView view, int editColumn)
     {
-        var back = SystemColors.Window;
-        var fore = row.IsUnreadable ? SystemColors.GrayText : SystemColors.WindowText;
+        var back = Palette?.Well ?? SystemColors.Window;
+        var dim = Palette?.Dim ?? SystemColors.GrayText;
+        var fore = row.IsUnreadable ? dim : Palette?.Text ?? SystemColors.WindowText;
         var authored = row.NextAuthored == true;
         var button = item.SubItems[editColumn];
         foreach (ListViewItem.ListViewSubItem cell in item.SubItems)
@@ -56,7 +60,7 @@ internal sealed class QueueRowStyle : IDisposable
             {
                 cell.BackColor = back;
             }
-            var cellFore = cell == button && !authored ? SystemColors.GrayText : fore;
+            var cellFore = cell == button && !authored ? dim : fore;
             if (cell.ForeColor != cellFore)
             {
                 cell.ForeColor = cellFore;
@@ -105,14 +109,22 @@ internal sealed class QueueRowStyle : IDisposable
     /// <summary>Has <paramref name="list"/>, a details view, drawn here: each cell in its own
     /// colours and font, aligned as its column, on <see cref="RowMarks.Selected"/> while its row
     /// is selected. The header is the system's.</summary>
-    public static void Draw(ListView list)
+    public static void Draw(ListView list, Theme.Palette? palette = null)
     {
         list.OwnerDraw = true;
         // An image list's height sets the rows': the list has no other.
         var rows = new ImageList { ImageSize = new Size(1, RowHeight) };
         list.SmallImageList = rows;
         list.Disposed += (_, _) => rows.Dispose();
-        list.DrawColumnHeader += (_, e) => e.DrawDefault = true;
+        list.DrawColumnHeader += (_, e) =>
+        {
+            if (palette is null)
+            {
+                e.DrawDefault = true;
+                return;
+            }
+            DrawHeader(list, e, palette);
+        };
         list.DrawItem += (_, _) => { }; // a details view draws by cell
         list.DrawSubItem += (_, e) =>
         {
@@ -126,7 +138,7 @@ internal sealed class QueueRowStyle : IDisposable
             var left = e.ColumnIndex != 0 ? e.Bounds.X
                 : item.Bounds.X + list.Columns.Cast<ColumnHeader>().Where(c => c.DisplayIndex < column.DisplayIndex).Sum(c => c.Width);
             var bounds = new Rectangle(left, e.Bounds.Y, column.Width, e.Bounds.Height);
-            var back = item.Selected ? RowMarks.Selected : cell.BackColor;
+            var back = item.Selected ? palette?.Raised ?? RowMarks.Selected : cell.BackColor;
             using (var brush = new SolidBrush(back))
             {
                 e.Graphics.FillRectangle(brush, bounds);
@@ -145,6 +157,29 @@ internal sealed class QueueRowStyle : IDisposable
                 align | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine
                 | (centred ? TextFormatFlags.NoPadding : TextFormatFlags.EndEllipsis));
         };
+    }
+
+    /// <summary>A header cell on the Well: its heading in Dim, an Edge rule under it and between
+    /// columns.</summary>
+    private static void DrawHeader(ListView list, DrawListViewColumnHeaderEventArgs e, Theme.Palette palette)
+    {
+        using (var back = new SolidBrush(palette.Well))
+        {
+            e.Graphics.FillRectangle(back, e.Bounds);
+        }
+        using (var rule = new Pen(palette.Edge))
+        {
+            e.Graphics.DrawLine(rule, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+            e.Graphics.DrawLine(rule, e.Bounds.Right - 1, e.Bounds.Top + 4, e.Bounds.Right - 1, e.Bounds.Bottom - 5);
+        }
+        var align = e.Header?.TextAlign switch
+        {
+            HorizontalAlignment.Right => TextFormatFlags.Right,
+            HorizontalAlignment.Center => TextFormatFlags.HorizontalCenter,
+            _ => TextFormatFlags.Left,
+        };
+        TextRenderer.DrawText(e.Graphics, e.Header?.Text, list.Font, Rectangle.Inflate(e.Bounds, -4, 0), palette.Dim,
+            align | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
     }
 
     /// <summary>Adds the speaker's column after every other, the ✎ button's included, and shows it

@@ -7,6 +7,9 @@ Shell. See the [spec](../spec.md), "The look": section labels and the queue.
 
 ## What to build
 
+- **Already done in issue 02**, so the queue was never white rows on a dark list: rows on Well
+  in Text, unreadable rows and ✎ when not authored in Dim, selection in Raised, and the header
+  drawn on Well with its headings in Dim. The open playlist is on Raised.
 - **`QueueRowStyle`** draws in the palette:
   - rows on Well;
   - the playing row's text in Accent;
@@ -19,6 +22,10 @@ Shell. See the [spec](../spec.md), "The look": section labels and the queue.
   **`PlaylistNameBar`**: Text, or Dim with no playlist.
 - **Pane titles** (`PaneTitle`, and the App's equivalents): small bold capitals in Accent.
 - **The drag's drop line** (`QueueDrag`): in Accent.
+- **The column rules below the last row.** Windows' dark list themes (`DarkMode_Explorer`, and
+  `DarkMode_ItemsView` too, as tried in issue 02) draw a blue-grey vertical rule at each column
+  edge down the list's empty part. Find what draws them and stop it: an owner-drawn background
+  for the empty area, or a list style.
 
 ## Acceptance
 
