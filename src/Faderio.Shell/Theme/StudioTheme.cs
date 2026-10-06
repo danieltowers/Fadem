@@ -110,12 +110,19 @@ internal static class StudioTheme
                 strip.RenderMode = ToolStripRenderMode.System;
                 strip.ForeColor = p.Dim;
                 break;
+            case PaneTitle.Title title:
+                title.ForeColor = p.Accent; // a section label, lit (studio theme issue 03)
+                break;
         }
         if (first)
         {
             if (NeedsNativeTheme(control))
             {
                 control.HandleCreated += (_, _) => NativeTheme(control);
+            }
+            if (control is ListView list)
+            {
+                EmptyGround.Attach(list);
             }
             control.ControlAdded += (_, e) =>
             {
@@ -158,6 +165,43 @@ internal static class StudioTheme
             {
                 _ = SetWindowTheme(header, dark ? "DarkMode_ItemsView" : "ItemsView", null);
             }
+        }
+    }
+
+    /// <summary>
+    /// A list's ground below its last row, plain. Windows' dark list theme (<c>DarkMode_Explorer</c>)
+    /// draws a two-pixel rule at every column's edge down a details view's empty part (its
+    /// <c>LVP_COLUMNDETAIL</c>), and no other dark list theme exists: the names it might be fall
+    /// back to the light theme, white frame and all (studio theme issue 03).
+    /// </summary>
+    private sealed class EmptyGround : NativeWindow
+    {
+        private readonly ListView _list;
+
+        private EmptyGround(ListView list) => _list = list;
+
+        public static void Attach(ListView list)
+        {
+            var ground = new EmptyGround(list);
+            if (list.IsHandleCreated)
+            {
+                ground.AssignHandle(list.Handle);
+            }
+            list.HandleCreated += (_, _) => ground.AssignHandle(list.Handle);
+            list.HandleDestroyed += (_, _) => ground.ReleaseHandle();
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_ERASEBKGND && _list.View == View.Details)
+            {
+                using var g = Graphics.FromHdc(m.WParam);
+                using var ground = new SolidBrush(_list.BackColor);
+                g.FillRectangle(ground, _list.ClientRectangle);
+                m.Result = (IntPtr)1;
+                return;
+            }
+            base.WndProc(ref m);
         }
     }
 
@@ -263,6 +307,7 @@ internal static class StudioTheme
     }
 
     private const int LVM_GETHEADER = 0x1000 + 31;
+    private const int WM_ERASEBKGND = 0x0014;
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
 
     [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]

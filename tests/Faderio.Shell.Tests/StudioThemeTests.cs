@@ -77,6 +77,52 @@ public sealed class StudioThemeTests
     });
 
     [Fact]
+    public void APaneTitle_IsASectionLabel_InTheAccent_InSmallBoldCapitals() => RunSta(() =>
+    {
+        using var panel = new Panel { Size = new Size(200, 60) };
+        var title = PaneTitle.Create("Playlists");
+        panel.Controls.Add(title);
+
+        StudioTheme.Apply(panel, Duophonic);
+
+        Assert.Equal(Duophonic.Accent, title.ForeColor);
+        Assert.True(title.Font.Bold);
+        Assert.True(title.Font.Size < panel.Font.Size);
+        Assert.Equal("Playlists", title.Text); // drawn in capitals, named as given
+        using var bitmap = new Bitmap(title.Width, title.Height);
+        title.DrawToBitmap(bitmap, new Rectangle(0, 0, title.Width, title.Height));
+        Assert.Contains(Pixels(bitmap), c => Near(c, Duophonic.Accent));
+    });
+
+    [Fact]
+    public void ADarkList_HasNoColumnRulesDownItsEmptyPart() => RunSta(() =>
+    {
+        using var form = new Form { Size = new Size(400, 300) };
+        var list = new ListView { Dock = DockStyle.Fill, View = View.Details };
+        list.Columns.Add("A", 60);
+        list.Columns.Add("B", 80);
+        list.Columns.Add("C", 60);
+        list.Items.Add(new ListViewItem(new[] { "1", "two", "3" }));
+        form.Controls.Add(list);
+        StudioTheme.Apply(form, Duophonic);
+        form.CreateControl();
+        _ = list.Handle;
+
+        using var bitmap = new Bitmap(list.Width, list.Height);
+        list.DrawToBitmap(bitmap, new Rectangle(0, 0, list.Width, list.Height));
+
+        // A row of pixels well below the one row, inside the frame: nothing but the Well.
+        var y = list.Height - 20;
+        var off = Enumerable.Range(4, list.Width - 30).Select(x => bitmap.GetPixel(x, y)).Where(c => !Near(c, Duophonic.Well)).ToList();
+        Assert.Empty(off);
+    });
+
+    private static IEnumerable<Color> Pixels(Bitmap bitmap) =>
+        Enumerable.Range(0, bitmap.Width).SelectMany(x => Enumerable.Range(0, bitmap.Height).Select(y => bitmap.GetPixel(x, y)));
+
+    private static bool Near(Color a, Color b) => Math.Abs(a.R - b.R) < 24 && Math.Abs(a.G - b.G) < 24 && Math.Abs(a.B - b.B) < 24;
+
+    [Fact]
     public void ALightPalette_KeepsLightLists() => RunSta(() =>
     {
         var light = Palette.From(new SkinColours(

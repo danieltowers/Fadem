@@ -4,7 +4,7 @@ namespace Faderio.Shell;
 
 /// <summary>
 /// The playlist sidebar (playlists issue 02, D16, D17): the library's playlists, the open one
-/// bold on the attended row's yellow. A click opens one; the context menu makes a new one,
+/// bold, in the accent on Raised (studio theme issue 03; the system's yellow with no palette). A click opens one; the context menu makes a new one,
 /// renames one inline (F2 and a double-click too) and deletes one after a Yes/No. Every gesture
 /// is one engine call. The list is <see cref="PlayerView.Playlists"/>, brought up to date on
 /// every render; the panel keeps no list of its own (placement test 3).
@@ -27,11 +27,11 @@ internal sealed class PlaylistSidebar : Panel
     /// <summary>While a label is being edited the list is not re-rendered, which would end the edit.</summary>
     private bool _editing;
 
-    /// <param name="leaveEditor">Saves a box being typed in and empties the editor before the
-    /// open playlist changes.</param>
     /// <summary>The colours its rows are drawn in (studio theme issue 02), or none for the system's.</summary>
     public Theme.Palette? Palette { get; set; }
 
+    /// <param name="leaveEditor">Saves a box being typed in and empties the editor before the
+    /// open playlist changes.</param>
     public PlaylistSidebar(PlaybackEngine engine, Action leaveEditor)
     {
         _engine = engine;
@@ -154,7 +154,7 @@ internal sealed class PlaylistSidebar : Panel
             {
                 item.BackColor = back;
             }
-            var fore = Palette?.Text ?? SystemColors.WindowText;
+            var fore = open && Palette is { } p ? p.Accent : Palette?.Text ?? SystemColors.WindowText;
             if (item.ForeColor != fore)
             {
                 item.ForeColor = fore;

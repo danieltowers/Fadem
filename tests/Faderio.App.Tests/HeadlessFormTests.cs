@@ -446,14 +446,14 @@ public sealed partial class HeadlessFormTests
         Assert.Equal(h.Form.Palette.Dim, marked.ForeColor);
         Assert.Contains("Unreadable", marked.ToolTipText);
         Assert.Equal("1", h.Form._queueList.Items[0].Text);
-        Assert.Equal(h.Form.Palette.Text, h.Form._queueList.Items[0].ForeColor);
+        Assert.Equal(h.Form.Palette.Accent, h.Form._queueList.Items[0].ForeColor); // A plays
 
         File.Move(b + ".away", b);
         h.Form.PlayRowAt(1); // a double-click tries it
         h.Form.Render();
 
         Assert.Equal("2", marked.Text); // now playing
-        Assert.Equal(h.Form.Palette.Text, marked.ForeColor);
+        Assert.Equal(h.Form.Palette.Accent, marked.ForeColor); // in the accent, as the playing row
         Assert.Equal("", marked.ToolTipText);
     });
 
@@ -2539,12 +2539,13 @@ public sealed partial class HeadlessFormTests
     private static string[] Names(PlaylistSidebar sidebar) =>
         sidebar._list.Items.Cast<ListViewItem>().Select(i => i.Text).ToArray();
 
-    /// <summary>The name the sidebar highlights: bold, raised (studio theme issue 02).</summary>
+    /// <summary>The name the sidebar highlights: bold, in the accent on Raised (studio theme issues 02, 03).</summary>
     private static string Highlighted(PlaylistSidebar sidebar)
     {
         var open = sidebar._list.Items.Cast<ListViewItem>().Where(i => i.Font.Bold).ToList();
         Assert.Single(open);
         Assert.Equal(sidebar.Palette!.Raised, open[0].BackColor);
+        Assert.Equal(sidebar.Palette!.Accent, open[0].ForeColor);
         return open[0].Text;
     }
 

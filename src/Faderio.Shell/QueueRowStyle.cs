@@ -51,7 +51,10 @@ internal sealed class QueueRowStyle : IDisposable
     {
         var back = Palette?.Well ?? SystemColors.Window;
         var dim = Palette?.Dim ?? SystemColors.GrayText;
-        var fore = row.IsUnreadable ? dim : Palette?.Text ?? SystemColors.WindowText;
+        // The attended row, the one that plays, reads at a glance in the accent (studio theme issue 03).
+        var fore = row.IsUnreadable ? dim
+            : row.IsCurrent && Palette is { } p ? p.Accent
+            : Palette?.Text ?? SystemColors.WindowText;
         var authored = row.NextAuthored == true;
         var button = item.SubItems[editColumn];
         foreach (ListViewItem.ListViewSubItem cell in item.SubItems)
@@ -60,7 +63,8 @@ internal sealed class QueueRowStyle : IDisposable
             {
                 cell.BackColor = back;
             }
-            var cellFore = cell == button && !authored ? dim : fore;
+            // ✎ is the plain text when authored, on the playing row too, and dim when not.
+            var cellFore = cell != button ? fore : authored && !row.IsUnreadable ? Palette?.Text ?? SystemColors.WindowText : dim;
             if (cell.ForeColor != cellFore)
             {
                 cell.ForeColor = cellFore;
@@ -107,15 +111,22 @@ internal sealed class QueueRowStyle : IDisposable
             : null;
 
     /// <summary>Has <paramref name="list"/>, a details view, drawn here: each cell in its own
-    /// colours and font, aligned as its column, on <see cref="RowMarks.Selected"/> while its row
-    /// is selected. The header is the system's.</summary>
+    /// colours and font, aligned as its column, on the palette's Raised (or
+    /// <see cref="RowMarks.Selected"/> with none) while its row is selected. The header is drawn
+    /// in the palette, or is the system's with none.</summary>
     public static void Draw(ListView list, Theme.Palette? palette = null)
     {
         list.OwnerDraw = true;
         // An image list's height sets the rows': the list has no other.
         var rows = new ImageList { ImageSize = new Size(1, RowHeight) };
         list.SmallImageList = rows;
-        list.Disposed += (_, _) => rows.Dispose();
+        // The header's headings: small bold capitals (studio theme issue 03).
+        var headings = new Font(list.Font.FontFamily, 7.5f, FontStyle.Bold);
+        list.Disposed += (_, _) =>
+        {
+            rows.Dispose();
+            headings.Dispose();
+        };
         list.DrawColumnHeader += (_, e) =>
         {
             if (palette is null)
@@ -123,7 +134,7 @@ internal sealed class QueueRowStyle : IDisposable
                 e.DrawDefault = true;
                 return;
             }
-            DrawHeader(list, e, palette);
+            DrawHeader(e, headings, palette);
         };
         list.DrawItem += (_, _) => { }; // a details view draws by cell
         list.DrawSubItem += (_, e) =>
@@ -159,9 +170,9 @@ internal sealed class QueueRowStyle : IDisposable
         };
     }
 
-    /// <summary>A header cell on the Well: its heading in Dim, an Edge rule under it and between
-    /// columns.</summary>
-    private static void DrawHeader(ListView list, DrawListViewColumnHeaderEventArgs e, Theme.Palette palette)
+    /// <summary>A header cell on the Well: its heading in small bold capitals in Dim, an Edge rule
+    /// under it and between columns.</summary>
+    private static void DrawHeader(DrawListViewColumnHeaderEventArgs e, Font headings, Theme.Palette palette)
     {
         using (var back = new SolidBrush(palette.Well))
         {
@@ -178,7 +189,7 @@ internal sealed class QueueRowStyle : IDisposable
             HorizontalAlignment.Center => TextFormatFlags.HorizontalCenter,
             _ => TextFormatFlags.Left,
         };
-        TextRenderer.DrawText(e.Graphics, e.Header?.Text, list.Font, Rectangle.Inflate(e.Bounds, -4, 0), palette.Dim,
+        TextRenderer.DrawText(e.Graphics, e.Header?.Text.ToUpperInvariant(), headings, Rectangle.Inflate(e.Bounds, -4, 0), palette.Dim,
             align | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
     }
 

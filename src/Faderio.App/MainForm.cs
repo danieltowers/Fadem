@@ -318,7 +318,7 @@ internal sealed class MainForm : Form
         };
         // Rows drag to a new place, and dropped files land where they are dropped (shared with
         // the plugin, phase 6 issues 02 and 03).
-        _queueDrag = new QueueDrag(_queueList, engine, (paths, before) => _ = _engine.Add(paths, before));
+        _queueDrag = new QueueDrag(_queueList, engine, (paths, before) => _ = _engine.Add(paths, before)) { Palette = Palette };
 
         _editor = new TransitionEditorPanel(engine, ShowNotice, suggested => Dialogs.ChooseRenderPath(this, suggested));
         _playlists = new PlaylistSidebar(engine, LeaveEditor) { Palette = Palette };

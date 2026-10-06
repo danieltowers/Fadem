@@ -28,6 +28,10 @@ internal sealed class QueueDrag : IDisposable
     /// view, so it is a thin panel over the list.</summary>
     internal Panel DropLine { get; }
 
+    /// <summary>The colours the drop line is drawn in (studio theme issue 03): the accent, or
+    /// the system's highlight with none.</summary>
+    public Theme.Palette? Palette { get; set; }
+
     /// <summary>Starts a drag of the selected rows. A test replaces it, since a headless list
     /// cannot enter the modal drag loop.</summary>
     internal Action<IDataObject> StartDrag { get; set; }
@@ -174,6 +178,8 @@ internal sealed class QueueDrag : IDisposable
         var y = rows && EndOfGroupAt(client) is { } end ? _list.Items[end].Bounds.Bottom - 1
             : index < count ? _list.Items[index].Bounds.Top - 1
             : _list.Items[count - 1].Bounds.Bottom - 1;
+        // Set as it shows: the theme colours every panel in a list as chrome.
+        DropLine.BackColor = Palette?.Accent ?? SystemColors.Highlight;
         DropLine.SetBounds(0, y, _list.ClientSize.Width, DropLine.Height);
         DropLine.Visible = true;
         DropLine.BringToFront();

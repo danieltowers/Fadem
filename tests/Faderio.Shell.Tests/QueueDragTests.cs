@@ -80,6 +80,21 @@ public sealed class QueueDragTests
     });
 
     [Fact]
+    public void TheDropLine_IsInTheAccent_OnAThemedList() => RunSta(() =>
+    {
+        var palette = Faderio.Shell.Theme.Palette.From(PaletteTests.Duophonic);
+        using var tc = TestEngine.Create();
+        using var list = QueueOf(tc, 2);
+        using var drag = new QueueDrag(list, tc.Engine, (_, _) => { }) { Palette = palette };
+        Faderio.Shell.Theme.StudioTheme.Apply(list, palette); // which colours the line, a panel, as chrome
+
+        DropAt(list, new DataObject(DataFormats.FileDrop, new[] { "a.wav" }), new Point(8, list.Items[1].Bounds.Top + 2), drop: false);
+
+        Assert.True(drag.DropLine.Visible);
+        Assert.Equal(palette.Accent, drag.DropLine.BackColor);
+    });
+
+    [Fact]
     public void RowsDroppedBelowASectionsLastRow_EndThatSection_AndAboveTheNextsFirst_StartIt() => RunSta(() =>
     {
         using var tc = TestEngine.Create();

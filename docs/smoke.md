@@ -78,9 +78,11 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       runs out. The transport does not move when it fills or empties. A name too long for the
       window ends in "…" and shows whole in its tooltip.
 - [ ] At launch the first row carries the marker, at rest: 🔈 before its number in the #
-      column. Playing or paused, the marker is 🔊. No row is shaded yellow. When the queue runs
-      out it goes back to the first row, 🔈, and ▶ plays that row. A selected row is a darker
-      grey, not blue, whether or not the queue has focus, and its ✎ is whole, not "✎…".
+      column. Playing or paused, the marker is 🔊. The marked row's text is in the accent, and no
+      row is shaded. When the queue runs out it goes back to the first row, 🔈, and ▶ plays that
+      row. A selected row is a raised tint, not blue, whether or not the queue has focus, and its
+      ✎ is whole, not "✎…". The header reads in small dim capitals, and the list's empty part
+      below the rows is plain, with no rule down any column's edge.
 - [ ] Pause, click a different row, press ▶: that row plays from 0:00 and carries the marker.
       With the playing row, no row or several rows selected, ▶ resumes where it paused.
 - [ ] The seek bar has visible travel across the width of the transport area, not a stub.
@@ -275,7 +277,8 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       shows *Hard cut* there, and the output mode chosen before. Back to the first library:
       12 s again.
 - [ ] Down the left, between the transport row and the status strip, a ~200 px **Playlists**
-      panel lists the library's playlists, the open one bold on the marker's yellow. In a fresh
+      panel lists the library's playlists, the open one bold in the accent on a raised tint, under
+      a PLAYLISTS label in the accent. In a fresh
       temp library launched with two files it shows "Untitled", highlighted. Right-click on empty
       space offers **New playlist** (Rename and Delete greyed out); it adds "Untitled 2",
       highlighted, and empties the queue and the editor.
@@ -449,8 +452,9 @@ which a background run cannot give.
       **Play** starts faderio: the meter shows the tone. **Stop** ends it: the meter reads 0.
 - [ ] **The view** (phase 5 issue 10), placed as above and present after a restart: under a
       "faderio" header, the transport row ⏮ ▶ ⏹ ⏭ ⤳ 🔀 🔁, then −5 s, the seek bar, +5 s and
-      "0:00 / -0:00"; **Playlists** listing the library's playlists with the open one bold on
-      yellow; the queue with #, Title, Artist, Length and a ✎ on every row but the last, bold
+      "0:00 / -0:00"; **Playlists** listing the library's playlists with the open one bold in
+      the accent on a raised tint; the pane labels PLAYLISTS, QUEUE and TRANSITION EDITOR in the
+      accent; the queue with #, Title, Artist, Length and a ✎ on every row but the last, bold
       where this → next is authored (phase 5 issue 11), and row 1 marked at rest (🔈); the strip
       reading "Ready." and, at its right, "library · WASAPI shared at 48000 Hz on Speakers
       (…)", the device in use (phase 5 issue 13). In the

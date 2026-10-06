@@ -217,7 +217,7 @@ internal sealed class PluginView : UserControl
         // Rows drag to a new place, as in the App (phase 6 issue 02). Files dropped from
         // MusicBee's track list, or from Explorer, are both a shell drag of the files (issue 01),
         // and land where they are dropped (issue 03).
-        _queueDrag = new QueueDrag(_queueList, engine, (paths, before) => _ = _engine.Add(paths, before));
+        _queueDrag = new QueueDrag(_queueList, engine, (paths, before) => _ = _engine.Add(paths, before)) { Palette = Palette };
         // #, Title, Artist, Length and Track gain until the library's own layout is read, at the
         // first render; Artist narrower than the App's, for a sidebar.
         _columns = new QueueColumns(
