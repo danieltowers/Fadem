@@ -87,6 +87,9 @@ internal sealed class PluginView : UserControl
 
     internal const string ColumnsFileName = "musicbee-columns.json";
 
+    /// <summary>The colours MusicBee's skin gives this view (studio theme issue 01).</summary>
+    internal Faderio.Shell.Theme.Palette Palette { get; init; } = Faderio.Shell.Theme.Palette.Studio;
+
     /// <summary>The ✎ column, after the queue's own: the editor button on every row but the last.</summary>
     internal int EditColumn => _columns.EditColumn;
 

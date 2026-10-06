@@ -5,6 +5,7 @@ using Faderio.Core.Playback;
 using Faderio.Core.Settings;
 using Faderio.Shell;
 using Faderio.Shell.Audio;
+using Faderio.Shell.Theme;
 
 namespace Faderio.MusicBee;
 
@@ -158,9 +159,43 @@ internal sealed class Host : IDisposable
     /// <summary>Fills a panel MusicBee made with a view of the engine, docked to fill, and shows it
     /// the notices already delivered. The view leaves when MusicBee disposes the panel.</summary>
     /// <param name="stopMusicBeesPlayer">MusicBee's <c>Player_Stop</c>, for the view's starts.</param>
+    /// <summary>MusicBee's skin, by element, state and component (studio theme issue 01); none
+    /// until the plugin hands it over, and a test may stand a fake in.</summary>
+    internal Func<int, int, int, int>? ReadSkin { get; set; }
+
+    /// <summary>Where the palette read is written for the App, or null to write none.</summary>
+    internal string? PaletteFile { get; set; }
+
+    /// <summary>The palette MusicBee's skin gives, read afresh for each view MusicBee makes, and
+    /// written for the App. A skin this MusicBee cannot report is the built-in palette.</summary>
+    private Palette ReadPalette()
+    {
+        Palette palette;
+        try
+        {
+            // The elements, states and components that answer, found by probing (studio theme spec).
+            int Read(int element, int state, int component) => ReadSkin?.Invoke(element, state, component) ?? 0;
+            palette = Palette.From(new SkinColours(
+                Chrome: Read(0, 0, 1), Well: Read(2, 0, 1), Edge: Read(16, 0, 0), Key: Read(7, 0, 1),
+                Text: Read(0, 0, 3), Dim: Read(7, 3, 3), Accent: Read(7, 4, 3)));
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            palette = Palette.Studio;
+        }
+        if (PaletteFile is { } file)
+        {
+            palette.Save(file);
+        }
+        return palette;
+    }
+
     public PluginView AttachView(Control panel, Action stopMusicBeesPlayer)
     {
-        var view = new PluginView(Engine, Notices, OnNoticed, _modeInUse, _deviceInUse, stopMusicBeesPlayer, OpenSettings);
+        var view = new PluginView(Engine, Notices, OnNoticed, _modeInUse, _deviceInUse, stopMusicBeesPlayer, OpenSettings)
+        {
+            Palette = ReadPalette(),
+        };
         _views.Add(view);
         view.Disposed += (_, _) => _views.Remove(view);
         panel.Controls.Add(view);

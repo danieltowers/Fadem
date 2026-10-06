@@ -88,6 +88,9 @@ internal sealed class MainForm : Form
     /// (playlists issue 06).</summary>
     internal readonly QueueColumns _columns;
 
+    /// <summary>The colours the window is drawn in (studio theme issue 01).</summary>
+    internal Faderio.Shell.Theme.Palette Palette { get; init; } = Faderio.Shell.Theme.Palette.Studio;
+
     /// <summary>The header's menu: a tick for each column.</summary>
     internal ContextMenuStrip _columnMenu => _columns.Menu;
 

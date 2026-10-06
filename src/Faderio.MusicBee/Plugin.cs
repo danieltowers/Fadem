@@ -47,7 +47,13 @@ public partial class Plugin
     {
         _outputs = outputs;
         _devices = devices;
+        PaletteFile = null; // a test names one, or none is written
     }
+
+    /// <summary>Where the plugin writes the palette it reads from MusicBee's skin (studio theme
+    /// issue 01): the standalone App's machine folder, so the App on this machine looks alike.</summary>
+    internal string? PaletteFile { get; set; } =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "faderio", "palette.json");
 
     /// <summary>Shows the settings dialog, owned by MusicBee's main window, and says whether the
     /// user pressed OK. A test replaces it, since a headless plugin cannot show a dialog.</summary>
@@ -211,7 +217,14 @@ public partial class Plugin
         _host = new Host(Path.Combine(_api.Setting_GetPersistentStoragePath(), "faderio"), _boxes!, _ui!, MusicBeesDevice, _outputs, _devices);
         // The view's ⚙ shows the dialog as Configure does, read at each press so a test's stands.
         _host.ShowSettings = dialog => ShowSettings(dialog);
+        _host.ReadSkin = ReadSkin;
+        _host.PaletteFile = PaletteFile;
     }
+
+    /// <summary>One of the skin's colours, as ARGB, or 0 where it has none or this MusicBee
+    /// cannot say. Ints only: the element, state and component numbers are the host's.</summary>
+    private int ReadSkin(int element, int state, int component) =>
+        _api.Setting_GetSkinElementColour is { } read ? read((SkinElement)element, (ElementState)state, (ElementComponent)component) : 0;
 
     /// <summary>MusicBee's own output device, by the name its preferences show ("Primary Sound
     /// Driver" on DirectSound's default), or null when it cannot say (phase 5 issue 13): the

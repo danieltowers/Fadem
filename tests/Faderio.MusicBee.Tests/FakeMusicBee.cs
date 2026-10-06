@@ -36,6 +36,8 @@ internal sealed class FakeMusicBee
             active = ActiveDevice;
             return true;
         };
+        _api.Setting_GetSkinElementColour = (element, state, component) =>
+            Skin.TryGetValue(((int)element, (int)state, (int)component), out var argb) ? argb : 0;
         _api.Library_QueryFilesEx = (string query, out string[] files) =>
         {
             Calls.Add($"Library_QueryFilesEx {query}");
@@ -43,6 +45,10 @@ internal sealed class FakeMusicBee
             return Selection is not null;
         };
     }
+
+    /// <summary>The skin's colours by element, state and component, as ARGB; 0, as MusicBee
+    /// answers, for any it does not hold.</summary>
+    public Dictionary<(int Element, int State, int Component), int> Skin { get; } = new();
 
     /// <summary>The tracks selected in MusicBee's main panel, as <c>domain=SelectedFiles</c>
     /// answers them; null when MusicBee cannot say (the query answers false).</summary>
