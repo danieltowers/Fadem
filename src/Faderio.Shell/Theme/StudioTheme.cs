@@ -204,6 +204,7 @@ internal static class StudioTheme
             if (control is ListView list)
             {
                 EmptyGround.Attach(list);
+                GroupHeaders.Attach(list);
             }
             if (control is TextBoxBase or ListView or Panel { BorderStyle: BorderStyle.FixedSingle })
             {
@@ -323,6 +324,99 @@ internal static class StudioTheme
                 return;
             }
             base.WndProc(ref m);
+        }
+    }
+
+    /// <summary>
+    /// A list's group headers, a section's in the queue, in the palette (studio theme issue 07):
+    /// the title image, a section's swatch, then the name in small bold capitals in Text, an Edge
+    /// rule, and the chevron in Dim, down while expanded and right while collapsed, as Windows'
+    /// own. Windows draws the name in its theme's blue and takes no colour for it
+    /// (<c>LVM_SETGROUPMETRICS</c> is ignored under visual styles), so the header is drawn here
+    /// in its custom draw stage, <c>LVCDI_GROUP</c>, and Windows' drawing skipped. Hit-testing
+    /// stays Windows', so the chevron, a double-click and the keys collapse and expand as before.
+    /// </summary>
+    private sealed class GroupHeaders : Hook
+    {
+        private readonly ListView _list;
+        private Font? _font;
+
+        private GroupHeaders(ListView list) : base(list)
+        {
+            _list = list;
+            list.Disposed += (_, _) => _font?.Dispose();
+        }
+
+        public static void Attach(ListView list) => _ = new GroupHeaders(list);
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_REFLECT_NOTIFY && _list.ShowGroups
+                && Marshal.PtrToStructure<NMHDR>(m.LParam).code == NM_CUSTOMDRAW
+                && Marshal.PtrToStructure<NMLVCUSTOMDRAW>(m.LParam) is { dwItemType: LVCDI_GROUP } draw
+                && draw.nmcd.dwDrawStage == CDDS_PREPAINT
+                && States.TryGetValue(_list, out var state)
+                && ListGroups.WithId(_list, (int)draw.nmcd.dwItemSpec) is { } group)
+            {
+                var r = draw.rcText;
+                var focused = (draw.nmcd.uItemState & CDIS_FOCUS) != 0 && _list.Focused;
+                Draw(draw.nmcd.hdc, Rectangle.FromLTRB(r.Left, r.Top, r.Right, r.Bottom), group, state.Palette, focused);
+                m.Result = (IntPtr)CDRF_SKIPDEFAULT;
+                return;
+            }
+            base.WndProc(ref m);
+        }
+
+        private void Draw(IntPtr dc, Rectangle header, ListViewGroup group, Palette p, bool focused)
+        {
+            using (var g = Graphics.FromHdc(dc))
+            using (var ground = new SolidBrush(_list.BackColor))
+            {
+                g.FillRectangle(ground, header);
+            }
+            if (group.Header.Length == 0)
+            {
+                return; // the rows above the first section: no header to show
+            }
+            var x = header.Left + 6;
+            var images = ListGroups.TitleImages(_list);
+            var image = ListGroups.TitleImage(_list, group);
+            if (images != IntPtr.Zero && image >= 0 && ImageList_GetIconSize(images, out var w, out var h))
+            {
+                // Windows' own, on the device context alone, before GDI+ holds it.
+                _ = ImageList_Draw(images, image, dc, x, header.Top + (header.Height - h) / 2, ILD_NORMAL);
+                x += w + 6;
+            }
+            using var gr = Graphics.FromHdc(dc);
+            _font ??= new Font(_list.Font.FontFamily, 7.5f, FontStyle.Bold);
+            var flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine
+                | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis;
+            var chevronX = (float)(header.Right - 16);
+            var text = group.Header.ToUpperInvariant();
+            var room = new Rectangle(x, header.Top, Math.Max(0, (int)chevronX - 10 - x), header.Height);
+            var size = TextRenderer.MeasureText(gr, text, _font, room.Size, flags);
+            TextRenderer.DrawText(gr, text, _font, room, p.Text, flags);
+            // On a pixel's centre, so the chevron's strokes land whole rather than half on two.
+            var cy = (float)(header.Top + header.Height / 2);
+            var ruleFrom = x + Math.Min(size.Width, room.Width) + 8;
+            if (ruleFrom < chevronX - 10)
+            {
+                using var rule = new Pen(p.Edge);
+                gr.DrawLine(rule, ruleFrom, (int)cy, (int)chevronX - 10, (int)cy);
+            }
+            if (ListGroups.IsCollapsible(_list, group))
+            {
+                gr.SmoothingMode = SmoothingMode.AntiAlias;
+                using var chevron = new Pen(p.Dim, 1.5f);
+                gr.DrawLines(chevron, ListGroups.IsCollapsed(_list, group)
+                    ? new[] { new PointF(chevronX - 2, cy - 4), new PointF(chevronX + 2, cy), new PointF(chevronX - 2, cy + 4) }
+                    : new[] { new PointF(chevronX - 4, cy - 2), new PointF(chevronX, cy + 2), new PointF(chevronX + 4, cy - 2) });
+                gr.SmoothingMode = SmoothingMode.None;
+            }
+            if (focused)
+            {
+                ControlPaint.DrawFocusRectangle(gr, Rectangle.Inflate(header, -1, -1), p.Dim, _list.BackColor);
+            }
         }
     }
 
@@ -811,6 +905,62 @@ internal static class StudioTheme
     private const int WM_PRINTCLIENT = 0x0318;
     private const long PRF_NONCLIENT = 0x02;
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    private const int WM_REFLECT_NOTIFY = 0x2000 + 0x004E;
+    private const int NM_CUSTOMDRAW = -12;
+    private const uint CDDS_PREPAINT = 0x1;
+    private const uint LVCDI_GROUP = 0x1;
+    private const uint CDIS_FOCUS = 0x10;
+    private const int CDRF_SKIPDEFAULT = 0x4;
+    private const uint ILD_NORMAL = 0;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left, Top, Right, Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NMHDR
+    {
+        public IntPtr hwndFrom;
+        public UIntPtr idFrom;
+        public int code;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NMCUSTOMDRAW
+    {
+        public NMHDR hdr;
+        public uint dwDrawStage;
+        public IntPtr hdc;
+        public RECT rc;
+        public UIntPtr dwItemSpec;
+        public uint uItemState;
+        public IntPtr lItemlParam;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NMLVCUSTOMDRAW
+    {
+        public NMCUSTOMDRAW nmcd;
+        public int clrText;
+        public int clrTextBk;
+        public int iSubItem;
+        public uint dwItemType;
+        public int clrFace;
+        public int iIconEffect;
+        public int iIconPhase;
+        public int iPartId;
+        public int iStateId;
+        public RECT rcText;
+        public uint uAlign;
+    }
+
+    [DllImport("comctl32.dll")]
+    private static extern bool ImageList_Draw(IntPtr images, int index, IntPtr dc, int x, int y, uint style);
+
+    [DllImport("comctl32.dll")]
+    private static extern bool ImageList_GetIconSize(IntPtr images, out int width, out int height);
 
     [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
     private static extern int SetWindowTheme(IntPtr window, string? app, string? list);

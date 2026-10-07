@@ -130,6 +130,11 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       ones dim, ticks in the accent. The status text is dim. Menus are layered popups, so
       capture them from the screen (`CopyFromScreen`), not with `PrintWindow`, which draws them
       black. Message boxes stay Windows' own.
+- [ ] **Section groups in the palette** (studio theme issue 07), on a playlist with two sections:
+      each header is its swatch, then the name in small bold capitals in the text colour, a
+      hairline rule in Edge (barely there on Duophonic, whose Edge is near its Well) and a dim
+      chevron at the right, down while expanded and right while collapsed. No Windows blue. A
+      posted double-click on a header's name collapses and expands it as before.
 - [ ] Right-clicking a row shows "Edit transition: this → next" and "Edit transition: previous
       → this", and, only while repeat is on one, "Edit transition: this → this". All read
       clearly, and a disabled one looks disabled. With repeat off, this → next is disabled on
@@ -576,6 +581,9 @@ which a background run cannot give.
       notice list and the section name dialog are in the skin's colours, with no white or
       system-grey surface. The queue's, header's and playlist's right-click menus are on
       MusicBee's chrome, with items in the text colour and ticks in the indian red accent.
+- [ ] **Section groups in the skin** (studio theme issue 07): a playlist with sections shows
+      its headers as in standalone, in the skin's colours with no Windows blue; a double-click
+      on a header collapses and expands it.
 - [ ] **Leaving the editor with a box being typed in** (a duration typed, not yet left), by
       **Close editor** in a sidebar or a click on another playlist in a main panel, asks
       nothing: the duration is saved ("Saved …" in the strip) and the editor goes.

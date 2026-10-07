@@ -8,13 +8,15 @@ namespace Faderio.Shell;
 /// issue 09): collapse and a title image, on Windows since Vista, which net48 has no member for. Each is the
 /// ListView message on the group's native id, so it behaves alike under net48 and net8.0, whose
 /// own <c>CollapsedState</c> is left at its default so that WinForms never sends a state of its
-/// own over this one.
+/// own over this one. The ids also name the groups to custom draw, which the studio theme draws
+/// headers by (studio theme issue 07).
 /// </summary>
 internal static class ListGroups
 {
     private const int LVM_FIRST = 0x1000;
     private const int LVM_GETGROUPSTATE = LVM_FIRST + 92;
     private const int LVM_SETIMAGELIST = LVM_FIRST + 3;
+    private const int LVM_GETIMAGELIST = LVM_FIRST + 2;
     private const int LVM_SETGROUPINFO = LVM_FIRST + 147;
     private const int LVM_GETGROUPINFO = LVM_FIRST + 149;
     private const int LVSIL_GROUPHEADER = 3;
@@ -68,15 +70,27 @@ internal static class ListGroups
         SendMessage(list.Handle, LVM_SETGROUPINFO, (IntPtr)IdOf(group), ref info);
     }
 
+    /// <summary>The native image list the group headers show from, or none.</summary>
+    public static IntPtr TitleImages(ListView list) =>
+        SendMessage(list.Handle, LVM_GETIMAGELIST, (IntPtr)LVSIL_GROUPHEADER, IntPtr.Zero);
+
+    /// <summary>The group with the native id <paramref name="id"/>, as custom draw names it, or null.</summary>
+    public static ListViewGroup? WithId(ListView list, int id) =>
+        list.Groups.Cast<ListViewGroup>().FirstOrDefault(group => IdOf(group) == id);
+
+    /// <summary><paramref name="group"/>'s header in the list's client area, or empty.</summary>
+    public static Rectangle HeaderBounds(ListView list, ListViewGroup group)
+    {
+        // The message's rectangle names the part asked for in its top on the way in.
+        var rect = new RECT { Top = LVGGR_HEADER };
+        return SendMessage(list.Handle, LVM_GETGROUPRECT, (IntPtr)IdOf(group), ref rect) != IntPtr.Zero
+            ? Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom)
+            : Rectangle.Empty;
+    }
+
     /// <summary>The group whose header is at <paramref name="client"/>, or null.</summary>
     public static ListViewGroup? HeaderAt(ListView list, Point client) =>
-        list.Groups.Cast<ListViewGroup>().FirstOrDefault(group =>
-        {
-            // The message's rectangle names the part asked for in its top on the way in.
-            var rect = new RECT { Top = LVGGR_HEADER };
-            return SendMessage(list.Handle, LVM_GETGROUPRECT, (IntPtr)IdOf(group), ref rect) != IntPtr.Zero
-                && Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom).Contains(client);
-        });
+        list.Groups.Cast<ListViewGroup>().FirstOrDefault(group => HeaderBounds(list, group).Contains(client));
 
     private static uint State(ListView list, ListViewGroup group, uint mask) =>
         (uint)SendMessage(list.Handle, LVM_GETGROUPSTATE, (IntPtr)IdOf(group), (IntPtr)mask);
