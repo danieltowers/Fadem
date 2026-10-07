@@ -38,8 +38,8 @@ internal sealed class MainForm : Form
     internal readonly SeekBar _seek;
     internal readonly Button _back5;
     internal readonly Button _forward5;
-    internal readonly Label _time;
-    internal readonly Label _seconds;
+    internal readonly Readout _time;
+    internal readonly Readout _seconds;
     internal readonly Label _attendedTrack;
     internal readonly Button _addFiles;
     internal readonly Button _addFolder;
@@ -172,28 +172,15 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Fill,
             Margin = new Padding(8, 8, 8, 8),
         };
-        _time = new Label
-        {
-            Text = "0:00 / -0:00",
-            Width = 170,
-            TextAlign = ContentAlignment.BottomLeft,
-            AutoSize = false,
-            Dock = DockStyle.Fill,
-            Margin = new Padding(0),
-        };
-        // The same in seconds, under it, to read against the editor's fade points.
-        _seconds = new Label
-        {
-            Text = Presenter.SecondsReadout(null),
-            TextAlign = ContentAlignment.TopLeft,
-            AutoSize = false,
-            Dock = DockStyle.Fill,
-            Margin = new Padding(0),
-        };
+        // The LED readout (studio theme issue 04), and the same in seconds under it, to read
+        // against the editor's fade points.
+        _time = Readout.Time();
+        _seconds = Readout.Seconds();
         // Its own height, within the transport's 50 px: left to itself the table asks for 100.
-        var times = new TableLayoutPanel { Dock = DockStyle.Fill, Height = 36, ColumnCount = 1, RowCount = 2, Margin = new Padding(3, 7, 3, 7) };
-        times.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-        times.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        // The LED line takes the room its large face needs; the seconds keep a small line.
+        var times = new TableLayoutPanel { Dock = DockStyle.Fill, Height = 46, ColumnCount = 1, RowCount = 2, Margin = new Padding(3, 2, 3, 2) };
+        times.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        times.RowStyles.Add(new RowStyle(SizeType.Absolute, 18));
         times.Controls.Add(_time, 0, 0);
         times.Controls.Add(_seconds, 0, 1);
         // The attended track's name, on its own line above the transport. It keeps its height

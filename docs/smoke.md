@@ -44,7 +44,7 @@ There is no ⏹ button (the engine still stops at launch and when the queue ends
 folds some symbol glyphs together, so find a transport button by comparing names ordinally, not
 with a name condition. The status strip's items are not exposed to it; read them
 from a capture. The seek bar is a pane named "Seek" whose thumb is not an element of its own: find
-the thumb in a capture (the highlight colour), and click it with posted mouse messages. The
+the thumb in a capture (the accent), and click it with posted mouse messages. The
 queue's ✎ button is different: the list answers a click where the real cursor is, not where a
 posted click says, so move the cursor onto the cell (`SetCursorPos`) before posting the click.
 
@@ -93,7 +93,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       thumb, and clicking it does nothing.
 - [ ] **Dragging the fades** (phase 6 issue 11). Playing a row with an authored fade-out (and a
       fade-in from the row before), the editor open on its this → next: the cursor over a red
-      mark, above or below the groove, is ↔; over a grey wedge there it is the move cursor; on
+      mark, above or below the groove, is ↔; over a wedge there it is the move cursor; on
       the groove it stays the arrow. Dragging the fade-out's start mark left, the mark and its
       wedge follow the mouse and the thumb stays put; on release the strip says "Saved …", the
       wedge ends where it ended before, and the editor's fade-out point and duration show the
@@ -102,6 +102,12 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] **+5 s** twice moves the readout on ten seconds and **−5 s** back five, playing or paused;
       near the start −5 s stops at 0:00. Both are greyed out at launch, with the seek bar.
 - [ ] The time readout shows elapsed and remaining, and remaining never reads `0:00` mid-track.
+- [ ] **The seek bar and the LED readout** (studio theme issue 04), playing a track with
+      authored fades (silent WAVs play it without sound): the played part and the thumb are the
+      accent, the groove is a dark edge, the fade wedges are the accent at low strength, the marks
+      and their handles are the mark colour (red, or the text colour where the accent is red),
+      and the scale is dim. The time readout is large, monospaced, in the accent and whole; the
+      seconds under it are small and dim.
 - [ ] Right-clicking a row shows "Edit transition: this → next" and "Edit transition: previous
       → this", and, only while repeat is on one, "Edit transition: this → this". All read
       clearly, and a disabled one looks disabled. With repeat off, this → next is disabled on
@@ -479,8 +485,8 @@ which a background run cannot give.
 - [ ] **WMA** (phase 6 issue 12). A `.wma` dropped into the queue shows its length in its row;
       played, a click in the middle of the seek bar lands at half the track.
 - [ ] **Dragging the fades** (phase 6 issue 11). With row 1 playing into an authored row 2 and the
-      editor open on it: the cursor is ↔ over a red mark above or below the groove and the move
-      cursor over a grey wedge there. A mark dragged follows the mouse, and on release the strip
+      editor open on it: the cursor is ↔ over a mark above or below the groove and the move
+      cursor over a wedge there. A mark dragged follows the mouse, and on release the strip
       says "Saved …" and the editor shows the new point and duration; a wedge dragged slides
       whole, the editor's duration unchanged.
 - [ ] A double-click on a row plays that row from its start.

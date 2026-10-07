@@ -77,4 +77,30 @@ public sealed partial class PluginTests
         view.Render();
         Assert.True(StudioTheme.IsLit(view._playPause));
     });
+
+    [Fact]
+    public void InTheSidebar_TheLedReadoutIsWholeAndInTheAccent_AndTheSeekRowHoldsOneLine() => RunSta(() =>
+    {
+        AnswerDuophonic();
+        using var panel = new Panel { Size = new Size(285, 700) }; // MusicBee's sidebar, as shipped
+        var view = PaletteView(panel);
+        Click(view._playPause);
+        view.Render();
+
+        Assert.Equal(view.Palette.Accent, view._time.ForeColor);
+        Assert.Equal(view.Palette.Dim, view._seconds.ForeColor);
+        Assert.StartsWith("0:00 / -", view._time.Text);
+        var font = view._time.DrawnFont;
+        Assert.Equal("Consolas", font.Name);
+        Assert.True(font.Size >= 11, $"the readout is drawn at only {font.Size} pt");
+        var size = TextRenderer.MeasureText(view._time.Text, font, Size.Empty, TextFormatFlags.NoPadding);
+        Assert.True(size.Width <= view._time.Width && size.Height <= view._time.Height, $"the readout, {size}, does not fit {view._time.Size}");
+        Assert.True(view._seconds.Top >= view._time.Bottom);
+        // The seek bar keeps room to seek, beside the jumps and the readout on its one row.
+        Assert.True(view._seek.Width - 2 * Faderio.Shell.SeekBar.Inset > 60, $"the seek bar has only {view._seek.Width} px");
+        Assert.Equal(view._seek.Parent, view._time.Parent!.Parent);
+
+        panel.Size = new Size(900, 500); // dragged to the main panel: the readout at full size
+        Assert.Equal(Faderio.Shell.Readout.LedSize, view._time.DrawnFont.Size);
+    });
 }

@@ -8,9 +8,9 @@ namespace Faderio.Shell;
 /// moves the thumb with the mouse and seeks once, on release; ← and → step a second and seek on
 /// key-up. It speaks <see cref="Playhead"/> and <see cref="Length"/> at its edge: pixels never
 /// leave it. Disabled, with no thumb, while nothing is attended. Replaces a stock TrackBar,
-/// whose channel click paged by its <c>LargeChange</c> instead of jumping. Red marks, the full
+/// whose channel click paged by its <c>LargeChange</c> instead of jumping. Marks (the palette's Mark), the full
 /// height of the bar with a square handle hung below, show where the track's fades begin and end, as the engine resolves them;
-/// between each pair a grey wedge drawn as the volume goes: rising for the fade-in, falling for
+/// between each pair a wedge in the palette's Fade, drawn as the volume goes: rising for the fade-in, falling for
 /// the fade-out. A scale runs along the groove from 0: a short tick every half second below it,
 /// and every ten seconds a longer one through it, labelled m:ss above. Where half seconds would
 /// fall closer than <see cref="MinTickGap"/> the short ticks step a second instead, then five;
@@ -43,12 +43,21 @@ internal sealed class SeekBar : Control
 
     private Length? _length;
     private FadeMarks _marks = FadeMarks.None;
-    private static readonly Color MarkColour = Color.FromArgb(220, 20, 20);
-    private static readonly Color FadeShade = Color.FromArgb(200, 200, 200);
-    /// <summary>The time scale, kept lighter than the groove so it reads as a guide.</summary>
-    private static readonly Color MinorTickColour = Color.FromArgb(195, 195, 195);
-    private static readonly Color MajorTickColour = Color.FromArgb(150, 150, 150);
-    private static readonly Color LabelColour = Color.FromArgb(125, 125, 125);
+
+    /// <summary>The colours it draws in (studio theme issue 04): the ground in Chrome, the groove
+    /// in Edge, the played part and the thumb in Accent, the wedges in Fade, the marks in Mark,
+    /// and the scale in Dim. <see cref="Theme.StudioTheme"/> sets the host's.</summary>
+    public Theme.Palette Palette
+    {
+        get => _palette;
+        set
+        {
+            _palette = value;
+            Invalidate();
+        }
+    }
+
+    private Theme.Palette _palette = Theme.Palette.Studio;
     private bool _dragging;
     private bool _stepping;
 
@@ -358,7 +367,7 @@ internal sealed class SeekBar : Control
             outline.Add(new System.Drawing.Point(x0 + (int)Math.Round((x1 - x0) * u), (int)Math.Round(bottom * (1 - loud))));
         }
         var wedge = outline.ToArray();
-        using var shade = new SolidBrush(FadeShade);
+        using var shade = new SolidBrush(_palette.Fade);
         g.FillPolygon(shade, wedge);
     }
 
@@ -388,8 +397,9 @@ internal sealed class SeekBar : Control
         var below = mid + TrackHeight / 2 + 1;
         var above = mid - TrackHeight / 2 - 2;
         var labelRight = int.MinValue;
-        using var minor = new Pen(MinorTickColour);
-        using var major = new Pen(MajorTickColour);
+        // The scale is a guide: its minor ticks fainter than its major ones.
+        using var minor = new Pen(Color.FromArgb(150, _palette.Dim));
+        using var major = new Pen(_palette.Dim);
         for (var ms = 0; ms <= length; ms += step)
         {
             var x = XOf(Playhead.FromMilliseconds(ms));
@@ -407,7 +417,7 @@ internal sealed class SeekBar : Control
                 continue;
             }
             TextRenderer.DrawText(g, label, _labelFont, new System.Drawing.Point(left, above - size.Height),
-                LabelColour, TextFormatFlags.NoPadding);
+                _palette.Dim, TextFormatFlags.NoPadding);
             labelRight = left + size.Width;
         }
     }
@@ -415,7 +425,7 @@ internal sealed class SeekBar : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
-        g.Clear(Parent?.BackColor ?? SystemColors.Control);
+        g.Clear(_palette.Chrome);
         var mid = Height / 2;
         var track = new Rectangle(Inset, mid - TrackHeight / 2, Math.Max(0, Width - 2 * Inset), TrackHeight);
         var marks = Live ? Marks().ToDictionary(m => m.Mark, m => m.X) : null;
@@ -424,7 +434,7 @@ internal sealed class SeekBar : Control
             ShadeFade(g, marks[FadeMark.FadeInStart], marks[FadeMark.FadeInEnd], rising: true, _marks.FadeInCurve);
             ShadeFade(g, marks[FadeMark.FadeOutStart], marks[FadeMark.FadeOutEnd], rising: false, _marks.FadeOutCurve);
         }
-        using (var groove = new SolidBrush(SystemColors.ControlDark))
+        using (var groove = new SolidBrush(_palette.Edge))
         {
             g.FillRectangle(groove, track);
         }
@@ -434,12 +444,12 @@ internal sealed class SeekBar : Control
         }
         DrawScale(g, mid);
         var x = XOf(Playhead);
-        using (var played = new SolidBrush(SystemColors.Highlight))
+        using (var played = new SolidBrush(_palette.Accent))
         {
             g.FillRectangle(played, track with { Width = x - Inset });
         }
-        using (var mark = new Pen(MarkColour, 2))
-        using (var handle = new SolidBrush(MarkColour))
+        using (var mark = new Pen(_palette.Mark, 2))
+        using (var handle = new SolidBrush(_palette.Mark))
         {
             foreach (var at in marks!.Values)
             {
@@ -453,7 +463,7 @@ internal sealed class SeekBar : Control
             }
         }
         var thumb = new Rectangle(x - Inset, mid - ThumbHeight / 2, 2 * Inset, ThumbHeight);
-        using (var fill = new SolidBrush(SystemColors.Highlight))
+        using (var fill = new SolidBrush(_palette.Accent))
         {
             g.FillRectangle(fill, thumb);
         }

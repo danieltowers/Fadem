@@ -52,7 +52,7 @@ public sealed class SeekBarTests
     }
 
     [Fact]
-    public void BetweenTheMarks_EachFadeIsShadedGrey_AsAWedge_RisingIn_AndFallingOut()
+    public void BetweenTheMarks_EachFadeIsShadedInTheFadeColour_AsAWedge_RisingIn_AndFallingOut()
     {
         using var bar = Bar();
         bar.Show(Playhead.FromMilliseconds(0), FiveSeconds,
@@ -62,24 +62,23 @@ public sealed class SeekBarTests
         using var picture = new Bitmap(bar.Width, bar.Height);
         bar.DrawToBitmap(picture, new Rectangle(0, 0, bar.Width, bar.Height));
 
-        bool GreyAt(double seconds, int y)
+        bool ShadedAt(double seconds, int y)
         {
             var x = SeekBar.Inset + (int)Math.Round(seconds / 5 * (bar.Width - 2 * SeekBar.Inset));
-            var pixel = picture.GetPixel(x, y);
-            return pixel.R == pixel.G && pixel.G == pixel.B && pixel.R < 225 && pixel.R > 150;
+            return picture.GetPixel(x, y).ToArgb() == bar.Palette.Fade.ToArgb();
         }
         const int top = 4;
         // The fade-in rises: low near its start, full height near its end.
-        Assert.False(GreyAt(0.6, top));
-        Assert.True(GreyAt(1.4, top));
-        Assert.True(GreyAt(0.6, bar.Height - 3));
+        Assert.False(ShadedAt(0.6, top));
+        Assert.True(ShadedAt(1.4, top));
+        Assert.True(ShadedAt(0.6, bar.Height - 3));
         // The fade-out falls: full height near its start, low near its end.
-        Assert.True(GreyAt(3.6, top));
-        Assert.False(GreyAt(4.4, top));
-        Assert.True(GreyAt(4.4, bar.Height - 3));
+        Assert.True(ShadedAt(3.6, top));
+        Assert.False(ShadedAt(4.4, top));
+        Assert.True(ShadedAt(4.4, bar.Height - 3));
         // Nothing between the fades.
-        Assert.False(GreyAt(2.5, top));
-        Assert.False(GreyAt(2.5, bar.Height - 3));
+        Assert.False(ShadedAt(2.5, top));
+        Assert.False(ShadedAt(2.5, bar.Height - 3));
     }
 
     /// <summary>The bar drawn with nothing on it but the scale, and whether a pixel is marked.</summary>
@@ -90,10 +89,11 @@ public sealed class SeekBarTests
         bar.Show(Playhead.Zero, length);
         var picture = new Bitmap(bar.Width, bar.Height);
         bar.DrawToBitmap(picture, new Rectangle(0, 0, bar.Width, bar.Height));
+        var ground = bar.Palette.Chrome.ToArgb();
         return (at, y) =>
         {
             var x = SeekBar.Inset + (int)Math.Round(at / seconds * (bar.Width - 2 * SeekBar.Inset));
-            return picture.GetPixel(x, y).R < 225; // the background is 240
+            return picture.GetPixel(x, y).ToArgb() != ground;
         };
     }
 
@@ -246,6 +246,28 @@ public sealed class SeekBarTests
             new FadeMarks(Faderio.Core.Domain.Point.FromSeconds(0.5), Faderio.Core.Domain.Point.FromSeconds(1.5),
                 Faderio.Core.Domain.Point.FromSeconds(3.5), Faderio.Core.Domain.Point.FromSeconds(4.5)));
         return bar;
+    }
+
+    [Fact]
+    public void InAPalette_ThePlayedPartAndThumbAreTheAccent_TheWedgesTheFade_AndNoSystemColourIsDrawn()
+    {
+        var duophonic = Faderio.Shell.Theme.Palette.From(PaletteTests.Duophonic);
+        using var bar = Faded(); // playing at 1 s, a fade-in from 0.5 to 1.5 s and out from 3.5 to 4.5
+        bar.Palette = duophonic;
+        using var picture = new Bitmap(bar.Width, bar.Height);
+        bar.DrawToBitmap(picture, new Rectangle(0, 0, bar.Width, bar.Height));
+        int At(double seconds, int y) => picture.GetPixel(X(bar, seconds), y).ToArgb();
+        const int groove = 15;
+
+        Assert.Equal(duophonic.Accent.ToArgb(), At(0.25, groove)); // played
+        Assert.Equal(duophonic.Accent.ToArgb(), At(1.0, groove - 7)); // the thumb, above the groove
+        Assert.Equal(duophonic.Edge.ToArgb(), At(2.5, groove)); // still to play
+        Assert.Equal(duophonic.Fade.ToArgb(), At(1.4, Top)); // inside the fade-in's wedge
+        Assert.Equal(duophonic.Mark.ToArgb(), At(3.5, Top));
+        Assert.Equal(duophonic.Chrome.ToArgb(), At(2.5, Top)); // the ground
+        var stock = new[] { SystemColors.Highlight, SystemColors.ControlDark, SystemColors.Control }.Select(c => c.ToArgb()).ToHashSet();
+        Assert.DoesNotContain(Enumerable.Range(0, picture.Width).SelectMany(x => Enumerable.Range(0, picture.Height).Select(y => picture.GetPixel(x, y).ToArgb())),
+            stock.Contains);
     }
 
     private static int X(SeekBar bar, double seconds) =>

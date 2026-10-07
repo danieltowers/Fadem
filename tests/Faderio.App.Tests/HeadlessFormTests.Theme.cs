@@ -76,6 +76,26 @@ public sealed partial class HeadlessFormTests
         Assert.True(heading.Font.Bold);
     });
 
+    // ── Studio theme issue 04: the seek bar and the LED readout ─────────────────────────
+
+    [Fact]
+    public void TheReadout_IsTheLedFaceInTheAccent_WholeAtFullSize_AndTheSeekBarTakesThePalette() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Form.AddPaths(new[] { TestAudio.WriteDcWav("alpha.wav", 5, 0.4) });
+        h.Form.PlayRowAt(0);
+        h.Form.Render();
+        var p = h.Form.Palette;
+
+        Assert.Same(p, h.Form._seek.Palette);
+        Assert.Equal(p.Accent, h.Form._time.ForeColor);
+        Assert.Equal(p.Dim, h.Form._seconds.ForeColor);
+        var font = h.Form._time.DrawnFont;
+        Assert.Equal(("Consolas", Faderio.Shell.Readout.LedSize), (font.Name, font.Size));
+        var size = TextRenderer.MeasureText(h.Form._time.Text, font, Size.Empty, TextFormatFlags.NoPadding);
+        Assert.True(size.Width <= h.Form._time.Width && size.Height <= h.Form._time.Height, $"the readout, {size}, does not fit {h.Form._time.Size}");
+    });
+
     /// <summary>The queue as drawn: through its own owner draw, from a print of its window.</summary>
     private static Bitmap QueuePixels(ListView list)
     {

@@ -113,6 +113,12 @@ internal static class StudioTheme
             case PaneTitle.Title title:
                 title.ForeColor = p.Accent; // a section label, lit (studio theme issue 03)
                 break;
+            case Readout readout:
+                readout.ForeColor = readout.Led ? p.Accent : p.Dim; // the LED readout (studio theme issue 04)
+                break;
+            case SeekBar seek:
+                seek.Palette = p;
+                break;
         }
         if (first)
         {

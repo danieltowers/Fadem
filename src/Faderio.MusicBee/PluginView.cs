@@ -63,8 +63,8 @@ internal sealed class PluginView : UserControl
     internal readonly Button _back5;
     internal readonly Button _forward5;
     internal readonly SeekBar _seek;
-    internal readonly Label _time;
-    internal readonly Label _seconds;
+    internal readonly Readout _time;
+    internal readonly Readout _seconds;
     internal readonly ToolStripStatusLabel _status;
     internal readonly ToolStripStatusLabel _noticeCount;
     internal readonly ToolStripStatusLabel _host;
@@ -160,9 +160,10 @@ internal sealed class PluginView : UserControl
         _tips.SetToolTip(_back5, "Back 5 seconds");
         _tips.SetToolTip(_forward5, "Forward 5 seconds");
         _seek = new SeekBar();
-        _time = new Label { Text = "0:00 / -0:00", TextAlign = ContentAlignment.BottomLeft, AutoSize = false, Dock = DockStyle.Fill, Margin = new Padding(0) };
-        // The same in seconds, under it, to read against the editor's fade points.
-        _seconds = new Label { Text = Presenter.SecondsReadout(null), TextAlign = ContentAlignment.TopLeft, AutoSize = false, Dock = DockStyle.Fill, Margin = new Padding(0) };
+        // The LED readout (studio theme issue 04), and the same in seconds under it, to read
+        // against the editor's fade points. In a sidebar's narrow column the time draws smaller.
+        _time = Readout.Time();
+        _seconds = Readout.Seconds();
         _attendedTrack = new Label
         {
             Dock = DockStyle.Fill,
@@ -180,7 +181,7 @@ internal sealed class PluginView : UserControl
         var seekRow = new TableLayoutPanel { Dock = DockStyle.Top, Height = 50, ColumnCount = 3, RowCount = 1 };
         seekRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         seekRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        seekRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
+        seekRow.ColumnStyles.Add(_readoutColumn);
         _forward5.Height = _back5.Height = 23;
         _forward5.Margin = new Padding(0, 0, 0, 1);
         _back5.Margin = new Padding(0, 1, 0, 0);
@@ -196,9 +197,9 @@ internal sealed class PluginView : UserControl
         seekRow.Controls.Add(_seek, 0, 0);
         seekRow.Controls.Add(jumps, 1, 0);
         // Its own height, within the row's 50 px: left to itself the table asks for 100.
-        var times = new TableLayoutPanel { Dock = DockStyle.Fill, Height = 34, ColumnCount = 1, RowCount = 2, Margin = new Padding(3, 8, 3, 8) };
-        times.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-        times.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        var times = new TableLayoutPanel { Dock = DockStyle.Fill, Height = 46, ColumnCount = 1, RowCount = 2, Margin = new Padding(3, 2, 3, 2) };
+        times.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        times.RowStyles.Add(new RowStyle(SizeType.Absolute, 18));
         times.Controls.Add(_time, 0, 0);
         times.Controls.Add(_seconds, 0, 1);
         seekRow.Controls.Add(times, 2, 0);
@@ -494,10 +495,18 @@ internal sealed class PluginView : UserControl
     /// beside it, so the queue keeps its columns.</summary>
     internal const int NarrowWidth = 560;
 
+    /// <summary>The readout's column: the App's width in a main panel, where the LED readout is
+    /// whole at full size, and narrower in a sidebar, where it draws smaller and the seek bar
+    /// keeps its travel (studio theme issue 04).</summary>
+    private readonly ColumnStyle _readoutColumn = new(SizeType.Absolute, WideReadout);
+
+    private const int WideReadout = 180, NarrowReadout = 120;
+
     /// <summary>Lays the view out for its width: the playlists beside the queue in a main panel,
     /// above it in a sidebar; the editor at the right in a main panel, always, and in a sidebar
     /// a page in the lists' place while an adjacency is open, under its Close bar; the host line
-    /// at its own width, or half the strip's when that is less, so the notice keeps the rest.</summary>
+    /// at its own width, or half the strip's when that is less, so the notice keeps the rest; the
+    /// readout's column wide in a main panel, narrow in a sidebar.</summary>
     private void FitWidth()
     {
         var narrow = ClientSize.Width < NarrowWidth;
@@ -513,6 +522,11 @@ internal sealed class PluginView : UserControl
             {
                 _playlists.Width = 200;
             }
+        }
+        var readout = narrow ? NarrowReadout : WideReadout;
+        if (_readoutColumn.Width != readout)
+        {
+            _readoutColumn.Width = readout;
         }
         PlaceEditor();
         var preferred = TextRenderer.MeasureText(_host.Text, _host.Font).Width + 8;

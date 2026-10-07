@@ -117,6 +117,47 @@ public sealed class StudioThemeTests
         Assert.Empty(off);
     });
 
+    // ── Studio theme issue 04: the LED readout ──────────────────────────────────────────
+
+    [Fact]
+    public void TheReadout_IsTheLedFaceInTheAccent_AndTheSecondsUnderItAreDim() => RunSta(() =>
+    {
+        using var panel = new Panel { Size = new Size(400, 60) };
+        var time = Readout.Time();
+        var seconds = Readout.Seconds();
+        time.SetBounds(0, 0, 180, 28);
+        seconds.Dock = DockStyle.None;
+        seconds.SetBounds(0, 28, 180, 18);
+        panel.Controls.AddRange(new Control[] { time, seconds });
+
+        StudioTheme.Apply(panel, Duophonic);
+        time.Text = "0:14 / -3:03";
+
+        Assert.Equal(Duophonic.Accent, time.ForeColor);
+        Assert.Equal(Duophonic.Dim, seconds.ForeColor);
+        Assert.Equal("Consolas", time.DrawnFont.Name);
+        Assert.Equal(Readout.LedSize, time.DrawnFont.Size); // it fits whole at full size
+        Assert.True(TextRenderer.MeasureText(time.Text, time.DrawnFont).Height <= time.Height, "the readout is clipped");
+        Assert.True(seconds.Font.Size < 10);
+    });
+
+    [Fact]
+    public void TheReadout_DrawsSmaller_WhereItWouldNotFit_SoItIsNeverCutShort() => RunSta(() =>
+    {
+        using var time = Readout.Time();
+        time.Dock = DockStyle.None;
+        time.SetBounds(0, 0, 110, 28); // the plugin's column in a sidebar, as it was
+        time.Text = "Held 1:02:03 / -1:02:03";
+
+        var font = time.DrawnFont;
+
+        Assert.True(font.Size < Readout.LedSize);
+        Assert.True(font.Size >= 8);
+        Assert.Equal("Consolas", font.Name);
+        Assert.True(TextRenderer.MeasureText(time.Text, font, Size.Empty, TextFormatFlags.NoPadding).Width <= time.Width || font.Size == 8,
+            "the readout is cut short");
+    });
+
     private static IEnumerable<Color> Pixels(Bitmap bitmap) =>
         Enumerable.Range(0, bitmap.Width).SelectMany(x => Enumerable.Range(0, bitmap.Height).Select(y => bitmap.GetPixel(x, y)));
 
