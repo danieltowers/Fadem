@@ -69,7 +69,19 @@ Looks:
   plugin settings were put back and MusicBee closed with nothing new in its error log. This
   build of the plugin stays installed.
 
-**Found, not fixed:** a section's rows show no stripe of its colour at their left. The queue is
-owner drawn (`QueueRowStyle.Draw`), and its cells draw text only, never the item's image, so the
-stripes `QueueSections` sets (`ImageIndex`) are never painted. The phase 6 Sections smoke item
-still expects them. Not touched here: the group headers were this issue's scope.
+**Found, then fixed (the same day, at the user's word):** a section's rows showed no stripe of
+its colour. The queue is owner drawn (`QueueRowStyle.Draw`) and its cells drew text only, never
+the item's image, so the stripes `QueueSections` sets (`ImageIndex`) were never painted.
+- `QueueRowStyle` now draws a row's image at the row's left edge (the leftmost shown column,
+  the speaker's in the hosts), its full height. The row is a pixel taller than its image, and
+  the image list's own stretch took that pixel from the next image (a green stripe ended in an
+  orange pixel), so the image's own bitmap is stretched nearest-neighbour instead.
+- **Row height**: the stripes were 4x16, and swapping them in shrank a sectioned queue's rows
+  from 23 px to 19; removing every section set no image list at all, shrinking them again. The
+  stripes are now `QueueRowStyle.RowHeight` tall, and `QueueSections` puts back the list's own
+  image list when no row is striped. So "test playlist" now scrolls: its rows have the queue's usual
+  spacing.
+- Tests: `ARowInASection_HasAStripeOfItsColour_AtItsLeftEdge` (on screen) and
+  `ADrawnQueue_KeepsItsRowHeight_AsSectionsComeAndGo`, both failing before the fix.
+- Looks: grey stripes down every row of intro and foo, unbroken, in the App (Duophonic) and in
+  MusicBee (Duophonic, same backup and restore as above; "test playlist" unchanged after).

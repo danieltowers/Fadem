@@ -14,7 +14,11 @@ internal sealed class QueueSections : IDisposable
 {
     private readonly ListView _list;
     private readonly PlaybackEngine _engine;
-    private readonly ImageList _stripes = SectionPalette.Images(new Size(4, 16));
+    private readonly ImageList _stripes = SectionPalette.Images(new Size(4, QueueRowStyle.RowHeight));
+
+    /// <summary>The list's own image list, which sets a drawn queue's row height
+    /// (<see cref="QueueRowStyle"/>): it is back while no row is striped.</summary>
+    private readonly ImageList? _own;
     private readonly ImageList _swatches = SectionPalette.Images(new Size(12, 12));
 
     /// <summary>The groups' sections, parallel to the list's groups: null for the unheaded one.</summary>
@@ -40,6 +44,7 @@ internal sealed class QueueSections : IDisposable
     {
         _list = list;
         _engine = engine;
+        _own = list.SmallImageList;
         AskName = initial => Dialogs.AskSectionName(_list.FindForm(), initial, Theme.StudioTheme.PaletteOf(_list));
         Menu = new SectionMenu(engine, () => _engine.View.Queue.FirstOrDefault(r => r.Id == _menuRow), initial => AskName(initial));
     }
@@ -51,7 +56,7 @@ internal sealed class QueueSections : IDisposable
         var rows = view.Queue;
         var count = Math.Min(rows.Count, _list.Items.Count);
         var anySection = rows.Any(r => r.Section is not null);
-        var striped = anySection ? _stripes : null;
+        var striped = anySection ? _stripes : _own;
         if (_list.SmallImageList != striped)
         {
             _list.SmallImageList = striped;

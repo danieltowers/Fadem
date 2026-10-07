@@ -74,6 +74,27 @@ public sealed class QueueSectionsTests
         Assert.All(list.Items.Cast<ListViewItem>(), i => Assert.Null(i.Group));
     });
 
+    /// <summary>The hosts' queue is drawn by <see cref="QueueRowStyle"/>, whose image list sets
+    /// its rows' height: sections coming and going keep it.</summary>
+    [Fact]
+    public void ADrawnQueue_KeepsItsRowHeight_AsSectionsComeAndGo() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        using var list = QueueOf(tc, 2);
+        QueueRowStyle.Draw(list);
+        using var sections = new QueueSections(list, tc.Engine);
+        sections.Apply(tc.View);
+        var height = list.Items[0].Bounds.Height;
+
+        tc.Engine.StartSection(tc.View.Queue[0].Id, "Intro");
+        sections.Apply(tc.View);
+        Assert.Equal(height, list.Items[0].Bounds.Height);
+
+        tc.Engine.RemoveSection(tc.View.Queue[0].Section!.Id);
+        sections.Apply(tc.View);
+        Assert.Equal(height, list.Items[0].Bounds.Height);
+    });
+
     [Fact]
     public void ACollapsedSection_IsACollapsedGroup_AndTheOthersCanCollapse() => RunSta(() =>
     {

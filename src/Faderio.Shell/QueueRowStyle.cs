@@ -1,3 +1,4 @@
+using System.Drawing.Drawing2D;
 using Faderio.Core.Playback;
 
 namespace Faderio.Shell;
@@ -11,7 +12,8 @@ namespace Faderio.Shell;
 /// plain while it is not. A render runs on every tick, so each cell's look is set only when it
 /// changes. The fonts are this style's: the list's own size draws the pencil at eight pixels.
 /// <see cref="Draw"/> has the list drawn by this style, so a selected row is
-/// <see cref="RowMarks.Selected"/>'s grey rather than the system's blue.
+/// <see cref="RowMarks.Selected"/>'s grey rather than the system's blue, and each row's image,
+/// a section's stripe, at its left edge (studio theme issue 07).
 /// </summary>
 internal sealed class QueueRowStyle : IDisposable
 {
@@ -22,8 +24,8 @@ internal sealed class QueueRowStyle : IDisposable
     /// <summary>The speaker's column: wide enough for its glyph, and no wider.</summary>
     public const int MarkColumnWidth = 26;
 
-    /// <summary>The rows' height: tall enough for the speaker.</summary>
-    private const int RowHeight = 22;
+    /// <summary>The rows' height: tall enough for the speaker. A section's stripes are as tall.</summary>
+    public const int RowHeight = 22;
 
     /// <summary>The colours rows are drawn in (studio theme issue 02), or none for the system's.</summary>
     public Theme.Palette? Palette { get; set; }
@@ -153,6 +155,20 @@ internal sealed class QueueRowStyle : IDisposable
             using (var brush = new SolidBrush(back))
             {
                 e.Graphics.FillRectangle(brush, bounds);
+            }
+            // The row's image, a section's stripe in the queue, at the row's left edge and its full
+            // height: drawn here, since the list draws nothing of a row itself. The row is a pixel
+            // taller than its image; the image list's own stretch takes that pixel from the next
+            // image, so the image's own bitmap is stretched, pixel for pixel.
+            if (column.DisplayIndex == 0 && item.ImageIndex >= 0 && list.SmallImageList is { } images
+                && item.ImageIndex < images.Images.Count)
+            {
+                using var image = images.Images[item.ImageIndex];
+                var state = e.Graphics.Save();
+                e.Graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+                e.Graphics.PixelOffsetMode = PixelOffsetMode.Half;
+                e.Graphics.DrawImage(image, new Rectangle(bounds.Left, bounds.Top, image.Width, bounds.Height));
+                e.Graphics.Restore(state);
             }
             var align = list.Columns[e.ColumnIndex].TextAlign switch
             {

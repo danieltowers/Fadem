@@ -13,7 +13,7 @@ public sealed class SectionGroupThemeTests
     private static readonly Palette Duophonic = Palette.From(PaletteTests.Duophonic);
 
     [Fact]
-    public void ASectionsHeader_IsItsNameInText_WithItsSwatch_AndADimChevron() => RunSta(() => Headers((bitmap, headers) =>
+    public void ASectionsHeader_IsItsNameInText_WithItsSwatch_AndADimChevron() => RunSta(() => Headers((bitmap, headers, _) =>
     {
         var intro = Pixels(bitmap, headers[0]);
         Assert.Contains(intro, c => DialogThemeTests.Near(c, Duophonic.Text)); // the name
@@ -24,12 +24,25 @@ public sealed class SectionGroupThemeTests
     }));
 
     [Fact]
-    public void ACollapsedSectionsHeader_IsInThePaletteToo() => RunSta(() => Headers((bitmap, headers) =>
+    public void ACollapsedSectionsHeader_IsInThePaletteToo() => RunSta(() => Headers((bitmap, headers, _) =>
     {
         var foo = Pixels(bitmap, headers[1]);
         Assert.Contains(foo, c => DialogThemeTests.Near(c, SectionPalette.ColourOf(1)));
         Assert.Contains(foo, c => DialogThemeTests.Near(c, Duophonic.Dim)); // its chevron
         Assert.Equal(Duophonic.Text.ToArgb(), Ink(foo, SectionPalette.ColourOf(1)).ToArgb());
+    }));
+
+    /// <summary>A row in a section has a stripe of its colour at its left edge, its full height;
+    /// a row in no section has none. The queue draws its own rows, so it draws the stripe too.</summary>
+    [Fact]
+    public void ARowInASection_HasAStripeOfItsColour_AtItsLeftEdge() => RunSta(() => Headers((bitmap, _, rows) =>
+    {
+        static List<Color> Edge(Bitmap bitmap, Rectangle row) => Pixels(bitmap, new Rectangle(row.Left, row.Top, 3, row.Height));
+        Assert.All(Edge(bitmap, rows[1]), c => Assert.True(DialogThemeTests.Near(c, SectionPalette.ColourOf(2)), $"{c} is not Intro's green"));
+        Assert.All(Edge(bitmap, rows[2]), c => Assert.True(DialogThemeTests.Near(c, SectionPalette.ColourOf(2)), $"{c} is not Intro's green"));
+        Assert.DoesNotContain(Edge(bitmap, rows[0]), c => DialogThemeTests.Near(c, SectionPalette.ColourOf(2)));
+        Assert.DoesNotContain(Pixels(bitmap, new Rectangle(rows[1].Left + 8, rows[1].Top, 20, rows[1].Height)),
+            c => DialogThemeTests.Near(c, SectionPalette.ColourOf(2))); // a stripe, not a block
     }));
 
     /// <summary>The colour most of a header is inked in, off the Well (and its Edge rule) and off
@@ -45,8 +58,8 @@ public sealed class SectionGroupThemeTests
 
     /// <summary>A themed, owner-drawn queue of four rows with an unheaded row, "Intro" (green) over
     /// two rows and "foo" (red, collapsed) over the last, as the hosts make it, captured; hands
-    /// <paramref name="check"/> the capture and the two headers' bounds in it.</summary>
-    private static void Headers(Action<Bitmap, Rectangle[]> check)
+    /// <paramref name="check"/> the capture, the two headers' bounds in it and the three shown rows'.</summary>
+    private static void Headers(Action<Bitmap, Rectangle[], Rectangle[]> check)
     {
         using var tc = TestEngine.Create();
         using var form = new QuietForm
@@ -77,6 +90,12 @@ public sealed class SectionGroupThemeTests
             return bounds;
         }).ToArray();
         Assert.All(headers, h => Assert.False(h.IsEmpty));
+        var rows = Enumerable.Range(0, 3).Select(i =>
+        {
+            var bounds = list.Items[i].Bounds;
+            bounds.Offset(origin.X - window.Left, origin.Y - window.Top);
+            return bounds;
+        }).ToArray();
         using var bitmap = new Bitmap(window.Right - window.Left, window.Bottom - window.Top);
         using (var g = Graphics.FromImage(bitmap))
         {
@@ -85,7 +104,7 @@ public sealed class SectionGroupThemeTests
             g.ReleaseHdc(dc);
         }
         form.Close();
-        check(bitmap, headers);
+        check(bitmap, headers, rows);
     }
 
     private static void Pump()
