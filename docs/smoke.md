@@ -117,6 +117,19 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       well, its frame and button dark too, its chevron dim when greyed. The traffic light keeps
       its green, amber and red, is dim when stopped, and has a dark ring. The editor's scroll
       bar is the dark one.
+- [ ] **Dialogs and menus** (studio theme issue 06): **Settings…**, **Transitions…**, **Open
+      library…**, the notice list (the status strip's "1 notice" link, in the accent), the
+      section name dialog (row menu → Section → Start a section here…) and the playlist rename
+      box (its one-pixel frame stays Windows' grey, a known gap). Each is in the palette, with
+      a dark title bar and no white or system-grey surface.
+      Lists and boxes are wells framed in a dark hairline. The Settings groups' titles are small
+      capitals in the accent, and the spin boxes and their arrows are dark. The manager's
+      headings are small dim capitals, its rows are on the well, and Preview and Preview global
+      are keys. The queue's, header's and playlist's right-click menus, and the Section
+      submenu, are on the chrome with a raised highlight: items in the text colour, disabled
+      ones dim, ticks in the accent. The status text is dim. Menus are layered popups, so
+      capture them from the screen (`CopyFromScreen`), not with `PrintWindow`, which draws them
+      black. Message boxes stay Windows' own.
 - [ ] Right-clicking a row shows "Edit transition: this → next" and "Edit transition: previous
       → this", and, only while repeat is on one, "Edit transition: this → this". All read
       clearly, and a disabled one looks disabled. With repeat off, this → next is disabled on
@@ -558,6 +571,11 @@ which a background run cannot give.
       boundary open and then with row 1's ✎: as in standalone, no white or system-grey box; the
       check box and radio buttons on the panel's ground, dim but readable when greyed; hint
       lines dim; the fade curve dark; the traffic light dim when stopped, with a dark ring.
+- [ ] **Dialogs and menus in the skin** (studio theme issue 06): faderio's **Configure…** in
+      MusicBee's Preferences, its library chooser (**Choose…**), the transition manager, the
+      notice list and the section name dialog are in the skin's colours, with no white or
+      system-grey surface. The queue's, header's and playlist's right-click menus are on
+      MusicBee's chrome, with items in the text colour and ticks in the indian red accent.
 - [ ] **Leaving the editor with a box being typed in** (a duration typed, not yet left), by
       **Close editor** in a sidebar or a click on another playlist in a main panel, asks
       nothing: the duration is saved ("Saved …" in the strip) and the editor goes.

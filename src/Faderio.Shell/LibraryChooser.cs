@@ -1,4 +1,5 @@
 using Faderio.Core.Persistence;
+using Faderio.Shell.Theme;
 
 namespace Faderio.Shell;
 
@@ -22,14 +23,18 @@ internal sealed class LibraryChooser : Form
     private readonly Action<string> _forget;
     private readonly Func<string?, string?> _chooseFolder;
     private IReadOnlyList<KnownLibrary> _rows = [];
+    private readonly Palette _palette;
 
     /// <param name="known">The known libraries, asked for when shown and after each removal.</param>
     /// <param name="forget">Takes a folder off the list: one engine call, or a launch's before the engine exists.</param>
     /// <param name="chooseFolder">The folder picked for Add folder…, starting where given, or null when cancelled.</param>
     /// <param name="selected">The folder to open with selected, or null for the open library.</param>
+    /// <param name="palette">The host's palette (studio theme issue 06), or the built-in one.</param>
     public LibraryChooser(
-        Func<IReadOnlyList<KnownLibrary>> known, Action<string> forget, Func<string?, string?> chooseFolder, string? selected = null)
+        Func<IReadOnlyList<KnownLibrary>> known, Action<string> forget, Func<string?, string?> chooseFolder, string? selected = null,
+        Palette? palette = null)
     {
+        _palette = palette ?? Palette.Studio;
         _known = known;
         _forget = forget;
         _chooseFolder = chooseFolder;
@@ -64,9 +69,9 @@ internal sealed class LibraryChooser : Form
         {
             AutoSize = true,
             MaximumSize = new Size(560, 0),
-            ForeColor = SystemColors.GrayText,
             Margin = new Padding(0, 6, 0, 0),
         };
+        StudioTheme.SetInk(_hint, Ink.Dim);
 
         _add = new Button { Text = "Add folder…", AutoSize = true };
         _remove = new Button { Text = "Remove from list", AutoSize = true };
@@ -92,6 +97,8 @@ internal sealed class LibraryChooser : Form
         layout.Controls.Add(buttons, 0, 2);
         Controls.Add(layout);
         CancelButton = _cancel;
+        QueueRowStyle.Draw(_list, _palette); // a selected row raised, the header in capitals
+        StudioTheme.Apply(this, _palette);
 
         // A list without a handle keeps no selection, and it is filled before it is first shown.
         _ = _list.Handle;
@@ -103,9 +110,10 @@ internal sealed class LibraryChooser : Form
 
     /// <summary>Shows the chooser and returns the folder chosen, or null when cancelled.</summary>
     public static string? Choose(
-        IWin32Window? owner, Func<IReadOnlyList<KnownLibrary>> known, Action<string> forget, string? selected = null)
+        IWin32Window? owner, Func<IReadOnlyList<KnownLibrary>> known, Action<string> forget, string? selected = null,
+        Palette? palette = null)
     {
-        using var chooser = new LibraryChooser(known, forget, start => Dialogs.ChooseLibraryFolder(owner, start), selected);
+        using var chooser = new LibraryChooser(known, forget, start => Dialogs.ChooseLibraryFolder(owner, start), selected, palette);
         if (owner is null)
         {
             // At a launch, before any window: in the taskbar and the screen's middle, or it is lost.
@@ -127,8 +135,13 @@ internal sealed class LibraryChooser : Form
             var item = new ListViewItem([row.Name, row.Folder, row.IsOpen ? "open" : row.Exists ? "" : "not found"])
             {
                 ToolTipText = row.Folder,
-                ForeColor = row.Exists ? SystemColors.WindowText : SystemColors.GrayText,
+                UseItemStyleForSubItems = false,
             };
+            foreach (ListViewItem.ListViewSubItem cell in item.SubItems)
+            {
+                cell.ForeColor = row.Exists ? _palette.Text : _palette.Dim;
+                cell.BackColor = _palette.Well;
+            }
             _list.Items.Add(item);
         }
         _list.EndUpdate();

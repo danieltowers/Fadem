@@ -112,7 +112,7 @@ internal sealed class MainForm : Form
         ChoosePlaylists = ShowPlaylistDialog;
         ChooseExportPath = ShowExportDialog;
         ConfirmClear = ShowClearDialog;
-        ChooseLibrary = () => LibraryChooser.Choose(this, _engine.KnownLibraries, _engine.ForgetLibrary);
+        ChooseLibrary = () => LibraryChooser.Choose(this, _engine.KnownLibraries, _engine.ForgetLibrary, palette: Palette);
         ShowSettings = dialog => dialog.ShowDialog(this) == DialogResult.OK;
         ShowNoticeList = ShowModeless;
         ShowTransitionManager = ShowModeless;
@@ -382,6 +382,7 @@ internal sealed class MainForm : Form
         };
 
         Faderio.Shell.Theme.StudioTheme.Apply(this, Palette); // the studio look (studio theme issue 02)
+        Faderio.Shell.Theme.StudioTheme.Apply(_columns.Menu, Palette); // the header's menu, shown by itself (studio theme issue 06)
         PlaceWindow();
         Render(_engine.View);
     }
@@ -578,7 +579,7 @@ internal sealed class MainForm : Form
     {
         if (_manager is null || _manager.IsDisposed)
         {
-            _manager = new TransitionManagerForm(_engine, EditFromManager);
+            _manager = new TransitionManagerForm(_engine, EditFromManager, palette: Palette);
         }
         var row = SingleSelectedRow();
         _manager.Open(_engine.View.Queue.FirstOrDefault(r => r.Id == row)?.Track);
@@ -606,7 +607,7 @@ internal sealed class MainForm : Form
         }
         if (_noticeList is null || _noticeList.IsDisposed)
         {
-            _noticeList = new NoticeListForm();
+            _noticeList = new NoticeListForm(Palette);
         }
         _noticeList.ShowEntries(_notices, selectLatest: true);
         ShowNoticeList(_noticeList);
@@ -677,7 +678,7 @@ internal sealed class MainForm : Form
     private void EditSettings()
     {
         var view = _engine.View;
-        using var dialog = new SettingsForm(view.MachineSettings, view.Settings, _outputModeInUse());
+        using var dialog = new SettingsForm(view.MachineSettings, view.Settings, _outputModeInUse(), Palette);
         if (ShowSettings(dialog))
         {
             if (dialog.MachineChanged)

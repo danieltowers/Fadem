@@ -50,6 +50,11 @@ internal static class StudioTheme
         }
     }
 
+    /// <summary>The palette <paramref name="control"/> was themed in, or the built-in one: for a
+    /// dialog or a menu made from a themed control, in its colours.</summary>
+    public static Palette PaletteOf(Control? control) =>
+        control is not null && States.TryGetValue(control, out var state) && state.Themed ? state.Palette : Palette.Studio;
+
     /// <summary>Lights or puts out a key's LED: ⏸ while playing, say. A checked toggle lights its own.</summary>
     public static void Light(ButtonBase key, bool on)
     {
@@ -94,7 +99,7 @@ internal static class StudioTheme
         control.ForeColor = InkOf(p, state.Ink);
         switch (control)
         {
-            case ListView or TextBox or ComboBox or ListBox:
+            case ListView or TextBox or ComboBox or ListBox or UpDownBase:
                 control.BackColor = p.Well;
                 break;
             case Label or RadioButton or CheckBox { Appearance: Appearance.Normal }:
@@ -133,20 +138,49 @@ internal static class StudioTheme
                     tick.EnabledChanged += (_, _) => tick.Invalidate();
                 }
                 break;
-            case TextBox box:
+            case TextBox box when box.Parent is not UpDownBase:
                 box.BorderStyle = BorderStyle.FixedSingle;
                 break;
             case ComboBox combo:
                 combo.FlatStyle = FlatStyle.Flat;
-                if (first && combo.DropDownStyle == ComboBoxStyle.DropDownList)
+                // One drawn by its owner already, as the manager's track picker, draws itself.
+                if (first && combo.DropDownStyle == ComboBoxStyle.DropDownList && combo.DrawMode == DrawMode.Normal)
                 {
                     combo.DrawMode = DrawMode.OwnerDrawFixed;
                     combo.DrawItem += DrawComboItem;
                 }
                 break;
             case ToolStrip strip:
-                strip.RenderMode = ToolStripRenderMode.System;
-                strip.ForeColor = p.Dim;
+                // Menus and the status strip (studio theme issue 06): a status strip's text is
+                // Dim, its link the accent.
+                strip.Renderer = new StudioRenderer(p);
+                strip.ForeColor = strip is ToolStripDropDown ? p.Text : p.Dim;
+                foreach (var label in strip.Items.OfType<ToolStripLabel>().Where(l => l.IsLink))
+                {
+                    label.LinkColor = label.ActiveLinkColor = label.VisitedLinkColor = p.Accent;
+                    label.LinkBehavior = LinkBehavior.HoverUnderline;
+                }
+                break;
+            case DataGridView grid:
+                Grid(grid, p, first);
+                break;
+            case GroupBox group:
+                group.FlatStyle = FlatStyle.Flat;
+                if (first)
+                {
+                    group.Paint += PaintGroup;
+                }
+                break;
+            case UpDownBase spin:
+                spin.BorderStyle = BorderStyle.FixedSingle;
+                if (first)
+                {
+                    spin.Paint += (_, e) => Frame(e.Graphics, spin);
+                }
+                break;
+            case Control buttons when first && control.Parent is UpDownBase && control is not TextBoxBase:
+                // A spin box's arrows: WinForms draws them in the system's light grey.
+                buttons.Paint += PaintSpinButtons;
                 break;
             case PaneTitle.Title title:
                 title.ForeColor = p.Accent; // a section label, lit (studio theme issue 03)
@@ -171,7 +205,7 @@ internal static class StudioTheme
             {
                 EmptyGround.Attach(list);
             }
-            if (control is TextBoxBase or Panel { BorderStyle: BorderStyle.FixedSingle })
+            if (control is TextBoxBase or ListView or Panel { BorderStyle: BorderStyle.FixedSingle })
             {
                 Hairline.Attach(control);
             }
@@ -179,6 +213,13 @@ internal static class StudioTheme
             {
                 ComboFrame.Attach(combo);
             }
+            control.ContextMenuStripChanged += (_, _) =>
+            {
+                if (control.ContextMenuStrip is { } menu && States.TryGetValue(control, out var owner))
+                {
+                    Theme(menu, owner.Palette);
+                }
+            };
             control.ControlAdded += (_, e) =>
             {
                 if (e.Control is { } added && States.TryGetValue(control, out var parent))
@@ -186,6 +227,10 @@ internal static class StudioTheme
                     Theme(added, parent.Palette);
                 }
             };
+        }
+        if (control.ContextMenuStrip is { } own)
+        {
+            Theme(own, p); // the control's own menu, with it
         }
         NativeTheme(control);
         foreach (Control child in control.Controls)
@@ -196,7 +241,7 @@ internal static class StudioTheme
     }
 
     private static bool NeedsNativeTheme(Control control) =>
-        control is ListView or ComboBox or TreeView or ScrollableControl { AutoScroll: true };
+        control is ListView or ComboBox or TreeView or ScrollBar or TextBoxBase { Multiline: true } or ScrollableControl { AutoScroll: true };
 
     /// <summary>Windows' own dark themes, for what WinForms cannot colour: scroll bars, the list's
     /// header beyond its columns, a dropdown's frame.</summary>
@@ -228,17 +273,47 @@ internal static class StudioTheme
     /// draws a two-pixel rule at every column's edge down a details view's empty part (its
     /// <c>LVP_COLUMNDETAIL</c>), and no other dark list theme exists: the names it might be fall
     /// back to the light theme, white frame and all (studio theme issue 03).
+    /// <para>Also the box a name is edited in, as a playlist is renamed (studio theme issue 06): the
+    /// list makes it, a child edit control of its own, which asks the list for its colours. It is on
+    /// the Well, in Text. Its one-pixel frame stays Windows' grey: drawing over it held only in a
+    /// test run alone, and clearing its border style left the frame as it was.</para>
     /// </summary>
     private sealed class EmptyGround : Hook
     {
         private readonly ListView _list;
+        private IntPtr _brush;
 
-        private EmptyGround(ListView list) : base(list) => _list = list;
+        private EmptyGround(ListView list) : base(list)
+        {
+            _list = list;
+            list.Disposed += (_, _) => Release();
+        }
 
         public static void Attach(ListView list) => _ = new EmptyGround(list);
 
+        private void Release()
+        {
+            if (_brush != IntPtr.Zero)
+            {
+                _ = DeleteObject(_brush);
+                _brush = IntPtr.Zero;
+            }
+        }
+
         protected override void WndProc(ref Message m)
         {
+            if (m.Msg == WM_CTLCOLOREDIT && States.TryGetValue(_list, out var state))
+            {
+                var p = state.Palette;
+                _ = SetTextColor(m.WParam, ColorTranslator.ToWin32(p.Text));
+                _ = SetBkColor(m.WParam, ColorTranslator.ToWin32(p.Well));
+                if (_brush == IntPtr.Zero)
+                {
+                    _brush = CreateSolidBrush(ColorTranslator.ToWin32(p.Well));
+                }
+                m.Result = _brush;
+                return;
+            }
             if (m.Msg == WM_ERASEBKGND && _list.View == View.Details)
             {
                 using var g = Graphics.FromHdc(m.WParam);
@@ -266,7 +341,8 @@ internal static class StudioTheme
     }
 
     /// <summary>
-    /// A text box's or a bordered panel's one-pixel frame in Edge (studio theme issue 05). Windows
+    /// A text box's, a list's or a bordered panel's one-pixel frame in Edge (studio theme issues 05
+    /// and 06). Windows
     /// draws it in its window frame colour, in the non-client area that WinForms' colours do not
     /// reach, and an edit control draws it again with its text; it is drawn over each time.
     /// </summary>
@@ -303,6 +379,7 @@ internal static class StudioTheme
         private bool Bordered => _control switch
         {
             TextBoxBase box => box.BorderStyle == BorderStyle.FixedSingle,
+            ListView list => list.BorderStyle != BorderStyle.None,
             Panel panel => panel.BorderStyle == BorderStyle.FixedSingle,
             _ => false,
         };
@@ -316,6 +393,12 @@ internal static class StudioTheme
             using var g = Graphics.FromHdc(dc);
             using var edge = new Pen(state.Palette.Edge);
             g.DrawRectangle(edge, 0, 0, _control.Width - 1, _control.Height - 1);
+            if (_control is ListView { BorderStyle: BorderStyle.Fixed3D })
+            {
+                // A list's sunken frame is two pixels: the inner one on the list's own ground.
+                using var ground = new Pen(_control.BackColor);
+                g.DrawRectangle(ground, 1, 1, _control.Width - 3, _control.Height - 3);
+            }
         }
     }
 
@@ -457,6 +540,155 @@ internal static class StudioTheme
         }
     }
 
+    /// <summary>A grid as the queue is drawn (studio theme issue 06): cells on the Well in Text, the
+    /// selected row on Raised, the headings small bold capitals in Dim with Edge rules, and its
+    /// buttons flat keys.</summary>
+    private static void Grid(DataGridView grid, Palette p, bool first)
+    {
+        grid.BackgroundColor = p.Well;
+        grid.GridColor = p.Edge;
+        grid.BorderStyle = BorderStyle.None;
+        grid.EnableHeadersVisualStyles = false;
+        grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+        grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
+        Cells(grid.DefaultCellStyle, p.Well, p.Text, p.Raised);
+        Cells(grid.RowsDefaultCellStyle, p.Well, p.Text, p.Raised);
+        Cells(grid.AlternatingRowsDefaultCellStyle, p.Well, p.Text, p.Raised);
+        Cells(grid.RowHeadersDefaultCellStyle, p.Well, p.Dim, p.Well);
+        Cells(grid.ColumnHeadersDefaultCellStyle, p.Well, p.Dim, p.Well);
+        if (first)
+        {
+            grid.ColumnHeadersDefaultCellStyle.Font = new Font(grid.Font.FontFamily, 7.5f, FontStyle.Bold);
+            grid.CellPainting += PaintGridCell;
+        }
+        foreach (DataGridViewColumn column in grid.Columns)
+        {
+            if (column is DataGridViewButtonColumn button)
+            {
+                button.FlatStyle = FlatStyle.Flat;
+                Cells(button.DefaultCellStyle, p.Well, p.Text, p.Raised); // the key drawn on the row
+            }
+            else if (!column.DefaultCellStyle.BackColor.IsEmpty || !column.DefaultCellStyle.ForeColor.IsEmpty)
+            {
+                Cells(column.DefaultCellStyle, p.Well, p.Text, p.Raised);
+            }
+        }
+    }
+
+    private static void Cells(DataGridViewCellStyle style, Color back, Color fore, Color selected)
+    {
+        style.BackColor = back;
+        style.ForeColor = fore;
+        style.SelectionBackColor = selected;
+        style.SelectionForeColor = fore;
+    }
+
+    /// <summary>A grid's heading, as the queue's header draws one; a button cell as a key.</summary>
+    private static void PaintGridCell(object? sender, DataGridViewCellPaintingEventArgs e)
+    {
+        if (sender is not DataGridView grid || !States.TryGetValue(grid, out var state) || e.Graphics is not { } g)
+        {
+            return;
+        }
+        var p = state.Palette;
+        var bounds = e.CellBounds;
+        if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && grid.Columns[e.ColumnIndex] is DataGridViewButtonColumn)
+        {
+            e.PaintBackground(e.ClipBounds, cellsPaintSelectionBackground: true);
+            var key = Rectangle.Inflate(bounds, -3, -2);
+            // No hover: the grid repaints a cell only when its row changes.
+            DrawKey(g, key, p, e.FormattedValue as string ?? "", e.CellStyle?.Font ?? grid.Font, grid.Enabled, hover: false, lit: false);
+            e.Handled = true;
+            return;
+        }
+        if (e.RowIndex != -1)
+        {
+            return;
+        }
+        using (var back = new SolidBrush(p.Well))
+        {
+            g.FillRectangle(back, bounds);
+        }
+        using (var rule = new Pen(p.Edge))
+        {
+            g.DrawLine(rule, bounds.Left, bounds.Bottom - 1, bounds.Right, bounds.Bottom - 1);
+            g.DrawLine(rule, bounds.Right - 1, bounds.Top + 4, bounds.Right - 1, bounds.Bottom - 5);
+        }
+        var text = (e.FormattedValue as string ?? "").ToUpperInvariant();
+        TextRenderer.DrawText(g, text, e.CellStyle?.Font ?? grid.Font, Rectangle.Inflate(bounds, -4, 0), p.Dim,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine
+            | TextFormatFlags.NoPrefix);
+        e.Handled = true;
+    }
+
+    /// <summary>A group box's frame in Edge and its title as a section label, small bold capitals
+    /// in the accent, over what WinForms drew in the system's colours.</summary>
+    private static void PaintGroup(object? sender, PaintEventArgs e)
+    {
+        if (sender is not GroupBox group || !States.TryGetValue(group, out var state))
+        {
+            return;
+        }
+        var p = state.Palette;
+        var g = e.Graphics;
+        g.Clear(group.BackColor);
+        using var title = new Font(group.Font.FontFamily, 7.5f, FontStyle.Bold);
+        var text = group.Text.ToUpperInvariant();
+        var size = TextRenderer.MeasureText(g, text, title, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
+        var top = size.Height / 2;
+        using (var edge = new Pen(p.Edge))
+        {
+            g.DrawRectangle(edge, 0, top, group.Width - 1, group.Height - top - 1);
+        }
+        if (text.Length > 0)
+        {
+            var label = new Rectangle(6, 0, size.Width + 6, size.Height);
+            using (var ground = new SolidBrush(group.BackColor))
+            {
+                g.FillRectangle(ground, label);
+            }
+            TextRenderer.DrawText(g, text, title, new Point(label.X + 3, 0), group.Enabled ? p.Accent : p.Dim,
+                TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
+        }
+    }
+
+    /// <summary>A spin box's frame in Edge.</summary>
+    private static void Frame(Graphics g, UpDownBase spin)
+    {
+        if (!States.TryGetValue(spin, out var state))
+        {
+            return;
+        }
+        using var edge = new Pen(state.Palette.Edge);
+        g.DrawRectangle(edge, 0, 0, spin.Width - 1, spin.Height - 1);
+    }
+
+    /// <summary>A spin box's up and down arrows on the Well, in Text, or Dim while disabled.</summary>
+    private static void PaintSpinButtons(object? sender, PaintEventArgs e)
+    {
+        if (sender is not Control buttons || !States.TryGetValue(buttons, out var state))
+        {
+            return;
+        }
+        var p = state.Palette;
+        var g = e.Graphics;
+        g.Clear(p.Well);
+        var w = buttons.Width;
+        var h = buttons.Height;
+        using (var edge = new Pen(p.Edge))
+        {
+            g.DrawLine(edge, 0, 0, 0, h);
+            g.DrawLine(edge, 0, h / 2, w, h / 2);
+        }
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        var cx = w / 2f + 0.5f;
+        using var chevron = new Pen(buttons.Enabled ? p.Text : p.Dim, 1.25f);
+        var up = h / 4f;
+        var down = h * 3 / 4f;
+        g.DrawLines(chevron, new[] { new PointF(cx - 3, up + 1.5f), new PointF(cx, up - 1.5f), new PointF(cx + 3, up + 1.5f) });
+        g.DrawLines(chevron, new[] { new PointF(cx - 3, down - 1.5f), new PointF(cx, down + 1.5f), new PointF(cx + 3, down - 1.5f) });
+    }
+
     /// <summary>A check box's box, and a radio button's circle, at 96 dpi; WinForms' flat one is 11.</summary>
     private const int TickSize = 13;
 
@@ -473,15 +705,21 @@ internal static class StudioTheme
             return;
         }
         var p = state.Palette;
-        var g = e.Graphics;
-        g.Clear(key.Parent?.BackColor ?? p.Chrome);
+        e.Graphics.Clear(key.Parent?.BackColor ?? p.Chrome);
+        var hover = key.Enabled && key.ClientRectangle.Contains(key.PointToClient(Cursor.Position));
+        DrawKey(e.Graphics, key.ClientRectangle, p, key.Text, key.Font, key.Enabled, hover, IsLit(key));
+    }
+
+    /// <summary>A key drawn in <paramref name="area"/>: on a control of its own, or in a grid's
+    /// button cell.</summary>
+    private static void DrawKey(Graphics g, Rectangle area, Palette p, string text, Font font, bool enabled, bool hover, bool lit)
+    {
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        var bounds = new Rectangle(0, 0, key.Width - 1, key.Height - 1);
+        var bounds = new Rectangle(area.X, area.Y, area.Width - 1, area.Height - 1);
         if (bounds.Width < 4 || bounds.Height < 4)
         {
             return;
         }
-        var hover = key.Enabled && key.ClientRectangle.Contains(key.PointToClient(Cursor.Position));
         var face = hover ? p.Raised : p.Key;
         using (var path = Rounded(bounds, KeyRadius))
         {
@@ -496,13 +734,13 @@ internal static class StudioTheme
         {
             g.DrawLine(shine, bounds.Left + KeyRadius, bounds.Top + 1, bounds.Right - KeyRadius, bounds.Top + 1);
         }
-        if (IsLit(key))
+        if (lit)
         {
             using var led = new SolidBrush(p.Accent);
             g.FillEllipse(led, bounds.Right - 7, bounds.Top + 3, 4, 4);
         }
         g.SmoothingMode = SmoothingMode.None;
-        TextRenderer.DrawText(g, key.Text, key.Font, key.ClientRectangle, key.Enabled ? p.Text : p.Dim,
+        TextRenderer.DrawText(g, text, font, area, enabled ? p.Text : p.Dim,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix
             | TextFormatFlags.NoPadding);
     }
@@ -567,6 +805,7 @@ internal static class StudioTheme
     private const int LVM_GETHEADER = 0x1000 + 31;
     private const int WM_ERASEBKGND = 0x0014;
     private const int WM_PAINT = 0x000F;
+    private const int WM_CTLCOLOREDIT = 0x0133;
     private const int WM_NCPAINT = 0x0085;
     private const int WM_PRINT = 0x0317;
     private const int WM_PRINTCLIENT = 0x0318;
@@ -587,6 +826,18 @@ internal static class StudioTheme
 
     [DllImport("user32.dll")]
     private static extern int ReleaseDC(IntPtr window, IntPtr dc);
+
+    [DllImport("gdi32.dll")]
+    private static extern int SetTextColor(IntPtr dc, int colour);
+
+    [DllImport("gdi32.dll")]
+    private static extern int SetBkColor(IntPtr dc, int colour);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateSolidBrush(int colour);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr gdiObject);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);

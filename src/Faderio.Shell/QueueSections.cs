@@ -40,7 +40,7 @@ internal sealed class QueueSections : IDisposable
     {
         _list = list;
         _engine = engine;
-        AskName = initial => Dialogs.AskSectionName(_list.FindForm(), initial);
+        AskName = initial => Dialogs.AskSectionName(_list.FindForm(), initial, Theme.StudioTheme.PaletteOf(_list));
         Menu = new SectionMenu(engine, () => _engine.View.Queue.FirstOrDefault(r => r.Id == _menuRow), initial => AskName(initial));
     }
 

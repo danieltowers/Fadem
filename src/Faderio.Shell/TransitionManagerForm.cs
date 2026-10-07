@@ -1,5 +1,6 @@
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;
+using Faderio.Shell.Theme;
 
 namespace Faderio.Shell;
 
@@ -16,6 +17,7 @@ internal sealed class TransitionManagerForm : Form
     private readonly PlaybackEngine _engine;
     private readonly Action<Adjacency> _edit;
     private readonly Action? _beforeSounding;
+    private readonly Palette _palette;
 
     internal readonly ComboBox _track;
     internal readonly Label _legend;
@@ -44,8 +46,10 @@ internal sealed class TransitionManagerForm : Form
     /// <param name="edit">Opens the editor on an adjacency, in the mode it was left in.</param>
     /// <param name="beforeSounding">Raised before a stored preview starts sound: a host in another
     /// player's process stops that player first (phase 5 issue 12). Null raises nothing.</param>
-    public TransitionManagerForm(PlaybackEngine engine, Action<Adjacency> edit, Action? beforeSounding = null)
+    /// <param name="palette">The host's palette (studio theme issue 06), or the built-in one.</param>
+    public TransitionManagerForm(PlaybackEngine engine, Action<Adjacency> edit, Action? beforeSounding = null, Palette? palette = null)
     {
+        _palette = palette ?? Palette.Studio;
         _engine = engine;
         _edit = edit;
         _beforeSounding = beforeSounding;
@@ -65,18 +69,21 @@ internal sealed class TransitionManagerForm : Form
             Margin = new Padding(4, 8, 4, 4),
             DrawMode = DrawMode.OwnerDrawFixed,
         };
-        // Drawn so that a gone track reads grey, as its rows do (phase 3 issue 02).
+        // Drawn so that a gone track reads dim, as its rows do (phase 3 issue 02), on the Well with
+        // the item under the pointer Raised (studio theme issue 06).
         _track.DrawItem += (_, e) =>
         {
-            e.DrawBackground();
+            var selected = (e.State & DrawItemState.Selected) != 0 && (e.State & DrawItemState.ComboBoxEdit) == 0;
+            using (var back = new SolidBrush(selected ? _palette.Raised : _palette.Well))
+            {
+                e.Graphics.FillRectangle(back, e.Bounds);
+            }
             if (e.Index >= 0 && _track.Items[e.Index] is TrackItem item)
             {
-                var selected = (e.State & DrawItemState.Selected) != 0;
-                var colour = item.Track.Gone && !selected ? SystemColors.GrayText : e.ForeColor;
+                var colour = item.Track.Gone || !_track.Enabled ? _palette.Dim : _palette.Text;
                 TextRenderer.DrawText(e.Graphics, item.ToString(), e.Font, e.Bounds, colour,
                     TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             }
-            e.DrawFocusRectangle();
         };
         var top = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 38, WrapContents = false };
         top.Controls.Add(new Label { Text = "Track:", AutoSize = true, Margin = new Padding(8, 12, 0, 0) });
@@ -85,7 +92,6 @@ internal sealed class TransitionManagerForm : Form
         {
             Dock = DockStyle.Top,
             Height = 22,
-            ForeColor = SystemColors.GrayText,
             Padding = new Padding(8, 0, 0, 0),
             TextAlign = ContentAlignment.MiddleLeft,
             AutoEllipsis = true,
@@ -101,7 +107,6 @@ internal sealed class TransitionManagerForm : Form
             RowHeadersVisible = false,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = false,
-            BackgroundColor = SystemColors.Window,
             AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None,
         };
         Column("", 28);
@@ -157,6 +162,8 @@ internal sealed class TransitionManagerForm : Form
         Controls.Add(_legend);
         Controls.Add(top);
         Controls.Add(bottom);
+        StudioTheme.SetInk(_legend, Ink.Dim);
+        StudioTheme.Apply(this, _palette);
 
         KeyDown += (_, e) =>
         {
@@ -265,7 +272,7 @@ internal sealed class TransitionManagerForm : Form
             row.Cells[1].ToolTipText = adjacency.Other.Gone ? Presenter.FmtGoneTip(adjacency.Other) : adjacency.Other.FilePath;
             if (adjacency.Other.Gone)
             {
-                row.DefaultCellStyle.ForeColor = SystemColors.GrayText;
+                row.DefaultCellStyle.ForeColor = row.DefaultCellStyle.SelectionForeColor = _palette.Dim;
             }
         }
         // The grid picks its first row for itself; that highlight means nothing in a read-only

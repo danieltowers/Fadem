@@ -35,9 +35,17 @@ internal static class Dialogs
 
     /// <summary>A section's name, opening on <paramref name="initial"/>: blank for a new section.
     /// Null when cancelled.</summary>
-    public static string? AskSectionName(IWin32Window? owner, string initial)
+    /// <param name="palette">The palette of the list it is asked from (studio theme issue 06).</param>
+    public static string? AskSectionName(IWin32Window? owner, string initial, Theme.Palette palette)
     {
-        using var form = new Form
+        using var form = SectionNameForm(initial, palette);
+        return form.ShowDialog(owner) == DialogResult.OK ? form.Controls[0].Controls.OfType<TextBox>().Single().Text : null;
+    }
+
+    /// <summary>The section name dialog, themed, not yet shown: its one text box is the name.</summary>
+    internal static Form SectionNameForm(string initial, Theme.Palette palette)
+    {
+        var form = new Form
         {
             Text = initial.Length == 0 ? "New section" : "Rename section",
             FormBorderStyle = FormBorderStyle.FixedDialog,
@@ -59,6 +67,7 @@ internal static class Dialogs
         form.Controls.Add(layout);
         form.AcceptButton = ok;
         form.CancelButton = cancel;
-        return form.ShowDialog(owner) == DialogResult.OK ? name.Text : null;
+        Theme.StudioTheme.Apply(form, palette);
+        return form;
     }
 }

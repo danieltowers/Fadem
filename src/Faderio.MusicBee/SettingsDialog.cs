@@ -3,6 +3,7 @@ using System.Windows.Forms;
 using Faderio.Core.Settings;
 using Faderio.Shell;
 using Faderio.Shell.Audio;
+using Faderio.Shell.Theme;
 
 namespace Faderio.MusicBee;
 
@@ -53,9 +54,10 @@ internal sealed class SettingsDialog : Form
     /// <param name="crossfadeSeconds">The default crossfade's length.</param>
     /// <param name="blankSeconds">What a blank fade duration plays.</param>
     /// <param name="replayGain">Which ReplayGain tracks play at.</param>
+    /// <param name="palette">The skin's palette (studio theme issue 06), or the built-in one.</param>
     public SettingsDialog(
         string? library, AudioOutputMode mode, string? device, IReadOnlyList<string> devices, string? musicBeesDevice, bool nowPlayingTab,
-        bool libraryOpen, bool crossfade, int crossfadeSeconds, int blankSeconds, ReplayGainMode replayGain)
+        bool libraryOpen, bool crossfade, int crossfadeSeconds, int blankSeconds, ReplayGainMode replayGain, Palette? palette = null)
     {
         Text = "faderio";
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -101,7 +103,7 @@ internal sealed class SettingsDialog : Form
         var nextStart = new Label
         {
             Text = "The mode applies when MusicBee next starts; the device when faderio next plays from stopped.",
-            AutoSize = true, ForeColor = SystemColors.GrayText,
+            AutoSize = true,
         };
 
         _nowPlayingTab = new CheckBox
@@ -110,7 +112,7 @@ internal sealed class SettingsDialog : Form
         };
         var nextVisit = new Label
         {
-            Text = "In place of MusicBee's own view, from the next visit to the tab.", AutoSize = true, ForeColor = SystemColors.GrayText,
+            Text = "In place of MusicBee's own view, from the next visit to the tab.", AutoSize = true,
         };
 
         // One parent, so the two choices exclude each other; N sits on the crossfade's line.
@@ -156,7 +158,7 @@ internal sealed class SettingsDialog : Form
         var inLibrary = new Label
         {
             Text = libraryOpen ? "Saved in the open library, as standalone faderio's Settings." : "Open a library to set these.",
-            AutoSize = true, ForeColor = SystemColors.GrayText,
+            AutoSize = true,
         };
 
         _ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Width = 80 };
@@ -199,6 +201,11 @@ internal sealed class SettingsDialog : Form
         rows.Controls.Add(buttons, 0, 10);
         rows.SetColumnSpan(buttons, 2);
         Controls.Add(rows);
+        foreach (var hint in new[] { nextStart, nextVisit, inLibrary })
+        {
+            StudioTheme.SetInk(hint, Ink.Dim);
+        }
+        StudioTheme.Apply(this, palette ?? Palette.Studio);
     }
 
     /// <summary>The folder chosen, or null when the box is blank.</summary>

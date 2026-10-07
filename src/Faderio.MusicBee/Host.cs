@@ -217,15 +217,17 @@ internal sealed class Host : IDisposable
         var nowPlayingTab = _chosen is null ? _pluginSettings.Settings.NowPlayingTab : _chosenNowPlayingTab;
         var libraryOpen = view.Library is { IsAvailable: true };
         var library = (_chosen is null ? null : _chosenLibrarySettings) ?? view.Settings;
+        // In the skin's colours, read now: the skin may have changed since the view was made.
+        var palette = ReadPalette();
         using var dialog = new SettingsDialog(
             shown.Library, shown.OutputMode, shown.OutputDevice, _devices(), _musicBeesDevice(), nowPlayingTab,
             libraryOpen, library.UnauthoredAdjacency == UnauthoredAdjacency.DefaultCrossfade, library.DefaultCrossfadeSeconds,
-            library.BlankDurationSeconds, library.ReplayGainMode);
+            library.BlankDurationSeconds, library.ReplayGainMode, palette);
         dialog.ChooseLibrary = selected =>
         {
             // Remove is at once (library chooser D6): list upkeep, not a setting to wait for Save.
             using var chooser = new LibraryChooser(
-                Engine.KnownLibraries, Engine.ForgetLibrary, start => Dialogs.ChooseLibraryFolder(dialog, start), selected);
+                Engine.KnownLibraries, Engine.ForgetLibrary, start => Dialogs.ChooseLibraryFolder(dialog, start), selected, palette);
             return ShowLibraryChooser(chooser, dialog) ? chooser.Chosen : null;
         };
         if (show(dialog))

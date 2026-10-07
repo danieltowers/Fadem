@@ -200,7 +200,8 @@ public sealed partial class HeadlessFormTests
         var row = manager._grid.Rows[RowOfOther(manager, "⚠ " + e)];
 
         Assert.Equal("→", row.Cells[0].Value);
-        Assert.Equal(SystemColors.GrayText, row.DefaultCellStyle.ForeColor);
+        Assert.Same(h.Form.Palette, Faderio.Shell.Theme.StudioTheme.PaletteOf(manager)); // in the host's palette (studio theme issue 06)
+        Assert.Equal(h.Form.Palette.Dim, row.DefaultCellStyle.ForeColor);
         Assert.Equal($"Not found where the store says: {e}", row.Cells[1].ToolTipText);
         Assert.All(manager._grid.Rows.Cast<DataGridViewRow>().Where(r => r != row),
             present => Assert.True(present.DefaultCellStyle.ForeColor.IsEmpty)); // not greyed

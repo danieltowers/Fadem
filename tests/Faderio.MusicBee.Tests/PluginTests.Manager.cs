@@ -188,7 +188,8 @@ public sealed partial class PluginTests
 
         Assert.Equal(2, manager._grid.Rows.Count);
         Assert.Equal("→", row.Cells[0].Value);
-        Assert.Equal(SystemColors.GrayText, row.DefaultCellStyle.ForeColor);
+        Assert.Same(view.Palette, Faderio.Shell.Theme.StudioTheme.PaletteOf(manager)); // in the skin's palette (studio theme issue 06)
+        Assert.Equal(view.Palette.Dim, row.DefaultCellStyle.ForeColor);
         Assert.Equal($"Not found where the store says: {c}", row.Cells[1].ToolTipText);
         Assert.Contains("⚠ " + c, manager._track.Items.Cast<object>().Select(i => i.ToString()));
 

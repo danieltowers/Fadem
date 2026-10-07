@@ -48,7 +48,7 @@ public sealed class LibraryChooserTests : IDisposable
         Assert.Equal(new[] { "Gigs", "Home", "Old" }, items.Select(i => i.Text));
         Assert.Equal(new[] { @"D:\Gigs", @"C:\Music\Home", @"E:\Old" }, items.Select(i => i.SubItems[1].Text));
         Assert.Equal(new[] { "", "open", "not found" }, items.Select(i => i.SubItems[2].Text));
-        Assert.Equal(SystemColors.GrayText, items[2].ForeColor);
+        Assert.Equal(Faderio.Shell.Theme.Palette.Studio.Dim, items[2].ForeColor); // dim, in the palette (studio theme issue 06)
         Assert.Equal(1, chooser._list.SelectedIndices[0]);
         Assert.StartsWith("Removing a library", chooser._hint.Text);
     });

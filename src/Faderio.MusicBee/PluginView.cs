@@ -379,6 +379,7 @@ internal sealed class PluginView : UserControl
         };
 
         Faderio.Shell.Theme.StudioTheme.Apply(this, Palette); // the studio look, in the skin's colours
+        Faderio.Shell.Theme.StudioTheme.Apply(_columns.Menu, Palette); // the header's menu, shown by itself (studio theme issue 06)
         ShowNotices();
         Render(_engine.View);
     }
@@ -682,7 +683,7 @@ internal sealed class PluginView : UserControl
     {
         if (_manager is null || _manager.IsDisposed)
         {
-            _manager = new TransitionManagerForm(_engine, EditFromManager, beforeSounding: StopMusicBeesPlayerIfSilent);
+            _manager = new TransitionManagerForm(_engine, EditFromManager, beforeSounding: StopMusicBeesPlayerIfSilent, palette: Palette);
         }
         _manager.Open(SelectedTrack());
         ShowTransitionManager(_manager);
@@ -748,7 +749,7 @@ internal sealed class PluginView : UserControl
         }
         if (_noticeList is null || _noticeList.IsDisposed)
         {
-            _noticeList = new NoticeListForm();
+            _noticeList = new NoticeListForm(Palette);
         }
         _noticeList.ShowEntries(_notices, selectLatest: true);
         ShowNoticeList(_noticeList);

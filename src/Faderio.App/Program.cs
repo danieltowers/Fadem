@@ -48,12 +48,15 @@ internal static class Program
         // exists: so the list is Core's own query on the machine's settings, and a removal its
         // own call. Cancelled, the app opens with no library: nothing is saved, and what is
         // queued still plays.
+        // The plugin's last read of MusicBee's skin, else the built-in (studio theme issue 01).
+        var palette = Faderio.Shell.Theme.Palette.ForMachine(machineFolder);
         var launch = LibraryLaunch.Resolve(libraryArgument, machine?.Settings.Library, Directory.Exists);
         var folder = launch.MustAsk
             ? LibraryChooser.Choose(
                 owner: null,
                 () => KnownLibrary.List(machine?.Settings ?? new MachineSettings(), open: null, Directory.Exists),
-                known => Forget(machine, known, notify))
+                known => Forget(machine, known, notify),
+                palette: palette)
             : launch.Folder;
         var library = folder is null ? null : Library.Open(folder);
 
@@ -69,8 +72,7 @@ internal static class Program
         // The title follows the library and the mode in use; the form renders both.
         var form = new MainForm(engine, sink, () => output.Mode,
             machineFolder is null ? null : Path.Combine(machineFolder, "window.json"),
-            // The plugin's last read of MusicBee's skin, else the built-in (studio theme issue 01).
-            Faderio.Shell.Theme.Palette.ForMachine(machineFolder));
+            palette);
         output.ModeChanged += () => form.BeginInvoke(() => form.Render());
         form.Shown += (_, _) =>
         {

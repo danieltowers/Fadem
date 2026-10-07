@@ -1,4 +1,5 @@
 using Faderio.Shell;
+using Faderio.Shell.Theme;
 using Faderio.Core.Settings;
 using Faderio.Shell.Audio;
 
@@ -47,7 +48,8 @@ internal sealed class SettingsForm : Form
     /// <param name="machine">This machine's settings to open on: the view's.</param>
     /// <param name="shown">The library's settings to open on: the view's.</param>
     /// <param name="inUse">The mode the output opened in, or null when none could be.</param>
-    public SettingsForm(MachineSettings machine, PlayerSettings shown, AudioOutputMode? inUse)
+    /// <param name="palette">The host's palette (studio theme issue 06), or the built-in one.</param>
+    public SettingsForm(MachineSettings machine, PlayerSettings shown, AudioOutputMode? inUse, Palette? palette = null)
     {
         _shownMachine = machine;
         _shownLibrary = shown;
@@ -64,7 +66,8 @@ internal sealed class SettingsForm : Form
         _outputMode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
         _outputMode.Items.AddRange(Enum.GetValues<AudioOutputMode>().Select(m => (object)new ModeItem(m)).ToArray());
         _outputMode.SelectedIndex = _outputMode.Items.IndexOf(new ModeItem(machine.OutputMode));
-        _nextLaunch = new Label { Text = "Applies at the next launch.", AutoSize = true, ForeColor = SystemColors.GrayText };
+        _nextLaunch = new Label { Text = "Applies at the next launch.", AutoSize = true };
+        StudioTheme.SetInk(_nextLaunch, Ink.Dim);
         _inUse = new Label { Text = Presenter.FmtModeInUse(machine.OutputMode, inUse), AutoSize = true };
 
         // One parent, so the two choices exclude each other; N sits on the crossfade's line.
@@ -137,6 +140,7 @@ internal sealed class SettingsForm : Form
         layout.Controls.Add(_libraryGroup, 0, 1);
         layout.Controls.Add(buttons, 0, 2);
         Controls.Add(layout);
+        StudioTheme.Apply(this, palette ?? Palette.Studio);
     }
 
     /// <summary>Whether the machine group now says other than it opened on: only then does OK

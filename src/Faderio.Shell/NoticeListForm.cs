@@ -1,4 +1,6 @@
 
+using Faderio.Shell.Theme;
+
 namespace Faderio.Shell;
 
 /// <summary>
@@ -13,7 +15,8 @@ internal sealed class NoticeListForm : Form
     internal readonly TextBox _detail;
     private readonly ColumnHeader _message;
 
-    public NoticeListForm()
+    /// <param name="palette">The host's palette (studio theme issue 06), or the built-in one.</param>
+    public NoticeListForm(Palette? palette = null)
     {
         Text = "faderio — notices";
         FormBorderStyle = FormBorderStyle.SizableToolWindow;
@@ -50,6 +53,8 @@ internal sealed class NoticeListForm : Form
 
         Controls.Add(_list);
         Controls.Add(_detail);
+        QueueRowStyle.Draw(_list, palette ?? Palette.Studio); // a selected row raised, the header in capitals
+        StudioTheme.Apply(this, palette ?? Palette.Studio);
         // A list without a handle keeps no selection, and the list is filled before it is first
         // shown, so the latest notice would open unselected.
         _ = _list.Handle;
