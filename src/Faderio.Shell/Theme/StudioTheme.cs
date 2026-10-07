@@ -4,6 +4,19 @@ using System.Runtime.InteropServices;
 
 namespace Faderio.Shell.Theme;
 
+/// <summary>What a control's text is, and so the role it is drawn in (studio theme issue 05).</summary>
+internal enum Ink
+{
+    /// <summary>Plain text, in Text.</summary>
+    Text,
+
+    /// <summary>A hint or a secondary line, in Dim.</summary>
+    Dim,
+
+    /// <summary>A refusal or a warning, in the accent: the look's one lit colour.</summary>
+    Warning,
+}
+
 /// <summary>
 /// The studio console look (studio theme issue 02), applied to a tree of controls in a
 /// <see cref="Palette"/>: the window in Chrome; lists, text boxes and dropdowns in recessed Wells;
@@ -20,6 +33,8 @@ internal static class StudioTheme
     {
         public Palette Palette = Palette.Studio;
         public bool On;
+        public bool Themed;
+        public Ink Ink;
     }
 
     /// <summary>Each themed control's palette, and a key's LED; gone with the control.</summary>
@@ -46,6 +61,22 @@ internal static class StudioTheme
         }
     }
 
+    /// <summary>Draws <paramref name="control"/>'s text in <paramref name="ink"/>'s role, now and
+    /// whenever it is themed: a hint in Dim, a refusal in the accent.</summary>
+    public static void SetInk(Control control, Ink ink)
+    {
+        var state = States.GetOrCreateValue(control);
+        state.Ink = ink;
+        control.ForeColor = InkOf(state.Palette, ink);
+    }
+
+    private static Color InkOf(Palette p, Ink ink) => ink switch
+    {
+        Ink.Dim => p.Dim,
+        Ink.Warning => p.Accent,
+        _ => p.Text,
+    };
+
     /// <summary>Whether <paramref name="key"/>'s LED is lit.</summary>
     public static bool IsLit(ButtonBase key) =>
         key is CheckBox { Appearance: Appearance.Button, Checked: true } || (States.TryGetValue(key, out var s) && s.On);
@@ -55,11 +86,12 @@ internal static class StudioTheme
 
     private static void Theme(Control control, Palette p)
     {
-        var first = !States.TryGetValue(control, out var state);
-        state ??= States.GetOrCreateValue(control);
+        var state = States.GetOrCreateValue(control);
+        var first = !state.Themed;
+        state.Themed = true;
         state.Palette = p;
 
-        control.ForeColor = p.Text;
+        control.ForeColor = InkOf(p, state.Ink);
         switch (control)
         {
             case ListView or TextBox or ComboBox or ListBox:
@@ -91,9 +123,15 @@ internal static class StudioTheme
                 }
                 break;
             case CheckBox or RadioButton:
-                ((ButtonBase)control).FlatStyle = FlatStyle.Flat;
-                ((ButtonBase)control).FlatAppearance.BorderColor = p.Dim;
-                ((ButtonBase)control).FlatAppearance.CheckedBackColor = control.BackColor;
+                var tick = (ButtonBase)control;
+                tick.FlatStyle = FlatStyle.Flat;
+                tick.FlatAppearance.BorderColor = p.Dim;
+                tick.FlatAppearance.CheckedBackColor = control.BackColor;
+                if (first)
+                {
+                    tick.Paint += PaintTick;
+                    tick.EnabledChanged += (_, _) => tick.Invalidate();
+                }
                 break;
             case TextBox box:
                 box.BorderStyle = BorderStyle.FixedSingle;
@@ -119,6 +157,9 @@ internal static class StudioTheme
             case SeekBar seek:
                 seek.Palette = p;
                 break;
+            case TrafficLight light:
+                light.Palette = p; // its ring and off state (studio theme issue 05)
+                break;
         }
         if (first)
         {
@@ -129,6 +170,14 @@ internal static class StudioTheme
             if (control is ListView list)
             {
                 EmptyGround.Attach(list);
+            }
+            if (control is TextBoxBase or Panel { BorderStyle: BorderStyle.FixedSingle })
+            {
+                Hairline.Attach(control);
+            }
+            if (control is ComboBox combo)
+            {
+                ComboFrame.Attach(combo);
             }
             control.ControlAdded += (_, e) =>
             {
@@ -180,22 +229,13 @@ internal static class StudioTheme
     /// <c>LVP_COLUMNDETAIL</c>), and no other dark list theme exists: the names it might be fall
     /// back to the light theme, white frame and all (studio theme issue 03).
     /// </summary>
-    private sealed class EmptyGround : NativeWindow
+    private sealed class EmptyGround : Hook
     {
         private readonly ListView _list;
 
-        private EmptyGround(ListView list) => _list = list;
+        private EmptyGround(ListView list) : base(list) => _list = list;
 
-        public static void Attach(ListView list)
-        {
-            var ground = new EmptyGround(list);
-            if (list.IsHandleCreated)
-            {
-                ground.AssignHandle(list.Handle);
-            }
-            list.HandleCreated += (_, _) => ground.AssignHandle(list.Handle);
-            list.HandleDestroyed += (_, _) => ground.ReleaseHandle();
-        }
+        public static void Attach(ListView list) => _ = new EmptyGround(list);
 
         protected override void WndProc(ref Message m)
         {
@@ -210,6 +250,218 @@ internal static class StudioTheme
             base.WndProc(ref m);
         }
     }
+
+    /// <summary>A window procedure ahead of a control's own, for as long as it has a handle.</summary>
+    private abstract class Hook : NativeWindow
+    {
+        protected Hook(Control control)
+        {
+            if (control.IsHandleCreated)
+            {
+                AssignHandle(control.Handle);
+            }
+            control.HandleCreated += (_, _) => AssignHandle(control.Handle);
+            control.HandleDestroyed += (_, _) => ReleaseHandle();
+        }
+    }
+
+    /// <summary>
+    /// A text box's or a bordered panel's one-pixel frame in Edge (studio theme issue 05). Windows
+    /// draws it in its window frame colour, in the non-client area that WinForms' colours do not
+    /// reach, and an edit control draws it again with its text; it is drawn over each time.
+    /// </summary>
+    private sealed class Hairline : Hook
+    {
+        private readonly Control _control;
+
+        private Hairline(Control control) : base(control) => _control = control;
+
+        public static void Attach(Control control) => _ = new Hairline(control);
+
+        protected override void WndProc(ref Message m)
+        {
+            base.WndProc(ref m);
+            // An edit control draws its frame again as it paints its text.
+            if (m.Msg is WM_NCPAINT or WM_PAINT)
+            {
+                var dc = GetWindowDC(Handle);
+                try
+                {
+                    Draw(dc);
+                }
+                finally
+                {
+                    _ = ReleaseDC(Handle, dc);
+                }
+            }
+            else if (m.Msg == WM_PRINT && ((long)m.LParam & PRF_NONCLIENT) != 0)
+            {
+                Draw(m.WParam);
+            }
+        }
+
+        private bool Bordered => _control switch
+        {
+            TextBoxBase box => box.BorderStyle == BorderStyle.FixedSingle,
+            Panel panel => panel.BorderStyle == BorderStyle.FixedSingle,
+            _ => false,
+        };
+
+        private void Draw(IntPtr dc)
+        {
+            if (dc == IntPtr.Zero || !Bordered || !States.TryGetValue(_control, out var state))
+            {
+                return;
+            }
+            using var g = Graphics.FromHdc(dc);
+            using var edge = new Pen(state.Palette.Edge);
+            g.DrawRectangle(edge, 0, 0, _control.Width - 1, _control.Height - 1);
+        }
+    }
+
+    /// <summary>
+    /// A dropdown's frame and button on the Well, with its chevron in Text, or Dim while disabled
+    /// (studio theme issue 05). WinForms' flat combo draws them in system colours, a light grey
+    /// frame and button once it is disabled; they are drawn over once it has.
+    /// </summary>
+    private sealed class ComboFrame : Hook
+    {
+        private readonly ComboBox _combo;
+
+        private ComboFrame(ComboBox combo) : base(combo) => _combo = combo;
+
+        public static void Attach(ComboBox combo) => _ = new ComboFrame(combo);
+
+        protected override void WndProc(ref Message m)
+        {
+            base.WndProc(ref m);
+            if (m.Msg == WM_PAINT)
+            {
+                var dc = GetDC(Handle);
+                try
+                {
+                    Draw(dc);
+                }
+                finally
+                {
+                    _ = ReleaseDC(Handle, dc);
+                }
+            }
+            else if (m.Msg is WM_PRINT or WM_PRINTCLIENT)
+            {
+                Draw(m.WParam);
+            }
+        }
+
+        private void Draw(IntPtr dc)
+        {
+            if (dc == IntPtr.Zero || _combo.FlatStyle != FlatStyle.Flat || !States.TryGetValue(_combo, out var state))
+            {
+                return;
+            }
+            var p = state.Palette;
+            var w = _combo.Width;
+            var h = _combo.Height;
+            if (w < 8 || h < 8)
+            {
+                return;
+            }
+            using var g = Graphics.FromHdc(dc);
+            using (var well = new Pen(p.Well))
+            {
+                g.DrawRectangle(well, 1, 1, w - 3, h - 3);
+                g.DrawRectangle(well, 2, 2, w - 5, h - 5);
+            }
+            // The button, and the strip WinForms paints beside it.
+            var arrow = SystemInformation.HorizontalScrollBarArrowWidth;
+            var button = new Rectangle(w - arrow - 4, 1, arrow + 3, h - 2);
+            using (var ground = new SolidBrush(p.Well))
+            {
+                g.FillRectangle(ground, button);
+            }
+            using (var edge = new Pen(p.Edge))
+            {
+                g.DrawRectangle(edge, 0, 0, w - 1, h - 1);
+            }
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var cx = button.Left + button.Width / 2f;
+            var cy = h / 2f;
+            using var chevron = new Pen(_combo.Enabled ? p.Text : p.Dim, 1.5f);
+            g.DrawLines(chevron, new[] { new PointF(cx - 4, cy - 2), new PointF(cx, cy + 2), new PointF(cx + 4, cy - 2) });
+        }
+    }
+
+    /// <summary>A check box or radio button on its parent's ground: the box or circle on the
+    /// Well with a Dim rim, its mark in the accent, the text in its ink; all of it Dim while
+    /// disabled, so it reads as disabled but stays legible (studio theme issue 05). WinForms' flat
+    /// one draws its box in the system's window colour, white, and greys its text its own way.</summary>
+    private static void PaintTick(object? sender, PaintEventArgs e)
+    {
+        if (sender is not ButtonBase tick || !States.TryGetValue(tick, out var state))
+        {
+            return;
+        }
+        var p = state.Palette;
+        var g = e.Graphics;
+        g.Clear(tick.BackColor);
+        var size = (int)Math.Round(TickSize * tick.DeviceDpi / 96.0);
+        var y = (tick.Height - size) / 2;
+        var box = new Rectangle(0, y, size - 1, size - 1);
+        var mark = tick.Enabled ? p.Accent : p.Dim;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        using (var well = new SolidBrush(p.Well))
+        using (var rim = new Pen(tick.Enabled ? p.Dim : p.Raised))
+        {
+            if (tick is RadioButton radio)
+            {
+                g.FillEllipse(well, box);
+                g.DrawEllipse(rim, box);
+                if (radio.Checked)
+                {
+                    using var dot = new SolidBrush(mark);
+                    g.FillEllipse(dot, box.Left + 3, box.Top + 3, box.Width - 6, box.Height - 6);
+                }
+            }
+            else
+            {
+                g.SmoothingMode = SmoothingMode.None;
+                g.FillRectangle(well, box);
+                g.DrawRectangle(rim, box);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                if (tick is CheckBox { CheckState: not CheckState.Unchecked })
+                {
+                    using var pen = new Pen(mark, 2f);
+                    g.DrawLines(pen, new[]
+                    {
+                        new PointF(box.Left + 2.5f, box.Top + size / 2f),
+                        new PointF(box.Left + size * 0.42f, box.Bottom - 3f),
+                        new PointF(box.Right - 2.5f, box.Top + 3f),
+                    });
+                }
+            }
+        }
+        g.SmoothingMode = SmoothingMode.None;
+        var text = new Rectangle(size + TickGap, 0, Math.Max(0, tick.Width - size - TickGap), tick.Height);
+        var flags = TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.NoPadding;
+        if (!tick.UseMnemonic)
+        {
+            flags |= TextFormatFlags.NoPrefix;
+        }
+        var height = TextRenderer.MeasureText(g, tick.Text, tick.Font, new Size(text.Width, int.MaxValue), flags).Height;
+        text.Y = Math.Max(0, (tick.Height - height) / 2);
+        text.Height = Math.Min(tick.Height, height);
+        TextRenderer.DrawText(g, tick.Text, tick.Font, text, tick.Enabled ? tick.ForeColor : p.Dim, flags);
+        if (tick.Focused)
+        {
+            ControlPaint.DrawFocusRectangle(g, Rectangle.Inflate(text, 1, 0), p.Text, tick.BackColor);
+        }
+    }
+
+    /// <summary>A check box's box, and a radio button's circle, at 96 dpi; WinForms' flat one is 11.</summary>
+    private const int TickSize = 13;
+
+    /// <summary>Between the box and the text.</summary>
+    private const int TickGap = 4;
 
     /// <summary>A rounded key: a top-lit face from Key, an Edge outline and a shine along its
     /// top; Raised under the pointer; the LED at its top-right while on; the glyph in Dim while
@@ -314,6 +566,11 @@ internal static class StudioTheme
 
     private const int LVM_GETHEADER = 0x1000 + 31;
     private const int WM_ERASEBKGND = 0x0014;
+    private const int WM_PAINT = 0x000F;
+    private const int WM_NCPAINT = 0x0085;
+    private const int WM_PRINT = 0x0317;
+    private const int WM_PRINTCLIENT = 0x0318;
+    private const long PRF_NONCLIENT = 0x02;
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
 
     [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
@@ -321,6 +578,15 @@ internal static class StudioTheme
 
     [DllImport("user32.dll")]
     private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDC(IntPtr window);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindowDC(IntPtr window);
+
+    [DllImport("user32.dll")]
+    private static extern int ReleaseDC(IntPtr window, IntPtr dc);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);

@@ -1,5 +1,6 @@
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;
+using Faderio.Shell.Theme;
 
 using Point = Faderio.Core.Domain.Point;
 
@@ -31,7 +32,7 @@ internal sealed class TransitionEditorPanel : Panel
     private readonly Action? _beforeSounding;
 
     internal readonly Label _title;
-    internal readonly Label _light;
+    internal readonly TrafficLight _light;
     internal readonly ToolTip _lightTip = new();
     internal readonly RadioButton _editGlobal;
     internal readonly RadioButton _editPlaylist;
@@ -144,17 +145,7 @@ internal sealed class TransitionEditorPanel : Panel
         };
         // The traffic light (phase 6 issue 07): which of the adjacency's tracks is heard, at the
         // heading's right, so it takes no height of its own.
-        // Painted, not a glyph, so that it can be as large as the row allows without the font's
-        // line height clipping it. Its colour is its ForeColor.
-        _light = new Label { Dock = DockStyle.Right, Width = 32, Visible = false };
-        _light.Paint += (_, e) =>
-        {
-            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            var x = (_light.Width - LightDiameter) / 2f;
-            var y = (_light.Height - LightDiameter) / 2f;
-            using var brush = new SolidBrush(_light.ForeColor);
-            e.Graphics.FillEllipse(brush, x, y, LightDiameter, LightDiameter);
-        };
+        _light = new TrafficLight { Dock = DockStyle.Right, Width = 32, Visible = false };
         var heading = new Panel { Dock = DockStyle.Top, Height = 28 };
         heading.Controls.Add(_title);
         heading.Controls.Add(_light);
@@ -190,10 +181,10 @@ internal sealed class TransitionEditorPanel : Panel
         {
             AutoSize = true,
             MaximumSize = new Size(290, 0),
-            ForeColor = SystemColors.GrayText,
             Visible = false,
             Margin = new Padding(3, 0, 3, 0),
         };
+        StudioTheme.SetInk(_effective, Ink.Dim);
         layout.Controls.Add(_effective, 0, row);
         layout.SetColumnSpan(_effective, 2);
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -203,10 +194,10 @@ internal sealed class TransitionEditorPanel : Panel
         {
             AutoSize = true,
             MaximumSize = new Size(290, 0),
-            ForeColor = Color.Firebrick,
             Visible = false,
             Margin = new Padding(3, 0, 3, 6),
         };
+        StudioTheme.SetInk(_missing, Ink.Warning);
         layout.Controls.Add(_missing, 0, row);
         layout.SetColumnSpan(_missing, 2);
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -396,10 +387,10 @@ internal sealed class TransitionEditorPanel : Panel
         {
             AutoSize = true,
             MaximumSize = new Size(280, 0),
-            ForeColor = SystemColors.GrayText,
             Visible = false,
             Margin = new Padding(3, 0, 3, 0),
         };
+        StudioTheme.SetInk(hint, Ink.Dim);
         layout.Controls.Add(hint, 0, row);
         layout.SetColumnSpan(hint, 2);
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -409,10 +400,10 @@ internal sealed class TransitionEditorPanel : Panel
         {
             AutoSize = true,
             MaximumSize = new Size(280, 0),
-            ForeColor = Color.Firebrick,
             Visible = false,
             Margin = new Padding(3, 0, 3, 4),
         };
+        StudioTheme.SetInk(reason, Ink.Warning);
         layout.Controls.Add(reason, 0, row);
         layout.SetColumnSpan(reason, 2);
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -820,7 +811,7 @@ internal sealed class TransitionEditorPanel : Panel
             return;
         }
         var heard = _engine.Heard(_adjacency);
-        _light.ForeColor = LightColor(heard);
+        _light.Heard = heard;
         var words = Presenter.FmtHeard(heard, _adjacency);
         _light.AccessibleName = words;
         if (_lightTip.GetToolTip(_light) != words)
@@ -828,18 +819,6 @@ internal sealed class TransitionEditorPanel : Panel
             _lightTip.SetToolTip(_light, words);
         }
     }
-
-    /// <summary>The light's diameter in pixels: three times the "●" glyph it was first drawn
-    /// with, inside the heading's 28 px row, whose extra 2 px the curve row gave up.</summary>
-    internal const float LightDiameter = 27f;
-
-    internal static Color LightColor(AdjacencyHeard heard) => heard switch
-    {
-        AdjacencyHeard.Outgoing => Color.FromArgb(0x2E, 0xA0, 0x43),
-        AdjacencyHeard.Incoming => Color.FromArgb(0xF0, 0xA0, 0x00),
-        AdjacencyHeard.OtherTrack => Color.FromArgb(0xD0, 0x30, 0x30),
-        _ => SystemColors.GrayText,
-    };
 
     /// <summary>Undo and Redo live while the engine has a change to walk, and say which.</summary>
     private void ShowHistory(Button button, string verb, HistoryStep? step)

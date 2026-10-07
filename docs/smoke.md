@@ -108,6 +108,15 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       and their handles are the mark colour (red, or the text colour where the accent is red),
       and the scale is dim. The time readout is large, monospaced, in the accent and whole; the
       seconds under it are small and dim.
+- [ ] **The transition editor** (studio theme issue 05), with no boundary open and then open on
+      one: no white or system-grey box anywhere in it. The boxes are dark wells with a hairline
+      edge. **From end**, ● Global and ○ This playlist sit on the panel's own ground, their box
+      or circle on the well and ticked in the accent; greyed, they are dim but readable. The
+      heading is in the text colour, the hint lines ("Play *b* or preview to capture", the line
+      under the selector) are dim. − / + and −1 / +1 are small keys. The fade curve sits on the
+      well, its frame and button dark too, its chevron dim when greyed. The traffic light keeps
+      its green, amber and red, is dim when stopped, and has a dark ring. The editor's scroll
+      bar is the dark one.
 - [ ] Right-clicking a row shows "Edit transition: this → next" and "Edit transition: previous
       → this", and, only while repeat is on one, "Edit transition: this → this". All read
       clearly, and a disabled one looks disabled. With repeat off, this → next is disabled on
@@ -148,7 +157,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] With the editor open, an empty duration box shows in grey what it plays if left blank:
       the **Blank fade durations** setting (5 by default) in Global, and in This playlist the
       global's duration, or that setting where the global sets none. Typing over it shows the
-      typed value in black. Change the setting in **Settings…** with the editor open: the grey
+      typed value in the text colour. Change the setting in **Settings…** with the editor open: the grey
       value follows at once.
 - [ ] With no boundary open (at launch, and after **Open library…**), the editor reads "No
       boundary selected" and every field, **From end**, the curve, ● Global and ○ This playlist
@@ -156,7 +165,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] Ticking **From end** on a fade-out point of 3.5 on a 5 s track shows 1.5; unticking shows
       3.5 again. The fade curve lists Equal-power and Linear.
 - [ ] Saving a fade-out point past the end of its track stores nothing: the strip says "Not
-      saved", and the reason shows in red under the field, readable in full, without pushing
+      saved", and the reason shows in the accent under the field, readable in full, without pushing
       the buttons out of sight. The next good value clears it.
 - [ ] At the top of the editor, "Editing: ● Global ○ This playlist (*name*)". Switched to This
       playlist, the boxes are empty with the global values in grey, the curve reads "(global)",
@@ -190,7 +199,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       fade-out Capture comes live, its line goes, its tooltip reads "Capture *b*'s playhead";
       the fade-in one stays greyed. A preview of b → c makes both live.
 - [ ] The traffic light (phase 6 issue 07) sits at the editor's top right, on the heading's
-      line, hidden with no boundary open. Editor on b → c: grey when stopped, red while a plays,
+      line, hidden with no boundary open. Editor on b → c: dim when stopped, red while a plays,
       green while b plays, amber while c plays. Its tooltip says which ("Playing *b*, this
       transition's first track").
 - [ ] Beside each **point** box (not the durations) sit **−** and **+**. Each press moves the
@@ -528,8 +537,8 @@ which a background run cannot give.
       editor is docked at the right from the start, 340 px wide, reading "No boundary
       selected" with its fields greyed, and no Close bar; ✎ on row 1 fills it.
 - [ ] **A save and its notice.** Fade-out duration typed as "abc", Enter: the strip reads "Not
-      saved: …" with a **1 notice** link and no box appears; the reason shows in red under the
-      field. Typed as 3, Enter: "Saved tone-a-440 → tone-b-660." in the strip, ✎ on row 1 bold,
+      saved: …" with a **1 notice** link and no box appears; the reason shows in the accent under
+      the field. Typed as 3, Enter: "Saved tone-a-440 → tone-b-660." in the strip, ✎ on row 1 bold,
       and the library's `transitions.json` holds the 3 s fade-out duration, as standalone
       faderio would have saved it. **Undo** (and Ctrl+Z with focus in the editor) puts the
       duration back, "Undone: saved …"; **Redo** puts 3 back.
@@ -544,7 +553,11 @@ which a background run cannot give.
       its tooltip "Capture *b*'s playhead"; the fade-in one stays greyed.
 - [ ] **The traffic light** (phase 6 issue 07) at the editor's top right, beside the heading:
       red while row 1 plays with row 2's ✎ open, green while row 2 plays, amber while row 3
-      plays, grey when stopped.
+      plays, dim when stopped.
+- [ ] **The transition editor in the skin** (studio theme issue 05), in a main panel, with no
+      boundary open and then with row 1's ✎: as in standalone, no white or system-grey box; the
+      check box and radio buttons on the panel's ground, dim but readable when greyed; hint
+      lines dim; the fade curve dark; the traffic light dim when stopped, with a dark ring.
 - [ ] **Leaving the editor with a box being typed in** (a duration typed, not yet left), by
       **Close editor** in a sidebar or a click on another playlist in a main panel, asks
       nothing: the duration is saved ("Saved …" in the strip) and the editor goes.

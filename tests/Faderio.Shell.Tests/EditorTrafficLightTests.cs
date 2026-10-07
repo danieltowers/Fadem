@@ -5,6 +5,7 @@ using Faderio.Core.Domain;
 using Faderio.Core.Playback;
 using Faderio.Core.Tests;
 using Faderio.Shell;
+using Faderio.Shell.Theme;
 
 namespace Faderio.Shell.Tests;
 
@@ -22,7 +23,7 @@ public sealed class EditorTrafficLightTests
         var (editor, _) = Editing(tc, playing: 0);
 
         Assert.True(IsSetVisible(editor._light));
-        Assert.Equal(TransitionEditorPanel.LightColor(AdjacencyHeard.OtherTrack), editor._light.ForeColor);
+        Assert.Equal(AdjacencyHeard.OtherTrack, editor._light.Heard);
         Assert.Equal("Playing a track that is not in this transition", editor._lightTip.GetToolTip(editor._light));
     });
 
@@ -32,7 +33,7 @@ public sealed class EditorTrafficLightTests
         using var tc = TestEngine.Create();
         var (editor, bc) = Editing(tc, playing: 1);
 
-        Assert.Equal(TransitionEditorPanel.LightColor(AdjacencyHeard.Outgoing), editor._light.ForeColor);
+        Assert.Equal(AdjacencyHeard.Outgoing, editor._light.Heard);
         Assert.Equal($"Playing {bc.Outgoing.Title}, this transition's first track", editor._lightTip.GetToolTip(editor._light));
         Assert.Equal(editor._lightTip.GetToolTip(editor._light), editor._light.AccessibleName);
     });
@@ -43,7 +44,7 @@ public sealed class EditorTrafficLightTests
         using var tc = TestEngine.Create();
         var (editor, bc) = Editing(tc, playing: 2);
 
-        Assert.Equal(TransitionEditorPanel.LightColor(AdjacencyHeard.Incoming), editor._light.ForeColor);
+        Assert.Equal(AdjacencyHeard.Incoming, editor._light.Heard);
         Assert.Equal($"Playing {bc.Incoming.Title}, this transition's second track", editor._lightTip.GetToolTip(editor._light));
     });
 
@@ -51,10 +52,10 @@ public sealed class EditorTrafficLightTests
     public void TheColoursAreDistinct_AndStoppedIsGrey()
     {
         var colours = new[] { AdjacencyHeard.Nothing, AdjacencyHeard.OtherTrack, AdjacencyHeard.Incoming, AdjacencyHeard.Outgoing }
-            .Select(TransitionEditorPanel.LightColor).ToList();
+            .Select(h => TrafficLight.Colour(h, Palette.Studio)).ToList();
 
         Assert.Equal(4, colours.Distinct().Count());
-        Assert.Equal(SystemColors.GrayText, colours[0]);
+        Assert.Equal(Palette.Studio.Dim, colours[0]); // off, in the palette (studio theme issue 05)
     }
 
     [Fact]
