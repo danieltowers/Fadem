@@ -115,13 +115,17 @@ internal sealed class QueueRowStyle : IDisposable
     /// <summary>Has <paramref name="list"/>, a details view, drawn here: each cell in its own
     /// colours and font, aligned as its column, on the palette's Raised (or
     /// <see cref="RowMarks.Selected"/> with none) while its row is selected. The header is drawn
-    /// in the palette, or is the system's with none.</summary>
-    public static void Draw(ListView list, Theme.Palette? palette = null)
+    /// in the palette, or is the system's with none. With <paramref name="ownRowHeight"/> the rows
+    /// keep the list's own height (the playlists', studio theme issue 06), not the queue's.</summary>
+    public static void Draw(ListView list, Theme.Palette? palette = null, bool ownRowHeight = false)
     {
         list.OwnerDraw = true;
         // An image list's height sets the rows': the list has no other.
         var rows = new ImageList { ImageSize = new Size(1, RowHeight) };
-        list.SmallImageList = rows;
+        if (!ownRowHeight)
+        {
+            list.SmallImageList = rows;
+        }
         // The header's headings: small bold capitals (studio theme issue 03).
         var headings = new Font(list.Font.FontFamily, 7.5f, FontStyle.Bold);
         list.Disposed += (_, _) =>

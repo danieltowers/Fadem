@@ -27,8 +27,24 @@ internal sealed class PlaylistSidebar : Panel
     /// <summary>While a label is being edited the list is not re-rendered, which would end the edit.</summary>
     private bool _editing;
 
-    /// <summary>The colours its rows are drawn in (studio theme issue 02), or none for the system's.</summary>
-    public Theme.Palette? Palette { get; set; }
+    /// <summary>The colours its rows are drawn in (studio theme issue 02), or none for the system's.
+    /// With one, the list is drawn by <see cref="QueueRowStyle"/> (studio theme issue 06): drawn by
+    /// Windows, its selected row was the dark theme's blue while the list had focus, and Windows'
+    /// theme draws that from the row's state, whatever colours it is given.</summary>
+    public Theme.Palette? Palette
+    {
+        get => _palette;
+        set
+        {
+            _palette = value;
+            if (value is not null && !_list.OwnerDraw)
+            {
+                QueueRowStyle.Draw(_list, value, ownRowHeight: true);
+            }
+        }
+    }
+
+    private Theme.Palette? _palette;
 
     /// <param name="leaveEditor">Saves a box being typed in and empties the editor before the
     /// open playlist changes.</param>

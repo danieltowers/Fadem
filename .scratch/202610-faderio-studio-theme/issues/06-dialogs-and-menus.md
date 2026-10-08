@@ -113,9 +113,20 @@ MusicBee closed with nothing new in its error log. By screenshot:
 - **The menus**: the queue's, the header's (ticks in the accent, the locked # dim), the
   playlist's and the Section submenu are on the chrome, disabled items dim.
 
-Seen, not fixed (outside this issue):
-- **The playlist list's selection is Windows' blue (`#0E2A41`) while the list has focus**, as
-  after a click on a playlist; the open playlist is on Raised only while it does not. The list
-  is not owner drawn, so the native focused selection paints over the item's colour. Seen in
-  both hosts. Issue 03's surface.
-- The manager's current cell puts a light frame round its row header ("→" in row 1).
+Seen, then fixed the same day at the user's word:
+- **The playlist list's selection was Windows' blue (`#0E2A41`) while the list had focus**, as
+  after a click on a playlist. The list was drawn by Windows, and its dark theme draws the
+  selection from the row's state: clearing the selected state in custom draw left it blue (and
+  tried first, it lit the wrong row). `PlaylistSidebar` now has its list drawn by
+  `QueueRowStyle.Draw`, as the queue, the chooser and the notice list are, keeping the list's own
+  row height (`ownRowHeight`). The selected row is Raised, the open one bold in the accent.
+- **The manager's current cell had a light, dotted focus frame** (`#EDEDED`, round "→" in row
+  1). The theme now paints a grid's data cells without WinForms' focus frame; the selected row
+  on Raised says where the current one is.
+- Tests (`SelectionThemeTests`, on screen with focus cues on): a focused playlist's selected
+  row is Raised and not the theme's blue; the playlists keep their own row height; a focused
+  grid's empty current cell has nothing light in it. Each failed before its fix (the grid's on
+  net48 x86 only: on net8.0 the grid drew no focus cue in the test).
+- Looks, after a real click into each, in the App (Duophonic `palette.json`) and in MusicBee
+  (Duophonic, `libmb06` as above, settings restored): the playlist row Raised (`#3D3D3D`), the
+  manager's current cell unframed.

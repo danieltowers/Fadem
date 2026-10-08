@@ -677,7 +677,8 @@ internal static class StudioTheme
         style.SelectionForeColor = fore;
     }
 
-    /// <summary>A grid's heading, as the queue's header draws one; a button cell as a key.</summary>
+    /// <summary>A grid's heading, as the queue's header draws one; a button cell as a key; any
+    /// other cell as WinForms draws it, less its focus frame.</summary>
     private static void PaintGridCell(object? sender, DataGridViewCellPaintingEventArgs e)
     {
         if (sender is not DataGridView grid || !States.TryGetValue(grid, out var state) || e.Graphics is not { } g)
@@ -695,8 +696,12 @@ internal static class StudioTheme
             e.Handled = true;
             return;
         }
-        if (e.RowIndex != -1)
+        if (e.RowIndex >= 0)
         {
+            // Without WinForms' focus frame, a dotted near white box on the current cell: the
+            // selected row, on Raised, already says where it is (studio theme issue 06).
+            e.Paint(e.ClipBounds, DataGridViewPaintParts.All & ~DataGridViewPaintParts.Focus);
+            e.Handled = true;
             return;
         }
         using (var back = new SolidBrush(p.Well))
