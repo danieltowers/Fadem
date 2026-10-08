@@ -1,6 +1,6 @@
 # Spec — faderio v3: the studio console look, in MusicBee's skin colours
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Raised 2026-10-05: "the whole app, its just default windows bog standard at the moment. how do
@@ -57,7 +57,7 @@ The look is drawn only from a **palette**: ten roles, never a hard-coded colour.
 
 | Role | Used for | In MusicBee, read from (`Setting_GetSkinElementColour`) | Duophonic gives |
 |---|---|---|---|
-| Chrome | window, toolbars, seek bar ground | element 2, default, background: the colour MusicBee draws its own bars in | `#1C1C1C` |
+| Chrome | window, toolbars, seek bar ground | the colour MusicBee draws the strip above the panel in: element 2, default, background, or element 0, state 1, background, whichever is lighter on a light skin and darker on a dark one (2026-10-08) | `#1C1C1C` |
 | Well | queue, playlists, editor fields | element 16, default, border | `#121212` |
 | Edge | wells' hairlines, key edges, groove | Chrome, 45% toward black | `#0F0F0F` |
 | Key | button face | element 7 (input control), default, background | `#2C2C2C` |
@@ -80,7 +80,9 @@ not grey. It is the accent.
 - **Rules over the raw values.** A role whose read is black where its neighbours are not (an
   element a skin leaves out) falls back to the role it derives from: Well → Chrome, Edge →
   Chrome darkened, Key → Chrome lightened. An accent with too little saturation (a monochrome
-  skin with no highlight) falls back to amber `#FFB000`. Text that has too little contrast on
+  skin with no highlight), or one too close to the text to look lit (below 1.5:1), falls back to
+  amber `#FFB000`, or deep amber `#8A5000` on a light skin (2026-10-08). An accent without 3:1
+  on Well moves a fifth of the way toward Text until it has it. Text that has too little contrast on
   Well (below 4.5:1) is pushed to white or black. A light skin gives a light palette, and the
   same look works on it: keys, wells and LEDs are all drawn from the roles.
 - **When it is read.** The plugin reads the palette as its view is made, and again whenever
@@ -169,7 +171,7 @@ wish (their installed one left alone), with this build installed there.
 - Restored after: the portable's ini, and `%APPDATA%aderio\palette.json` (it holds the last
   skin read, so it held MusicBee3's light palette until restored).
 
-Found on both light skins (not fixed):
+Found on both light skins, and fixed the same day (below):
 1. **The accent is near black.** Element 7, state 4's foreground is `#330000` on CalciumMETRO
    and `#291212` on MusicBee3: saturated, so the monochrome fallback keeps it, but beside black
    Text it does not read as lit. The section labels, the LED readout and the playing row look
@@ -178,3 +180,28 @@ Found on both light skins (not fixed):
    `#FFB000` itself is weak on `#D7D7D7`, so a light palette may want a darker fallback.
 2. **CalciumMETRO's chrome leaves a seam:** the panel is `#BEBEBE` (element 2, background) but
    MusicBee draws its tab and header strips in `#EBEBEB`. Duophonic and MusicBee3 match.
+
+2026-10-08, both fixed, at the user's word ("use a deep amber").
+- **The near-black accent was ours, not the skins'.** A temporary probe build (never committed)
+  dumped every answer in the portable MusicBee: the raw accents are vivid, `#FF0000` on
+  CalciumMETRO and `#CD5C5C` on MusicBee3. The contrast rule meant to move an accent a fifth of
+  the way toward Text per step, but `Mix`'s arguments were the wrong way round, so one step kept
+  only a fifth of the accent: `#FF0000` → `#330000`. Fixed, the light skins keep their reds,
+  `#CC0000` and `#A44A4A`; Duophonic's `#CD5C5C` already reads and is unchanged.
+- **Deep amber `#8A5000`** (4.5:1 on CalciumMETRO's well) is the light skins' fallback, for a
+  grey accent and, new, for one too close to the text (below 1.5:1); amber stays the dark
+  skins'. Neither measured light skin needs it.
+- **The chrome:** MusicBee draws the strip above the panel in `#EBEBEB` on CalciumMETRO, which is
+  element 0, state 1 (the tab bar's), not element 2 (`#BEBEBE`). On MusicBee3 it is element 2's
+  white and element 0, state 1 is `#E6E6E6`; on Duophonic element 2's `#1C1C1C` against
+  `#202020`. So the host reads both (`SkinColours.Bars`, element 0, state 1, component 1) and
+  the palette takes the lighter on a light skin, the darker on a dark one. That rule fits the
+  three skins measured, no more.
+- Tests (`PaletteTests`): the light skins' measured answers give their reds and their chrome;
+  Duophonic's chrome holds with its element 0, state 1 added to its fixture; a grey or
+  text-like accent on a light skin is deep amber. All four failed on the old rules.
+- Looks, the portable MusicBee started on each light skin with this build: CalciumMETRO's labels,
+  readout and playing row red, and no seam against MusicBee's strip; MusicBee3's in its red,
+  chrome still white. The portable's ini and `palette.json` restored after; the installed
+  MusicBee untouched (its Duophonic skin file was copied into the portable for the probe, then
+  removed).

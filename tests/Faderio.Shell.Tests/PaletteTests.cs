@@ -23,7 +23,18 @@ public sealed class PaletteTests : IDisposable
 
     internal static readonly SkinColours Duophonic = new(
         Chrome: Argb(0x1C1C1C), Well: Argb(0x121212), Edge: 0, Key: Argb(0x2C2C2C),
-        Text: Argb(0xE1E1E1), Dim: Argb(0x6D6D6D), Accent: Argb(0xCD5C5C));
+        Text: Argb(0xE1E1E1), Dim: Argb(0x6D6D6D), Accent: Argb(0xCD5C5C), Bars: Argb(0x202020));
+
+    /// <summary>Two light skins, as the portable MusicBee answered a probe on 2026-10-08. MusicBee
+    /// draws the strip above the panel in <c>#EBEBEB</c> on CalciumMETRO and in white on
+    /// MusicBee3; MusicBee3 gives no text colour.</summary>
+    internal static readonly SkinColours CalciumMetro = new(
+        Chrome: Argb(0xBEBEBE), Well: Argb(0xD7D7D7), Edge: 0, Key: Argb(0xFFFFFF),
+        Text: Argb(0x787878), Dim: Argb(0x8C8C8C), Accent: Argb(0xFF0000), Bars: Argb(0xEBEBEB));
+
+    internal static readonly SkinColours MusicBee3 = new(
+        Chrome: Argb(0xFFFFFF), Well: Argb(0xDFDFDF), Edge: 0, Key: Argb(0xFFFFFF),
+        Text: 0, Dim: Argb(0x969696), Accent: Argb(0xCD5C5C), Bars: Argb(0xE6E6E6));
 
     private static string Hex(Color c) => Palette.Hex(c);
 
@@ -47,6 +58,47 @@ public sealed class PaletteTests : IDisposable
 
         Assert.Equal("#FFB000", Hex(p.Accent));
         Assert.Equal("#E0453A", Hex(p.Mark));
+    }
+
+    /// <summary>Light skins keep their own red, darkened only as far as it takes to read on their
+    /// wells: one step of 20% toward the text. The step once kept 20% of the accent instead, which
+    /// left both near black (<c>#330000</c>, <c>#291212</c>).</summary>
+    [Fact]
+    public void ALightSkinsRed_IsDarkenedOnlyUntilItReads()
+    {
+        var calcium = Palette.From(CalciumMetro);
+        var musicBee3 = Palette.From(MusicBee3);
+
+        Assert.False(calcium.IsDark);
+        Assert.Equal("#CC0000", Hex(calcium.Accent));
+        Assert.Equal("#A44A4A", Hex(musicBee3.Accent));
+        Assert.Equal("#000000", Hex(calcium.Text)); // its grey text, pushed to black on its well
+        Assert.Equal("#000000", Hex(musicBee3.Text)); // none given
+    }
+
+    /// <summary>The chrome meets the strip MusicBee draws above the panel. That strip is element 2's
+    /// colour on some skins and element 0's (state 1) on others; on every skin measured it is the
+    /// lighter of the two on a light skin and the darker on a dark one.</summary>
+    [Fact]
+    public void TheChrome_IsTheLighterBarOnALightSkin_AndTheDarkerOnADarkOne()
+    {
+        Assert.Equal("#EBEBEB", Hex(Palette.From(CalciumMetro).Chrome));
+        Assert.Equal("#FFFFFF", Hex(Palette.From(MusicBee3).Chrome));
+        Assert.Equal("#1C1C1C", Hex(Palette.From(Duophonic).Chrome));
+    }
+
+    [Fact]
+    public void AGreyAccent_OnALightSkin_IsDeepAmber()
+    {
+        Assert.Equal("#8A5000", Hex(Palette.From(CalciumMetro with { Accent = Argb(0x9A9A9A) }).Accent));
+    }
+
+    /// <summary>An accent that reads on the well but not beside the text: lit and plain would look alike.</summary>
+    [Fact]
+    public void AnAccentTooCloseToTheText_IsAmber_OrDeepAmberOnALightSkin()
+    {
+        Assert.Equal("#8A5000", Hex(Palette.From(CalciumMetro with { Accent = Argb(0x200000) }).Accent));
+        Assert.Equal("#FFB000", Hex(Palette.From(Duophonic with { Accent = Argb(0xFFC0C0), Text = Argb(0xF0F0F0) }).Accent));
     }
 
     [Fact]

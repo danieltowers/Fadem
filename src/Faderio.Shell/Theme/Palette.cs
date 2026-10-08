@@ -6,9 +6,10 @@ namespace Faderio.Shell.Theme;
 /// <summary>
 /// What a skin says, before any rule: each as MusicBee answers <c>Setting_GetSkinElementColour</c>,
 /// an ARGB value, or 0 where the skin does not answer (studio theme issue 01). The plugin reads
-/// them; a host with no skin has none.
+/// them; a host with no skin has none. <paramref name="Bars"/> is the other colour MusicBee may draw
+/// its bars in (light-skin fix, 2026-10-08).
 /// </summary>
-internal sealed record SkinColours(int Chrome, int Well, int Edge, int Key, int Text, int Dim, int Accent)
+internal sealed record SkinColours(int Chrome, int Well, int Edge, int Key, int Text, int Dim, int Accent, int Bars = 0)
 {
     /// <summary>No skin at all: every role falls back.</summary>
     public static SkinColours None { get; } = new(0, 0, 0, 0, 0, 0, 0);
@@ -17,8 +18,9 @@ internal sealed record SkinColours(int Chrome, int Well, int Edge, int Key, int 
 /// <summary>
 /// The colours the studio look is drawn in (studio theme spec, "The colours"): ten roles, never a
 /// fixed colour. Made from a skin's answers by <see cref="From"/>, whose rules keep any skin
-/// usable: a role the skin leaves out falls back to the one it derives from, a grey accent to
-/// amber, and text without contrast to white or black. <see cref="Studio"/> is the built-in one,
+/// usable: a role the skin leaves out falls back to the one it derives from, a grey accent (or
+/// one that looks like the text) to amber, deep amber on a light skin, and text without contrast
+/// to white or black. <see cref="Studio"/> is the built-in one,
 /// for a host with no skin. Kept as <c>palette.json</c> in the App's machine folder, where the
 /// plugin writes what it last read so the App on the same machine looks alike.
 /// </summary>
@@ -29,6 +31,10 @@ internal sealed record Palette(
     public const string FileName = "palette.json";
 
     private static readonly Color Amber = Color.FromArgb(0xFF, 0xB0, 0x00);
+
+    /// <summary>The fallback accent on a light skin, where amber itself is too pale to read:
+    /// 4.5:1 on CalciumMETRO's well.</summary>
+    private static readonly Color DeepAmber = Color.FromArgb(0x8A, 0x50, 0x00);
     private static readonly Color Red = Color.FromArgb(0xE0, 0x45, 0x3A);
 
     /// <summary>The built-in palette: the prototype's studio console, graphite and amber.</summary>
@@ -48,6 +54,12 @@ internal sealed record Palette(
         }
         var chrome = Answered(skin.Chrome) ?? Answered(skin.Well) ?? Color.FromArgb(0x2A, 0x2D, 0x33);
         var dark = Luminance(chrome) < 0.18;
+        // MusicBee draws the strip above the panel in one of two colours, by skin: on every skin
+        // measured it is the lighter of them on a light skin and the darker on a dark one.
+        if (Answered(skin.Bars) is { } bars && (dark ? Luminance(bars) < Luminance(chrome) : Luminance(bars) > Luminance(chrome)))
+        {
+            chrome = bars;
+        }
         var well = Answered(skin.Well) ?? Shade(chrome, dark ? -0.15 : 0.04);
         var edge = Answered(skin.Edge) ?? Shade(chrome, -0.45);
         var key = Answered(skin.Key) ?? Shade(chrome, dark ? 0.08 : -0.06);
@@ -61,10 +73,15 @@ internal sealed record Palette(
         {
             dim = Mix(text, well, 0.5);
         }
-        var accent = Answered(skin.Accent) is { } a && Saturation(a) >= 0.25 ? a : Amber;
+        var fallback = dark ? Amber : DeepAmber;
+        var accent = Answered(skin.Accent) is { } a && Saturation(a) >= 0.25 ? a : fallback;
         for (var i = 0; i < 10 && Contrast(accent, well) < 3; i++)
         {
-            accent = Mix(accent, text, 0.2);
+            accent = Mix(text, accent, 0.2); // a fifth of the way toward the text
+        }
+        if (Contrast(accent, text) < 1.5)
+        {
+            accent = fallback; // lit and plain would look alike
         }
         var raised = Shade(key, dark ? 0.08 : -0.08);
         var fade = Mix(accent, chrome, 0.3);
