@@ -154,3 +154,27 @@ Replace the "stock look" assumptions in `docs/smoke.md`'s Looks halves.
 - Re-laying out any window: the look changes, the layout stays.
 
 ## Comments
+
+2026-10-08, the light-skin check (Smoke, MusicBee), in the **portable** MusicBee at the user's
+wish (their installed one left alone), with this build installed there.
+- **After a restart:** the portable started on Neutral\CalciumMETRO (set in its ini, closed).
+  The panel was in that skin's palette: chrome `#BEBEBE`, wells `#D7D7D7`, keys white, text
+  black, `IsDark` false. The section header, swatch and stripes read; `palette.json` was
+  rewritten with it.
+- **Live, no restart needed:** View → Skins → MusicBee3 while it ran. MusicBee rebuilt its
+  main window (a new handle), the plugin's view was made afresh and read the skin again, and the
+  panel came up in MusicBee3's palette (chrome `#FFFFFF`, wells `#DFDFDF`), blending with
+  MusicBee's white bars. So the spec's open question is answered: **MusicBee re-makes the panel
+  on a skin change; no restart.**
+- Restored after: the portable's ini, and `%APPDATA%aderio\palette.json` (it holds the last
+  skin read, so it held MusicBee3's light palette until restored).
+
+Found on both light skins (not fixed):
+1. **The accent is near black.** Element 7, state 4's foreground is `#330000` on CalciumMETRO
+   and `#291212` on MusicBee3: saturated, so the monochrome fallback keeps it, but beside black
+   Text it does not read as lit. The section labels, the LED readout and the playing row look
+   black; the playing row barely stands out. A rule for an accent too close to Text in
+   lightness (or contrast) would send it to a fallback that reads on a light Well; amber
+   `#FFB000` itself is weak on `#D7D7D7`, so a light palette may want a darker fallback.
+2. **CalciumMETRO's chrome leaves a seam:** the panel is `#BEBEBE` (element 2, background) but
+   MusicBee draws its tab and header strips in `#EBEBEB`. Duophonic and MusicBee3 match.
