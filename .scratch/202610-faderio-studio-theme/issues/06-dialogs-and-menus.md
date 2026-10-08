@@ -1,6 +1,6 @@
 # 06: Dialogs and menus
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02
 
 Shell and both hosts. See the [spec](../spec.md), "Every window and dialog" and "Menus".
@@ -26,7 +26,7 @@ Shell and both hosts. See the [spec](../spec.md), "Every window and dialog" and 
 
 - [x] Headless: each dialog listed, made with a palette, has no `SystemColors` back or fore colour
       left. Each menu's renderer is the palette's.
-- [ ] Looks, both hosts (App: done; MusicBee: not done, S: offline, see Comments): each dialog and each right-click menu, by screenshot, with no white or
+- [x] Looks, both hosts (App 2026-10-07; MusicBee 2026-10-08, see Comments): each dialog and each right-click menu, by screenshot, with no white or
       system-grey surface.
 - [x] `dotnet test` passes on net8.0 and net48 x86. The commit states both counts.
 
@@ -91,3 +91,31 @@ as it was found. To finish: reconnect S:, then check Configure…, its Choose…
 notice list, the section name dialog and the three menus in Duophonic.
 
 Tests: net8.0 Core 1152, Shell 202, App 192; net48 x86 Core 1131, Shell 202, MusicBee 106; 0 failed.
+
+2026-10-08, the MusicBee look, done. The installed MusicBee in Duophonic, opened on the user's
+"library" with S: connected (MusicBee's own library settings were rewritten at close, "temp"
+untouched). faderio's library was pointed for the run at a scratch one (`libmb06`): a playlist
+"Theme check" of two silent WAVs and one missing file, and the two pre-written transitions
+(one to a gone file). The plugin's `settings.json` was backed up first and restored after;
+MusicBee closed with nothing new in its error log. By screenshot:
+- **Configure's dialog**, opened from the view's ⚙, which runs the same `Host.Configure` as
+  Preferences' Configure… (same dialog, the skin read afresh): dark title bar, fields and
+  dropdowns on the Well, the tick and radio in the accent, hints dim, OK, Cancel and Choose…
+  as keys. **Its Choose…**: the chooser on the Well, its open row raised, small dim capital
+  headings, the hint dim, Remove from list a dimmed key. Both cancelled.
+- **The transition manager** (queue menu, Transitions…): capital headings, cells on the Well,
+  the legend dim, the gone row dim, Preview and Preview global as keys, dark title bar.
+- **The notice list**, from the strip's "1 notice" in the accent (opening the playlist refused
+  the missing file): small capital headings, the row raised, the detail on the Well with a dark
+  scroll bar. The status text is dim.
+- **The section name dialog** (Section → Start a section here…, cancelled; the playlist file
+  unchanged): dark title bar, the box on the Well, keys.
+- **The menus**: the queue's, the header's (ticks in the accent, the locked # dim), the
+  playlist's and the Section submenu are on the chrome, disabled items dim.
+
+Seen, not fixed (outside this issue):
+- **The playlist list's selection is Windows' blue (`#0E2A41`) while the list has focus**, as
+  after a click on a playlist; the open playlist is on Raised only while it does not. The list
+  is not owner drawn, so the native focused selection paints over the item's colour. Seen in
+  both hosts. Issue 03's surface.
+- The manager's current cell puts a light frame round its row header ("→" in row 1).
