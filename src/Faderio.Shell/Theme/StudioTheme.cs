@@ -367,7 +367,33 @@ internal static class StudioTheme
             base.WndProc(ref m);
         }
 
+        /// <summary>Draws the header on an opaque bitmap, then copies it to the list: Windows fades a
+        /// header under the mouse in and out in a buffer with an alpha channel, where GDI's text
+        /// leaves the alpha at nought, so a header drawn straight onto it flickered (2026-10-09).</summary>
         private void Draw(IntPtr dc, Rectangle header, ListViewGroup group, Palette p, bool focused)
+        {
+            if (header.Width <= 0 || header.Height <= 0)
+            {
+                return;
+            }
+            using var buffer = new Bitmap(header.Width, header.Height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            using (var g = Graphics.FromImage(buffer))
+            {
+                var bufferDc = g.GetHdc();
+                try
+                {
+                    DrawOpaque(bufferDc, new Rectangle(Point.Empty, header.Size), group, p, focused);
+                }
+                finally
+                {
+                    g.ReleaseHdc(bufferDc);
+                }
+            }
+            using var target = Graphics.FromHdc(dc);
+            target.DrawImageUnscaled(buffer, header.Location);
+        }
+
+        private void DrawOpaque(IntPtr dc, Rectangle header, ListViewGroup group, Palette p, bool focused)
         {
             using (var g = Graphics.FromHdc(dc))
             using (var ground = new SolidBrush(_list.BackColor))

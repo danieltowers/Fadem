@@ -1,4 +1,6 @@
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using Faderio.Core.Playback;
 
 namespace Faderio.Shell;
@@ -120,6 +122,7 @@ internal sealed class QueueRowStyle : IDisposable
     public static void Draw(ListView list, Theme.Palette? palette = null, bool ownRowHeight = false)
     {
         list.OwnerDraw = true;
+        _ = new NoHotRow(list);
         // An image list's height sets the rows': the list has no other.
         var rows = new ImageList { ImageSize = new Size(1, RowHeight) };
         if (!ownRowHeight)
@@ -155,38 +158,56 @@ internal sealed class QueueRowStyle : IDisposable
             var left = e.ColumnIndex != 0 ? e.Bounds.X
                 : item.Bounds.X + list.Columns.Cast<ColumnHeader>().Where(c => c.DisplayIndex < column.DisplayIndex).Sum(c => c.Width);
             var bounds = new Rectangle(left, e.Bounds.Y, column.Width, e.Bounds.Height);
-            var back = item.Selected ? palette?.Raised ?? RowMarks.Selected : cell.BackColor;
-            using (var brush = new SolidBrush(back))
+            if (bounds.Width <= 0 || bounds.Height <= 0)
             {
-                e.Graphics.FillRectangle(brush, bounds);
+                return;
             }
-            // The row's image, a section's stripe in the queue, at the row's left edge and its full
-            // height: drawn here, since the list draws nothing of a row itself. The row is a pixel
-            // taller than its image; the image list's own stretch takes that pixel from the next
-            // image, so the image's own bitmap is stretched, pixel for pixel.
-            if (column.DisplayIndex == 0 && item.ImageIndex >= 0 && list.SmallImageList is { } images
-                && item.ImageIndex < images.Images.Count)
+            // The cell is drawn on an opaque bitmap, then copied to the list. In groups Windows fades
+            // the row under the mouse in and out, drawing it into a buffer with an alpha channel;
+            // GDI's text leaves that alpha at nought there, so a row drawn straight onto it showed
+            // no text while it faded, a flicker (2026-10-09).
+            using var buffer = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format24bppRgb);
+            using (var g = Graphics.FromImage(buffer))
             {
-                using var image = images.Images[item.ImageIndex];
-                var state = e.Graphics.Save();
-                e.Graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
-                e.Graphics.PixelOffsetMode = PixelOffsetMode.Half;
-                e.Graphics.DrawImage(image, new Rectangle(bounds.Left, bounds.Top, image.Width, bounds.Height));
-                e.Graphics.Restore(state);
+                DrawCell(g, new Rectangle(Point.Empty, bounds.Size));
             }
-            var align = list.Columns[e.ColumnIndex].TextAlign switch
+            e.Graphics.DrawImageUnscaled(buffer, bounds.Location);
+
+            void DrawCell(Graphics g, Rectangle area)
             {
-                HorizontalAlignment.Right => TextFormatFlags.Right,
-                HorizontalAlignment.Center => TextFormatFlags.HorizontalCenter,
-                _ => TextFormatFlags.Left,
-            };
-            // A centred cell is the ✎ button's: narrow, and never cut short.
-            var centred = align == TextFormatFlags.HorizontalCenter;
-            var text = centred ? bounds : Rectangle.Inflate(bounds, -4, 0);
-            TextRenderer.DrawText(
-                e.Graphics, cell.Text, cell.Font ?? list.Font, text, cell.ForeColor, back,
-                align | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine
-                | (centred ? TextFormatFlags.NoPadding : TextFormatFlags.EndEllipsis));
+                var back = item.Selected ? palette?.Raised ?? RowMarks.Selected : cell.BackColor;
+                using (var brush = new SolidBrush(back))
+                {
+                    g.FillRectangle(brush, area);
+                }
+                // The row's image, a section's stripe in the queue, at the row's left edge and its full
+                // height: drawn here, since the list draws nothing of a row itself. The row is a pixel
+                // taller than its image; the image list's own stretch takes that pixel from the next
+                // image, so the image's own bitmap is stretched, pixel for pixel.
+                if (column.DisplayIndex == 0 && item.ImageIndex >= 0 && list.SmallImageList is { } images
+                    && item.ImageIndex < images.Images.Count)
+                {
+                    using var image = images.Images[item.ImageIndex];
+                    g.InterpolationMode = InterpolationMode.NearestNeighbor;
+                    g.PixelOffsetMode = PixelOffsetMode.Half;
+                    g.DrawImage(image, new Rectangle(area.Left, area.Top, image.Width, area.Height));
+                    g.InterpolationMode = InterpolationMode.Default;
+                    g.PixelOffsetMode = PixelOffsetMode.Default;
+                }
+                var align = list.Columns[e.ColumnIndex].TextAlign switch
+                {
+                    HorizontalAlignment.Right => TextFormatFlags.Right,
+                    HorizontalAlignment.Center => TextFormatFlags.HorizontalCenter,
+                    _ => TextFormatFlags.Left,
+                };
+                // A centred cell is the ✎ button's: narrow, and never cut short.
+                var centred = align == TextFormatFlags.HorizontalCenter;
+                var text = centred ? area : Rectangle.Inflate(area, -4, 0);
+                TextRenderer.DrawText(
+                    g, cell.Text, cell.Font ?? list.Font, text, cell.ForeColor, back,
+                    align | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine
+                    | (centred ? TextFormatFlags.NoPadding : TextFormatFlags.EndEllipsis));
+            }
         };
     }
 
@@ -211,6 +232,38 @@ internal sealed class QueueRowStyle : IDisposable
         };
         TextRenderer.DrawText(e.Graphics, e.Header?.Text.ToUpperInvariant(), headings, Rectangle.Inflate(e.Bounds, -4, 0), palette.Dim,
             align | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+    }
+
+    /// <summary>
+    /// Keeps Windows from tracking the row under the mouse (2026-10-09). The rows are drawn here and
+    /// show no hover, but in groups Windows fades the row and the header under the mouse in and out
+    /// by its own drawing, its blue hover without the row's text, so a row flickered blank as the
+    /// mouse crossed it. Refusing <c>LVN_HOTTRACK</c> leaves no row hot and nothing to fade.
+    /// </summary>
+    private sealed class NoHotRow : NativeWindow
+    {
+        public NoHotRow(ListView list)
+        {
+            if (list.IsHandleCreated)
+            {
+                AssignHandle(list.Handle);
+            }
+            list.HandleCreated += (_, _) => AssignHandle(list.Handle);
+            list.HandleDestroyed += (_, _) => ReleaseHandle();
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_REFLECT_NOTIFY && Marshal.ReadInt32(m.LParam, 2 * IntPtr.Size) == LVN_HOTTRACK)
+            {
+                m.Result = (IntPtr)1;
+                return;
+            }
+            base.WndProc(ref m);
+        }
+
+        private const int WM_REFLECT_NOTIFY = 0x204E;
+        private const int LVN_HOTTRACK = -121;
     }
 
     /// <summary>Adds the speaker's column after every other, the ✎ button's included, and shows it
