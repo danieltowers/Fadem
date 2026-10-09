@@ -1,6 +1,6 @@
 # 05: The logo at the top right
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 03
 
 Phase 6, improvements round 2, both hosts. Raised 2026-10-09: "add fadem logo to top right. scale to
@@ -30,3 +30,19 @@ The product is being renamed to Fadem (public release issue 02); the art already
 - [ ] Crisp at 100 % and at 150 % display scaling; not stretched.
 - [ ] In MusicBee's sidebar it does not push the track's name to nothing; the name is cut short first.
 - [ ] Both images are embedded; the plugin's install is still `mb_faderio.dll` and `faderio\`.
+
+## Comments
+
+### 2026-10-09, built
+
+`Logo` in the shell, a control both hosts dock at the right: the App in a cell at the command
+row's right, level with its buttons; the plugin at the track's line's right, docked after the
+name, so the name ends in "…" before it. Both PNGs are embedded in `Faderio.Shell.dll`. The
+art's transparent margin is trimmed at load (it is about a fifth of the height), then scaled
+once, high-quality bicubic, to 22 px tall, about 61 px wide, and drawn pixel for pixel. The
+mark is in colour in both arts; only the wordmark is white or black.
+
+Not checked: 150 % scaling by eye. There the rows keep their fixed pixel heights, so the logo
+stays 22 px tall (crisp, smaller to the eye); its width follows the parent's height at layout,
+so the slot is never wider than the art (`LogoTests`, a short parent).
+

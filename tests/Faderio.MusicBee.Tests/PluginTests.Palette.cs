@@ -65,6 +65,35 @@ public sealed partial class PluginTests
         Assert.Equal(1, view.Controls.Cast<Control>().Where(c => c.Visible).Min(c => c.Top));
     });
 
+    /// <summary>Round 2 issue 05: the logo at the right of the track's line, white on a dark skin
+    /// and black on a light one, and in a sidebar the track's name is cut short before it.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TheLogo_IsAtTheTrackLinesRight_InTheArtForTheSkin(bool light) => RunSta(() =>
+    {
+        if (light)
+        {
+            _musicBee.Skin[(0, 0, 1)] = Opaque(0xF0F0F0);
+            _musicBee.Skin[(2, 0, 1)] = Opaque(0xFFFFFF);
+            _musicBee.Skin[(0, 0, 3)] = Opaque(0x202020);
+        }
+        else
+        {
+            AnswerDuophonic();
+        }
+        using var panel = new Panel { Size = new Size(284, 500) }; // MusicBee's sidebar as shipped
+        var view = PaletteView(panel);
+
+        Assert.Equal(!light, view.Palette.IsDark);
+        Assert.Equal(!light, view._logo.IsDark);
+        var line = view._logo.Parent!;
+        Assert.Same(line, view._attendedTrack.Parent);
+        Assert.Equal(line.ClientSize.Width, view._logo.Right);
+        Assert.Equal(view._logo.Left, view._attendedTrack.Right);
+        Assert.True(view._attendedTrack.Width > line.ClientSize.Width / 2); // the name keeps most of the line
+    });
+
     [Fact]
     public void ASkinThatAnswersNothing_GivesTheBuiltInPalette() => RunSta(() =>
     {

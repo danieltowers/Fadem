@@ -48,6 +48,7 @@ internal sealed class MainForm : Form
     internal readonly Button _openTransitions;
     internal readonly ToolStripButton _settings;
     internal readonly Button _openLibrary;
+    internal readonly Logo _logo;
     internal readonly Button _prev;
     internal readonly Button _playPause;
     internal readonly Button _next;
@@ -142,8 +143,18 @@ internal sealed class MainForm : Form
         _openTransitions = new Button { Text = "Transitions…", Width = 96, Height = 28, Margin = new Padding(16, 8, 4, 0) };
         _openLibrary = new Button { Text = "Open library…", Width = 100, Height = 28, Margin = new Padding(16, 8, 4, 0) };
         // The queue's own commands get a row of their own, so the seek bar keeps its travel.
-        var queueBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36, WrapContents = false };
-        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _importPlaylist, _exportPlaylist, _openTransitions, _openLibrary });
+        var queueButtons = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
+        queueButtons.Controls.AddRange(new Control[] { _addFiles, _addFolder, _importPlaylist, _exportPlaylist, _openTransitions, _openLibrary });
+        // The logo at the row's right (round 2 issue 05), level with the buttons; docked after
+        // them, so rightmost.
+        _logo = new Logo(Palette.IsDark) { Dock = DockStyle.Right, Margin = new Padding(0) };
+        var logoCell = new Panel { Dock = DockStyle.Right, Padding = new Padding(0, 8, 4, 0) };
+        logoCell.Controls.Add(_logo);
+        logoCell.Width = _logo.Width + logoCell.Padding.Horizontal;
+        _logo.Resize += (_, _) => logoCell.Width = _logo.Width + logoCell.Padding.Horizontal;
+        var queueBar = new Panel { Dock = DockStyle.Top, Height = 36 };
+        queueBar.Controls.Add(queueButtons);
+        queueBar.Controls.Add(logoCell);
         var symbols = new Font("Segoe UI Symbol", 9f);
         _prev = new Button { Text = "⏮", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };

@@ -51,6 +51,7 @@ internal sealed class PluginView : UserControl
     internal readonly PlaylistSidebar _playlists;
     internal readonly ListView _queueList;
     internal readonly Label _attendedTrack;
+    internal readonly Logo _logo;
     internal readonly Button _prev;
     internal readonly Button _playPause;
     internal readonly Button _stop;
@@ -316,6 +317,10 @@ internal sealed class PluginView : UserControl
         Controls.Add(buttons);
         var trackLine = new Panel { Dock = DockStyle.Top, Height = 26 };
         trackLine.Controls.Add(_attendedTrack);
+        // The logo at the top right (round 2 issue 05): docked after the name, so rightmost, and
+        // the name is cut short before it.
+        _logo = new Logo(Palette.IsDark) { Dock = DockStyle.Right };
+        trackLine.Controls.Add(_logo);
         Controls.Add(trackLine);
         Resize += (_, _) => FitWidth();
         FitWidth();

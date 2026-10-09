@@ -1221,6 +1221,23 @@ public sealed partial class HeadlessFormTests
         Assert.False(h.Form._syncEditor.Checked);
     });
 
+    /// <summary>Round 2 issue 05: the logo at the right of the top toolbar row, level with its
+    /// buttons, in the art for the palette (white on the dark built-in one).</summary>
+    [Fact]
+    public void TheLogo_IsAtTheRightOfTheToolbarRow() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var row = h.Form._addFiles.Parent!.Parent!;
+        row.Width = 1200;
+        row.PerformLayout();
+
+        Assert.True(h.Form._logo.IsDark);
+        Assert.Same(row, h.Form._logo.Parent!.Parent);
+        Assert.Equal(row.ClientSize.Width - 4, h.Form._logo.Parent.Left + h.Form._logo.Right);
+        Assert.True(h.Form._logo.Parent.Left >= h.Form._openLibrary.Right);
+        Assert.InRange(h.Form._logo.ArtSize.Height, 20, 24);
+    });
+
     /// <summary>Round 2 issue 03: Settings is a flat ⚙ at the status strip's far right, as in the
     /// plugin, and the toolbar has no Settings… button.</summary>
     [Fact]

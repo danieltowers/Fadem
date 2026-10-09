@@ -54,6 +54,9 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       button in the command row (settings are the **⚙** at the status strip's far right, round 2
       issue 03); choosing another folder in it empties the queue and
       the editor and puts that folder's name in the title.
+- [ ] **The logo** (round 2 issue 05): at the command row's right, level with its buttons, the
+      Fadem logo about 22 px tall, white lettering on a dark palette and black on a light one
+      (a `palette.json` in the `--machine=` folder gives a light one), crisp and not stretched.
 - [ ] **The library chooser** (library chooser issue 02). **Open library…** opens "Choose a
       library": the known libraries by Name and Folder, most recently opened first, the open one
       reading *open* and selected, and under the list "Removing a library from the list leaves
@@ -586,6 +589,9 @@ which a background run cannot give.
 - [ ] **A rule under MusicBee's strip** (round 2 issue 01): a one-pixel line in the palette's edge
       colour runs the full width of the plugin's top, between MusicBee's strip and the track's
       line, in the sidebar and in the Now Playing tab, on a dark and a light skin.
+- [ ] **The logo** (round 2 issue 05): at the right of the track's line, under the rule, the
+      Fadem logo about 22 px tall, white lettering on a dark skin and black on a light one. In
+      the sidebar a long track name ends in "…" before it, never under it.
 - [ ] **Section groups in the skin** (studio theme issue 07): a playlist with sections shows
       its headers as in standalone, in the skin's colours with no Windows blue; a double-click
       on a header collapses and expands it.

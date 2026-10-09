@@ -25,6 +25,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The logo (round 2 issue 05), embedded so neither host ships a file for it. -->
+    <EmbeddedResource Include="..\..\assets\logo-white.png" LogicalName="Faderio.Shell.logo-white.png" />
+    <EmbeddedResource Include="..\..\assets\logo-black.png" LogicalName="Faderio.Shell.logo-black.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The hosts compose the controls, and their tests reach them (ADR 0002, S5). -->
     <InternalsVisibleTo Include="faderio" /> <!-- the App: its assembly is named faderio -->
     <InternalsVisibleTo Include="Faderio.App.Tests" />
