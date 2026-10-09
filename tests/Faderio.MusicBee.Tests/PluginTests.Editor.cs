@@ -137,6 +137,36 @@ public sealed partial class PluginTests
         Assert.True(view._editor.ReasonFor(TransitionField.FadeOutDuration).Visible);
     });
 
+    /// <summary>Round 2 issue 02: Sync editor is the editor's. In a main panel it is at the right
+    /// of the editor's pane title; in a sidebar, where that title is hidden and the editor is a
+    /// page, it is on the page's Close bar, at the left.</summary>
+    [Fact]
+    public void SyncEditor_IsAtTheRightOfTheEditorsTitle_OrOnItsCloseBarInASidebar() => RunSta(() =>
+    {
+        AuthorLibrary();
+        ChooseLibrary(LibraryFolder);
+        Start();
+        Launched();
+        using var panel = new Panel { Size = new Size(1200, 600) };
+        _plugin.OnDockablePanelCreated(panel);
+        var view = View(panel);
+        view.Render();
+
+        Assert.Same(view._editorTitle, view._syncEditor.Parent);
+        Assert.Equal(DockStyle.Right, view._syncEditor.Dock);
+        Assert.True(view._syncEditor.Visible);
+
+        panel.Size = new Size(285, 330); // MusicBee's sidebar
+        view.EditTransitionAt(0);
+
+        Assert.Same(view._editorBar, view._syncEditor.Parent);
+        Assert.Equal(DockStyle.Left, view._syncEditor.Dock);
+        Assert.True(view._syncEditor.Visible);
+
+        panel.Size = new Size(1200, 600);
+        Assert.Same(view._editorTitle, view._syncEditor.Parent);
+    });
+
     [Fact]
     public void InASidebar_TheEditorIsHiddenUntilAnAdjacencyOpens_ThenTakesTheListsPlaceUnderItsCloseBar() => RunSta(() =>
     {

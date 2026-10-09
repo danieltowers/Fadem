@@ -70,8 +70,9 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       and in the title; Esc puts the old name back. A name another playlist has is refused with
       "Not renamed: …" in the strip, and the old name stays.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
-- [ ] The transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, a **Sync editor** checkbox, then −5 s, the seek
-      bar, +5 s and the time; no ⏹.
+- [ ] The transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, then −5 s, the seek bar, +5 s and the time; no ⏹.
+      The editor has a TRANSITION EDITOR pane title with the **Sync editor** checkbox at its
+      right (round 2 issue 02).
 - [ ] Between the buttons and the transport row, a line names the playing track in a larger
       font: its title and artist ("Title — Artist"), or its filename when untagged. It is blank
       at launch, keeps naming the track while paused, and goes blank when the queue is cleared or
@@ -490,9 +491,10 @@ which a background run cannot give.
       where this → next is authored (phase 5 issue 11), and row 1 marked at rest (🔈); the strip
       reading "Ready." and, at its right, "library · WASAPI shared at 48000 Hz on Speakers
       (…)", the device in use (phase 5 issue 13). In the
-      sidebar as shipped (284 px) the buttons fit one row, with **Sync editor** at the right
-      end of the playing track's line above them; in the sidebar it moves the editor only while
-      the editor's page is open, never taking the queue away. The playlists sit above the
+      sidebar as shipped (284 px) the buttons fit one row. **Sync editor** is at the right of the
+      TRANSITION EDITOR title in a main panel; in the sidebar it is at the left of the editor
+      page's Close editor bar (round 2 issue 02), and moves the editor only while that page is
+      open, never taking the queue away. The playlists sit above the
       queue, no column is off the edge, and the host line is cut short with its whole text as
       its tooltip.
 - [ ] **The queue's columns**, as the App's: a library with no layout of the plugin's shows #,

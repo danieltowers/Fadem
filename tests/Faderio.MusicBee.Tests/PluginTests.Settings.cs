@@ -420,7 +420,6 @@ public sealed partial class PluginTests
         _plugin.OnDockablePanelCreated(panel);
         var view = View(panel);
         Assert.Equal("faderio settings", view._tips.GetToolTip(view._openSettings));
-        Assert.Same(view._syncEditor.Parent, view._openSettings.Parent); // on the track's line, after Sync editor
         Assert.Equal(13.5f, view._openSettings.Font.Size); // half as big again as the strip's 9 pt
 
         string? opened = null;

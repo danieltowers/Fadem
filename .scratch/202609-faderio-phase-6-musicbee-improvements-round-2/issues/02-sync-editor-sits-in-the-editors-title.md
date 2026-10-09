@@ -1,6 +1,6 @@
 # 02: Sync editor sits at the right of the editor's title
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Phase 6, improvements round 2, both hosts. Raised 2026-10-09: "Move sync editor checkbox into far
@@ -28,3 +28,13 @@ and still one engine call per click. Its tooltip (`Presenter.SyncEditorTip`) is 
 - [ ] A long boundary name ends in "…" before the checkbox; the checkbox is never cut.
 - [ ] In MusicBee's sidebar (about 284 px) the title line still fits on one line.
 - [ ] Tests that find the checkbox by its old place updated; smoke items that name its place updated.
+
+## Comments
+
+### 2026-10-09, built
+
+The user chose the pane title row (TRANSITION EDITOR), not the boundary name's line, so the name
+and the traffic light keep theirs. The App gains that pane title. In the plugin's sidebar the title
+is hidden while the editor is a page, so Sync editor sits at the left of its Close editor bar
+there (`PlaceEditor`). The App's editor scrolls a little again at 1240 x 660: the title row is
+22 px.

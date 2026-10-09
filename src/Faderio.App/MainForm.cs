@@ -156,7 +156,8 @@ internal sealed class MainForm : Form
         _shuffle = new CheckBox { Text = "🔀", Visible = false, Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 44, Height = 28, Margin = new Padding(10, 8, 2, 4) };
         _repeat = new CheckBox { Text = "🔁", Visible = false, Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 44, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         // A plain checkbox, unlike the toggles: it plays nothing, it only moves the editor.
-        _syncEditor = new CheckBox { Text = "Sync editor", AutoCheck = false, AutoSize = true, Margin = new Padding(10, 12, 2, 4) };
+        // The editor's (round 2 issue 02): at the right of its pane title. Its own font, not the title's.
+        _syncEditor = new CheckBox { Text = "Sync editor", AutoCheck = false, AutoSize = true, Dock = DockStyle.Right, Font = Font };
         _tips = new ToolTip();
         _tips.SetToolTip(_syncEditor, Presenter.SyncEditorTip);
         _tips.SetToolTip(_transitionNow, "Transition now");
@@ -212,7 +213,6 @@ internal sealed class MainForm : Form
         transport.Controls.Add(_cueTransition, 4, 0);
         transport.Controls.Add(_shuffle, 5, 0);
         transport.Controls.Add(_repeat, 6, 0);
-        transport.Controls.Add(_syncEditor, 7, 0);
         var jumps = new TableLayoutPanel
         {
             ColumnCount = 1, RowCount = 2, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
@@ -311,12 +311,20 @@ internal sealed class MainForm : Form
         _playlists = new PlaylistSidebar(engine, LeaveEditor) { Palette = Palette };
         _playlistName = new PlaylistNameBar(engine) { Palette = Palette };
 
+        // The editor under its pane title, Sync editor at the title's right (round 2 issue 02).
+        var editorTitle = PaneTitle.Create("Transition editor");
+        editorTitle.Controls.Add(_syncEditor);
+        _editor.Dock = DockStyle.Fill;
+        var editorPane = new Panel { Dock = DockStyle.Right, Width = TransitionEditorPanel.DefaultWidth };
+        editorPane.Controls.Add(_editor);
+        editorPane.Controls.Add(editorTitle);
+
         // Docking order: the side panels and bottom strip first, then the name over the queue,
         // between them, and the fill-docked list last.
         Controls.Add(_queueList);
         Controls.Add(_playlistName);
         Controls.Add(_playlists);
-        Controls.Add(_editor);
+        Controls.Add(editorPane);
         Controls.Add(statusStrip);
         Controls.Add(transport);
         Controls.Add(_attendedTrack);

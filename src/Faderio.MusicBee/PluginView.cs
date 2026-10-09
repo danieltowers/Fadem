@@ -37,14 +37,14 @@ internal sealed class PluginView : UserControl
     private readonly System.Windows.Forms.Timer _timer;
     internal readonly ToolTip _tips;
     private readonly QueueRowStyle _rowStyle = new();
-    private readonly Panel _editorBar;
+    internal readonly Panel _editorBar;
 
     /// <summary>The queue and the editor, each under a title bar as the playlists are, so the
     /// three panes start level (phase 6). The editor's title shows only in a main panel: in a
     /// sidebar the editor's page has the Close bar over it.</summary>
     internal readonly Panel _queuePane;
     internal readonly Panel _editorPane;
-    private readonly Label _editorTitle;
+    internal readonly Label _editorTitle;
     internal readonly QueueDrag _queueDrag;
     internal readonly QueueSections _sections;
 
@@ -141,11 +141,11 @@ internal sealed class PluginView : UserControl
         _repeat = new CheckBox { Text = "🔁", Visible = false, Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 35, Height = 28, Margin = new Padding(1, 6, 1, 4) };
         _back5 = new Button { Text = "−5 s", Width = 48, Height = 28, Enabled = false };
         _forward5 = new Button { Text = "+5 s", Width = 48, Height = 28, Enabled = false };
-        // On the track's line, not the buttons' row: there, in a sidebar, it wraps to a row of its
-        // own, and the editor's page loses that height.
-        _syncEditor = new CheckBox { Text = "Sync editor", AutoCheck = false, AutoSize = true, Dock = DockStyle.Right, Padding = new Padding(0, 4, 4, 0) };
-        // faderio's settings without MusicBee's Preferences: at the top right, after Sync editor on
-        // the track's line, so it fits a sidebar. Flat, as a strip's button, at half as big again.
+        // The editor's (round 2 issue 02): at the right of its pane title, or on its Close bar in
+        // a sidebar, where the title is hidden (PlaceEditor). Its own font, not the title's.
+        _syncEditor = new CheckBox { Text = "Sync editor", AutoCheck = false, AutoSize = true, Dock = DockStyle.Right, Font = Font };
+        // faderio's settings without MusicBee's Preferences: at the top right, on the track's line,
+        // so it fits a sidebar. Flat, as a strip's button, at half as big again.
         _openSettings = new Button
         {
             Text = "⚙", Font = new Font("Segoe UI Symbol", 13.5f), FlatStyle = FlatStyle.Flat, Dock = DockStyle.Right,
@@ -323,7 +323,6 @@ internal sealed class PluginView : UserControl
         Controls.Add(buttons);
         var trackLine = new Panel { Dock = DockStyle.Top, Height = 26 };
         trackLine.Controls.Add(_attendedTrack);
-        trackLine.Controls.Add(_syncEditor);
         trackLine.Controls.Add(_openSettings); // docked first, so rightmost
         Controls.Add(trackLine);
         Resize += (_, _) => FitWidth();
@@ -556,6 +555,7 @@ internal sealed class PluginView : UserControl
             _editorPane.Width = TransitionEditorPanel.DefaultWidth;
             _editorPane.Visible = _editorTitle.Visible = true;
             _editorBar.Visible = false;
+            Hold(_syncEditor, _editorTitle, DockStyle.Right);
             _playlists.Visible = _queuePane.Visible = true;
             return;
         }
@@ -566,8 +566,20 @@ internal sealed class PluginView : UserControl
         _editorPane.Dock = DockStyle.Fill;
         _editorTitle.Visible = false;
         _editorBar.Visible = open;
+        Hold(_syncEditor, _editorBar, DockStyle.Left);
         _editorPane.Visible = open;
         _playlists.Visible = _queuePane.Visible = !open;
+    }
+
+    /// <summary>Puts <paramref name="control"/> in <paramref name="parent"/>, docked to
+    /// <paramref name="side"/>, unless it is there already.</summary>
+    private static void Hold(Control control, Control parent, DockStyle side)
+    {
+        if (control.Parent != parent)
+        {
+            parent.Controls.Add(control);
+        }
+        control.Dock = side;
     }
 
     /// <summary>The columns were made again, and the list emptied: every row is made again.</summary>

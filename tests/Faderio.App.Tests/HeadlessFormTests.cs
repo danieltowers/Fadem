@@ -1190,7 +1190,7 @@ public sealed partial class HeadlessFormTests
         // Ordinal: UI text comparison folds ⏹ and ⏸ together.
         Assert.DoesNotContain(transport.Controls.Cast<Control>(), c => string.Equals(c.Text, "⏹", StringComparison.Ordinal));
         Assert.Equal(
-            new[] { "⏮", "▶", "⏭", "⤳", "⏩", "🔀", "🔁", "Sync editor" },
+            new[] { "⏮", "▶", "⏭", "⤳", "⏩", "🔀", "🔁" }, // Sync editor is the editor's (round 2 issue 02)
             transport.Controls.OfType<ButtonBase>().OrderBy(transport.GetColumn).Select(c => c.Text).ToArray());
     });
 
@@ -1219,6 +1219,19 @@ public sealed partial class HeadlessFormTests
         Click(h.Form._syncEditor);
         h.Form.Render();
         Assert.False(h.Form._syncEditor.Checked);
+    });
+
+    /// <summary>Round 2 issue 02: Sync editor is the editor's, at the right of its pane title,
+    /// not on the transport's row.</summary>
+    [Fact]
+    public void SyncEditor_IsAtTheRightOfTheEditorsPaneTitle() => RunSta(() =>
+    {
+        using var h = new Harness();
+
+        Assert.IsType<PaneTitle.Title>(h.Form._syncEditor.Parent);
+        Assert.Equal(DockStyle.Right, h.Form._syncEditor.Dock);
+        Assert.Same(h.Form._editor.Parent, h.Form._syncEditor.Parent!.Parent); // the editor's pane
+        Assert.True(h.Form._syncEditor.Parent!.Bottom <= h.Form._editor.Top, "the title is not above the editor");
     });
 
     [Fact]
