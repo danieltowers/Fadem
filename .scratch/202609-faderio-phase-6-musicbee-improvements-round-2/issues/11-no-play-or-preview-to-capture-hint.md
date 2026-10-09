@@ -1,6 +1,6 @@
 # 11: No "Play … or preview to capture" hint
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Phase 6, improvements round 2, both hosts. Raised 2026-10-09: ""Play {TitleOf(track)} or preview
@@ -20,3 +20,9 @@ the Capture buttons' own tooltips ("Capture *b*'s playhead") stay.
 - [ ] Capture's tooltip unchanged.
 - [ ] Tests that read the hint's text are updated to check it is hidden; smoke items that name the
       hint updated.
+
+## Comments
+
+### 2026-10-09, built
+
+The hints are set as before but shown only with `CaptureHints`, false. Capture's tooltip unchanged.

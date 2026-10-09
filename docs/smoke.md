@@ -112,8 +112,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       one: no white or system-grey box anywhere in it. The boxes are dark wells with a hairline
       edge. **From end**, ● Global and ○ This playlist sit on the panel's own ground, their box
       or circle on the well and ticked in the accent; greyed, they are dim but readable. The
-      heading is in the text colour, the hint lines ("Play *b* or preview to capture", the line
-      under the selector) are dim. − / + and −1 / +1 are small keys. The fade curve sits on the
+      heading is in the text colour, the hint line under the selector is dim. − / + and −1 / +1 are small keys. The fade curve sits on the
       well, its frame and button dark too, its chevron dim when greyed. The traffic light keeps
       its green, amber and red, is dim when stopped, and has a dark ring. The editor's scroll
       bar is the dark one.
@@ -166,7 +165,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       another control.
 - [ ] All four parameter fields, the capture buttons, **From end** beside the fade-out point
       and the **Fade curve** list are visible without scrolling at the default window size.
-- [ ] Undo, Redo, Remove transition and Render are visible once the editor is open on an
+- [ ] Undo, Redo and Remove transition are visible (Render is hidden, round 2 issue 09) once the editor is open on an
       adjacency; there is no Save and no Revert. Undo and Redo are greyed until there is a
       change to walk, and their tooltips say which ("Undo: saved *a* → *b*"). Undo puts the
       field and the store back, opening the adjacency it changed if another is open; Redo puts
@@ -187,8 +186,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       the buttons out of sight. The next good value clears it.
 - [ ] At the top of the editor, "Editing: ● Global ○ This playlist (*name*)". Switched to This
       playlist, the boxes are empty with the global values in grey, the curve reads "(global)",
-      and **Remove override** sits under Remove transition, beside Render; Render stays in view
-      at the default window size. Typing one value shows it black among the grey; leaving the
+      and **Remove override** sits under Remove transition, in view at the default window size. Typing one value shows it black among the grey; leaving the
       box says "Saved *a* → *b* in *name*." and a grey line under the selector names what the
       playlist plays. **Remove override** says "Removed the override of …" and the line goes.
       Switching mode saves a box being typed in to the mode left; the next ✎ opens in the last
@@ -205,16 +203,16 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       Author a transition, rename one of its files and open the manager: the row reads
       "⚠ *path*", greyed, with a tooltip saying it was not found where the store says; the picker
       marks that track the same way. Double-click it: under the heading the editor says
-      "*file* is missing: this transition can be removed, not changed."; Preview, Render, capture
+      "*file* is missing: this transition can be removed, not changed."; Preview, capture
       and ± are greyed and the boxes read-only; Remove transition removes it and the row leaves the manager.
 - [ ] **Remove transition** says "Removed …" in the strip and empties the fields; **Undo**
       puts the transition back, "Undone: removed …".
 - [ ] Pressing capture writes a number into the field, and it is the number the time readout
       showed at that moment.
 - [ ] Capture reads the open transition's own tracks (phase 6 issue 06). Track a playing, the
-      editor on b → c: both Capture buttons greyed, the grey line under the fade-out point reads
-      "Play *b* or preview to capture", under the fade-in point the same for *c*. Play b: the
-      fade-out Capture comes live, its line goes, its tooltip reads "Capture *b*'s playhead";
+      editor on b → c: both Capture buttons greyed, and no line under either point (the "Play *b*
+      or preview to capture" hints are hidden, round 2 issue 11). Play b: the
+      fade-out Capture comes live, its tooltip reads "Capture *b*'s playhead";
       the fade-in one stays greyed. A preview of b → c makes both live.
 - [ ] The traffic light (phase 6 issue 07) sits at the editor's top right, on the heading's
       line, hidden with no boundary open. Editor on b → c: dim when stopped, red while a plays,
@@ -226,7 +224,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       or not a number.
 - [ ] Each **duration** box has the same four, laid out as a point's: **−** and **+** beside it,
       **−1** and **+1** under them. They stop at 0; a blank duration moves from the grey value it
-      plays. At the default 1240×660 the editor scrolls to reach Render.
+      plays. At the default 1240×660 the editor scrolls to reach its last row of buttons.
 - [ ] **Preview** and **Stop preview** sit together in the editor, Stop preview greyed out
       until a preview runs. While one runs, Preview reads **Preview again**, and the line under
       them shows the phase and each voice's position ("Pre-roll · outgoing 2:25", then
@@ -370,8 +368,9 @@ sharp percussive transient; the realism check is the authored boundary from the 
       falls silent — it does not jump to the incoming track early.
 - [ ] Seeking during the crossfade cancels the transition and the outgoing track continues
       alone.
-- [ ] Render this boundary; open the file; the fade starts at the same place it did in the
-      app.
+- [ ] *(Hidden since round 2 issue 09: the editor shows no Render this boundary button; skip
+      until it returns.)* Render this boundary; open the file; the fade starts at the same place
+      it did in the app.
 - [ ] Mid-song, preview a draft: the song stops, the outgoing track plays from 5 s before its
       fade-out point, through the transition and 5 s on, then silence. Capture a better fade-in
       point while the incoming track plays and press **Preview again**: the new point is heard.
@@ -546,8 +545,8 @@ which a background run cannot give.
 - [ ] **The editor in a sidebar** (phase 5 issue 11). No editor shows until ✎ on row 1 is
       clicked: then "tone-a-440 → tone-b-660" opens as a page in the lists' place, under the
       transport and a **Close editor** bar, with the authored values in its fields, Editing:
-      Global ticked, every field, From end, the curve, Preview, Remove transition and Render
-      live, Undo and Redo beside Remove transition, scrolling inside where the panel is short
+      Global ticked, every field, From end, the curve, Preview and Remove transition
+      live (Render hidden), Undo and Redo beside Remove transition, scrolling inside where the panel is short
       (MusicBee stacks its sidebar panels); at 284 px Undo / Redo / Remove transition wrap onto
       two rows rather than being cut off at the edge. **Close editor** empties it and brings the
       lists back, a box being typed in saved first, with no question.
@@ -566,9 +565,9 @@ which a background run cannot give.
       preview is ("Pre-roll · outgoing 0:05"). **Stop preview**: meter 0, the buttons as before.
       Then **▶** plays the queue from its start, and **⏹** stops it.
 - [ ] **Capture reads its own track** (phase 6 issue 06). Row 1 playing, the editor on row 2's
-      ✎: both Capture buttons greyed, a grey line under each point names its track ("Play *b*
-      or preview to capture"). Playing row 2 brings the fade-out Capture live, its line gone and
-      its tooltip "Capture *b*'s playhead"; the fade-in one stays greyed.
+      ✎: both Capture buttons greyed, with no line under either point (hints hidden, round 2
+      issue 11). Playing row 2 brings the fade-out Capture live, its tooltip "Capture *b*'s
+      playhead"; the fade-in one stays greyed.
 - [ ] **The traffic light** (phase 6 issue 07) at the editor's top right, beside the heading:
       red while row 1 plays with row 2's ✎ open, green while row 2 plays, amber while row 3
       plays, dim when stopped.

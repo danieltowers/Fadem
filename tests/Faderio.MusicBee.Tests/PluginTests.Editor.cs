@@ -165,7 +165,6 @@ public sealed partial class PluginTests
         Assert.True(view._editorPane.Top >= view._seek.Parent!.Bottom, "the editor covers the transport");
         Assert.True(view._editor.Height >= 150, $"the editor has only {view._editor.Height} px");
         // Nothing in the editor is cut off at this width: its button rows wrap instead.
-        Assert.True(view._editor._render.Right <= view._editor._render.Parent!.ClientSize.Width, "Render is off the edge");
         Assert.True(view._editor._remove.Right <= view._editor._remove.Parent!.ClientSize.Width, "Remove transition is off the edge");
 
         view.CloseEditor();

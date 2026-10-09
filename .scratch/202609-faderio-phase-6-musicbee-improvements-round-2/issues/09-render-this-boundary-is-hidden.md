@@ -1,6 +1,6 @@
 # 09: Render this boundary is hidden
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Phase 6, improvements round 2, both hosts. Raised 2026-10-09: "hide transition rendering button".
@@ -21,3 +21,10 @@ Rendering stays in the engine and its tests; only the button goes.
 - [ ] Shell and App tests that press the button set it visible first, or test the render through
       the panel's method; none skipped.
 - [ ] Smoke items that use Render are marked as hidden, not deleted.
+
+## Comments
+
+### 2026-10-09, built
+
+`_render` is built with `Visible = false`, still enabled with a boundary open; its row takes no
+height outside playlist mode, and the editor fits 1240 x 660 without a scroll.

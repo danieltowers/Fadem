@@ -226,7 +226,8 @@ internal sealed class TransitionEditorPanel : Panel
         _redo = new Button { Text = "Redo", Width = 72, Height = 30, Enabled = false };
         _remove = new Button { Text = "Remove transition", Width = 124, Height = 30, Enabled = false };
         _removeOverride = new Button { Text = "Remove override", Width = 124, Height = 30, Enabled = false, Visible = false };
-        _render = new Button { Text = "Render this boundary", Width = 160, Height = 30, Enabled = false };
+        // Hidden (round 2 issue 09), but built and wired, so it comes back with one line.
+        _render = new Button { Text = "Render this boundary", Width = 160, Height = 30, Enabled = false, Visible = false };
         _preview = new Button { Text = "Preview", Width = 110, Height = 30, Enabled = false };
         _stopPreview = new Button { Text = "Stop preview", Width = 110, Height = 30, Enabled = false };
         ButtonRow(layout, ref row, _preview, _stopPreview);
@@ -237,7 +238,7 @@ internal sealed class TransitionEditorPanel : Panel
         row++;
         ButtonRow(layout, ref row, _undo, _redo, _remove);
         // Remove override sits under Remove transition in playlist mode only (D21), in Render's
-        // row, so that Render stays in view at the default window size.
+        // row; with Render hidden, the row takes no height outside playlist mode.
         ButtonRow(layout, ref row, _render, _removeOverride);
 
         _captureOut.Click += (_, _) => CaptureFadeOut();
@@ -782,8 +783,12 @@ internal sealed class TransitionEditorPanel : Panel
     }
 
     /// <summary>A Capture button is live while the engine would find its track's voice, and its
-    /// tooltip names the track. Greyed on an adjacency that can be played, the line under its field
-    /// says what to play, since a disabled button shows no tooltip; a gone one has no line.</summary>
+    /// tooltip names the track. The line under its field, saying what to play while it is greyed,
+    /// is set but shown only with <see cref="CaptureHints"/>.</summary>
+    /// <summary>Whether the lines under the Capture fields show: hidden (round 2 issue 11), "not
+    /// helpful", kept for a later return.</summary>
+    private static readonly bool CaptureHints = false;
+
     private void ShowCapture(Button button, Label hint, CaptureSide side)
     {
         var track = _adjacency is { } a ? (side == CaptureSide.FadeOut ? a.Outgoing : a.Incoming) : null;
@@ -796,7 +801,7 @@ internal sealed class TransitionEditorPanel : Panel
             _captureTips.SetToolTip(button, tip);
         }
         hint.Text = track is null ? "" : Presenter.FmtCaptureHint(track);
-        hint.Visible = playable && !live;
+        hint.Visible = CaptureHints && playable && !live;
     }
 
     /// <summary>The traffic light: green while the open adjacency's outgoing track is heard,

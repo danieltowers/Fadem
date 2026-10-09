@@ -8,24 +8,23 @@ using Faderio.Shell;
 namespace Faderio.Shell.Tests;
 
 /// <summary>Phase 6 issue 06: each Capture button reads the open transition's own track, is live
-/// only while that track is heard, names it in its tooltip, and while greyed says under its field
-/// what to play. On each host's runtime, against a real engine.</summary>
+/// only while that track is heard and names it in its tooltip. The line under its field that said
+/// what to play while it was greyed is hidden (round 2 issue 11), kept for a later return. On each
+/// host's runtime, against a real engine.</summary>
 public sealed class EditorCapturesOwnTracksTests
 {
     private const int Second = 44100;
 
     [Fact]
-    public void AnotherTrackPlaying_BothCapturesGreyed_TheHintNamesTheTrack_AndAClickDoesNothing() => RunSta(() =>
+    public void AnotherTrackPlaying_BothCapturesGreyed_NoHintShown_AndAClickDoesNothing() => RunSta(() =>
     {
         using var tc = TestEngine.Create();
         var (editor, bc) = Editing(tc, playing: 0);
 
         Assert.False(editor._captureOut.Enabled);
         Assert.False(editor._captureIn.Enabled);
-        Assert.True(IsSetVisible(editor._captureOutHint));
-        Assert.Contains(bc.Outgoing.Title, editor._captureOutHint.Text);
-        Assert.True(IsSetVisible(editor._captureInHint));
-        Assert.Contains(bc.Incoming.Title, editor._captureInHint.Text);
+        Assert.False(IsSetVisible(editor._captureOutHint));
+        Assert.False(IsSetVisible(editor._captureInHint));
 
         Click(editor._captureOut);
 
@@ -43,13 +42,24 @@ public sealed class EditorCapturesOwnTracksTests
         Assert.Equal($"Capture {bc.Outgoing.Title}'s playhead", editor._captureTips.GetToolTip(editor._captureOut));
         Assert.False(IsSetVisible(editor._captureOutHint));
         Assert.False(editor._captureIn.Enabled);
-        Assert.True(IsSetVisible(editor._captureInHint));
-        Assert.Contains(bc.Incoming.Title, editor._captureInHint.Text);
+        Assert.False(IsSetVisible(editor._captureInHint));
 
         Click(editor._captureOut);
 
         Assert.Equal("2", editor._fadeOutPoint.Text);
         Assert.Equal(TimeSpan.FromSeconds(2), tc.Engine.Transition(bc).Global!.FadeOutPoint!.Position);
+    });
+
+    /// <summary>Round 2 issue 09: Render this boundary is hidden, but still built and wired, so it
+    /// comes live with a boundary open as it did and can come back with one line.</summary>
+    [Fact]
+    public void RenderThisBoundary_IsHidden_ButStillComesLive() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        var (editor, _) = Editing(tc, playing: 0);
+
+        Assert.False(IsSetVisible(editor._render));
+        Assert.True(editor._render.Enabled);
     });
 
     [Fact]
