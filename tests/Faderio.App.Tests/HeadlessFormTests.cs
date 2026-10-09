@@ -1221,21 +1221,25 @@ public sealed partial class HeadlessFormTests
         Assert.False(h.Form._syncEditor.Checked);
     });
 
-    /// <summary>Round 2 issue 05: the logo at the right of the top toolbar row, level with its
-    /// buttons, in the art for the palette (white on the dark built-in one).</summary>
+    /// <summary>Round 2 issue 05: the logo in a column at the top right, beside the command row
+    /// and the track's line, at its full 66 px (three times the line, 2026-10-10), in the art for
+    /// the palette (white on the dark built-in one).</summary>
     [Fact]
-    public void TheLogo_IsAtTheRightOfTheToolbarRow() => RunSta(() =>
+    public void TheLogo_IsAtTheTopRight_BesideTheCommandRowAndTheTracksLine() => RunSta(() =>
     {
         using var h = new Harness();
-        var row = h.Form._addFiles.Parent!.Parent!;
-        row.Width = 1200;
-        row.PerformLayout();
+        var header = h.Form._logo.Parent!;
+        header.Width = 1200;
+        header.PerformLayout();
 
         Assert.True(h.Form._logo.IsDark);
-        Assert.Same(row, h.Form._logo.Parent!.Parent);
-        Assert.Equal(row.ClientSize.Width - 4, h.Form._logo.Parent.Left + h.Form._logo.Right);
-        Assert.True(h.Form._logo.Parent.Left >= h.Form._openLibrary.Right);
-        Assert.InRange(h.Form._logo.ArtSize.Height, 20, 24);
+        Assert.Same(header, h.Form._addFiles.Parent!.Parent!.Parent);
+        Assert.Same(header, h.Form._attendedTrack.Parent!.Parent);
+        Assert.Equal(header.ClientSize.Width, h.Form._logo.Right);
+        Assert.Equal(0, h.Form._logo.Top);
+        Assert.Equal(h.Form._logo.Room, header.Height); // no taller than the logo needs
+        Assert.Equal(h.Form._logo.Room - 4, h.Form._logo.ArtSize.Height);
+        Assert.True(h.Form._attendedTrack.Parent.Right <= h.Form._logo.Left); // the name is cut short before it
     });
 
     /// <summary>Round 2 issue 03: Settings is a flat ⚙ at the status strip's far right, as in the

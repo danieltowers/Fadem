@@ -26,8 +26,22 @@ public sealed class LogoTests
         Assert.All(Wordmark(false), c => Assert.True(c.GetBrightness() < 0.05f, $"{c}"));
     }
 
+    /// <summary>Three times the top line's 22 px (2026-10-10), in a parent with room for it.</summary>
     [Fact]
-    public void OnTheTopLine_ItIsDrawnTwentyTwoPixelsTall_AtTheArtsProportions() => RunSta(() =>
+    public void WithRoom_ItIsDrawnSixtySixPixelsTall_AtTheArtsProportions() => RunSta(() =>
+    {
+        using var logo = new Logo(dark: true) { Dock = DockStyle.Right };
+        using var column = new Panel { Size = new Size(600, logo.Room) };
+        column.Controls.Add(logo);
+
+        Assert.Equal(logo.Room - 4, logo.ArtSize.Height); // 66 at 100 %
+        Assert.InRange((double)logo.ArtSize.Width / logo.ArtSize.Height, 2.5, 3.0); // the art's margin trimmed
+        Assert.Equal(logo.ArtSize.Width + 4, logo.Width);
+        Assert.Equal(column.Width, logo.Right);
+    });
+
+    [Fact]
+    public void OnATwentySixPixelLine_ItShrinksToTwentyTwo_AndTheNameEndsBeforeIt() => RunSta(() =>
     {
         using var line = new Panel { Size = new Size(300, 26) };
         using var name = new Label { Dock = DockStyle.Fill, Text = "A track", AutoEllipsis = true };
@@ -35,8 +49,7 @@ public sealed class LogoTests
         line.Controls.Add(name);
         line.Controls.Add(logo); // docked after the name, so rightmost
 
-        Assert.Equal(Logo.LogicalHeight, logo.ArtSize.Height); // 22, the line leaving room for no more at any scaling
-        Assert.InRange((double)logo.ArtSize.Width / logo.ArtSize.Height, 2.5, 3.0); // the art's margin trimmed
+        Assert.Equal(22, logo.ArtSize.Height);
         Assert.Equal(logo.ArtSize.Width + 4, logo.Width);
         Assert.Equal(line.Width, logo.Right);
         Assert.Equal(logo.Left, name.Right); // the name is cut short before it

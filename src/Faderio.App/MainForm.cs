@@ -143,18 +143,11 @@ internal sealed class MainForm : Form
         _openTransitions = new Button { Text = "Transitions…", Width = 96, Height = 28, Margin = new Padding(16, 8, 4, 0) };
         _openLibrary = new Button { Text = "Open library…", Width = 100, Height = 28, Margin = new Padding(16, 8, 4, 0) };
         // The queue's own commands get a row of their own, so the seek bar keeps its travel.
-        var queueButtons = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
-        queueButtons.Controls.AddRange(new Control[] { _addFiles, _addFolder, _importPlaylist, _exportPlaylist, _openTransitions, _openLibrary });
-        // The logo at the row's right (round 2 issue 05), level with the buttons; docked after
-        // them, so rightmost.
-        _logo = new Logo(Palette.IsDark) { Dock = DockStyle.Right, Margin = new Padding(0) };
-        var logoCell = new Panel { Dock = DockStyle.Right, Padding = new Padding(0, 8, 4, 0) };
-        logoCell.Controls.Add(_logo);
-        logoCell.Width = _logo.Width + logoCell.Padding.Horizontal;
-        _logo.Resize += (_, _) => logoCell.Width = _logo.Width + logoCell.Padding.Horizontal;
-        var queueBar = new Panel { Dock = DockStyle.Top, Height = 36 };
-        queueBar.Controls.Add(queueButtons);
-        queueBar.Controls.Add(logoCell);
+        var queueBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36, WrapContents = false };
+        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _importPlaylist, _exportPlaylist, _openTransitions, _openLibrary });
+        // The logo (round 2 issue 05) in a column of its own at the top right, beside the command
+        // row and the track's line, which it is about as tall as.
+        _logo = new Logo(Palette.IsDark) { Dock = DockStyle.Right };
         var symbols = new Font("Segoe UI Symbol", 9f);
         _prev = new Button { Text = "⏮", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
@@ -339,8 +332,16 @@ internal sealed class MainForm : Form
         Controls.Add(editorPane);
         Controls.Add(statusStrip);
         Controls.Add(transport);
-        Controls.Add(_attendedTrack);
-        Controls.Add(queueBar);
+        // The track's line takes what the logo's height leaves under the command row, so it
+        // meets the transport. The height before the line fills anything.
+        var header = new Panel { Dock = DockStyle.Top, Height = Math.Max(queueBar.Height + _attendedTrack.Height, _logo.Room) };
+        _attendedTrack.Dock = DockStyle.Fill;
+        var rows = new Panel { Dock = DockStyle.Fill };
+        rows.Controls.Add(_attendedTrack);
+        rows.Controls.Add(queueBar);
+        header.Controls.Add(rows);
+        header.Controls.Add(_logo); // docked after the rows, so rightmost
+        Controls.Add(header);
 
         _addFiles.Click += (_, _) => AddChosen(ChooseFiles);
         _addFolder.Click += (_, _) => AddChosen(ChooseFolders);

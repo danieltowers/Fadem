@@ -46,3 +46,13 @@ Not checked: 150 % scaling by eye. There the rows keep their fixed pixel heights
 stays 22 px tall (crisp, smaller to the eye); its width follows the parent's height at layout,
 so the slot is never wider than the art (`LogoTests`, a short parent).
 
+### 2026-10-10, three times the size
+
+The user: "logo should be 3x size". `Logo.LogicalHeight` is 66. A row could not hold that, so the
+logo has a column of its own at the top right: in the App beside the command row and the track's
+line (the header is 70 px, 8 more than the two rows; the track's line fills the extra, so it
+still meets the transport); in the plugin's main panel beside the track's line and the buttons
+(about 6 px more). In a sidebar the 182 px-wide logo would take most of the 284 px, so it stays
+on the track's line there, shrunk to 22 px. The App's editor, which already scrolled a little at
+1240 x 660, is 8 px shorter.
+

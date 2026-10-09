@@ -15,8 +15,9 @@ namespace Faderio.Shell;
 /// </summary>
 internal sealed class Logo : Control
 {
-    /// <summary>The logo's height at 100 % display scaling, in pixels.</summary>
-    public const int LogicalHeight = 22;
+    /// <summary>The logo's height at 100 % display scaling, in pixels: three times the top line's
+    /// 22, as the user asked (2026-10-10), so the hosts give it a column of its own.</summary>
+    public const int LogicalHeight = 66;
 
     /// <summary>The room kept above and below it, and at its right.</summary>
     private const int Inset = 2;
@@ -53,6 +54,9 @@ internal sealed class Logo : Control
             return new Size(WidthAt(height), height);
         }
     }
+
+    /// <summary>The height a parent gives it for the art at its full height, insets included.</summary>
+    public int Room => Scaled(LogicalHeight) + 2 * Inset;
 
     /// <summary>The embedded art for a dark palette (white) or a light one (black).</summary>
     internal static Bitmap Art(bool dark)

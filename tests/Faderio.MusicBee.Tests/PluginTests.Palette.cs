@@ -94,6 +94,23 @@ public sealed partial class PluginTests
         Assert.True(view._attendedTrack.Width > line.ClientSize.Width / 2); // the name keeps most of the line
     });
 
+    /// <summary>Round 2 issue 05, at three times the line (2026-10-10): in a main panel the logo is
+    /// a column of its own beside the track's line and the buttons, at its full height.</summary>
+    [Fact]
+    public void InAMainPanel_TheLogoIsAColumnBesideTheTracksLineAndTheButtons_AtFullHeight() => RunSta(() =>
+    {
+        AnswerDuophonic();
+        using var panel = new Panel { Size = new Size(1200, 700) };
+        var view = PaletteView(panel);
+
+        Assert.NotSame(view._logo.Parent, view._attendedTrack.Parent);
+        Assert.Equal(view.ClientSize.Width, view._logo.Right);
+        Assert.Equal(view._logo.Room - 4, view._logo.ArtSize.Height);
+        Assert.True(view._logo.Parent!.Height >= view._logo.Room);
+        Assert.True(view._attendedTrack.Parent!.Parent!.Right <= view._logo.Left);
+        Assert.True(view._playPause.Bottom + view._playPause.Parent!.Top <= view._logo.Bottom); // the buttons beside it
+    });
+
     [Fact]
     public void ASkinThatAnswersNothing_GivesTheBuiltInPalette() => RunSta(() =>
     {

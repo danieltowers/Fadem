@@ -52,6 +52,9 @@ internal sealed class PluginView : UserControl
     internal readonly ListView _queueList;
     internal readonly Label _attendedTrack;
     internal readonly Logo _logo;
+    private readonly Panel _header;
+    private readonly Panel _trackLine;
+    private readonly FlowLayoutPanel _buttons;
     internal readonly Button _prev;
     internal readonly Button _playPause;
     internal readonly Button _stop;
@@ -314,14 +317,20 @@ internal sealed class PluginView : UserControl
         Controls.Add(_editorBar);
         Controls.Add(statusStrip);
         Controls.Add(seekRow);
-        Controls.Add(buttons);
-        var trackLine = new Panel { Dock = DockStyle.Top, Height = 26 };
-        trackLine.Controls.Add(_attendedTrack);
-        // The logo at the top right (round 2 issue 05): docked after the name, so rightmost, and
-        // the name is cut short before it.
+        _trackLine = new Panel { Dock = DockStyle.Top, Height = 26 };
+        _trackLine.Controls.Add(_attendedTrack);
+        _buttons = buttons;
+        var rows = new Panel { Dock = DockStyle.Fill };
+        rows.Controls.Add(buttons);
+        rows.Controls.Add(_trackLine);
+        // The logo at the top right (round 2 issue 05): in a main panel a column of its own beside
+        // the track's line and the buttons; in a sidebar on the track's line, as tall as the line
+        // allows, so the buttons keep the sidebar's width (FitWidth).
         _logo = new Logo(Palette.IsDark) { Dock = DockStyle.Right };
-        trackLine.Controls.Add(_logo);
-        Controls.Add(trackLine);
+        _header = new Panel { Dock = DockStyle.Top };
+        _header.Controls.Add(rows);
+        Controls.Add(_header);
+        buttons.SizeChanged += (_, _) => FitHeader();
         Resize += (_, _) => FitWidth();
         FitWidth();
 
@@ -537,8 +546,28 @@ internal sealed class PluginView : UserControl
             _readoutColumn.Width = readout;
         }
         PlaceEditor();
+        // Docked last, so rightmost: past the name on the track's line, or past both rows.
+        Hold(_logo, narrow ? _trackLine : _header, DockStyle.Right);
+        FitHeader();
         var preferred = TextRenderer.MeasureText(_host.Text, _host.Font).Width + 8;
         _host.Width = Math.Max(0, Math.Min(preferred, ClientSize.Width / 2));
+    }
+
+    /// <summary>The track's line over the buttons, and as tall as the logo where it has its column.</summary>
+    private void FitHeader()
+    {
+        var rows = _trackLine.Height + _buttons.Height;
+        var height = _logo.Parent == _header ? Math.Max(rows, _logo.Room) : rows;
+        if (_header.Height != height)
+        {
+            _header.Height = height;
+        }
+        // The buttons' height can change inside the header's own layout, which does not run again
+        // for its new height: the logo takes it here.
+        if (_logo.Parent == _header && _logo.Height != _header.DisplayRectangle.Height)
+        {
+            _logo.Height = _header.DisplayRectangle.Height;
+        }
     }
 
     /// <summary>Puts the editor where the view's width wants it: at the right in a main panel,
