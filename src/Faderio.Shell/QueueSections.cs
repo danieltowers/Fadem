@@ -40,6 +40,10 @@ internal sealed class QueueSections : IDisposable
     /// <summary>The row the menu is for, found as it opened.</summary>
     private RowId? _menuRow;
 
+    /// <summary>Where a right-press on a header opened the menu, which it is for; null for a menu
+    /// opened any other way, which is for the row or header under the mouse.</summary>
+    private Point? _headerPress;
+
     public QueueSections(ListView list, PlaybackEngine engine)
     {
         _list = list;
@@ -47,6 +51,7 @@ internal sealed class QueueSections : IDisposable
         _own = list.SmallImageList;
         AskName = initial => Dialogs.AskSectionName(_list.FindForm(), initial, Theme.StudioTheme.PaletteOf(_list));
         Menu = new SectionMenu(engine, () => _engine.View.Queue.FirstOrDefault(r => r.Id == _menuRow), initial => AskName(initial));
+        _ = new HeaderClicks(this);
     }
 
     /// <summary>Shows <paramref name="view"/>'s sections on the list, whose items are its queue's
@@ -175,10 +180,64 @@ internal sealed class QueueSections : IDisposable
     /// the mouse, else for the one selected row.</summary>
     public void MenuOpening()
     {
-        _menuRow = HeaderRowAt(_list.PointToClient(Cursor.Position))
+        _menuRow = HeaderRowAt(_headerPress ?? _list.PointToClient(Cursor.Position))
             ?? (_list.SelectedItems.Count == 1 ? (RowId)_list.SelectedItems[0].Tag! : null);
+        _headerPress = null;
         Menu.Refresh();
     }
+
+    /// <summary>
+    /// What Windows does not do for a group's header (studio theme, 2026-10-09): it sends no
+    /// <c>WM_CONTEXTMENU</c> for a right-click there, so the menu never opened, and a click on the
+    /// chevron did not collapse the group. A right-press on a header opens the list's menu for that
+    /// section; a press at the header's right end, where the chevron is drawn, collapses or expands
+    /// it, the next render telling the engine. Either is answered here and kept from Windows, so a
+    /// collapse is never toggled twice. A double-click on the name is still Windows' own.
+    /// </summary>
+    private sealed class HeaderClicks : NativeWindow
+    {
+        private readonly QueueSections _owner;
+
+        public HeaderClicks(QueueSections owner)
+        {
+            _owner = owner;
+            var list = owner._list;
+            if (list.IsHandleCreated)
+            {
+                AssignHandle(list.Handle);
+            }
+            list.HandleCreated += (_, _) => AssignHandle(list.Handle);
+            list.HandleDestroyed += (_, _) => ReleaseHandle();
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            var list = _owner._list;
+            if (m.Msg is WM_RBUTTONDOWN or WM_LBUTTONDOWN or WM_LBUTTONDBLCLK && list.ShowGroups)
+            {
+                var at = new Point(unchecked((short)(long)m.LParam), unchecked((short)((long)m.LParam >> 16)));
+                if (ListGroups.HeaderAt(list, at) is { } group && group.Header.Length > 0)
+                {
+                    if (m.Msg == WM_RBUTTONDOWN && list.ContextMenuStrip is { } menu)
+                    {
+                        _owner._headerPress = at;
+                        menu.Show(list, at);
+                        return;
+                    }
+                    if (m.Msg != WM_RBUTTONDOWN && _owner.ChevronAt(at) is { } chevron)
+                    {
+                        ListGroups.SetCollapsed(list, chevron, !ListGroups.IsCollapsed(list, chevron));
+                        return;
+                    }
+                }
+            }
+            base.WndProc(ref m);
+        }
+    }
+
+    private const int WM_LBUTTONDOWN = 0x0201;
+    private const int WM_LBUTTONDBLCLK = 0x0203;
+    private const int WM_RBUTTONDOWN = 0x0204;
 
     /// <summary>The first row of the section whose header is at <paramref name="client"/>, which a
     /// right-click there opens the menu for; null off a header.</summary>
@@ -186,6 +245,17 @@ internal sealed class QueueSections : IDisposable
         _list.ShowGroups && ListGroups.HeaderAt(_list, client) is { } group && group.Items.Count > 0
             ? group.Items.Cast<ListViewItem>().OrderBy(i => i.Index).Select(i => (RowId)i.Tag!).First()
             : null;
+
+    /// <summary>The section's group whose chevron is at <paramref name="client"/>: the header's right
+    /// end, where the chevron is drawn, on a header that collapses; null anywhere else.</summary>
+    internal ListViewGroup? ChevronAt(Point client) =>
+        _list.ShowGroups && ListGroups.HeaderAt(_list, client) is { } group && group.Header.Length > 0
+        && client.X >= ListGroups.HeaderBounds(_list, group).Right - ChevronWidth && ListGroups.IsCollapsible(_list, group)
+            ? group
+            : null;
+
+    /// <summary>How far in from a header's right end a press is on its chevron.</summary>
+    private const int ChevronWidth = 32;
 
     /// <summary>What a group's header shows: a change to it is a new group.</summary>
     private static (SectionId?, string?) Heading(SectionView? section) => (section?.Id, section?.Name);

@@ -146,6 +146,87 @@ public sealed class QueueSectionsTests
         Assert.Null(sections.HeaderRowAt(new Point(20, endFirst.Top + 2)));
     });
 
+    /// <summary>Windows sends no <c>WM_CONTEXTMENU</c> for a right-click on a group's header, so the
+    /// menu never opened there; a right-press on one now opens it, for that section, with no row
+    /// selected.</summary>
+    [Fact]
+    public void ARightPressOnASectionsHeader_OpensTheMenu_ForThatSection() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        using var list = QueueOf(tc, 3);
+        using var sections = new QueueSections(list, tc.Engine);
+        using var menu = new ContextMenuStrip { Items = { sections.Menu.Root } };
+        var opened = 0;
+        menu.Opening += (_, _) =>
+        {
+            opened++;
+            sections.MenuOpening();
+        };
+        list.ContextMenuStrip = menu;
+        tc.Engine.StartSection(tc.View.Queue[1].Id, "Intro");
+        sections.Apply(tc.View);
+        var header = ListGroups.HeaderBounds(list, list.Groups[1]);
+
+        Press(list, WM_RBUTTONDOWN, new Point(40, header.Top + header.Height / 2));
+        menu.Close();
+
+        Assert.Equal(1, opened);
+        Assert.Empty(list.SelectedItems);
+        Assert.True(sections.Menu.Rename.Enabled); // the menu is for Intro
+    });
+
+    /// <summary>A click on the chevron did not collapse its group.</summary>
+    [Fact]
+    public void APressOnAHeadersChevron_CollapsesIt_AndAgainExpandsIt_AndTheEngineIsTold() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        using var list = QueueOf(tc, 3);
+        using var sections = new QueueSections(list, tc.Engine);
+        tc.Engine.StartSection(tc.View.Queue[1].Id, "Intro");
+        sections.Apply(tc.View);
+        var header = ListGroups.HeaderBounds(list, list.Groups[1]);
+        var chevron = new Point(header.Right - 16, header.Top + header.Height / 2);
+
+        Press(list, WM_LBUTTONDOWN, chevron);
+        sections.Apply(tc.View);
+        Assert.True(ListGroups.IsCollapsed(list, list.Groups[1]));
+        Assert.True(tc.View.Queue[1].Section!.Collapsed);
+
+        Press(list, WM_LBUTTONDOWN, chevron);
+        sections.Apply(tc.View);
+        Assert.False(ListGroups.IsCollapsed(list, list.Groups[1]));
+        Assert.False(tc.View.Queue[1].Section!.Collapsed);
+    });
+
+    /// <summary>Only the header's right end is the chevron: a press on the name is Windows' own,
+    /// and its double-click collapses as it always has.</summary>
+    [Fact]
+    public void OnlyAHeadersRightEnd_IsItsChevron() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        using var list = QueueOf(tc, 3);
+        using var sections = new QueueSections(list, tc.Engine);
+        tc.Engine.StartSection(tc.View.Queue[1].Id, "Intro");
+        sections.Apply(tc.View);
+        var header = ListGroups.HeaderBounds(list, list.Groups[1]);
+        var middle = header.Top + header.Height / 2;
+
+        Assert.Same(list.Groups[1], sections.ChevronAt(new Point(header.Right - 16, middle)));
+        Assert.Null(sections.ChevronAt(new Point(40, middle))); // the name
+        Assert.Null(sections.ChevronAt(new Point(header.Right - 16, list.Items[1].Bounds.Top + 4))); // a row below
+        Assert.Null(sections.ChevronAt(new Point(header.Right - 16, ListGroups.HeaderBounds(list, list.Groups[0]).Top + 4))); // the unheaded group
+    });
+
+    private const int WM_LBUTTONDOWN = 0x0201;
+    private const int WM_RBUTTONDOWN = 0x0204;
+
+    /// <summary>A mouse button message at <paramref name="at"/> in the list, as Windows sends one.</summary>
+    private static void Press(ListView list, int message, Point at) =>
+        SendMessage(list.Handle, message, (IntPtr)(message == WM_RBUTTONDOWN ? 2 : 1), (IntPtr)((at.Y << 16) | (at.X & 0xFFFF)));
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
     /// <summary>A details list of the engine's queue, <paramref name="rows"/> tones long, each
     /// item carrying its row's id as both hosts' queues do, laid out but never shown. Its groups
     /// need common controls 6, which <see cref="VisualStyles"/> turns on as the assembly loads.</summary>
