@@ -1,6 +1,6 @@
 # 01: A line between MusicBee and faderio
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Phase 6, improvements round 2, MusicBee only. Raised 2026-10-09: "add a boundary line at the top
@@ -20,3 +20,10 @@ whole width, in the sidebar and in the Now Playing tab alike.
 - [ ] Nothing below it moves by more than that pixel; the editor's height budget (memory: editor
       panel height budget) is not pushed into a scroll.
 - [ ] Looks smoke item for the MusicBee view extended to name the rule.
+
+## Comments
+
+### 2026-10-09, built
+
+The view keeps a pixel of top padding and paints it in Edge (`PluginView.OnPaint`). On the user's
+skin that is `#0F0F0F` on `#1C1C1C`, a subtle line; the user kept it as it is.

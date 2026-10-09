@@ -48,6 +48,23 @@ public sealed partial class PluginTests
         Assert.True(Palette.Load(file)!.Same(view.Palette));
     });
 
+    /// <summary>Round 2 issue 01: a one-pixel rule in the palette's Edge across the view's top, so
+    /// MusicBee's strip and faderio do not run together; the controls start under it.</summary>
+    [Fact]
+    public void TheViewsTop_IsARuleInEdge_TheFullWidth() => RunSta(() =>
+    {
+        AnswerDuophonic();
+        using var panel = new Panel { Size = new Size(900, 500) };
+        var view = PaletteView(panel);
+
+        using var bitmap = new Bitmap(view.Width, view.Height);
+        view.DrawToBitmap(bitmap, new Rectangle(Point.Empty, view.Size));
+
+        var edge = view.Palette.Edge.ToArgb();
+        Assert.All(Enumerable.Range(0, view.Width), x => Assert.Equal(edge, bitmap.GetPixel(x, 0).ToArgb()));
+        Assert.Equal(1, view.Controls.Cast<Control>().Where(c => c.Visible).Min(c => c.Top));
+    });
+
     [Fact]
     public void ASkinThatAnswersNothing_GivesTheBuiltInPalette() => RunSta(() =>
     {

@@ -114,6 +114,8 @@ internal sealed class PluginView : UserControl
         ShowTransitionManager = ShowModeless;
 
         Dock = DockStyle.Fill;
+        // A pixel at the top for the rule between MusicBee's strip and the view (OnPaint).
+        Padding = new Padding(0, 1, 0, 0);
         // Never ambient: unset, a dark skin's panel would turn the view's labels and buttons
         // dark-on-dark. The studio theme sets both from the skin's palette, at the end.
 
@@ -508,6 +510,15 @@ internal sealed class PluginView : UserControl
     /// a page in the lists' place while an adjacency is open, under its Close bar; the host line
     /// at its own width, or half the strip's when that is less, so the notice keeps the rest; the
     /// readout's column wide in a main panel, narrow in a sidebar.</summary>
+    /// <summary>A one-pixel rule in Edge across the top (round 2 issue 01), so MusicBee's strip and
+    /// the view do not run together. Painted here, in the padding the controls dock under.</summary>
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        using var rule = new Pen(Palette.Edge);
+        e.Graphics.DrawLine(rule, 0, 0, Width, 0);
+    }
+
     private void FitWidth()
     {
         var narrow = ClientSize.Width < NarrowWidth;

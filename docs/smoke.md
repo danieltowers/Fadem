@@ -580,6 +580,9 @@ which a background run cannot give.
       notice list and the section name dialog are in the skin's colours, with no white or
       system-grey surface. The queue's, header's and playlist's right-click menus are on
       MusicBee's chrome, with items in the text colour and ticks in the indian red accent.
+- [ ] **A rule under MusicBee's strip** (round 2 issue 01): a one-pixel line in the palette's edge
+      colour runs the full width of the plugin's top, between MusicBee's strip and the track's
+      line, in the sidebar and in the Now Playing tab, on a dark and a light skin.
 - [ ] **Section groups in the skin** (studio theme issue 07): a playlist with sections shows
       its headers as in standalone, in the skin's colours with no Windows blue; a double-click
       on a header collapses and expands it.
