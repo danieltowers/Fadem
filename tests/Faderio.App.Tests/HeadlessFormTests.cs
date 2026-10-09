@@ -1221,6 +1221,21 @@ public sealed partial class HeadlessFormTests
         Assert.False(h.Form._syncEditor.Checked);
     });
 
+    /// <summary>Round 2 issue 03: Settings is a flat ⚙ at the status strip's far right, as in the
+    /// plugin, and the toolbar has no Settings… button.</summary>
+    [Fact]
+    public void Settings_IsAGearAtTheStatusStripsRight_NotInTheToolbar() => RunSta(() =>
+    {
+        using var h = new Harness();
+
+        Assert.Equal("⚙", h.Form._settings.Text);
+        Assert.Equal("faderio settings", h.Form._settings.ToolTipText);
+        var strip = h.Form._settings.Owner!;
+        Assert.IsType<StatusStrip>(strip);
+        Assert.Same(h.Form._settings, strip.Items[strip.Items.Count - 1]);
+        Assert.DoesNotContain(h.Form._addFiles.Parent!.Controls.Cast<Control>(), c => c.Text.StartsWith("Settings"));
+    });
+
     /// <summary>Round 2 issue 02: Sync editor is the editor's, at the right of its pane title,
     /// not on the transport's row.</summary>
     [Fact]

@@ -46,7 +46,7 @@ internal sealed class MainForm : Form
     internal readonly Button _importPlaylist;
     internal readonly Button _exportPlaylist;
     internal readonly Button _openTransitions;
-    internal readonly Button _settings;
+    internal readonly ToolStripButton _settings;
     internal readonly Button _openLibrary;
     internal readonly Button _prev;
     internal readonly Button _playPause;
@@ -131,7 +131,9 @@ internal sealed class MainForm : Form
         _cancelAdd = new ToolStripButton("Cancel") { Available = false, DisplayStyle = ToolStripItemDisplayStyle.Text };
         // The clip light (build issue 17): dark until the engine latches a clip.
         _clip = new ToolStripStatusLabel { ForeColor = Palette.Dim, Margin = new Padding(8, 3, 0, 2) };
-        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _addProgress, _cancelAdd, _clip }, ShowItemToolTips = true };
+        // Settings: a flat ⚙ at the strip's far right, as in the plugin (round 2 issue 03).
+        _settings = SettingsGear.Create(() => EditSettings());
+        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _addProgress, _cancelAdd, _clip, _settings }, ShowItemToolTips = true };
 
         _addFiles = new Button { Text = "Add files…", Width = 90, Height = 28, Margin = new Padding(4, 8, 4, 0) };
         _addFolder = new Button { Text = "Add folder…", Width = 90, Height = 28, Margin = new Padding(0, 8, 4, 0) };
@@ -139,10 +141,9 @@ internal sealed class MainForm : Form
         _exportPlaylist = new Button { Text = "Export playlist…", Width = 112, Height = 28, Margin = new Padding(0, 8, 4, 0) };
         _openTransitions = new Button { Text = "Transitions…", Width = 96, Height = 28, Margin = new Padding(16, 8, 4, 0) };
         _openLibrary = new Button { Text = "Open library…", Width = 100, Height = 28, Margin = new Padding(16, 8, 4, 0) };
-        _settings = new Button { Text = "Settings…", Width = 90, Height = 28, Margin = new Padding(0, 8, 4, 0) };
         // The queue's own commands get a row of their own, so the seek bar keeps its travel.
         var queueBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36, WrapContents = false };
-        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _importPlaylist, _exportPlaylist, _openTransitions, _openLibrary, _settings });
+        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _importPlaylist, _exportPlaylist, _openTransitions, _openLibrary });
         var symbols = new Font("Segoe UI Symbol", 9f);
         _prev = new Button { Text = "⏮", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
@@ -336,7 +337,6 @@ internal sealed class MainForm : Form
         _exportPlaylist.Click += (_, _) => ExportPlaylist();
         _openTransitions.Click += (_, _) => OpenTransitions();
         _openLibrary.Click += (_, _) => OpenLibrary();
-        _settings.Click += (_, _) => EditSettings();
         _cancelAdd.Click += (_, _) => _engine.CancelAdd();
         _status.Click += (_, _) => OpenNotices();
         _noticeCount.Click += (_, _) => OpenNotices();

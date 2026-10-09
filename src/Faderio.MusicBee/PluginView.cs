@@ -68,7 +68,7 @@ internal sealed class PluginView : UserControl
     internal readonly ToolStripStatusLabel _status;
     internal readonly ToolStripStatusLabel _noticeCount;
     internal readonly ToolStripStatusLabel _host;
-    internal readonly Button _openSettings;
+    internal readonly ToolStripButton _openSettings;
     internal readonly EditTransitionMenu _editMenu;
     internal readonly ToolStripMenuItem _openTransitions;
     internal readonly ToolStripMenuItem _removeRows;
@@ -124,7 +124,10 @@ internal sealed class PluginView : UserControl
         // Where MusicBee's window has no title of faderio's: the library, the mode in use and the
         // device. Cut short in a narrow panel, whole in its tooltip.
         _host = new ToolStripStatusLabel { ForeColor = Palette.Dim, Margin = new Padding(8, 3, 0, 2), AutoSize = false, TextAlign = ContentAlignment.MiddleLeft };
-        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _host }, ShowItemToolTips = true, SizingGrip = false };
+        // faderio's settings without MusicBee's Preferences: a flat ⚙ at the strip's far right
+        // (round 2 issue 03).
+        _openSettings = SettingsGear.Create(openSettings);
+        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _host, _openSettings }, ShowItemToolTips = true, SizingGrip = false };
 
         var symbols = new Font("Segoe UI Symbol", 9f);
         // Sized so the eight fit MusicBee's sidebar as shipped (284 px) on one row; narrower, the
@@ -144,17 +147,7 @@ internal sealed class PluginView : UserControl
         // The editor's (round 2 issue 02): at the right of its pane title, or on its Close bar in
         // a sidebar, where the title is hidden (PlaceEditor). Its own font, not the title's.
         _syncEditor = new CheckBox { Text = "Sync editor", AutoCheck = false, AutoSize = true, Dock = DockStyle.Right, Font = Font };
-        // faderio's settings without MusicBee's Preferences: at the top right, on the track's line,
-        // so it fits a sidebar. Flat, as a strip's button, at half as big again.
-        _openSettings = new Button
-        {
-            Text = "⚙", Font = new Font("Segoe UI Symbol", 13.5f), FlatStyle = FlatStyle.Flat, Dock = DockStyle.Right,
-            Width = 28, Padding = new Padding(0), Margin = new Padding(0), UseMnemonic = false, AccessibleName = "faderio settings",
-        };
-        _openSettings.FlatAppearance.BorderSize = 0;
-        _openSettings.Click += (_, _) => openSettings();
         _tips = new ToolTip();
-        _tips.SetToolTip(_openSettings, "faderio settings");
         _tips.SetToolTip(_syncEditor, Presenter.SyncEditorTip);
         _tips.SetToolTip(_stop, "Stop, and let go of the audio device");
         _tips.SetToolTip(_transitionNow, "Transition now");
@@ -323,7 +316,6 @@ internal sealed class PluginView : UserControl
         Controls.Add(buttons);
         var trackLine = new Panel { Dock = DockStyle.Top, Height = 26 };
         trackLine.Controls.Add(_attendedTrack);
-        trackLine.Controls.Add(_openSettings); // docked first, so rightmost
         Controls.Add(trackLine);
         Resize += (_, _) => FitWidth();
         FitWidth();

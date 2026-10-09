@@ -419,8 +419,13 @@ public sealed partial class PluginTests
         using var panel = new System.Windows.Forms.Panel();
         _plugin.OnDockablePanelCreated(panel);
         var view = View(panel);
-        Assert.Equal("faderio settings", view._tips.GetToolTip(view._openSettings));
-        Assert.Equal(13.5f, view._openSettings.Font.Size); // half as big again as the strip's 9 pt
+        // Round 2 issue 03: a flat ⚙ at the status strip's far right, after the host line.
+        Assert.Equal("faderio settings", view._openSettings.ToolTipText);
+        Assert.Equal("⚙", view._openSettings.Text);
+        var strip = view._openSettings.Owner!;
+        Assert.IsType<System.Windows.Forms.StatusStrip>(strip);
+        Assert.Same(view._openSettings, strip.Items[strip.Items.Count - 1]);
+        Assert.Same(view._host, strip.Items[strip.Items.Count - 2]);
 
         string? opened = null;
         _plugin.ShowSettings = dialog =>

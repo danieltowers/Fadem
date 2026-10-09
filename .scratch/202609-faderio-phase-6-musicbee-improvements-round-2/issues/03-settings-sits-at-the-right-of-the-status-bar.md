@@ -1,6 +1,6 @@
 # 03: Settings sits at the far right of the status bar
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Phase 6, improvements round 2, both hosts. Raised 2026-10-09: "Move the settings button into the far right of
@@ -25,3 +25,11 @@ the button did.
 - [ ] The host line (library · mode · device) is cut short before the ⚙, never over it.
 - [ ] In the App, the ⚙ is the last thing in its status strip and opens Settings; the toolbar has
       no Settings… button.
+
+## Comments
+
+### 2026-10-09, built
+
+Both hosts make the gear with `SettingsGear.Create`, a flat ToolStripButton, last in the status
+strip after the spring label. The App's toolbar ends at Open library…; the plugin's track line holds
+only the track's name, which frees the corner issue 05 puts the logo in.

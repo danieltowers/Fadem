@@ -21,7 +21,7 @@ fallback chain; `--library=<folder>` opens that folder as the library without as
 instead of `%APPDATA%\faderio`. Point both at fresh temp folders, so a smoke run writes nothing
 into the user's library or machine settings. `--library=` without `--machine=` keeps no machine
 files at all: the output mode is the default, nothing is remembered, and the window opens
-centred. The output mode is a machine setting, chosen in **Settings…** and used from the next
+centred. The output mode is a machine setting, chosen in **⚙** settings and used from the next
 launch, so the items that relaunch pass the same two folders again:
 
 ```
@@ -50,8 +50,9 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 
 - [ ] The window opens without an error dialog.
 - [ ] The title reads "Untitled — faderio — *temp folder's name* · WASAPI shared at 44100 Hz"
-      (or the mode in use), and nothing asked for a folder. **Open library…** sits between
-      **Export playlist…** and **Settings…**; choosing another folder in it empties the queue and
+      (or the mode in use), and nothing asked for a folder. **Open library…** is the last
+      button in the command row (settings are the **⚙** at the status strip's far right, round 2
+      issue 03); choosing another folder in it empties the queue and
       the editor and puts that folder's name in the title.
 - [ ] **The library chooser** (library chooser issue 02). **Open library…** opens "Choose a
       library": the known libraries by Name and Folder, most recently opened first, the open one
@@ -117,7 +118,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       well, its frame and button dark too, its chevron dim when greyed. The traffic light keeps
       its green, amber and red, is dim when stopped, and has a dark ring. The editor's scroll
       bar is the dark one.
-- [ ] **Dialogs and menus** (studio theme issue 06): **Settings…**, **Transitions…**, **Open
+- [ ] **Dialogs and menus** (studio theme issue 06): **⚙** settings, **Transitions…**, **Open
       library…**, the notice list (the status strip's "1 notice" link, in the accent), the
       section name dialog (row menu → Section → Start a section here…) and the playlist rename
       box (its one-pixel frame stays Windows' grey, a known gap). Each is in the palette, with
@@ -175,7 +176,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] With the editor open, an empty duration box shows in grey what it plays if left blank:
       the **Blank fade durations** setting (5 by default) in Global, and in This playlist the
       global's duration, or that setting where the global sets none. Typing over it shows the
-      typed value in the text colour. Change the setting in **Settings…** with the editor open: the grey
+      typed value in the text colour. Change the setting in **⚙** settings with the editor open: the grey
       value follows at once.
 - [ ] With no boundary open (at launch, and after **Open library…**), the editor reads "No
       boundary selected" and every field, **From end**, the curve, ● Global and ○ This playlist
@@ -292,11 +293,11 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] Adding a rejected file (an `.m4a`, an `.ogg`, or a file with more than two channels)
       leaves the list unchanged and shows one notice naming the property that failed and
       pointing at `docs/supported-audio.md`. Nothing is queued, nothing plays.
-- [ ] With WASAPI exclusive chosen in **Settings…**, launched with `--unavailable=exclusive`,
+- [ ] With WASAPI exclusive chosen in **⚙** settings, launched with `--unavailable=exclusive`,
       the title names WASAPI shared, not exclusive, and the strip says exclusive was
       unavailable. With `--unavailable=exclusive,shared` the title names WaveOut at 44100 Hz,
       with a notice for each step.
-- [ ] **Settings…** opens a dialog with OK and Cancel showing the four settings in two
+- [ ] The **⚙** at the far right of the status strip (tooltip "faderio settings") opens a dialog with OK and Cancel showing the four settings in two
       groups. **This machine**: the output mode with "Applies at the next launch." under it.
       **This library**: *Hard cut* or *Crossfade for N s*, with N greyed out under *Hard cut*;
       **Blank fade durations** in seconds (0 to 30, live under either choice); and **ReplayGain:**, a list of Track,
@@ -305,7 +306,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] A setting changed and saved with OK is still set after a restart; Cancel keeps nothing.
       Changing only the output mode says "Saved machine settings."; only a library setting,
       "Saved settings.".
-- [ ] Crossfade for 12 s in one library, then **Open library…** on a fresh folder: **Settings…**
+- [ ] Crossfade for 12 s in one library, then **Open library…** on a fresh folder: **⚙** settings
       shows *Hard cut* there, and the output mode chosen before. Back to the first library:
       12 s again.
 - [ ] Down the left, between the transport row and the status strip, a ~200 px **Playlists**
@@ -327,7 +328,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       the same place at the same size. Closed maximised, it opens maximised.
 - [ ] Launching with a corrupt `<library>\.faderio\settings.json` shows no
       dialog: the strip says the file was moved aside to `settings.json.corrupt`, and
-      **Settings…** shows the library's defaults.
+      **⚙** settings shows the library's defaults.
 - [ ] Adding the library's longest FLAC (about 26 minutes) shows its full length in the time
       readout, and seeking into its last minute lands there. Length is not proven by the test
       suite; this is where it is checked.
@@ -394,10 +395,10 @@ sharp percussive transient; the realism check is the authored boundary from the 
       without a gap or a fade into silence.
 - [ ] Unplug headphones mid-song; playback pauses and nothing plays from the speakers. Replug
       and press Play; it resumes where it paused.
-- [ ] With *Crossfade for 8 s* on in **Settings…**, two tracks with no authored transition
+- [ ] With *Crossfade for 8 s* on in **⚙** settings, two tracks with no authored transition
       crossfade over 8 s. Switched on mid-track, the very next boundary crossfades.
 - [ ] On a track with a ReplayGain tag (the library has two; tag one with rsgain or foobar2000
-      if needed), choosing Off in **Settings…** mid-track changes the level at once,
+      if needed), choosing Off in **⚙** settings mid-track changes the level at once,
       with no click, and Track brings it back. An untagged track does not change. On a track
       tagged with a different album gain, Album changes the level to it; Smart does too while
       the rows beside it are of the same album, with shuffle off.
@@ -647,7 +648,7 @@ which a background run cannot give.
       when MusicBee next starts; the device when faderio next plays from stopped."
 - [ ] Configure…'s **ReplayGain:** lists Track, Album, Smart and Off, opens on the library's
       mode, is greyed with no library open, and a mode chosen with OK and Preferences' **Save**
-      changes the playing track's level at once; standalone's **Settings…** then shows it.
+      changes the playing track's level at once; standalone's **⚙** settings then shows it.
 - [ ] **Choose…** (library chooser issue 03) opens the same "Choose a library" as standalone's
       **Open library…**, owned by faderio's dialog, listing the plugin's own known libraries
       (never standalone's), the open one selected. A row chosen with **Open** fills the box and
