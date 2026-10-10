@@ -19,6 +19,9 @@ internal sealed class TransitionResolver
     /// <summary>What a blank authored duration resolves to: the blank duration setting.</summary>
     public TimeSpan BlankDuration => TimeSpan.FromSeconds(Settings.BlankDurationSeconds);
 
+    /// <summary>What a blank curve resolves to: the default curve setting.</summary>
+    public FadeCurveKind DefaultCurve => Settings.DefaultCurve;
+
     public TransitionResolver(PlayerSettings settings) => Settings = settings;
 
     /// <param name="global">The globally authored transition for this adjacency, if any.</param>
@@ -66,7 +69,7 @@ internal sealed class TransitionResolver
             FadeOutDuration = ShortenToEnd(fadeOutPoint, fadeOutDuration, outgoingDuration),
             FadeInPoint = fadeInPoint,
             FadeInDuration = fadeInDuration,
-            Curve = authored.Curve ?? FadeCurveKind.EqualPower,
+            Curve = authored.Curve ?? DefaultCurve,
         };
     }
 
@@ -80,7 +83,7 @@ internal sealed class TransitionResolver
             FadeOutDuration = ShortenToEnd(point, d, outgoingDuration),
             FadeInPoint = TimeSpan.Zero,
             FadeInDuration = d,
-            Curve = FadeCurveKind.EqualPower,
+            Curve = DefaultCurve,
         };
     }
 

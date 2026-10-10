@@ -22,6 +22,14 @@ public sealed record TransitionLayers(TransitionSpec? Global, TransitionSpec? Ov
     /// engine read it when it answered. Five seconds, the setting's default, where none was read.</summary>
     public TimeSpan BlankDuration { get; init; } = TimeSpan.FromSeconds(new Settings.PlayerSettings().BlankDurationSeconds);
 
+    /// <summary>What a blank curve plays: the library's default curve, as the engine read it when it
+    /// answered (round 2 issue 14). Equal-power, the setting's default, where none was read.</summary>
+    public FadeCurveKind DefaultCurve { get; init; } = new Settings.PlayerSettings().DefaultCurve;
+
+    /// <summary>The global transition's curve as it plays: its own, else <see cref="DefaultCurve"/>.
+    /// What the editor's curve list shows in the global layer.</summary>
+    public FadeCurveKind GlobalCurve => Global?.Curve ?? DefaultCurve;
+
     /// <summary>The open playlist plays something other than the global transition.</summary>
     public bool Differ => Effective != Global;
 

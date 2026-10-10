@@ -97,6 +97,32 @@ public sealed class RendererTests
         Assert.Equal(0.2, left[(int)(2.7 * 44100)], 3);
     }
 
+    /// <summary>Round 2 issue 14: a transition with no curve of its own renders in the library's
+    /// default curve.</summary>
+    [Fact]
+    public void TheEngine_RendersABlankCurve_AsItsLibrarysDefaultCurve()
+    {
+        using var tc = TestEngine.Create(new Settings.PlayerSettings { DefaultCurve = FadeCurveKind.Linear });
+        var a = TestAudio.WriteDcWav("a.wav", 4, 0.4);
+        var b = TestAudio.WriteDcWav("b.wav", 4, 0.2);
+        tc.Store.Upsert(a, b, new TransitionSpec
+        {
+            FadeOutPoint = new FadePointSpec(TimeSpan.FromSeconds(1.5), FromEnd: false),
+            FadeOutDuration = TimeSpan.FromSeconds(2),
+            FadeInDuration = TimeSpan.FromSeconds(2),
+        });
+        var adjacency = new Adjacency(tc.TrackOf(a), tc.TrackOf(b));
+        var wav = Path.Combine(tc.TempDir, "curve.wav");
+
+        var report = tc.Engine.RenderBoundary(adjacency, wav);
+
+        // Half way through the fades, at 2.5 s: linear is half of each, 0.2 + 0.1. Equal-power
+        // would be 0.71 of each, 0.42.
+        Assert.Equal(1500, report.FadeOutPointInFile.Milliseconds);
+        var (left, _) = ReadLeft(wav);
+        Assert.Equal(0.3, left[(int)(2.5 * 44100)], 2);
+    }
+
     [Fact]
     public void TheEngine_RendersAnUnauthoredBoundary_WithItsLibrarysDefaultCrossfade()
     {

@@ -133,6 +133,26 @@ public class TransitionResolverTests
         Assert.Equal(FadeCurveKind.Linear, resolver.Resolve(linear, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10)).Curve);
     }
 
+    /// <summary>Round 2 issue 14: a transition with no curve of its own plays the library's default
+    /// curve; one with a curve keeps it.</summary>
+    [Fact]
+    public void ABlankCurve_PlaysTheDefaultCurve_AndAnAuthoredOneIsKept()
+    {
+        var resolver = new TransitionResolver(Settings() with { DefaultCurve = FadeCurveKind.SCurve });
+        var blank = new TransitionSpec { FadeInDuration = TimeSpan.FromSeconds(2) };
+        Assert.Equal(FadeCurveKind.SCurve, resolver.Resolve(blank, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10)).Curve);
+
+        var linear = blank with { Curve = FadeCurveKind.Linear };
+        Assert.Equal(FadeCurveKind.Linear, resolver.Resolve(linear, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10)).Curve);
+    }
+
+    [Fact]
+    public void TheDefaultCrossfade_PlaysTheDefaultCurve()
+    {
+        var resolver = new TransitionResolver(Settings(UnauthoredAdjacency.DefaultCrossfade) with { DefaultCurve = FadeCurveKind.Linear });
+        Assert.Equal(FadeCurveKind.Linear, resolver.Resolve(null, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10)).Curve);
+    }
+
     [Fact]
     public void PlaylistOverride_FillsPerParameter_WithFallThrough()
     {

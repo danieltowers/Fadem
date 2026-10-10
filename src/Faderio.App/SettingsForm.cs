@@ -1,5 +1,6 @@
 using Faderio.Shell;
 using Faderio.Shell.Theme;
+using Faderio.Core.Domain;
 using Faderio.Core.Settings;
 using Faderio.Shell.Audio;
 
@@ -10,7 +11,7 @@ namespace Faderio.App;
 /// the output mode, with a note that it applies at the next launch and, when it is not the mode
 /// in use (a fallback, or a choice waiting for the next launch), the mode in use beside it.
 /// "This library": what unauthored boundaries play, what a transition's blank fade duration plays,
-/// and the ReplayGain mode. It opens on the view's
+/// the default fade curve (round 2 issue 14), and the ReplayGain mode. It opens on the view's
 /// settings and hands back each group's choice, <see cref="MachineChoice"/> and
 /// <see cref="LibraryChoice"/>; on OK the caller sends each group the user changed to its own
 /// engine command. It holds
@@ -27,6 +28,7 @@ internal sealed class SettingsForm : Form
     internal readonly RadioButton _crossfade;
     internal readonly NumericUpDown _seconds;
     internal readonly NumericUpDown _blankSeconds;
+    internal readonly ComboBox _defaultCurve;
     internal readonly ComboBox _replayGain;
     internal readonly Button _ok;
     internal readonly Button _cancel;
@@ -37,6 +39,12 @@ internal sealed class SettingsForm : Form
     private sealed record ModeItem(AudioOutputMode Mode)
     {
         public override string ToString() => OutputModeNames.Of(Mode);
+    }
+
+    /// <summary>A curve as the list shows it, named as the editor names it.</summary>
+    private sealed record CurveItem(FadeCurveKind Curve)
+    {
+        public override string ToString() => Presenter.FmtCurve(Curve);
     }
 
     /// <summary>A ReplayGain mode as the list shows it.</summary>
@@ -102,6 +110,10 @@ internal sealed class SettingsForm : Form
             _blankSeconds, new Label { Text = "s", AutoSize = true, Margin = new Padding(0, 6, 0, 0) },
         });
 
+        _defaultCurve = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160, AccessibleName = "Default fade curve" };
+        _defaultCurve.Items.AddRange(Enum.GetValues<FadeCurveKind>().Select(c => (object)new CurveItem(c)).ToArray());
+        _defaultCurve.SelectedIndex = _defaultCurve.Items.IndexOf(new CurveItem(shown.DefaultCurve));
+
         _replayGain = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300, AccessibleName = "ReplayGain" };
         _replayGain.Items.AddRange(Presenter.ReplayGainModes.Select(m => (object)new GainItem(m)).ToArray());
         _replayGain.SelectedIndex = _replayGain.Items.IndexOf(new GainItem(shown.ReplayGainMode));
@@ -131,8 +143,10 @@ internal sealed class SettingsForm : Form
         libraryRows.Controls.Add(boundaries, 1, 0);
         libraryRows.Controls.Add(Caption("Blank fade durations:"), 0, 1);
         libraryRows.Controls.Add(blank, 1, 1);
-        libraryRows.Controls.Add(Caption("ReplayGain:"), 0, 2);
-        libraryRows.Controls.Add(_replayGain, 1, 2);
+        libraryRows.Controls.Add(Caption("Default fade curve:"), 0, 2);
+        libraryRows.Controls.Add(_defaultCurve, 1, 2);
+        libraryRows.Controls.Add(Caption("ReplayGain:"), 0, 3);
+        libraryRows.Controls.Add(_replayGain, 1, 3);
         _libraryGroup = Group("This library", libraryRows);
 
         var layout = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Dock = DockStyle.Fill };
@@ -165,6 +179,7 @@ internal sealed class SettingsForm : Form
         UnauthoredAdjacency = _crossfade.Checked ? UnauthoredAdjacency.DefaultCrossfade : UnauthoredAdjacency.HardCut,
         DefaultCrossfadeSeconds = (int)_seconds.Value,
         BlankDurationSeconds = (int)_blankSeconds.Value,
+        DefaultCurve = ((CurveItem)_defaultCurve.SelectedItem!).Curve,
         ReplayGainMode = ((GainItem)_replayGain.SelectedItem!).Mode,
     };
 

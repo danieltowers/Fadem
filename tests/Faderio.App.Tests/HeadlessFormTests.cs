@@ -1722,6 +1722,29 @@ public sealed partial class HeadlessFormTests
         Assert.Equal(ReplayGainMode.Off, h.Engine.View.Settings.ReplayGainMode);
     });
 
+    /// <summary>Round 2 issue 14: the default fade curve is set in Settings, saved with the library,
+    /// and the open editor's curve follows it for a transition with no curve of its own.</summary>
+    [Fact]
+    public void TheDefaultCurve_IsSetInSettings_AndTheEditorFollows() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var editor = h.Form._editor;
+        EditingAlphaToBeta(h);
+        Assert.Equal("Equal-power", editor._curve.Text);
+
+        h.Form.ShowSettings = dialog =>
+        {
+            Assert.Equal("Equal-power", dialog._defaultCurve.Text);
+            dialog._defaultCurve.SelectedIndex = dialog._defaultCurve.FindStringExact("S-curve");
+            return true;
+        };
+        Click(h.Form._settings);
+
+        Assert.Equal(FadeCurveKind.SCurve, h.Engine.View.Settings.DefaultCurve);
+        Assert.Equal(FadeCurveKind.SCurve, new SettingsStore(h.SettingsPath).Settings.DefaultCurve);
+        Assert.Equal("S-curve", editor._curve.Text);
+    });
+
     [Fact]
     public void TheSettingsDialog_GroupsThisMachine_AndThisLibrary() => RunSta(() =>
     {

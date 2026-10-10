@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Faderio.Core.Domain;
 using Faderio.Core.Queue;
 
 namespace Faderio.Core.Settings;
@@ -58,6 +59,11 @@ public sealed record PlayerSettings
     /// seconds, 0 to 30. It applies only to a duration left blank; one typed in is kept.</summary>
     public int BlankDurationSeconds { get; init; } = 5;
 
+    /// <summary>The curve a transition with none of its own plays, the default crossfade's, and
+    /// the one the editor offers a new transition: equal-power by default (round 2 issue 14). A
+    /// curve saved with a transition is kept.</summary>
+    public FadeCurveKind DefaultCurve { get; init; } = FadeCurveKind.EqualPower;
+
     /// <summary>Which ReplayGain tracks play at, clamped symmetrically: track gain by default.</summary>
     public ReplayGainMode ReplayGainMode { get; init; } = ReplayGainMode.Track;
 
@@ -92,6 +98,7 @@ public sealed record PlayerSettings
         UnauthoredAdjacency = Compat.IsDefined(UnauthoredAdjacency) ? UnauthoredAdjacency : UnauthoredAdjacency.HardCut,
         DefaultCrossfadeSeconds = Compat.Clamp(DefaultCrossfadeSeconds, MinDefaultCrossfadeSeconds, MaxDefaultCrossfadeSeconds),
         BlankDurationSeconds = Compat.Clamp(BlankDurationSeconds, MinBlankDurationSeconds, MaxBlankDurationSeconds),
+        DefaultCurve = Compat.IsDefined(DefaultCurve) ? DefaultCurve : FadeCurveKind.EqualPower,
         Repeat = Compat.IsDefined(Repeat) ? Repeat : RepeatMode.Off,
         ReplayGainMode = FormerReplayGainEnabled == false ? ReplayGainMode.Off
             : Compat.IsDefined(ReplayGainMode) ? ReplayGainMode : ReplayGainMode.Track,

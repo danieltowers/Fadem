@@ -120,6 +120,12 @@ a playlist override, a blank duration falls through to the global transition's f
 omitted parameter does.
 _Avoid_: Default fade, default crossfade
 
+**Default curve**:
+The fade curve a transition plays when none is set for it, the default crossfade's, and the one
+the editor offers a new transition: a library setting, equal-power unless changed. A curve saved
+with a transition is kept.
+_Avoid_: Global curve
+
 **Transition now**:
 The user action of starting the current adjacency's transition immediately, instead of at its
 fade-out point. Only the fade-out point moves, to the playhead; everything else plays as

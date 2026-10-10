@@ -83,6 +83,7 @@ public sealed partial class PlaybackEngine
                     global, playlistOverride, TransitionResolver.Merge(global, playlistOverride))
                 {
                     BlankDuration = _resolver.BlankDuration,
+                    DefaultCurve = _resolver.DefaultCurve,
                 });
             })
             .Where(p => p.Layers.Global is { IsBlank: false } || p.Layers.Override is not null)

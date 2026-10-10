@@ -161,7 +161,7 @@ public sealed partial class PlaybackEngine
 
     /// <summary>Whether saving <paramref name="draft"/> would leave the store as it is: it holds
     /// this transition for the adjacency, or holds nothing and the draft is blank, since a blank
-    /// save stores nothing. A missing curve is equal-power, as the resolver reads it, and a blank
+    /// save stores nothing. A missing curve is the default curve, as the resolver reads it, and a blank
     /// entry left by an older build is nothing. The editor's test for unsaved edits (build issue
     /// 15).
     /// <para>For <see cref="TransitionLayer.Playlist"/>, whether the open playlist's override is
@@ -186,7 +186,8 @@ public sealed partial class PlaybackEngine
             return WithCurve(stored) == WithCurve(draft);
         });
 
-        static TransitionSpec WithCurve(TransitionSpec spec) => spec with { Curve = spec.Curve ?? FadeCurveKind.EqualPower };
+        // A blank curve is the default curve, as the resolver plays it (round 2 issue 14).
+        TransitionSpec WithCurve(TransitionSpec spec) => spec with { Curve = spec.Curve ?? _resolver.DefaultCurve };
     }
 
     /// <summary>The adjacency's transition, layer by layer: the global one, the open playlist's
@@ -202,6 +203,7 @@ public sealed partial class PlaybackEngine
             return new TransitionLayers(global, playlistOverride, TransitionResolver.Merge(global, playlistOverride))
             {
                 BlankDuration = _resolver.BlankDuration,
+                DefaultCurve = _resolver.DefaultCurve,
             };
         });
     }

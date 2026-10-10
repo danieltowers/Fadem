@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Windows.Forms;
+using Faderio.Core.Domain;
 using Faderio.Core.Settings;
 using Faderio.Shell;
 using Faderio.Shell.Audio;
@@ -16,12 +17,13 @@ namespace Faderio.MusicBee;
 /// machine's by name. A saved device that is not there is listed as not found, so opening the
 /// dialog never loses it. Below them, whether faderio takes over MusicBee's Now Playing tab
 /// (phase 6 issue 08). Last, the open library's fade defaults and ReplayGain mode, as standalone
-/// faderio's Settings has them: what a boundary nobody authored plays, the blank duration, and
-/// which ReplayGain tracks play at, with MusicBee's choices. They are the
+/// faderio's Settings has them: what a boundary nobody authored plays, the blank duration, the
+/// default fade curve (round 2 issue 14), and which ReplayGain tracks play at, with MusicBee's choices. They are the
 /// library's, saved in it, so with none open they are shown disabled. It holds nothing once
 /// closed: its caller reads <see cref="Library"/>, <see cref="OutputMode"/>,
 /// <see cref="OutputDevice"/>, <see cref="NowPlayingTab"/>, <see cref="Crossfade"/>,
-/// <see cref="CrossfadeSeconds"/>, <see cref="BlankSeconds"/> and <see cref="ReplayGain"/>.
+/// <see cref="CrossfadeSeconds"/>, <see cref="BlankSeconds"/>, <see cref="DefaultCurve"/> and
+/// <see cref="ReplayGain"/>.
 /// <para>MusicBee loads every type here before the plugin's resolver exists, so no field holds
 /// a Core value: the mode lists' items are boxed modes, named as they are drawn.</para>
 /// </summary>
@@ -36,6 +38,7 @@ internal sealed class SettingsDialog : Form
     internal readonly RadioButton _crossfade;
     internal readonly NumericUpDown _crossfadeSeconds;
     internal readonly NumericUpDown _blankSeconds;
+    internal readonly ComboBox _defaultCurve;
     internal readonly ComboBox _replayGain;
 
     /// <summary>The device each item of the list stands for: null for MusicBee's own.</summary>
@@ -54,10 +57,12 @@ internal sealed class SettingsDialog : Form
     /// <param name="crossfadeSeconds">The default crossfade's length.</param>
     /// <param name="blankSeconds">What a blank fade duration plays.</param>
     /// <param name="replayGain">Which ReplayGain tracks play at.</param>
+    /// <param name="defaultCurve">The curve a transition with none of its own plays.</param>
     /// <param name="palette">The skin's palette (studio theme issue 06), or the built-in one.</param>
     public SettingsDialog(
         string? library, AudioOutputMode mode, string? device, IReadOnlyList<string> devices, string? musicBeesDevice, bool nowPlayingTab,
-        bool libraryOpen, bool crossfade, int crossfadeSeconds, int blankSeconds, ReplayGainMode replayGain, Palette? palette = null)
+        bool libraryOpen, bool crossfade, int crossfadeSeconds, int blankSeconds, ReplayGainMode replayGain,
+        FadeCurveKind defaultCurve, Palette? palette = null)
     {
         Text = "faderio";
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -143,6 +148,17 @@ internal sealed class SettingsDialog : Form
         };
         var blank = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
         blank.Controls.AddRange(new Control[] { _blankSeconds, Seconds() });
+        _defaultCurve = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList, Width = 160, AccessibleName = "Default fade curve", FormattingEnabled = true,
+            Enabled = libraryOpen,
+        };
+        _defaultCurve.Format += (_, e) => e.Value = Presenter.FmtCurve((FadeCurveKind)e.ListItem!);
+        foreach (var each in ShellCompat.Values<FadeCurveKind>())
+        {
+            _defaultCurve.Items.Add(each);
+        }
+        _defaultCurve.SelectedItem = defaultCurve;
         _replayGain = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList, Width = 320, AccessibleName = "ReplayGain", FormattingEnabled = true,
@@ -195,10 +211,12 @@ internal sealed class SettingsDialog : Form
         rows.Controls.Add(boundaries, 1, 6);
         rows.Controls.Add(Caption("Blank fade durations:"), 0, 7);
         rows.Controls.Add(blank, 1, 7);
-        rows.Controls.Add(Caption("ReplayGain:"), 0, 8);
-        rows.Controls.Add(_replayGain, 1, 8);
-        rows.Controls.Add(inLibrary, 1, 9);
-        rows.Controls.Add(buttons, 0, 10);
+        rows.Controls.Add(Caption("Default fade curve:"), 0, 8);
+        rows.Controls.Add(_defaultCurve, 1, 8);
+        rows.Controls.Add(Caption("ReplayGain:"), 0, 9);
+        rows.Controls.Add(_replayGain, 1, 9);
+        rows.Controls.Add(inLibrary, 1, 10);
+        rows.Controls.Add(buttons, 0, 11);
         rows.SetColumnSpan(buttons, 2);
         Controls.Add(rows);
         foreach (var hint in new[] { nextStart, nextVisit, inLibrary })
@@ -227,6 +245,9 @@ internal sealed class SettingsDialog : Form
 
     /// <summary>What a blank fade duration plays, in whole seconds.</summary>
     public int BlankSeconds => (int)_blankSeconds.Value;
+
+    /// <summary>The curve a transition with none of its own plays.</summary>
+    public FadeCurveKind DefaultCurve => (FadeCurveKind)_defaultCurve.SelectedItem!;
 
     /// <summary>Which ReplayGain tracks play at.</summary>
     public ReplayGainMode ReplayGain => (ReplayGainMode)_replayGain.SelectedItem!;

@@ -1,3 +1,4 @@
+using Faderio.Core.Domain;
 using Faderio.Core.Persistence;
 using Faderio.Core.Playback;
 using Faderio.Core.Settings;
@@ -114,6 +115,15 @@ public sealed class SettingsStoreTests : IDisposable
     {
         File.WriteAllText(_path, $"{{\"blankDurationSeconds\": {written}}}");
         Assert.Equal(loaded, new SettingsStore(_path).Settings.BlankDurationSeconds);
+    }
+
+    [Theory]
+    [InlineData("\"defaultCurve\": \"SCurve\"", FadeCurveKind.SCurve)]
+    [InlineData("\"schemaVersion\": 1", FadeCurveKind.EqualPower)]
+    public void TheDefaultCurve_IsRead_AndEqualPowerWhereAbsent(string json, FadeCurveKind loaded)
+    {
+        File.WriteAllText(_path, $"{{{json}}}");
+        Assert.Equal(loaded, new SettingsStore(_path).Settings.DefaultCurve);
     }
 
     [Fact]

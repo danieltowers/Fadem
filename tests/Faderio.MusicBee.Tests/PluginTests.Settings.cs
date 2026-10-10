@@ -1,4 +1,5 @@
 using System.Reflection;
+using Faderio.Core.Domain;
 using Faderio.Core.Playback;
 using Faderio.Core.Settings;
 using Faderio.Core.Tests;
@@ -340,6 +341,28 @@ public sealed partial class PluginTests
             Assert.Equal(8, dialog._crossfadeSeconds.Value);
             Assert.Equal(3, dialog._blankSeconds.Value);
         });
+    }
+
+    /// <summary>Round 2 issue 14: the default fade curve opens on the library's and is saved to it
+    /// at Save, named as the editor names it.</summary>
+    [Fact]
+    public void TheDefaultCurve_OpensOnTheLibrarys_AndIsSavedToItAtSave()
+    {
+        AuthorLibrary();
+        ChooseLibrary(LibraryFolder);
+        Start();
+        Launched();
+
+        Configure(read: dialog =>
+        {
+            Assert.Equal("Equal-power", dialog._defaultCurve.Text);
+            dialog._defaultCurve.SelectedIndex = dialog._defaultCurve.FindStringExact("Linear");
+        });
+        _plugin.SaveSettings();
+
+        Assert.Equal(FadeCurveKind.Linear, new SettingsStore(LibrarySettingsFile).Settings.DefaultCurve);
+        Assert.Equal(FadeCurveKind.Linear, _plugin.Host!.Engine.View.Settings.DefaultCurve);
+        Configure(ok: false, read: dialog => Assert.Equal("Linear", dialog._defaultCurve.Text));
     }
 
     [Fact]

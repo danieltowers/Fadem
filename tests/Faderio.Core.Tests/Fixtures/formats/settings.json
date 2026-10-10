@@ -3,6 +3,7 @@
   "unauthoredAdjacency": "DefaultCrossfade",
   "defaultCrossfadeSeconds": 7,
   "blankDurationSeconds": 3,
+  "defaultCurve": "SCurve",
   "replayGainMode": "Off",
   "shuffle": true,
   "repeat": "All",

@@ -313,10 +313,11 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       the title names WASAPI shared, not exclusive, and the strip says exclusive was
       unavailable. With `--unavailable=exclusive,shared` the title names WaveOut at 44100 Hz,
       with a notice for each step.
-- [ ] The **⚙** at the far right of the status strip (tooltip "faderio settings") opens a dialog with OK and Cancel showing the four settings in two
+- [ ] The **⚙** at the far right of the status strip (tooltip "faderio settings") opens a dialog with OK and Cancel showing the five settings in two
       groups. **This machine**: the output mode with "Applies at the next launch." under it.
       **This library**: *Hard cut* or *Crossfade for N s*, with N greyed out under *Hard cut*;
-      **Blank fade durations** in seconds (0 to 30, live under either choice); and **ReplayGain:**, a list of Track,
+      **Blank fade durations** in seconds (0 to 30, live under either choice); **Default fade
+      curve:**, Equal-power, Linear or S-curve, on Equal-power by default; and **ReplayGain:**, a list of Track,
       Album, Smart (album gain on an album's run of tracks) and Off, on Track by default. Launched into a fallback as above, it also reads "In use now: WASAPI
       shared" (or WaveOut) under the mode chosen.
 - [ ] A setting changed and saved with OK is still set after a restart; Cancel keeps nothing.
@@ -674,6 +675,9 @@ which a background run cannot give.
 - [ ] Configure…'s **ReplayGain:** lists Track, Album, Smart and Off, opens on the library's
       mode, is greyed with no library open, and a mode chosen with OK and Preferences' **Save**
       changes the playing track's level at once; standalone's **⚙** settings then shows it.
+- [ ] Configure…'s **Default fade curve:** (round 2 issue 14) lists Equal-power, Linear and
+      S-curve, opens on the library's, is greyed with no library open, and one chosen with OK and
+      Preferences' **Save** shows at once in the editor's Fade curve for a new boundary.
 - [ ] **Choose…** (library chooser issue 03) opens the same "Choose a library" as standalone's
       **Open library…**, owned by faderio's dialog, listing the plugin's own known libraries
       (never standalone's), the open one selected. A row chosen with **Open** fills the box and

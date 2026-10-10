@@ -92,6 +92,11 @@ internal sealed class TransitionEditorPanel : Panel
     /// <summary>The <see cref="PlayerView.StoreVersion"/> the fields were last loaded at.</summary>
     private long _loadedStore;
 
+    /// <summary>The library's settings the fields were last shown under, held as the store's
+    /// version is: a change, from either host's Settings, shows what a blank duration and a blank
+    /// curve play now (round 2 issue 14).</summary>
+    private Faderio.Core.Settings.PlayerSettings? _shownSettings;
+
     private readonly ToolTip _historyTips = new();
 
     /// <summary>The attended row the editor last followed playback to and the transition the engine
@@ -683,14 +688,14 @@ internal sealed class TransitionEditorPanel : Panel
         ShowLayer();
         var layers = _engine.Transition(adjacency);
         var playlist = Layer == TransitionLayer.Playlist;
-        Fill(playlist ? layers.Override : layers.Global, editing: true, playlist ? layers.Global : null);
+        Fill(playlist ? layers.Override : layers.Global, editing: true, playlist ? layers.Global : null, layers.GlobalCurve);
         ShowLayers(layers);
     }
 
     /// <summary>What the store holds besides the fields: the global values as placeholders in
     /// playlist mode, what a blank duration plays in either mode, and the heading line when the
     /// open playlist plays something else. Read again after every save or removal, since either
-    /// layer may have changed.</summary>
+    /// layer may have changed. The curve is the fields', so a pick a save refused stays.</summary>
     private void ShowLayers(TransitionLayers layers)
     {
         var global = Layer == TransitionLayer.Playlist ? layers.Global : null;
@@ -707,7 +712,7 @@ internal sealed class TransitionEditorPanel : Panel
     }
 
     /// <summary>Reads the open adjacency's layers again: after a save or removal here, and after
-    /// the library's settings change, which set what a blank duration plays.</summary>
+    /// the library's settings change, which set what a blank duration and a blank curve play.</summary>
     internal void ShowLayers()
     {
         if (_adjacency is not null)
@@ -724,7 +729,7 @@ internal sealed class TransitionEditorPanel : Panel
         _adjacency = null;
         _title.Text = NoAdjacency;
         ShowTrackTitles(null);
-        Fill(null, editing: false, global: null);
+        Fill(null, editing: false, global: null, TransitionLayers.None.GlobalCurve);
         ShowLayers(TransitionLayers.None);
     }
 
@@ -732,12 +737,13 @@ internal sealed class TransitionEditorPanel : Panel
 
     /// <summary>The fields from <paramref name="spec"/>. With <paramref name="global"/>, in playlist
     /// mode, From end follows the global point while the override has none, so the placeholder
-    /// reads as the global does; and a missing curve is "(global)".</summary>
-    private void Fill(TransitionSpec? spec, bool editing, TransitionSpec? global)
+    /// reads as the global does; and a missing curve is "(global)". In the global layer the curve
+    /// is <paramref name="globalCurve"/>, the stored one or the default.</summary>
+    private void Fill(TransitionSpec? spec, bool editing, TransitionSpec? global, FadeCurveKind globalCurve)
     {
         _loading = true;
         _fadeOutFromEnd.Checked = (spec?.FadeOutPoint ?? global?.FadeOutPoint)?.FromEnd ?? false;
-        ShowCurve(Layer == TransitionLayer.Playlist ? spec?.Curve : spec?.Curve ?? FadeCurveKind.EqualPower);
+        ShowCurve(Layer == TransitionLayer.Playlist ? spec?.Curve : globalCurve);
         _loading = false;
         _fadeOut = spec?.FadeOutPoint?.Point;
         _fadeIn = spec?.FadeInPoint?.Point;
@@ -768,14 +774,28 @@ internal sealed class TransitionEditorPanel : Panel
         ShowLight();
     }
 
-    /// <summary>Called on every render: the editor following playback, the fields loaded again
-    /// once the store has moved, unless a box is being typed in (phase 6 issue 11: a drag on the
+    /// <summary>Called on every render: the editor following playback, the layers shown again once
+    /// the library's settings have changed, the fields loaded again once the store has moved, unless a box is being typed in (phase 6 issue 11: a drag on the
     /// seek bar saves the transition shown here), each capture button live
     /// only while its own track is heard, as the engine says, the traffic light, and the preview's
     /// buttons and line, which follow the preview.</summary>
     public void Refresh(PlayerView view)
     {
         Follow(view);
+        if (view.Settings != _shownSettings)
+        {
+            // What a blank duration and a blank curve play may have changed (round 2 issue 14):
+            // the fields load again, unless a box is being typed in.
+            _shownSettings = view.Settings;
+            if (_adjacency is { } open && !_pending)
+            {
+                Load(open);
+            }
+            else
+            {
+                ShowLayers();
+            }
+        }
         if (view.StoreVersion != _loadedStore && _adjacency is { } adjacency && !_pending)
         {
             Load(adjacency);

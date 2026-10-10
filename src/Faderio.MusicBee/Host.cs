@@ -224,7 +224,7 @@ internal sealed class Host : IDisposable
         using var dialog = new SettingsDialog(
             shown.Library, shown.OutputMode, shown.OutputDevice, _devices(), _musicBeesDevice(), nowPlayingTab,
             libraryOpen, library.UnauthoredAdjacency == UnauthoredAdjacency.DefaultCrossfade, library.DefaultCrossfadeSeconds,
-            library.BlankDurationSeconds, library.ReplayGainMode, palette);
+            library.BlankDurationSeconds, library.ReplayGainMode, library.DefaultCurve, palette);
         dialog.ChooseLibrary = selected =>
         {
             // Remove is at once (library chooser D6): list upkeep, not a setting to wait for Save.
@@ -242,6 +242,7 @@ internal sealed class Host : IDisposable
                     UnauthoredAdjacency = dialog.Crossfade ? UnauthoredAdjacency.DefaultCrossfade : UnauthoredAdjacency.HardCut,
                     DefaultCrossfadeSeconds = dialog.CrossfadeSeconds,
                     BlankDurationSeconds = dialog.BlankSeconds,
+                    DefaultCurve = dialog.DefaultCurve,
                     ReplayGainMode = dialog.ReplayGain,
                 }
                 : null;

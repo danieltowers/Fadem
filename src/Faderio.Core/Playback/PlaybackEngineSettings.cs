@@ -42,7 +42,8 @@ public sealed partial class PlaybackEngine
             RaiseNotice("Saved settings.");
             if (previous.UnauthoredAdjacency != next.UnauthoredAdjacency ||
                 previous.DefaultCrossfadeSeconds != next.DefaultCrossfadeSeconds ||
-                previous.BlankDurationSeconds != next.BlankDurationSeconds)
+                previous.BlankDurationSeconds != next.BlankDurationSeconds ||
+                previous.DefaultCurve != next.DefaultCurve)
             {
                 RescheduleCurrentBoundary();
             }

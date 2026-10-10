@@ -99,6 +99,7 @@ public sealed class FileFormatTests : IDisposable
         UnauthoredAdjacency = UnauthoredAdjacency.DefaultCrossfade,
         DefaultCrossfadeSeconds = 7,
         BlankDurationSeconds = 3,
+        DefaultCurve = FadeCurveKind.SCurve,
         ReplayGainMode = ReplayGainMode.Off,
         Shuffle = true,
         Repeat = RepeatMode.All,
