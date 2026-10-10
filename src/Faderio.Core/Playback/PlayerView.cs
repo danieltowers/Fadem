@@ -240,6 +240,9 @@ public enum FadeSide
 /// editor's traffic light. <see cref="Outgoing"/> while its outgoing track is heard, whether or
 /// not its incoming one is too; <see cref="Incoming"/> while only its incoming track is;
 /// <see cref="OtherTrack"/> while a track of neither side is; <see cref="Nothing"/> when stopped.
+/// <see cref="Outgoing"/> only while the pair is the transition the queue would play from the
+/// outgoing track's row; while that row's next is another track, <see cref="OutgoingIntoAnother"/>
+/// (round 2 issue 08).
 /// </summary>
 public enum AdjacencyHeard
 {
@@ -247,6 +250,7 @@ public enum AdjacencyHeard
     OtherTrack,
     Incoming,
     Outgoing,
+    OutgoingIntoAnother,
 }
 
 /// <summary>The adjacencies the editor can open from one row, each as the queue would reach it

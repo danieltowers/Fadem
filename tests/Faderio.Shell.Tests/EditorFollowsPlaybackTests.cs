@@ -96,6 +96,85 @@ public sealed class EditorFollowsPlaybackTests
         Assert.Null(editor.Adjacency);
     });
 
+    /// <summary>Round 2 issue 08: a drop between the playing track and its next moves the editor to
+    /// the playing track's transition into the dropped one, and the light, green, is for that pair.</summary>
+    [Fact]
+    public void ADropBeforeThePlayingTracksNext_MovesTheEditorToTheNewPair() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        var (a, b, _) = Queue(tc);
+        using var editor = Editor(tc);
+        tc.Engine.SetEditorFollowsPlayback(true);
+        tc.Engine.Play();
+        tc.Output.Advance(Second);
+        editor.Refresh(tc.View);
+
+        var x = TestAudio.WriteDcWav("sync-x.wav", 3, 0.4);
+        tc.Engine.Add(new[] { x }, before: tc.RowOf(b)).Wait();
+        editor.Refresh(tc.View);
+
+        Assert.Equal(tc.AdjacencyOf(a, x), editor.Adjacency);
+        Assert.Equal(AdjacencyHeard.Outgoing, editor._light.Heard);
+    });
+
+    /// <summary>A row moved in as the playing track's next does the same.</summary>
+    [Fact]
+    public void ARowMovedInAsThePlayingTracksNext_MovesTheEditorToTheNewPair() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        var (a, b, c) = Queue(tc);
+        using var editor = Editor(tc);
+        tc.Engine.SetEditorFollowsPlayback(true);
+        tc.Engine.Play();
+        tc.Output.Advance(Second);
+        editor.Refresh(tc.View);
+
+        tc.Engine.Move(new[] { tc.RowOf(c) }, before: tc.RowOf(b));
+        editor.Refresh(tc.View);
+
+        Assert.Equal(tc.AdjacencyOf(a, c), editor.Adjacency);
+        Assert.Equal(AdjacencyHeard.Outgoing, editor._light.Heard);
+    });
+
+    /// <summary>So does removing the playing track's next.</summary>
+    [Fact]
+    public void RemovingThePlayingTracksNext_MovesTheEditorToTheNewPair() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        var (a, b, c) = Queue(tc);
+        using var editor = Editor(tc);
+        tc.Engine.SetEditorFollowsPlayback(true);
+        tc.Engine.Play();
+        tc.Output.Advance(Second);
+        editor.Refresh(tc.View);
+
+        tc.Engine.Remove(new[] { tc.RowOf(b) });
+        editor.Refresh(tc.View);
+
+        Assert.Equal(tc.AdjacencyOf(a, c), editor.Adjacency);
+        Assert.Equal(AdjacencyHeard.Outgoing, editor._light.Heard);
+    });
+
+    /// <summary>Removing the playing track's next leaves it the last row, with nothing to follow
+    /// to: the editor stays on the pair, and the light is not green for it.</summary>
+    [Fact]
+    public void RemovingTheLastRowsNext_LeavesTheEditor_AndTheLightIsNotGreen() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        var (_, b, c) = Queue(tc);
+        using var editor = Editor(tc);
+        tc.Engine.SetEditorFollowsPlayback(true);
+        tc.Engine.PlayRow(tc.RowOf(b));
+        tc.Output.Advance(Second);
+        editor.Refresh(tc.View);
+
+        tc.Engine.Remove(new[] { tc.RowOf(c) });
+        editor.Refresh(tc.View);
+
+        Assert.Equal(b, editor.Adjacency!.Outgoing.FilePath);
+        Assert.Equal(AdjacencyHeard.OutgoingIntoAnother, editor._light.Heard);
+    });
+
     private static TransitionEditorPanel Editor(TestEngine tc) => new(tc.Engine, _ => { }, _ => null);
 
     /// <summary>A, B and C, each 3 s, queued and stopped.</summary>

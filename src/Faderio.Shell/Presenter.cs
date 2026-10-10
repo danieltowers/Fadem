@@ -120,6 +120,7 @@ internal static class Presenter
     public static string FmtHeard(AdjacencyHeard heard, Adjacency adjacency) => heard switch
     {
         AdjacencyHeard.Outgoing => $"Playing {TitleOf(adjacency.Outgoing)}, this transition's first track",
+        AdjacencyHeard.OutgoingIntoAnother => $"Playing {TitleOf(adjacency.Outgoing)}, this transition's first track, but next comes another track",
         AdjacencyHeard.Incoming => $"Playing {TitleOf(adjacency.Incoming)}, this transition's second track",
         AdjacencyHeard.OtherTrack => "Playing a track that is not in this transition",
         _ => "Nothing is playing",

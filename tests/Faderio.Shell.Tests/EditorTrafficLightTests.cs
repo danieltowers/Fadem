@@ -48,6 +48,23 @@ public sealed class EditorTrafficLightTests
         Assert.Equal($"Playing {bc.Incoming.Title}, this transition's second track", editor._lightTip.GetToolTip(editor._light));
     });
 
+    /// <summary>Round 2 issue 08: the first track playing while its next is another track is red,
+    /// as another track is, since this transition is not the one about to be heard.</summary>
+    [Fact]
+    public void TheFirstTrackPlaying_IntoAnotherTrack_IsRed_AndItsTooltipSaysSo() => RunSta(() =>
+    {
+        using var tc = TestEngine.Create();
+        var (editor, bc) = Editing(tc, playing: 1);
+
+        tc.Engine.Remove(new[] { tc.RowOf(bc.Incoming.FilePath) });
+        editor.Refresh(tc.View);
+
+        Assert.Equal(AdjacencyHeard.OutgoingIntoAnother, editor._light.Heard);
+        Assert.Equal(TrafficLight.Colour(AdjacencyHeard.OtherTrack, Palette.Studio), editor._light.Lit);
+        Assert.Equal($"Playing {bc.Outgoing.Title}, this transition's first track, but next comes another track",
+            editor._lightTip.GetToolTip(editor._light));
+    });
+
     [Fact]
     public void TheColoursAreDistinct_AndStoppedIsGrey()
     {

@@ -79,24 +79,37 @@ public sealed partial class PlaybackEngine
     /// editor's traffic light (phase 6 issue 07). The tracks in hand are a running preview's
     /// heard voices, or else the queue's attended voice, playing or paused, and a live crossfade's
     /// incoming voice. They match the adjacency's sides by file path, as a capture does; the
-    /// outgoing side wins when both are in hand. Read from the same published state as
-    /// <see cref="View"/>, without the lock, since the editor asks on every render.</summary>
+    /// outgoing side wins when both are in hand. In the queue the outgoing side is
+    /// <see cref="AdjacencyHeard.Outgoing"/> only while the row heard goes into the incoming track,
+    /// by ⏭'s rule or into itself under repeat-one; while it goes into another track, the pair is
+    /// not the transition about to be heard: <see cref="AdjacencyHeard.OutgoingIntoAnother"/>
+    /// (round 2 issue 08). Read from the same published state as <see cref="View"/>, without the
+    /// lock, since the editor asks on every render.</summary>
     public AdjacencyHeard Heard(Adjacency adjacency)
     {
         ThrowIfDisposed();
         var view = View;
-        var paths = view.Preview is { } preview
-            ? new[]
+        if (view.Preview is { } preview)
+        {
+            var heard = new[]
             {
                 preview.Outgoing is null ? null : preview.Adjacency.Outgoing.FilePath,
                 preview.Incoming is null ? null : preview.Adjacency.Incoming.FilePath,
-            }
-            : new[] { view.Attended?.Row.Track.FilePath, view.Incoming?.Row.Track.FilePath };
-        return paths.Contains(adjacency.Outgoing.FilePath) ? AdjacencyHeard.Outgoing
-            : paths.Contains(adjacency.Incoming.FilePath) ? AdjacencyHeard.Incoming
-            : paths.Any(p => p is not null) ? AdjacencyHeard.OtherTrack
-            : AdjacencyHeard.Nothing;
+            };
+            return Heard(adjacency, heard, intoIncoming: heard.Contains(adjacency.Outgoing.FilePath));
+        }
+        var rows = new[] { view.Attended?.Row, view.Incoming?.Row };
+        var into = rows.Any(row => row is not null && row.Track.FilePath == adjacency.Outgoing.FilePath
+            && _snapshot.AdjacenciesOf(row.Id) is var next
+            && new[] { next.Next, next.Self }.Any(n => n is not null && SamePair(n, adjacency)));
+        return Heard(adjacency, rows.Select(row => row?.Track.FilePath).ToArray(), into);
     }
+
+    private static AdjacencyHeard Heard(Adjacency adjacency, string?[] paths, bool intoIncoming) =>
+        paths.Contains(adjacency.Outgoing.FilePath) ? intoIncoming ? AdjacencyHeard.Outgoing : AdjacencyHeard.OutgoingIntoAnother
+        : paths.Contains(adjacency.Incoming.FilePath) ? AdjacencyHeard.Incoming
+        : paths.Any(p => p is not null) ? AdjacencyHeard.OtherTrack
+        : AdjacencyHeard.Nothing;
 
     /// <summary>The same moment in <paramref name="track"/>, measured from its other end:
     /// ticking or unticking from-end on a fade-out point (build issue 14). On a 3:40 track, 3:12

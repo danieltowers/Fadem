@@ -51,13 +51,14 @@ internal sealed class TrafficLight : Control
     }
 
     /// <summary>The colour lit for <paramref name="heard"/>: green while the outgoing track is
-    /// heard, amber while only the incoming one is, red while another track is, the palette's Dim
-    /// while stopped.</summary>
+    /// heard going into the incoming one, amber while only the incoming one is, red while another
+    /// track is or the outgoing one goes into another (round 2 issue 08), the palette's Dim while
+    /// stopped.</summary>
     public static Color Colour(AdjacencyHeard heard, Palette palette) => heard switch
     {
         AdjacencyHeard.Outgoing => Color.FromArgb(0x2E, 0xA0, 0x43),
         AdjacencyHeard.Incoming => Color.FromArgb(0xF0, 0xA0, 0x00),
-        AdjacencyHeard.OtherTrack => Color.FromArgb(0xD0, 0x30, 0x30),
+        AdjacencyHeard.OtherTrack or AdjacencyHeard.OutgoingIntoAnother => Color.FromArgb(0xD0, 0x30, 0x30),
         _ => palette.Dim,
     };
 

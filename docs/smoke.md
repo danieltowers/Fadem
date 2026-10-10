@@ -228,7 +228,8 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] The traffic light (phase 6 issue 07) sits at the editor's top right, on the heading's
       line, hidden with no boundary open. Editor on b → c: dim when stopped, red while a plays,
       green while b plays, amber while c plays. Its tooltip says which ("Playing *b*, this
-      transition's first track").
+      transition's first track"). With b playing and c removed (Del), red: "…, but next comes
+      another track" (round 2 issue 08).
 - [ ] Beside each **point** box (not the durations) sit **−** and **+**. Each press moves the
       number shown by 0.1, Shift-click by 1; with **From end** ticked, + makes the from-end number
       bigger. They stop at 0 and at the track's length, and are greyed out while the box is blank
@@ -285,7 +286,9 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       while a row plays, the editor opens on that row's this → next at once; when the next
       track comes in (once the outgoing one falls silent) it moves to that track's this → next.
       On the last row it stays where it was. Opened on another boundary between tracks, the
-      editor stays there until the next track comes in. The tick survives a relaunch.
+      editor stays there until the next track comes in, or until the playing row's next changes:
+      a drop, a move or a removal (Del) that gives it another next moves the editor to the
+      playing row's this → that next, green (round 2 issue 08). The tick survives a relaunch.
 - [ ] The status strip shows the latest notice and, at its right, a count ("3 notices").
       Saving the same boundary several times shows one "Saved … ×n", not n notices.
       A notice longer than the strip is clipped and never pushes the count off. Clicking the
@@ -588,7 +591,9 @@ which a background run cannot give.
       playhead"; the fade-in one stays greyed.
 - [ ] **The traffic light** (phase 6 issue 07) at the editor's top right, beside the heading:
       red while row 1 plays with row 2's ✎ open, green while row 2 plays, amber while row 3
-      plays, dim when stopped.
+      plays, dim when stopped. With Sync editor ticked and row 1 playing, a track dragged from
+      MusicBee between rows 1 and 2 moves the editor to row 1 → the dropped track, green
+      (round 2 issue 08).
 - [ ] **The transition editor in the skin** (studio theme issue 05), in a main panel, with no
       boundary open and then with row 1's ✎: as in standalone, no white or system-grey box; the
       check box and radio buttons on the panel's ground, dim but readable when greyed; hint

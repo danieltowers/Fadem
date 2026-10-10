@@ -94,9 +94,10 @@ internal sealed class TransitionEditorPanel : Panel
 
     private readonly ToolTip _historyTips = new();
 
-    /// <summary>The attended row the editor last followed playback to, held as the queue's
-    /// version is, to see the listener come to another; null while not following or stopped.</summary>
-    private RowId? _followed;
+    /// <summary>The attended row the editor last followed playback to and the transition the engine
+    /// gave it then, held as the queue's version is, to see the listener come to another row or
+    /// the row's next change under it (round 2 issue 08); nulls while not following or stopped.</summary>
+    private (RowId? Row, Adjacency? Next) _followed;
 
     /// <summary>Whether following playback may open the editor now. A host whose editor is a page
     /// in the lists' place lets it follow only while that page is shown.</summary>
@@ -797,7 +798,8 @@ internal sealed class TransitionEditorPanel : Panel
 
     /// <summary>While the editor follows playback, each row the listener comes to opens it on the
     /// engine's <see cref="PlayerView.EditorFollow"/>, as ✎ would, once: between rows the user can
-    /// open another. Switched on, it follows at once. The last row has nothing to follow to, so the
+    /// open another. So does a drop, a move or a removal that gives the row another next (round 2
+    /// issue 08). Switched on, it follows at once. The last row has nothing to follow to, so the
     /// editor stays where it was. A preview is never ended by it: it follows once the preview has.</summary>
     private void Follow(PlayerView view)
     {
@@ -805,13 +807,13 @@ internal sealed class TransitionEditorPanel : Panel
         {
             return;
         }
-        var row = view.Settings.EditorFollowsPlayback ? view.Attended?.Row.Id : null;
-        if (row == _followed)
+        (RowId? Row, Adjacency? Next) followed = view.Settings.EditorFollowsPlayback ? (view.Attended?.Row.Id, view.EditorFollow) : default;
+        if (followed == _followed)
         {
             return;
         }
-        _followed = row;
-        if (view.EditorFollow is { } adjacency && CanFollow())
+        _followed = followed;
+        if (followed.Next is { } adjacency && CanFollow())
         {
             Open(adjacency);
         }

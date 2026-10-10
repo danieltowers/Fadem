@@ -1,5 +1,6 @@
 using Faderio.Core.Domain;
 using Faderio.Core.Playback;
+using Faderio.Core.Queue;
 
 namespace Faderio.Core.Tests;
 
@@ -60,6 +61,73 @@ public sealed class AdjacencyHeardTests
         Assert.Equal(AdjacencyHeard.Outgoing, tc.Engine.Heard(tc.AdjacencyOf(b, c)));
         tc.Engine.Pause();
         Assert.Equal(AdjacencyHeard.Outgoing, tc.Engine.Heard(tc.AdjacencyOf(b, c)));
+    }
+
+    /// <summary>Round 2 issue 08: the outgoing track heard is green only while its row's next is
+    /// the incoming track, the transition about to be heard. Once the queue gives that row another
+    /// next, by a removal or a move, the pair is not adjacent: <see cref="AdjacencyHeard.OutgoingIntoAnother"/>.</summary>
+    [Fact]
+    public void TheOutgoingTrackPlaying_WithItsNextRemoved_IsOutgoingIntoAnother()
+    {
+        using var tc = TestEngine.Create();
+        var (a, b, c) = Queue(tc);
+        var ab = tc.AdjacencyOf(a, b);
+        tc.Engine.Play();
+        tc.Output.Advance(2 * Second);
+
+        tc.Engine.Remove(new[] { tc.RowOf(b) });
+
+        Assert.Equal(AdjacencyHeard.OutgoingIntoAnother, tc.Engine.Heard(ab));
+        Assert.Equal(AdjacencyHeard.Outgoing, tc.Engine.Heard(tc.AdjacencyOf(a, c)));
+    }
+
+    [Fact]
+    public void TheOutgoingTrackPlaying_WithAnotherRowMovedInAsItsNext_IsOutgoingIntoAnother()
+    {
+        using var tc = TestEngine.Create();
+        var (a, b, c) = Queue(tc);
+        tc.Engine.Play();
+        tc.Output.Advance(2 * Second);
+
+        tc.Engine.Move(new[] { tc.RowOf(c) }, before: tc.RowOf(b));
+
+        Assert.Equal(AdjacencyHeard.OutgoingIntoAnother, tc.Engine.Heard(tc.AdjacencyOf(a, b)));
+        Assert.Equal(AdjacencyHeard.Outgoing, tc.Engine.Heard(tc.AdjacencyOf(a, c)));
+    }
+
+    [Fact]
+    public void TheLastTrackPlaying_WithRepeatOff_IsOutgoingIntoAnother_ForAnyPairItStarts()
+    {
+        using var tc = TestEngine.Create();
+        var (a, _, c) = Queue(tc);
+        tc.Engine.PlayRow(tc.RowOf(c));
+        tc.Output.Advance(2 * Second);
+
+        Assert.Equal(AdjacencyHeard.OutgoingIntoAnother, tc.Engine.Heard(tc.AdjacencyOf(c, a)));
+    }
+
+    [Fact]
+    public void TheLastTrackPlaying_UnderRepeatAll_IsOutgoing_IntoTheFirst()
+    {
+        using var tc = TestEngine.Create();
+        var (a, _, c) = Queue(tc);
+        tc.Engine.SetRepeat(RepeatMode.All);
+        tc.Engine.PlayRow(tc.RowOf(c));
+        tc.Output.Advance(2 * Second);
+
+        Assert.Equal(AdjacencyHeard.Outgoing, tc.Engine.Heard(tc.AdjacencyOf(c, a)));
+    }
+
+    [Fact]
+    public void ATrackPlaying_UnderRepeatOne_IsOutgoing_IntoItself()
+    {
+        using var tc = TestEngine.Create();
+        var (a, _, _) = Queue(tc);
+        tc.Engine.SetRepeat(RepeatMode.One);
+        tc.Engine.Play();
+        tc.Output.Advance(2 * Second);
+
+        Assert.Equal(AdjacencyHeard.Outgoing, tc.Engine.Heard(tc.AdjacencyOf(a, a)));
     }
 
     [Fact]
