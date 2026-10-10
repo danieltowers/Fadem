@@ -130,6 +130,59 @@ public sealed partial class PluginTests
         Assert.Equal(view.ClientSize.Width, view._logo.Right);
     });
 
+    /// <summary>Round 2 issue 12: Cue transition is ⇥ on a dark and a light skin, drawn at
+    /// ⤳'s 13 pt, dimmer when greyed, and centred as ⏭ is.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CueTransition_IsAnArrowToABar_DrawnAndCentredAsTheNextKeyIs(bool light) => RunSta(() =>
+    {
+        if (light)
+        {
+            _musicBee.Skin[(0, 0, 1)] = Opaque(0xF0F0F0);
+            _musicBee.Skin[(2, 0, 1)] = Opaque(0xFFFFFF);
+            _musicBee.Skin[(0, 0, 3)] = Opaque(0x202020);
+        }
+        else
+        {
+            AnswerDuophonic();
+        }
+        using var panel = new Panel { Size = new Size(900, 500) };
+        var view = PaletteView(panel);
+        Assert.Equal(!light, view.Palette.IsDark);
+        Assert.Equal("⇥", view._cueTransition.Text);
+
+        var greyed = KeyInk(view._cueTransition); // stopped: greyed
+        var next = KeyInk(view._next);
+        view._cueTransition.Enabled = true;
+        var lit = KeyInk(view._cueTransition);
+
+        Assert.False(greyed.Bounds.IsEmpty, "no glyph drawn while greyed");
+        Assert.True(greyed.Strength < lit.Strength, $"greyed stands off the face by {greyed.Strength}, live by {lit.Strength}");
+        Assert.True(lit.Bounds.Width >= 10 && lit.Bounds.Height >= 6, $"the glyph is only {lit.Bounds.Size}, ⏭ {next.Bounds.Size}");
+        PointF Centre(Rectangle r, Control key) => new(r.Left + r.Width / 2f - key.Width / 2f, r.Top + r.Height / 2f - key.Height / 2f);
+        var (cue, beside) = (Centre(lit.Bounds, view._cueTransition), Centre(next.Bounds, view._next));
+        Assert.True(Math.Abs(cue.X - beside.X) <= 2 && Math.Abs(cue.Y - beside.Y) <= 2, $"⇥ is off by {cue}, ⏭ by {beside}");
+    });
+
+    /// <summary>A key's glyph as drawn: the bounds of the pixels inside its edge that stand off
+    /// its face (sampled at its left, middle) by more than a faint fringe, and how far the most
+    /// distinct of them stands off it.</summary>
+    private static (Rectangle Bounds, int Strength) KeyInk(Control key)
+    {
+        using var bitmap = new Bitmap(key.Width, key.Height);
+        key.DrawToBitmap(bitmap, new Rectangle(Point.Empty, key.Size));
+        var face = bitmap.GetPixel(4, key.Height / 2);
+        var ink = (from x in Enumerable.Range(4, key.Width - 8)
+                   from y in Enumerable.Range(4, key.Height - 8)
+                   let c = bitmap.GetPixel(x, y)
+                   let off = Math.Abs(c.R - face.R) + Math.Abs(c.G - face.G) + Math.Abs(c.B - face.B)
+                   where off > 90
+                   select (At: new Point(x, y), Off: off)).ToList();
+        return ink.Count == 0 ? (Rectangle.Empty, 0)
+            : (Rectangle.FromLTRB(ink.Min(q => q.At.X), ink.Min(q => q.At.Y), ink.Max(q => q.At.X) + 1, ink.Max(q => q.At.Y) + 1), ink.Max(q => q.Off));
+    }
+
     [Fact]
     public void ASkinThatAnswersNothing_GivesTheBuiltInPalette() => RunSta(() =>
     {

@@ -1,6 +1,6 @@
 # 12: A better icon for Cue transition
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Phase 6, improvements round 2, both hosts. Raised 2026-10-09: "Cue transition button needs a
@@ -32,3 +32,14 @@ button's text colour. Its tooltip stays "Cue transition: play from 5 s before it
 
 - [ ] The chosen icon, in both hosts, legible at the button's size on a dark and a light skin, and
       greyed when the button is disabled.
+
+## Comments
+
+### 2026-10-10, built
+
+Segoe UI Symbol has ⇥ (U+21E5). At the transport's 9 pt it drew as a thin line about 9 x 3 px
+with a faint head, too small beside ⏭ (10 x 7), so it is drawn at 13 pt, the size ⤳ already
+uses for the same reason; no substitute icon. Both hosts share one `arrows` font for ⤳ and ⇥.
+`CueTransition_IsAnArrowToABar_DrawnAndCentredAsTheNextKeyIs` (App, and the plugin on a dark and
+a light skin) checks the glyph is at least 10 x 6, dimmer greyed than live, and centred within
+2 px of ⏭; it fails at 9 pt.

@@ -25,6 +25,46 @@ public sealed partial class HeadlessFormTests
         Assert.True(h.Form.Palette.Same(Palette.Studio)); // no palette.json: the built-in
     });
 
+    /// <summary>Round 2 issue 12: Cue transition is ⇥, "go to a point", drawn in Segoe UI Symbol
+    /// (which has it) at ⤳'s 13 pt, as large as ⏭ near enough, dimmer when greyed, and centred
+    /// as ⏭ is.</summary>
+    [Fact]
+    public void CueTransition_IsAnArrowToABar_DrawnAndCentredAsTheNextKeyIs() => RunSta(() =>
+    {
+        using var h = new Harness();
+        Assert.Equal("⇥", h.Form._cueTransition.Text);
+
+        var greyed = KeyInk(h.Form._cueTransition); // stopped: greyed
+        var next = KeyInk(h.Form._next);
+        h.Form._cueTransition.Enabled = true;
+        var lit = KeyInk(h.Form._cueTransition);
+
+        Assert.False(greyed.Bounds.IsEmpty, "no glyph drawn while greyed");
+        Assert.True(greyed.Strength < lit.Strength, $"greyed stands off the face by {greyed.Strength}, live by {lit.Strength}");
+        Assert.True(lit.Bounds.Width >= 10 && lit.Bounds.Height >= 6, $"the glyph is only {lit.Bounds.Size}, ⏭ {next.Bounds.Size}");
+        PointF Centre(Rectangle r, Control key) => new(r.Left + r.Width / 2f - key.Width / 2f, r.Top + r.Height / 2f - key.Height / 2f);
+        var (cue, beside) = (Centre(lit.Bounds, h.Form._cueTransition), Centre(next.Bounds, h.Form._next));
+        Assert.True(Math.Abs(cue.X - beside.X) <= 2 && Math.Abs(cue.Y - beside.Y) <= 2, $"⇥ is off by {cue}, ⏭ by {beside}");
+    });
+
+    /// <summary>A key's glyph as drawn: the bounds of the pixels inside its edge that stand off
+    /// its face (sampled at its left, middle) by more than a faint fringe, and how far the most
+    /// distinct of them stands off it.</summary>
+    private static (Rectangle Bounds, int Strength) KeyInk(Control key)
+    {
+        using var bitmap = new Bitmap(key.Width, key.Height);
+        key.DrawToBitmap(bitmap, new Rectangle(Point.Empty, key.Size));
+        var face = bitmap.GetPixel(4, key.Height / 2);
+        var ink = (from x in Enumerable.Range(4, key.Width - 8)
+                   from y in Enumerable.Range(4, key.Height - 8)
+                   let c = bitmap.GetPixel(x, y)
+                   let off = Math.Abs(c.R - face.R) + Math.Abs(c.G - face.G) + Math.Abs(c.B - face.B)
+                   where off > 90
+                   select (At: new Point(x, y), Off: off)).ToList();
+        return ink.Count == 0 ? (Rectangle.Empty, 0)
+            : (Rectangle.FromLTRB(ink.Min(q => q.At.X), ink.Min(q => q.At.Y), ink.Max(q => q.At.X) + 1, ink.Max(q => q.At.Y) + 1), ink.Max(q => q.Off));
+    }
+
     // ── Studio theme issue 03: the queue, the playlists and their labels ────────────────
 
     [Fact]

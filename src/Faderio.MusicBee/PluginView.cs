@@ -135,6 +135,8 @@ internal sealed class PluginView : UserControl
         var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _host, _openSettings }, ShowItemToolTips = true, SizingGrip = false };
 
         var symbols = new Font("Segoe UI Symbol", 9f);
+        // Arrows draw small in that font; at 13 pt ⤳ and ⇥ read as clearly as ⏭.
+        var arrows = new Font("Segoe UI Symbol", 13f);
         // Sized so the eight fit MusicBee's sidebar as shipped (284 px) on one row; narrower, the
         // row wraps.
         _prev = new Button { Text = "⏮", Font = symbols, Width = 31, Height = 28, Margin = new Padding(4, 6, 1, 4) };
@@ -142,8 +144,8 @@ internal sealed class PluginView : UserControl
         // Stop is this host's: a guest in MusicBee's process lets go of the device while stopped.
         _stop = new Button { Text = "⏹", Font = symbols, Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
         _next = new Button { Text = "⏭", Font = symbols, Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
-        _transitionNow = new Button { Text = "⤳", Font = new Font("Segoe UI Symbol", 13f), Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
-        _cueTransition = new Button { Text = "⏩", Font = symbols, Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        _transitionNow = new Button { Text = "⤳", Font = arrows, Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
+        _cueTransition = new Button { Text = "⇥", Font = arrows, Width = 31, Height = 28, Margin = new Padding(1, 6, 1, 4) };
         // Hidden: shuffle and repeat are not what faderio is for, but kept wired up.
         _shuffle = new CheckBox { Text = "🔀", Visible = false, Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 35, Height = 28, Margin = new Padding(4, 6, 1, 4) };
         _repeat = new CheckBox { Text = "🔁", Visible = false, Font = symbols, Appearance = Appearance.Button, AutoCheck = false, TextAlign = ContentAlignment.MiddleCenter, Width = 35, Height = 28, Margin = new Padding(1, 6, 1, 4) };
@@ -679,7 +681,7 @@ internal sealed class PluginView : UserControl
 
     internal void SeekTo(Playhead playhead) => _engine.Seek(playhead);
 
-    /// <summary>Before faderio starts to sound, from ▶, ⏩ or a preview: MusicBee's player stops
+    /// <summary>Before faderio starts to sound, from ▶, ⇥ or a preview: MusicBee's player stops
     /// unless faderio sounds already and so already has the device.</summary>
     private void StopMusicBeesPlayerIfSilent()
     {

@@ -152,9 +152,10 @@ internal sealed class MainForm : Form
         _prev = new Button { Text = "⏮", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _next = new Button { Text = "⏭", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
-        // Arrows draw small in this font; at 13 pt the wave arrow reads as clearly as ⏭.
-        _transitionNow = new Button { Text = "⤳", Font = new Font("Segoe UI Symbol", 13f), Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
-        _cueTransition = new Button { Text = "⏩", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
+        // Arrows draw small in this font; at 13 pt ⤳ and ⇥ read as clearly as ⏭.
+        var arrows = new Font("Segoe UI Symbol", 13f);
+        _transitionNow = new Button { Text = "⤳", Font = arrows, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
+        _cueTransition = new Button { Text = "⇥", Font = arrows, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         // Hidden: shuffle and repeat are not what faderio is for, but kept wired up.
         // Push buttons that stay pressed in while on. They never check themselves: what they
         // show is always the view's, set in Render.

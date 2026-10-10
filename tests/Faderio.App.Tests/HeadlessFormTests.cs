@@ -1190,7 +1190,7 @@ public sealed partial class HeadlessFormTests
         // Ordinal: UI text comparison folds ⏹ and ⏸ together.
         Assert.DoesNotContain(transport.Controls.Cast<Control>(), c => string.Equals(c.Text, "⏹", StringComparison.Ordinal));
         Assert.Equal(
-            new[] { "⏮", "▶", "⏭", "⤳", "⏩", "🔀", "🔁" }, // Sync editor is the editor's (round 2 issue 02)
+            new[] { "⏮", "▶", "⏭", "⤳", "⇥", "🔀", "🔁" }, // Sync editor is the editor's (round 2 issue 02)
             transport.Controls.OfType<ButtonBase>().OrderBy(transport.GetColumn).Select(c => c.Text).ToArray());
     });
 

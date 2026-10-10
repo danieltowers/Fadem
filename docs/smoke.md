@@ -75,7 +75,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       and in the title; Esc puts the old name back. A name another playlist has is refused with
       "Not renamed: …" in the strip, and the old name stays.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
-- [ ] The transport row reads ⏮ ▶ ⏭ ⤳ 🔀 🔁, then −5 s, the seek bar, +5 s and the time; no ⏹.
+- [ ] The transport row reads ⏮ ▶ ⏭ ⤳ ⇥ 🔀 🔁, then −5 s, the seek bar, +5 s and the time; no ⏹.
       The editor has a TRANSITION EDITOR pane title with the **Sync editor** checkbox at its
       right (round 2 issue 02).
 - [ ] Between the buttons and the transport row, a line names the playing track in a larger
@@ -273,6 +273,9 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] Between ⏭ and the shuffle toggle, the Transition now button (⤳) reads clearly and its
       tooltip says "Transition now". It is greyed out while stopped, while paused, on the last
       row with repeat off, and during a crossfade, and live otherwise.
+- [ ] Beside it, Cue transition is ⇥, an arrow into a bar (round 2 issue 12): about as large as
+      ⏭ and centred like it, legible on a dark and a light palette, dim while greyed. Its tooltip
+      says "Cue transition: play from 5 s before it".
 - [ ] **Sync editor** is unticked in a fresh library, and its tooltip says what it does. Ticked
       while a row plays, the editor opens on that row's this → next at once; when the next
       track comes in (once the outgoing one falls silent) it moves to that track's this → next.
@@ -490,7 +493,7 @@ which a background run cannot give.
 - [ ] With the settings file naming a library whose open playlist holds two generated tones,
       **Play** starts faderio: the meter shows the tone. **Stop** ends it: the meter reads 0.
 - [ ] **The view** (phase 5 issue 10), placed as above and present after a restart: under a
-      "faderio" header, the transport row ⏮ ▶ ⏹ ⏭ ⤳ 🔀 🔁, then −5 s, the seek bar, +5 s and
+      "faderio" header, the transport row ⏮ ▶ ⏹ ⏭ ⤳ ⇥ 🔀 🔁, then −5 s, the seek bar, +5 s and
       "0:00 / -0:00"; **Playlists** listing the library's playlists with the open one bold in
       the accent on a raised tint; the pane labels PLAYLISTS, QUEUE and TRANSITION EDITOR in the
       text colour (round 2 issue 06); the queue with #, Title, Artist, Length and a ✎ on every
