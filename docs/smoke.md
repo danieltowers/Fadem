@@ -170,6 +170,10 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       ("abc", or a point past the end) shows its reason and is dropped on leaving.
 - [ ] The transition editor opens with its title fully visible — not clipped, not behind
       another control.
+- [ ] **Each half names its track** (round 2 issue 10): with a boundary open, the outgoing
+      track's title, dim, on its own line above **Fade-out point**, and the incoming track's above
+      **Fade-in point**. A title wider than the editor ends in "…" and is whole in its tooltip.
+      With no boundary open neither line shows and they leave no gap.
 - [ ] All four parameter fields, the capture buttons, **From end** beside the fade-out point
       and the **Fade curve** list are visible without scrolling at the default window size.
 - [ ] Undo, Redo and Remove transition are visible (Render is hidden, round 2 issue 09) once the editor is open on an
@@ -231,7 +235,8 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       or not a number.
 - [ ] Each **duration** box has the same four, laid out as a point's: **−** and **+** beside it,
       **−1** and **+1** under them. They stop at 0; a blank duration moves from the grey value it
-      plays. At the default 1240×660 the editor scrolls to reach its last row of buttons.
+      plays. At the default 1240×720 (round 2 issue 10) the editor shows its last row of buttons
+      without scrolling, a boundary open or not.
 - [ ] **Preview** and **Stop preview** sit together in the editor, Stop preview greyed out
       until a preview runs. While one runs, Preview reads **Preview again**, and the line under
       them shows the phase and each voice's position ("Pre-roll · outgoing 2:25", then

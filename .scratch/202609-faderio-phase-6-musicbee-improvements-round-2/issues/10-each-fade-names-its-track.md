@@ -1,6 +1,6 @@
 # 10: Each half of the editor names its track
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Phase 6, improvements round 2, both hosts. Raised 2026-10-09: "make it clearer which section
@@ -27,3 +27,22 @@ take no height they did not have to.
 - [ ] The editor still fits the App's default window (1240 × 660) and the MusicBee sidebar without
       a new scroll (memory: editor panel height budget); issue 09 frees a row toward this.
 - [ ] A shell test checks the two labels follow the open boundary, and empty with none.
+
+## Comments
+
+### 2026-10-10, built
+
+`TransitionEditorPanel`: a Dim line above Fade-out point names the outgoing track and one above
+Fade-in point the incoming (`Presenter.TitleOf`, now public), one line with "…" and whole in a
+tooltip; hidden with no adjacency open, so their auto-sized rows take no height.
+`EditorNamesItsTracksTests` covers placement, following, closing and a long title.
+
+**The window-size line was changed by the user's decision.** Measured with `GetScrollInfo` at
+1240 x 660: HEAD's editor already overflowed by 16 px with no adjacency open (the logo commits
+took the slack after issue 09), and the two titles add 44 px with one open, 60 in all. Asked, the
+user chose a taller default window: 1240 x 720, where nothing scrolls, open or closed. In the
+portable MusicBee's main panel the titles show and nothing scrolls; the sidebar, a page that
+scrolls by design at ~330 px, was not checked.
+
+Note: the heading names the adjacency by file names (`Adjacency.Name`), the new lines by title
+tag, so a tagged track reads differently in the two.

@@ -2559,7 +2559,7 @@ public sealed partial class HeadlessFormTests
         using var h = new Harness(windowFile: file);
 
         Assert.Equal(FormStartPosition.CenterScreen, h.Form.StartPosition);
-        Assert.Equal(new Size(1240, 660), h.Form.Size);
+        Assert.Equal(new Size(1240, 720), h.Form.Size); // round 2 issue 10: the editor whole with an adjacency open
     });
 
     [Fact]

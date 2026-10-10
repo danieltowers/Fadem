@@ -125,7 +125,8 @@ internal static class Presenter
         _ => "Nothing is playing",
     };
 
-    private static string TitleOf(Track track) =>
+    /// <summary>A track's display name: its title, else its file's name.</summary>
+    public static string TitleOf(Track track) =>
         string.IsNullOrEmpty(track.Title) ? Path.GetFileNameWithoutExtension(track.FilePath) : track.Title;
 
     /// <summary>A gone track's tooltip in the manager (phase 3 issue 02).</summary>

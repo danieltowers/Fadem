@@ -32,6 +32,9 @@ internal sealed class TransitionEditorPanel : Panel
     private readonly Action? _beforeSounding;
 
     internal readonly Label _title;
+    internal readonly Label _outgoingTitle;
+    internal readonly Label _incomingTitle;
+    internal readonly ToolTip _titleTips = new();
     internal readonly TrafficLight _light;
     internal readonly ToolTip _lightTip = new();
     internal readonly RadioButton _editGlobal;
@@ -203,11 +206,13 @@ internal sealed class TransitionEditorPanel : Panel
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         row++;
 
+        _outgoingTitle = TrackTitle(layout, ref row);
         _fadeOutFromEnd = new CheckBox { Text = "From end", Dock = DockStyle.Fill, Enabled = false, Margin = new Padding(3, 0, 3, 0) };
         _fadeOutPoint = Field(layout, ref row, TransitionField.FadeOutPoint, "Fade-out point (s)", _fadeOutFromEnd, out _captureOut, "Capture", out _captureOutHint);
         (_fadeOutLess, _fadeOutMore, _fadeOutLessSecond, _fadeOutMoreSecond) = NudgeButtons(_fadeOutPoint);
         _fadeOutDuration = Field(layout, ref row, TransitionField.FadeOutDuration, "Fade-out duration (s)", null, out _, null, out _);
         (_fadeOutDurationLess, _fadeOutDurationMore, _fadeOutDurationLessSecond, _fadeOutDurationMoreSecond) = NudgeButtons(_fadeOutDuration, "Shorter", "Longer");
+        _incomingTitle = TrackTitle(layout, ref row);
         _fadeInPoint = Field(layout, ref row, TransitionField.FadeInPoint, "Fade-in point (s)", null, out _captureIn, "Capture", out _captureInHint);
         (_fadeInLess, _fadeInMore, _fadeInLessSecond, _fadeInMoreSecond) = NudgeButtons(_fadeInPoint);
         _fadeInDuration = Field(layout, ref row, TransitionField.FadeInDuration, "Fade-in duration (s)", null, out _, null, out _);
@@ -365,6 +370,40 @@ internal sealed class TransitionEditorPanel : Panel
 
     /// <summary>The line beside a field that says why its value was refused; hidden otherwise.</summary>
     internal Label ReasonFor(TransitionField field) => _reasons[field];
+
+    /// <summary>The line above a half of the fields naming the track it is (round 2 issue 10): one
+    /// line cut short with "…", whole in its tooltip. Hidden with no adjacency open, so its row
+    /// takes no height.</summary>
+    private Label TrackTitle(TableLayoutPanel layout, ref int row)
+    {
+        var title = new Label
+        {
+            AutoSize = false,
+            AutoEllipsis = true,
+            Anchor = AnchorStyles.Left | AnchorStyles.Right,
+            Height = Font.Height + 2,
+            Visible = false,
+            Margin = new Padding(3, 4, 3, 0),
+        };
+        StudioTheme.SetInk(title, Ink.Dim);
+        title.FontChanged += (_, _) => title.Height = title.Font.Height + 2; // one line, whatever the host's font
+        layout.Controls.Add(title, 0, row);
+        layout.SetColumnSpan(title, 2);
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        row++;
+        return title;
+    }
+
+    /// <summary>The track titles above the halves: the open adjacency's, or none.</summary>
+    private void ShowTrackTitles(Adjacency? adjacency)
+    {
+        foreach (var (label, track) in new[] { (_outgoingTitle, adjacency?.Outgoing), (_incomingTitle, adjacency?.Incoming) })
+        {
+            label.Text = track is null ? "" : Presenter.TitleOf(track);
+            label.Visible = track is not null;
+            _titleTips.SetToolTip(label, label.Text);
+        }
+    }
 
     private TextBox Field(
         TableLayoutPanel layout, ref int row, TransitionField field, string label, Control? beside,
@@ -639,6 +678,7 @@ internal sealed class TransitionEditorPanel : Panel
         _adjacency = adjacency;
         _loadedStore = _engine.View.StoreVersion;
         _title.Text = adjacency.Name;
+        ShowTrackTitles(adjacency);
         ShowLayer();
         var layers = _engine.Transition(adjacency);
         var playlist = Layer == TransitionLayer.Playlist;
@@ -682,6 +722,7 @@ internal sealed class TransitionEditorPanel : Panel
     {
         _adjacency = null;
         _title.Text = NoAdjacency;
+        ShowTrackTitles(null);
         Fill(null, editing: false, global: null);
         ShowLayers(TransitionLayers.None);
     }
