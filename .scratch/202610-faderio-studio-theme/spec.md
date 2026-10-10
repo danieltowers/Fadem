@@ -20,7 +20,8 @@ Branch `prototype/ui-themes` (commit `efc6c81`), throwaway, never for main. It p
 over the real main window, with a floating switcher (`pwsh
 src/Faderio.App/Prototype/run-prototype-theme.ps1 -Theme B`): today's, A MusicBee Duophonic
 (flat, monochrome), **B Studio console**, and C Neon DJ. **B won.** Its structure is the design.
-Its fixed graphite and amber colours are not: those come from the host's skin.
+Its fixed graphite and amber colours are not: those come from the host's skin, all but the
+accent, which is faderio's own blue (round 2 issue 07, 2026-10-09).
 
 ## Solution
 
@@ -64,9 +65,9 @@ The look is drawn only from a **palette**: ten roles, never a hard-coded colour.
 | Text | text | element 0, default, foreground | `#E1E1E1` |
 | Dim | headers, scale, disabled, unreadable | element 7, state 3, foreground | `#6D6D6D` |
 | Raised | selection, hover | Key, 8% toward white (toward black on a light skin) | `#3D3D3D` |
-| Accent | LED, readout, playing row, played, labels | element 7, state 4, foreground | `#CD5C5C` |
+| Accent | LED, readout, playing row, played, labels | fixed `#0078D7`, Windows' default selection blue, on every skin (round 2 issue 07); the skin's own (element 7, state 4, foreground) is not read | `#0078D7` |
 | Fade | the seek bar's wedges | Accent at 30% over Chrome | derived |
-| Mark | fade marks and handles | red `#E0453A`, or Text where the Accent is itself red, so the marks stand apart from the played part | Text |
+| Mark | fade marks and handles | red `#E0453A`, or Text where the Accent is itself red, so the marks stand apart from the played part | `#E0453A` |
 
 These values were measured on 2026-10-06 by a temporary probe in the installed plugin. The probe
 called every element from −12 to 40, every state from 0 to 12 and every component from 0 to 6.
@@ -75,14 +76,14 @@ draws its own bars in element 2's `#1C1C1C`. Issue 02 moved the mapping one step
 elements −1, 0, 2, 7, 10, 14, 15, 16 and 17 answer; every other combination is black. The
 plugin's `MusicBeeInterface.cs` names only five elements and two states, so the spec names the
 numbers it found. State 4's foreground (`#CD5C5C`, indian red) is the skin's one colour that is
-not grey. It is the accent.
+not grey. It was the accent until round 2 issue 07 (2026-10-09) made the accent a fixed blue.
 
 - **Rules over the raw values.** A role whose read is black where its neighbours are not (an
   element a skin leaves out) falls back to the role it derives from: Well → Chrome, Edge →
-  Chrome darkened, Key → Chrome lightened. An accent with too little saturation (a monochrome
-  skin with no highlight), or one too close to the text to look lit (below 1.5:1), falls back to
-  amber `#FFB000`, or deep amber `#8A5000` on a light skin (2026-10-08). An accent without 3:1
-  on Well moves a fifth of the way toward Text until it has it. Text that has too little contrast on
+  Chrome darkened, Key → Chrome lightened. The accent is `#0078D7` on dark and light skins
+  alike; on a Well where it has less than 3:1 it moves a fifth of the way toward Text until it
+  has it. (Until round 2 issue 07 the accent was the skin's, with amber `#FFB000` and deep amber
+  `#8A5000` as fallbacks; both are gone.) Text that has too little contrast on
   Well (below 4.5:1) is pushed to white or black. A light skin gives a light palette, and the
   same look works on it: keys, wells and LEDs are all drawn from the roles.
 - **When it is read.** The plugin reads the palette as its view is made, and again whenever
@@ -90,7 +91,7 @@ not grey. It is the accent.
   needs a restart, is checked at the smoke step and recorded.
 - **The standalone app** has no MusicBee to ask. It uses the palette the plugin last read on
   this machine, which the plugin writes to the app's machine folder (`%APPDATA%\faderio\palette.json`)
-  each time it reads one. With none, it uses a built-in Studio palette: B's graphite and amber.
+  each time it reads one. With none, it uses a built-in Studio palette: B's graphite, with the blue accent.
   The two hosts on one machine then look alike, and an app user without MusicBee still gets the
   look.
 
@@ -116,7 +117,8 @@ not grey. It is the accent.
 ## Testing
 
 - **`Palette`** (net8.0 and net48): Duophonic's measured values give the table's roles. A
-  monochrome accent falls back to amber. A black role falls back to the role it derives from.
+  accent is `#0078D7` whatever the skin answers, pulled toward Text on a Well it fails 3:1 on.
+  A black role falls back to the role it derives from.
   Low-contrast text is pushed. A light skin gives a light palette whose contrast holds.
 - **Headless controls:** a themed tree has no `SystemColors` left in any colour, the original
   greys included. A key paints its LED only when on. The readout uses the monospaced face. The
@@ -138,7 +140,8 @@ Replace the "stock look" assumptions in `docs/smoke.md`'s Looks halves.
 ## Decisions (accepted by the user, 2026-10-06)
 
 1. **The accent is the skin's own** (Duophonic: indian red `#CD5C5C`), not B's amber. Amber only
-   when the skin has no accent.
+   when the skin has no accent. *Superseded 2026-10-09 by round 2 issue 07: the accent is a
+   fixed `#0078D7` on every skin.*
 2. **The app follows the plugin's last palette** through `palette.json`, else the built-in
    Studio palette. The alternative is that the app always uses the built-in palette.
 3. **No theme setting** in this slice: no light/dark toggle, no picker. The skin decides. A

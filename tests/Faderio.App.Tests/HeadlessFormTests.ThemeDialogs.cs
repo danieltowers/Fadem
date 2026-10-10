@@ -24,7 +24,7 @@ public sealed partial class HeadlessFormTests
     {
         var duophonic = Palette.From(new SkinColours(
             unchecked((int)0xFF1C1C1C), unchecked((int)0xFF121212), 0, unchecked((int)0xFF2C2C2C),
-            unchecked((int)0xFFE1E1E1), unchecked((int)0xFF6D6D6D), unchecked((int)0xFFCD5C5C)));
+            unchecked((int)0xFFE1E1E1), unchecked((int)0xFF6D6D6D)));
         using var settings = new SettingsForm(new MachineSettings(), new PlayerSettings(), null, duophonic);
 
         Assert.Empty(AllControls(settings).Where(c => c.BackColor.IsSystemColor || c.ForeColor.IsSystemColor)

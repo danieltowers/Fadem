@@ -177,11 +177,12 @@ internal sealed class Host : IDisposable
             // The chrome meets the strip MusicBee draws above the panel: element 2's colour on some
             // skins (Duophonic, MusicBee3), element 0's in state 1 on others (CalciumMETRO), which
             // the palette chooses between. The wells sit a step darker, at element 16's border, and
-            // the edges are derived darker still.
+            // the edges are derived darker still. The skin's accent is not read: faderio's is its
+            // own blue (round 2 issue 07).
             int Read(int element, int state, int component) => ReadSkin?.Invoke(element, state, component) ?? 0;
             palette = Palette.From(new SkinColours(
                 Chrome: Read(2, 0, 1), Well: Read(16, 0, 0), Edge: 0, Key: Read(7, 0, 1),
-                Text: Read(0, 0, 3), Dim: Read(7, 3, 3), Accent: Read(7, 4, 3), Bars: Read(0, 1, 1)));
+                Text: Read(0, 0, 3), Dim: Read(7, 3, 3), Bars: Read(0, 1, 1)));
         }
         catch (Exception e) when (e is not OutOfMemoryException)
         {

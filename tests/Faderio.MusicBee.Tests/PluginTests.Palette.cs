@@ -19,7 +19,7 @@ public sealed partial class PluginTests
         _musicBee.Skin[(16, 0, 0)] = Opaque(0x121212);
         _musicBee.Skin[(7, 0, 1)] = Opaque(0x2C2C2C);
         _musicBee.Skin[(7, 3, 3)] = Opaque(0x6D6D6D);
-        _musicBee.Skin[(7, 4, 3)] = Opaque(0xCD5C5C);
+        _musicBee.Skin[(7, 4, 3)] = Opaque(0xCD5C5C); // its red accent, which faderio does not take
     }
 
     private PluginView PaletteView(Panel panel)
@@ -44,7 +44,7 @@ public sealed partial class PluginTests
 
         Assert.Equal("#1C1C1C", Palette.Hex(view.Palette.Chrome)); // MusicBee's own bars
         Assert.Equal("#121212", Palette.Hex(view.Palette.Well));
-        Assert.Equal("#CD5C5C", Palette.Hex(view.Palette.Accent));
+        Assert.Equal("#0078D7", Palette.Hex(view.Palette.Accent)); // round 2 issue 07: the blue, not the skin's red
         Assert.True(Palette.Load(file)!.Same(view.Palette));
     });
 

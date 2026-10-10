@@ -50,7 +50,9 @@ public sealed partial class HeadlessFormTests
             .Select(x => drawn.GetPixel(x, row.Top + row.Height / 2).ToArgb())
             .GroupBy(c => c).OrderByDescending(g => g.Count()).First().Key;
         Assert.Equal(p.Raised.ToArgb(), ground);
-        var stock = new[] { SystemColors.Window, SystemColors.Info, Faderio.Shell.RowMarks.Selected, SystemColors.Highlight }.Select(c => c.ToArgb()).ToHashSet();
+        // The accent is Windows' default selection blue (round 2 issue 07), so a pixel of it is no stock one.
+        var stock = new[] { SystemColors.Window, SystemColors.Info, Faderio.Shell.RowMarks.Selected, SystemColors.Highlight }.Select(c => c.ToArgb())
+            .Where(c => c != p.Accent.ToArgb()).ToHashSet();
         // Within the rows, which the style draws; the frame and scroll bars are the theme's.
         var drawnRows = rows.Cast<ListViewItem>().Select(i => Rectangle.Intersect(i.Bounds, new Rectangle(System.Drawing.Point.Empty, drawn.Size)));
         Assert.DoesNotContain(drawnRows.SelectMany(r => Enumerable.Range(r.Left, r.Width)

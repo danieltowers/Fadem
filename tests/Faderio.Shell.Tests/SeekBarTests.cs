@@ -265,7 +265,9 @@ public sealed class SeekBarTests
         Assert.Equal(duophonic.Fade.ToArgb(), At(1.4, Top)); // inside the fade-in's wedge
         Assert.Equal(duophonic.Mark.ToArgb(), At(3.5, Top));
         Assert.Equal(duophonic.Chrome.ToArgb(), At(2.5, Top)); // the ground
-        var stock = new[] { SystemColors.Highlight, SystemColors.ControlDark, SystemColors.Control }.Select(c => c.ToArgb()).ToHashSet();
+        // The accent is Windows' default selection blue (round 2 issue 07), so a pixel of it is no stock one.
+        var stock = new[] { SystemColors.Highlight, SystemColors.ControlDark, SystemColors.Control }.Select(c => c.ToArgb())
+            .Where(c => c != duophonic.Accent.ToArgb()).ToHashSet();
         Assert.DoesNotContain(Enumerable.Range(0, picture.Width).SelectMany(x => Enumerable.Range(0, picture.Height).Select(y => picture.GetPixel(x, y).ToArgb())),
             stock.Contains);
     }

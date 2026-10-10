@@ -20,7 +20,7 @@ public sealed partial class PluginTests
             var renderer = Assert.IsType<StudioRenderer>(menu.Renderer);
             Assert.Same(view.Palette, renderer.Palette);
         }
-        Assert.Equal("#CD5C5C", Palette.Hex(view._noticeCount.LinkColor));
+        Assert.Equal("#0078D7", Palette.Hex(view._noticeCount.LinkColor));
     });
 
     [Fact]

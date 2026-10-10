@@ -7,20 +7,21 @@ namespace Faderio.Shell.Theme;
 /// What a skin says, before any rule: each as MusicBee answers <c>Setting_GetSkinElementColour</c>,
 /// an ARGB value, or 0 where the skin does not answer (studio theme issue 01). The plugin reads
 /// them; a host with no skin has none. <paramref name="Bars"/> is the other colour MusicBee may draw
-/// its bars in (light-skin fix, 2026-10-08).
+/// its bars in (light-skin fix, 2026-10-08). No accent: faderio's is its own blue on every skin
+/// (round 2 issue 07).
 /// </summary>
-internal sealed record SkinColours(int Chrome, int Well, int Edge, int Key, int Text, int Dim, int Accent, int Bars = 0)
+internal sealed record SkinColours(int Chrome, int Well, int Edge, int Key, int Text, int Dim, int Bars = 0)
 {
     /// <summary>No skin at all: every role falls back.</summary>
-    public static SkinColours None { get; } = new(0, 0, 0, 0, 0, 0, 0);
+    public static SkinColours None { get; } = new(0, 0, 0, 0, 0, 0);
 }
 
 /// <summary>
-/// The colours the studio look is drawn in (studio theme spec, "The colours"): ten roles, never a
-/// fixed colour. Made from a skin's answers by <see cref="From"/>, whose rules keep any skin
-/// usable: a role the skin leaves out falls back to the one it derives from, a grey accent (or
-/// one that looks like the text) to amber, deep amber on a light skin, and text without contrast
-/// to white or black. <see cref="Studio"/> is the built-in one,
+/// The colours the studio look is drawn in (studio theme spec, "The colours"): ten roles, all but
+/// the accent from the skin. Made from a skin's answers by <see cref="From"/>, whose rules keep any
+/// skin usable: a role the skin leaves out falls back to the one it derives from, text without
+/// contrast goes to white or black, and the accent, Windows' selection blue on every skin (round 2
+/// issue 07), is pulled toward the text on a well it does not read on. <see cref="Studio"/> is the built-in one,
 /// for a host with no skin. Kept as <c>palette.json</c> in the App's machine folder, where the
 /// plugin writes what it last read so the App on the same machine looks alike.
 /// </summary>
@@ -30,16 +31,14 @@ internal sealed record Palette(
 {
     public const string FileName = "palette.json";
 
-    private static readonly Color Amber = Color.FromArgb(0xFF, 0xB0, 0x00);
-
-    /// <summary>The fallback accent on a light skin, where amber itself is too pale to read:
-    /// 4.5:1 on CalciumMETRO's well.</summary>
-    private static readonly Color DeepAmber = Color.FromArgb(0x8A, 0x50, 0x00);
+    /// <summary>The accent: Windows' default selection blue, which the seek bar drew in before
+    /// the studio theme. Fixed, so it never follows Windows' settings or the skin.</summary>
+    private static readonly Color Blue = Color.FromArgb(0x00, 0x78, 0xD7);
     private static readonly Color Red = Color.FromArgb(0xE0, 0x45, 0x3A);
 
-    /// <summary>The built-in palette: the prototype's studio console, graphite and amber.</summary>
+    /// <summary>The built-in palette: the prototype's studio console in graphite.</summary>
     public static Palette Studio { get; } = From(new SkinColours(
-        Argb(0x2A2D33), Argb(0x18191D), Argb(0x0A0A0C), Argb(0x3A3F47), Argb(0xD8DCE2), Argb(0x7C8490), Argb(0xFFB000)));
+        Argb(0x2A2D33), Argb(0x18191D), Argb(0x0A0A0C), Argb(0x3A3F47), Argb(0xD8DCE2), Argb(0x7C8490)));
 
     /// <summary>Whether the wells are dark: the native dark scroll bars and title bar follow it.</summary>
     public bool IsDark => Luminance(Well) < 0.18;
@@ -73,15 +72,10 @@ internal sealed record Palette(
         {
             dim = Mix(text, well, 0.5);
         }
-        var fallback = dark ? Amber : DeepAmber;
-        var accent = Answered(skin.Accent) is { } a && Saturation(a) >= 0.25 ? a : fallback;
+        var accent = Blue;
         for (var i = 0; i < 10 && Contrast(accent, well) < 3; i++)
         {
             accent = Mix(text, accent, 0.2); // a fifth of the way toward the text
-        }
-        if (Contrast(accent, text) < 1.5)
-        {
-            accent = fallback; // lit and plain would look alike
         }
         var raised = Shade(key, dark ? 0.08 : -0.08);
         var fade = Mix(accent, chrome, 0.3);
@@ -177,14 +171,6 @@ internal sealed record Palette(
     {
         var (la, lb) = (Luminance(a), Luminance(b));
         return (Math.Max(la, lb) + 0.05) / (Math.Min(la, lb) + 0.05);
-    }
-
-    /// <summary>HSV saturation, 0 for a grey.</summary>
-    private static double Saturation(Color c)
-    {
-        var max = Math.Max(c.R, Math.Max(c.G, c.B));
-        var min = Math.Min(c.R, Math.Min(c.G, c.B));
-        return max == 0 ? 0 : (max - min) / (double)max;
     }
 
     private static double HueDistance(Color a, Color b)

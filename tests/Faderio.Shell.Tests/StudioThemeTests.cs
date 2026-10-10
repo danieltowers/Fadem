@@ -187,7 +187,7 @@ public sealed class StudioThemeTests
     {
         var light = Palette.From(new SkinColours(
             unchecked((int)0xFFF0F0F0), unchecked((int)0xFFFFFFFF), unchecked((int)0xFFC8C8C8), unchecked((int)0xFFE6E6E6),
-            unchecked((int)0xFF202020), unchecked((int)0xFF808080), unchecked((int)0xFF1F77B4)));
+            unchecked((int)0xFF202020), unchecked((int)0xFF808080)));
         using var panel = new Panel();
         var list = new ListView();
         panel.Controls.Add(list);

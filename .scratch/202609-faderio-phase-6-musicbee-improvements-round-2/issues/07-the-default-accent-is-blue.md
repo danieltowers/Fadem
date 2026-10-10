@@ -1,6 +1,6 @@
 # 07: The accent is blue, on every skin
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Phase 6, improvements round 2, both hosts. Raised 2026-10-09: "change default highlight colour to
@@ -38,3 +38,15 @@ that is "the original blue".
 - [ ] `PaletteTests` pin the accent at `#0078D7` whatever the skin answers, and the nudge on a
       Well where it fails contrast.
 - [ ] The studio theme spec's and `docs/smoke.md`'s wording about the skin's accent updated.
+
+## Comments
+
+### 2026-10-10, built
+
+`Palette.From`: the accent is a fixed `#0078D7` on every skin, nudged toward Text only on a Well
+it fails 3:1 on; `Amber`, `DeepAmber`, the saturation test and the too-close-to-text fallback are
+gone. `SkinColours` has no accent and the plugin no longer reads element 7, state 4. Mark is red
+on every skin now, the user's included. The blue equals Windows' default `SystemColors.Highlight`
+pixel for pixel, so the two "no stock colour drawn" checks (seek bar, App queue rows) leave the
+accent out of their stock set. The portable MusicBee wrote `#0078D7` on Duophonic, CalciumMETRO
+and MusicBee3 (no nudge on any of their wells), and the App drew it from those files.

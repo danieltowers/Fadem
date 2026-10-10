@@ -111,7 +111,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] **The seek bar and the LED readout** (studio theme issue 04), playing a track with
       authored fades (silent WAVs play it without sound): the played part and the thumb are the
       accent, the groove is a dark edge, the fade wedges are the accent at low strength, the marks
-      and their handles are the mark colour (red, or the text colour where the accent is red),
+      and their handles are the mark colour (red; the accent is blue, round 2 issue 07),
       and the scale is dim. The time readout is large, monospaced, in the text colour (round 2
       issue 06) and whole; the seconds under it are small and dim.
 - [ ] **The transition editor** (studio theme issue 05), with no boundary open and then open on
@@ -189,8 +189,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] Ticking **From end** on a fade-out point of 3.5 on a 5 s track shows 1.5; unticking shows
       3.5 again. The fade curve lists Equal-power and Linear.
 - [ ] Saving a fade-out point past the end of its track stores nothing: the strip says "Not
-      saved", and the reason shows in the mark colour under the field (red; the text colour on a
-      red-accented palette, round 2 issue 06), readable in full, without pushing
+      saved", and the reason shows in the mark colour under the field (red, round 2 issue 07), readable in full, without pushing
       the buttons out of sight. The next good value clears it.
 - [ ] At the top of the editor, "Editing: ● Global ○ This playlist (*name*)". Switched to This
       playlist, the boxes are empty with the global values in grey, the curve reads "(global)",
@@ -565,7 +564,7 @@ which a background run cannot give.
       selected" with its fields greyed, and no Close bar; ✎ on row 1 fills it.
 - [ ] **A save and its notice.** Fade-out duration typed as "abc", Enter: the strip reads "Not
       saved: …" with a **1 notice** link and no box appears; the reason shows in the mark colour
-      under the field (the text colour while the skin's accent is red, round 2 issue 06).
+      under the field (red: the accent is blue whatever the skin, round 2 issue 07).
       Typed as 3, Enter: "Saved tone-a-440 → tone-b-660." in the strip, ✎ on row 1 bold,
       and the library's `transitions.json` holds the 3 s fade-out duration, as standalone
       faderio would have saved it. **Undo** (and Ctrl+Z with focus in the editor) puts the
@@ -590,7 +589,8 @@ which a background run cannot give.
       MusicBee's Preferences, its library chooser (**Choose…**), the transition manager, the
       notice list and the section name dialog are in the skin's colours, with no white or
       system-grey surface. The queue's, header's and playlist's right-click menus are on
-      MusicBee's chrome, with items in the text colour and ticks in the indian red accent.
+      MusicBee's chrome, with items in the text colour and ticks in the accent, `#0078D7` whatever the skin's own
+      accent (round 2 issue 07).
 - [ ] **A rule under MusicBee's strip** (round 2 issue 01): a one-pixel line in the palette's edge
       colour runs the full width of the plugin's top, between MusicBee's strip and the track's
       line, in the sidebar and in the Now Playing tab, on a dark and a light skin.
