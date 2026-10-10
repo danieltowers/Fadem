@@ -76,8 +76,9 @@ public sealed class StudioThemeTests
         Assert.True(LedLit(toggle));
     });
 
+    /// <summary>In Text since round 2 issue 06: the accent is kept for what marks a state.</summary>
     [Fact]
-    public void APaneTitle_IsASectionLabel_InTheAccent_InSmallBoldCapitals() => RunSta(() =>
+    public void APaneTitle_IsASectionLabel_InText_InSmallBoldCapitals() => RunSta(() =>
     {
         using var panel = new Panel { Size = new Size(200, 60) };
         var title = PaneTitle.Create("Playlists");
@@ -85,13 +86,14 @@ public sealed class StudioThemeTests
 
         StudioTheme.Apply(panel, Duophonic);
 
-        Assert.Equal(Duophonic.Accent, title.ForeColor);
+        Assert.Equal(Duophonic.Text, title.ForeColor);
         Assert.True(title.Font.Bold);
         Assert.True(title.Font.Size < panel.Font.Size);
         Assert.Equal("Playlists", title.Text); // drawn in capitals, named as given
         using var bitmap = new Bitmap(title.Width, title.Height);
         title.DrawToBitmap(bitmap, new Rectangle(0, 0, title.Width, title.Height));
-        Assert.Contains(Pixels(bitmap), c => Near(c, Duophonic.Accent));
+        Assert.Contains(Pixels(bitmap), c => Near(c, Duophonic.Text));
+        Assert.DoesNotContain(Pixels(bitmap), c => Near(c, Duophonic.Accent));
     });
 
     [Fact]
@@ -117,10 +119,27 @@ public sealed class StudioThemeTests
         Assert.Empty(off);
     });
 
+    /// <summary>Round 2 issue 06: a refusal or warning is in Mark, the seek bar's red, not the
+    /// accent. On the built-in palette the two differ (on a red-accented one Mark is the text).</summary>
+    [Fact]
+    public void AWarning_IsInMark_NotTheAccent() => RunSta(() =>
+    {
+        using var panel = new Panel();
+        var warning = new Label { Text = "Not saved" };
+        panel.Controls.Add(warning);
+        StudioTheme.SetInk(warning, Ink.Warning);
+
+        StudioTheme.Apply(panel, Palette.Studio);
+
+        Assert.Equal(Palette.Studio.Mark, warning.ForeColor);
+        Assert.NotEqual(Palette.Studio.Accent, warning.ForeColor);
+    });
+
     // ── Studio theme issue 04: the LED readout ──────────────────────────────────────────
 
+    /// <summary>The readout in Text since round 2 issue 06.</summary>
     [Fact]
-    public void TheReadout_IsTheLedFaceInTheAccent_AndTheSecondsUnderItAreDim() => RunSta(() =>
+    public void TheReadout_IsTheLedFaceInText_AndTheSecondsUnderItAreDim() => RunSta(() =>
     {
         using var panel = new Panel { Size = new Size(400, 60) };
         var time = Readout.Time();
@@ -133,7 +152,7 @@ public sealed class StudioThemeTests
         StudioTheme.Apply(panel, Duophonic);
         time.Text = "0:14 / -3:03";
 
-        Assert.Equal(Duophonic.Accent, time.ForeColor);
+        Assert.Equal(Duophonic.Text, time.ForeColor);
         Assert.Equal(Duophonic.Dim, seconds.ForeColor);
         Assert.Equal("Consolas", time.DrawnFont.Name);
         Assert.Equal(Readout.LedSize, time.DrawnFont.Size); // it fits whole at full size

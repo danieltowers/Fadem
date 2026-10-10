@@ -32,7 +32,7 @@ public sealed class EditorThemeTests
         editor.Commit();
         editor.Refresh(tc.View);
         AssertThemed(editor);
-        Assert.Equal(Duophonic.Accent, editor.ReasonFor(TransitionField.FadeOutPoint).ForeColor); // a refusal is lit
+        Assert.Equal(Duophonic.Mark, editor.ReasonFor(TransitionField.FadeOutPoint).ForeColor); // a refusal is in Mark (round 2 issue 06); Duophonic's red accent makes Mark its text, so AWarning_IsInMark_NotTheAccent holds the red
     });
 
     private static void AssertThemed(TransitionEditorPanel editor)
@@ -44,7 +44,7 @@ public sealed class EditorThemeTests
         Assert.Equal(Duophonic.Text, editor._title.ForeColor);
         Assert.Equal(Duophonic.Dim, editor._captureOutHint.ForeColor);
         Assert.Equal(Duophonic.Dim, editor._effective.ForeColor);
-        Assert.Equal(Duophonic.Accent, editor._missing.ForeColor);
+        Assert.Equal(Duophonic.Mark, editor._missing.ForeColor);
         Assert.All(new[] { editor._fadeOutLess, editor._fadeOutMore, editor._fadeOutLessSecond, editor._fadeOutMoreSecond },
             b => Assert.True(StudioTheme.IsKey(b) && b.FlatStyle == FlatStyle.Flat));
         Assert.Equal(Duophonic, editor._light.Palette);

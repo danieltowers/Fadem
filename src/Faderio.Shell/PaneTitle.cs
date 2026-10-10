@@ -3,8 +3,8 @@ namespace Faderio.Shell;
 /// <summary>
 /// The title bar over a pane: the playlists, and in the plugin's view the queue and the editor
 /// beside them (phase 6), one height and alignment so the panes' boxes start level. It reads in
-/// small bold capitals, which <see cref="Theme.StudioTheme"/> sets in the accent (studio theme
-/// issue 03); its text stays as given.
+/// small bold capitals, which <see cref="Theme.StudioTheme"/> sets in Text (studio theme issue 03;
+/// the accent until round 2 issue 06); its text stays as given.
 /// </summary>
 public static class PaneTitle
 {

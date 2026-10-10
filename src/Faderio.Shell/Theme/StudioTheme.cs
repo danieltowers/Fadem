@@ -13,7 +13,8 @@ internal enum Ink
     /// <summary>A hint or a secondary line, in Dim.</summary>
     Dim,
 
-    /// <summary>A refusal or a warning, in the accent: the look's one lit colour.</summary>
+    /// <summary>A refusal or a warning, in Mark, the seek bar's red: the accent is kept for what
+    /// marks a state (round 2 issue 06).</summary>
     Warning,
 }
 
@@ -67,7 +68,7 @@ internal static class StudioTheme
     }
 
     /// <summary>Draws <paramref name="control"/>'s text in <paramref name="ink"/>'s role, now and
-    /// whenever it is themed: a hint in Dim, a refusal in the accent.</summary>
+    /// whenever it is themed: a hint in Dim, a refusal in Mark (round 2 issue 06).</summary>
     public static void SetInk(Control control, Ink ink)
     {
         var state = States.GetOrCreateValue(control);
@@ -78,7 +79,7 @@ internal static class StudioTheme
     private static Color InkOf(Palette p, Ink ink) => ink switch
     {
         Ink.Dim => p.Dim,
-        Ink.Warning => p.Accent,
+        Ink.Warning => p.Mark,
         _ => p.Text,
     };
 
@@ -183,10 +184,10 @@ internal static class StudioTheme
                 buttons.Paint += PaintSpinButtons;
                 break;
             case PaneTitle.Title title:
-                title.ForeColor = p.Accent; // a section label, lit (studio theme issue 03)
+                title.ForeColor = p.Text; // a section label (studio theme issue 03), in Text (round 2 issue 06)
                 break;
             case Readout readout:
-                readout.ForeColor = readout.Led ? p.Accent : p.Dim; // the LED readout (studio theme issue 04)
+                readout.ForeColor = readout.Led ? p.Text : p.Dim; // the LED readout (studio theme issue 04), in Text (round 2 issue 06)
                 break;
             case SeekBar seek:
                 seek.Palette = p;
@@ -747,7 +748,7 @@ internal static class StudioTheme
     }
 
     /// <summary>A group box's frame in Edge and its title as a section label, small bold capitals
-    /// in the accent, over what WinForms drew in the system's colours.</summary>
+    /// in Text (round 2 issue 06), over what WinForms drew in the system's colours.</summary>
     private static void PaintGroup(object? sender, PaintEventArgs e)
     {
         if (sender is not GroupBox group || !States.TryGetValue(group, out var state))
@@ -772,7 +773,7 @@ internal static class StudioTheme
             {
                 g.FillRectangle(ground, label);
             }
-            TextRenderer.DrawText(g, text, title, new Point(label.X + 3, 0), group.Enabled ? p.Accent : p.Dim,
+            TextRenderer.DrawText(g, text, title, new Point(label.X + 3, 0), group.Enabled ? p.Text : p.Dim,
                 TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
         }
     }

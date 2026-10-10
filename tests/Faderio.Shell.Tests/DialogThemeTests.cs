@@ -149,7 +149,9 @@ public sealed class DialogThemeTests
         Assert.DoesNotContain(pixels, c => c.R > 0xC0 && c.G > 0xC0 && c.B > 0xC0 && !Near(c, Duophonic.Text)); // no light arrows' ground
         using var groupBitmap = new Bitmap(group.Width, group.Height);
         group.DrawToBitmap(groupBitmap, new Rectangle(0, 0, group.Width, group.Height));
-        Assert.Contains(Enumerable.Range(0, 60).Select(x => groupBitmap.GetPixel(x, 6)), c => Near(c, Duophonic.Accent)); // its title, lit
+        var titleRow = Enumerable.Range(0, 60).Select(x => groupBitmap.GetPixel(x, 6)).ToList();
+        Assert.Contains(titleRow, c => Near(c, Duophonic.Text)); // its title, in Text (round 2 issue 06)
+        Assert.DoesNotContain(titleRow, c => Near(c, Duophonic.Accent));
     });
 
     /// <summary>On screen: the box exists only while a name is being edited, which needs a shown

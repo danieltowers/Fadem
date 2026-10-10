@@ -161,7 +161,7 @@ public sealed partial class PluginTests
     });
 
     [Fact]
-    public void InTheSidebar_TheLedReadoutIsWholeAndInTheAccent_AndTheSeekRowHoldsOneLine() => RunSta(() =>
+    public void InTheSidebar_TheLedReadoutIsWholeAndInText_AndTheSeekRowHoldsOneLine() => RunSta(() =>
     {
         AnswerDuophonic();
         using var panel = new Panel { Size = new Size(285, 700) }; // MusicBee's sidebar, as shipped
@@ -169,7 +169,7 @@ public sealed partial class PluginTests
         Click(view._playPause);
         view.Render();
 
-        Assert.Equal(view.Palette.Accent, view._time.ForeColor);
+        Assert.Equal(view.Palette.Text, view._time.ForeColor); // round 2 issue 06
         Assert.Equal(view.Palette.Dim, view._seconds.ForeColor);
         Assert.StartsWith("0:00 / -", view._time.Text);
         var font = view._time.DrawnFont;

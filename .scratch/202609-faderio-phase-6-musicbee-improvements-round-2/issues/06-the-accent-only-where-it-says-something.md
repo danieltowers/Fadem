@@ -1,6 +1,6 @@
 # 06: The accent only where it marks a state
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Phase 6, improvements round 2, both hosts. Raised 2026-10-09: "remove highlight colour from track
@@ -32,3 +32,14 @@ taken off what does not:
 - [ ] The seek bar unchanged apart from issue 07's colour.
 - [ ] Theme tests that pinned these uses to the accent updated; `docs/smoke.md`'s studio theme
       items updated to match.
+
+## Comments
+
+### 2026-10-10, built
+
+`StudioTheme`: pane titles, the Settings groups' titles and the LED readout are in Text (Dim when
+disabled, the seconds line still Dim); `Ink.Warning` is Mark. Every other accent use is on the
+keep list, and `SeekBar` is untouched. On a red-accented palette (the user's skin, until issue 07)
+Mark is the text colour, so a refusal there reads in the text colour, not red; on the built-in
+and light palettes it is red (`AWarning_IsInMark_NotTheAccent`).
+

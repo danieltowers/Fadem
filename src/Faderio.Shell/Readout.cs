@@ -3,8 +3,8 @@ namespace Faderio.Shell;
 /// <summary>
 /// The time readout in either host (studio theme issue 04): <see cref="Time"/>, "0:14 / -3:03",
 /// is the LED readout, large in a monospaced face, which <see cref="Theme.StudioTheme"/> sets in
-/// the accent; <see cref="Seconds"/>, the line under it, stays small and is set in Dim. The time
-/// is drawn at <see cref="LedSize"/> where it fits, and smaller where it does not, as in the
+/// Text (the accent until round 2 issue 06); <see cref="Seconds"/>, the line under it, stays
+/// small and is set in Dim. The time is drawn at <see cref="LedSize"/> where it fits, and smaller where it does not, as in the
 /// plugin's sidebar or on an hour-long track, so it is never cut short.
 /// </summary>
 internal sealed class Readout : Label

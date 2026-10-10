@@ -112,8 +112,8 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       authored fades (silent WAVs play it without sound): the played part and the thumb are the
       accent, the groove is a dark edge, the fade wedges are the accent at low strength, the marks
       and their handles are the mark colour (red, or the text colour where the accent is red),
-      and the scale is dim. The time readout is large, monospaced, in the accent and whole; the
-      seconds under it are small and dim.
+      and the scale is dim. The time readout is large, monospaced, in the text colour (round 2
+      issue 06) and whole; the seconds under it are small and dim.
 - [ ] **The transition editor** (studio theme issue 05), with no boundary open and then open on
       one: no white or system-grey box anywhere in it. The boxes are dark wells with a hairline
       edge. **From end**, ● Global and ○ This playlist sit on the panel's own ground, their box
@@ -128,7 +128,8 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       box (its one-pixel frame stays Windows' grey, a known gap). Each is in the palette, with
       a dark title bar and no white or system-grey surface.
       Lists and boxes are wells framed in a dark hairline. The Settings groups' titles are small
-      capitals in the accent, and the spin boxes and their arrows are dark. The manager's
+      capitals in the text colour (round 2 issue 06), and the spin boxes and their arrows are
+      dark. The manager's
       headings are small dim capitals, its rows are on the well, and Preview and Preview global
       are keys. The queue's, header's and playlist's right-click menus, and the Section
       submenu, are on the chrome with a raised highlight: items in the text colour, disabled
@@ -188,7 +189,8 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] Ticking **From end** on a fade-out point of 3.5 on a 5 s track shows 1.5; unticking shows
       3.5 again. The fade curve lists Equal-power and Linear.
 - [ ] Saving a fade-out point past the end of its track stores nothing: the strip says "Not
-      saved", and the reason shows in the accent under the field, readable in full, without pushing
+      saved", and the reason shows in the mark colour under the field (red; the text colour on a
+      red-accented palette, round 2 issue 06), readable in full, without pushing
       the buttons out of sight. The next good value clears it.
 - [ ] At the top of the editor, "Editing: ● Global ○ This playlist (*name*)". Switched to This
       playlist, the boxes are empty with the global values in grey, the curve reads "(global)",
@@ -315,7 +317,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       12 s again.
 - [ ] Down the left, between the transport row and the status strip, a ~200 px **Playlists**
       panel lists the library's playlists, the open one bold in the accent on a raised tint, under
-      a PLAYLISTS label in the accent. In a fresh
+      a PLAYLISTS label in the text colour (round 2 issue 06). In a fresh
       temp library launched with two files it shows "Untitled", highlighted. Right-click on empty
       space offers **New playlist** (Rename and Delete greyed out); it adds "Untitled 2",
       highlighted, and empties the queue and the editor.
@@ -492,7 +494,8 @@ which a background run cannot give.
       "faderio" header, the transport row ⏮ ▶ ⏹ ⏭ ⤳ 🔀 🔁, then −5 s, the seek bar, +5 s and
       "0:00 / -0:00"; **Playlists** listing the library's playlists with the open one bold in
       the accent on a raised tint; the pane labels PLAYLISTS, QUEUE and TRANSITION EDITOR in the
-      accent; the queue with #, Title, Artist, Length and a ✎ on every row but the last, bold
+      text colour (round 2 issue 06); the queue with #, Title, Artist, Length and a ✎ on every
+      row but the last, bold
       where this → next is authored (phase 5 issue 11), and row 1 marked at rest (🔈); the strip
       reading "Ready." and, at its right, "library · WASAPI shared at 48000 Hz on Speakers
       (…)", the device in use (phase 5 issue 13). In the
@@ -561,8 +564,9 @@ which a background run cannot give.
       editor is docked at the right from the start, 340 px wide, reading "No boundary
       selected" with its fields greyed, and no Close bar; ✎ on row 1 fills it.
 - [ ] **A save and its notice.** Fade-out duration typed as "abc", Enter: the strip reads "Not
-      saved: …" with a **1 notice** link and no box appears; the reason shows in the accent under
-      the field. Typed as 3, Enter: "Saved tone-a-440 → tone-b-660." in the strip, ✎ on row 1 bold,
+      saved: …" with a **1 notice** link and no box appears; the reason shows in the mark colour
+      under the field (the text colour while the skin's accent is red, round 2 issue 06).
+      Typed as 3, Enter: "Saved tone-a-440 → tone-b-660." in the strip, ✎ on row 1 bold,
       and the library's `transitions.json` holds the 3 s fade-out duration, as standalone
       faderio would have saved it. **Undo** (and Ctrl+Z with focus in the editor) puts the
       duration back, "Undone: saved …"; **Redo** puts 3 back.

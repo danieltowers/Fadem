@@ -60,7 +60,7 @@ public sealed partial class HeadlessFormTests
     });
 
     [Fact]
-    public void TheOpenPlaylist_IsInTheAccent_OnRaised_AndTheHeadingIsLit() => RunSta(() =>
+    public void TheOpenPlaylist_IsInTheAccent_OnRaised_AndTheHeadingIsInText() => RunSta(() =>
     {
         using var h = new Harness();
         h.Form.Render();
@@ -72,14 +72,14 @@ public sealed partial class HeadlessFormTests
         Assert.Equal(p.Raised, open.BackColor);
         var heading = sidebar.Controls.OfType<Label>().Single();
         Assert.Equal("Playlists", heading.Text);
-        Assert.Equal(p.Accent, heading.ForeColor);
+        Assert.Equal(p.Text, heading.ForeColor); // round 2 issue 06
         Assert.True(heading.Font.Bold);
     });
 
     // ── Studio theme issue 04: the seek bar and the LED readout ─────────────────────────
 
     [Fact]
-    public void TheReadout_IsTheLedFaceInTheAccent_WholeAtFullSize_AndTheSeekBarTakesThePalette() => RunSta(() =>
+    public void TheReadout_IsTheLedFaceInText_WholeAtFullSize_AndTheSeekBarTakesThePalette() => RunSta(() =>
     {
         using var h = new Harness();
         h.Form.AddPaths(new[] { TestAudio.WriteDcWav("alpha.wav", 5, 0.4) });
@@ -88,7 +88,7 @@ public sealed partial class HeadlessFormTests
         var p = h.Form.Palette;
 
         Assert.Same(p, h.Form._seek.Palette);
-        Assert.Equal(p.Accent, h.Form._time.ForeColor);
+        Assert.Equal(p.Text, h.Form._time.ForeColor); // round 2 issue 06
         Assert.Equal(p.Dim, h.Form._seconds.ForeColor);
         var font = h.Form._time.DrawnFont;
         Assert.Equal(("Consolas", Faderio.Shell.Readout.LedSize), (font.Name, font.Size));
