@@ -56,3 +56,12 @@ still meets the transport); in the plugin's main panel beside the track's line a
 on the track's line there, shrunk to 22 px. The App's editor, which already scrolled a little at
 1240 x 660, is 8 px shorter.
 
+
+### 2026-10-10, the logo cut at its left in MusicBee
+
+The user: "the logo is cropped on the left hand edge. if i resize the window it stops being
+cropped". The view starts narrow, so the logo starts on the track's line at that line's width;
+widening moved it into its column, but the header's docking did not run again for a change made
+inside its own layout, so it kept the narrow width and the art, drawn from the right, lost its
+left 16 px until the next resize. The header now places the logo and the rows itself
+(`PluginView.FitHeader`), and `APanelThatWidens_GivesTheLogoTheWidthOfItsFullHeight` holds it.

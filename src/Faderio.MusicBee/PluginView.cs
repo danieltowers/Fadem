@@ -53,6 +53,7 @@ internal sealed class PluginView : UserControl
     internal readonly Label _attendedTrack;
     internal readonly Logo _logo;
     private readonly Panel _header;
+    private readonly Panel _rows;
     private readonly Panel _trackLine;
     private readonly FlowLayoutPanel _buttons;
     internal readonly Button _prev;
@@ -320,17 +321,19 @@ internal sealed class PluginView : UserControl
         _trackLine = new Panel { Dock = DockStyle.Top, Height = 26 };
         _trackLine.Controls.Add(_attendedTrack);
         _buttons = buttons;
-        var rows = new Panel { Dock = DockStyle.Fill };
-        rows.Controls.Add(buttons);
-        rows.Controls.Add(_trackLine);
+        // Placed by FitHeader, not docked.
+        _rows = new Panel();
+        _rows.Controls.Add(buttons);
+        _rows.Controls.Add(_trackLine);
         // The logo at the top right (round 2 issue 05): in a main panel a column of its own beside
         // the track's line and the buttons; in a sidebar on the track's line, as tall as the line
         // allows, so the buttons keep the sidebar's width (FitWidth).
         _logo = new Logo(Palette.IsDark) { Dock = DockStyle.Right };
         _header = new Panel { Dock = DockStyle.Top };
-        _header.Controls.Add(rows);
+        _header.Controls.Add(_rows);
         Controls.Add(_header);
         buttons.SizeChanged += (_, _) => FitHeader();
+        _header.Resize += (_, _) => FitHeader();
         Resize += (_, _) => FitWidth();
         FitWidth();
 
@@ -546,27 +549,42 @@ internal sealed class PluginView : UserControl
             _readoutColumn.Width = readout;
         }
         PlaceEditor();
-        // Docked last, so rightmost: past the name on the track's line, or past both rows.
-        Hold(_logo, narrow ? _trackLine : _header, DockStyle.Right);
+        // On the track's line docked last, so rightmost, past the name; in its column placed by
+        // FitHeader.
+        Hold(_logo, narrow ? _trackLine : _header, narrow ? DockStyle.Right : DockStyle.None);
         FitHeader();
         var preferred = TextRenderer.MeasureText(_host.Text, _host.Font).Width + 8;
         _host.Width = Math.Max(0, Math.Min(preferred, ClientSize.Width / 2));
     }
 
-    /// <summary>The track's line over the buttons, and as tall as the logo where it has its column.</summary>
+    /// <summary>The track's line over the buttons, and where the logo has its column, as tall as
+    /// the logo and the logo at their right. Placed here, not docked: the header's docking does
+    /// not run again for a change made inside its own layout (the buttons' height changes there),
+    /// and left to it the logo kept the track's line's width when it moved into its column, its
+    /// art cut at the left until the next resize (2026-10-10).</summary>
     private void FitHeader()
     {
+        var column = _logo.Parent == _header;
         var rows = _trackLine.Height + _buttons.Height;
-        var height = _logo.Parent == _header ? Math.Max(rows, _logo.Room) : rows;
+        var height = column ? Math.Max(rows, _logo.Room) : rows;
         if (_header.Height != height)
         {
             _header.Height = height;
         }
-        // The buttons' height can change inside the header's own layout, which does not run again
-        // for its new height: the logo takes it here.
-        if (_logo.Parent == _header && _logo.Height != _header.DisplayRectangle.Height)
+        var room = _header.DisplayRectangle;
+        var logoWidth = column ? _logo.WidthFor(room.Height) : 0;
+        if (column)
         {
-            _logo.Height = _header.DisplayRectangle.Height;
+            Place(_logo, new Rectangle(room.Right - logoWidth, room.Top, logoWidth, room.Height));
+        }
+        Place(_rows, new Rectangle(room.Left, room.Top, room.Width - logoWidth, room.Height));
+    }
+
+    private static void Place(Control control, Rectangle bounds)
+    {
+        if (control.Bounds != bounds)
+        {
+            control.Bounds = bounds;
         }
     }
 

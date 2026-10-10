@@ -111,6 +111,25 @@ public sealed partial class PluginTests
         Assert.True(view._playPause.Bottom + view._playPause.Parent!.Top <= view._logo.Bottom); // the buttons beside it
     });
 
+    /// <summary>The user saw the logo cut at its left (2026-10-10): the view starts narrow, so the
+    /// logo starts on the track's line at that line's width, and widening put it in its column
+    /// without the width for its full height until the next resize.</summary>
+    [Fact]
+    public void APanelThatWidens_GivesTheLogoTheWidthOfItsFullHeight() => RunSta(() =>
+    {
+        AnswerDuophonic();
+        using var panel = new Panel { Size = new Size(284, 700) };
+        var view = PaletteView(panel);
+        Assert.Same(view._attendedTrack.Parent, view._logo.Parent);
+
+        panel.Width = 1200;
+
+        Assert.NotSame(view._attendedTrack.Parent, view._logo.Parent);
+        Assert.Equal(view._logo.Room - 4, view._logo.ArtSize.Height);
+        Assert.Equal(view._logo.ArtSize.Width + 4, view._logo.Width);
+        Assert.Equal(view.ClientSize.Width, view._logo.Right);
+    });
+
     [Fact]
     public void ASkinThatAnswersNothing_GivesTheBuiltInPalette() => RunSta(() =>
     {

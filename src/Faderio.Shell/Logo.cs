@@ -141,12 +141,16 @@ internal sealed class Logo : Control
     private void FitWidth()
     {
         var room = Parent is { } p && Dock is DockStyle.Left or DockStyle.Right ? p.DisplayRectangle.Height : int.MaxValue;
-        var width = WidthAt(Math.Max(1, Math.Min(Scaled(LogicalHeight), room - 2 * Inset))) + 2 * Inset;
+        var width = WidthFor(room);
         if (Width != width)
         {
             Width = width;
         }
     }
+
+    /// <summary>Its width at <paramref name="height"/>: the art's at the height it is drawn,
+    /// insets included.</summary>
+    public int WidthFor(int height) => WidthAt(Math.Max(1, Math.Min(Scaled(LogicalHeight), height - 2 * Inset))) + 2 * Inset;
 
     private int Scaled(int pixels) => (int)Math.Round(pixels * DeviceDpi / 96.0);
 
