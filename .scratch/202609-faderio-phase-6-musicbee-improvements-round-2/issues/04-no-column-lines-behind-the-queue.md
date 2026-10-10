@@ -1,6 +1,6 @@
 # 04: No column lines behind the queue
 
-Status: ready-for-human
+Status: resolved
 Blocked by: none
 
 Phase 6, improvements round 2, both hosts. Raised 2026-10-09: "remove the divider lines in the
@@ -50,3 +50,8 @@ row, with and without sections, in both hosts. The column header's own separator
 **For the user:** in MusicBee, with sections shown, sweep the mouse over the rows and the section
 headers, then look below the last row and between rows. No rules means this resolves. Rules mean
 a screenshot, and this goes back to ready-for-agent.
+
+### 2026-10-10, resolved
+
+The user swept the mouse over the rows and section headers in MusicBee with sections shown: no
+rules below the last row or between rows.
