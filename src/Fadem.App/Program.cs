@@ -1,3 +1,4 @@
+using System.Reflection;
 using Fadem.Shell;
 using Fadem.Core.Persistence;
 using Fadem.Core.Playback;
@@ -58,6 +59,10 @@ internal static class Program
                 known => Forget(machine, known, notify),
                 palette: palette)
             : launch.Folder;
+        // The splash (2026-10-11), once the chooser is done with, for the rest of the load.
+        using var splash = new Splash(palette,
+            typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
+        splash.ShowNow();
         var library = folder is null ? null : Library.Open(folder);
 
         // The engine owns both settings files; only the output mode is read here, since the
@@ -76,10 +81,12 @@ internal static class Program
         output.ModeChanged += () => form.BeginInvoke(() => form.Render());
         form.Shown += (_, _) =>
         {
+            splash.Close();
             // Queued behind the posted notices, so a rejection notice from the add is the last
             // thing shown.
             form.BeginInvoke(async () => await form.RunLaunchArguments(args));
         };
+        splash.WaitOutMinimum();
         Application.Run(form);
     }
 

@@ -162,7 +162,7 @@ internal sealed class Logo : Control
     /// <summary>A copy of the trimmed art, the logo's own: GDI+ draws a bitmap on one thread at a
     /// time, and logos are built and drawn on several (tests in parallel, both hosts). A clone
     /// copies the pixels exactly, where drawing the art into a new bitmap could round its edges.</summary>
-    private static Bitmap TrimmedArt(bool dark)
+    internal static Bitmap TrimmedArt(bool dark)
     {
         lock (TrimmedArtsLock)
         {
@@ -207,7 +207,7 @@ internal sealed class Logo : Control
         return right < 0 ? new Bitmap(art) : art.Clone(Rectangle.FromLTRB(left, top, right + 1, bottom + 1), PixelFormat.Format32bppArgb);
     }
 
-    private static Bitmap Scale(Image art, Size size)
+    internal static Bitmap Scale(Image art, Size size)
     {
         var scaled = new Bitmap(size.Width, size.Height);
         using var g = Graphics.FromImage(scaled);
