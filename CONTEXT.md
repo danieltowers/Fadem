@@ -266,3 +266,11 @@ Output the listener hears beyond full scale, attributed to what caused it: the a
 transition was in flight, or else the attended track. Clips are latched until the user clears
 them.
 _Avoid_: Overload, distortion, peak
+
+### Releases
+
+**Version**:
+A release of Fadem, named by its git tag in semver: `v1.0.0`, `v1.0.1`, `v1.1.0`. The tag, the
+installer and the assembly all carry the same number. "v2" and "v3" in older tickets and ADRs
+name the predecessor repo and this repo's first stretch of work, not releases.
+_Avoid_: v3, Fadem v3, generation

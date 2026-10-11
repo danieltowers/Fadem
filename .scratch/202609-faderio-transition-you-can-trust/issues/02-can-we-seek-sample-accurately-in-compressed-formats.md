@@ -76,5 +76,5 @@ files longer than eight seconds, and seek accuracy at rates other than 44.1 kHz.
 **Consequence for the map.** The mitigation choice is a real decision with real costs, so it
 became [ticket 09](09-how-exact-is-the-authoring-promise.md) rather than being settled here.
 The one-line warm-up read that rescues FLAC is recorded against
-[ticket 07](07-migrate-faderio-core-into-v3.md) as a repair, since it is near-free and
+[ticket 07](07-migrate-faderio-core.md) as a repair, since it is near-free and
 removes the only catastrophic case whatever ticket 09 decides.

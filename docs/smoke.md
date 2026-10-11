@@ -1,13 +1,13 @@
 # Smoke checklist
 
 Run by **every session that touches the shell**, before that session's commit. Decided in
-[wayfinder ticket 06](../.scratch/202609-faderio-v3/issues/06-how-do-we-make-green-tests-and-a-broken-app-impossible.md).
+[wayfinder ticket 06](../.scratch/202609-faderio-transition-you-can-trust/issues/06-how-do-we-make-green-tests-and-a-broken-app-impossible.md).
 
 The list is in two halves, each run by the party that can actually judge it. A session never
 reports "smoke passed" on items it could not perceive.
 
 Scoped to the slice as defined in
-[ticket 05](../.scratch/202609-faderio-v3/issues/05-what-exactly-is-in-the-narrow-slice.md).
+[ticket 05](../.scratch/202609-faderio-transition-you-can-trust/issues/05-what-exactly-is-in-the-narrow-slice.md).
 Extend it when the shell grows; never let an item go stale.
 
 ## Looks — the agent runs this

@@ -163,7 +163,7 @@ Externally: `Playhead`, `Point`, `Length`, and `TimeSpan` for durations. `Frames
 exactly one seam, `IAudioOutput`, so a samples count cannot cross it — v2's
 `FramesToSamplesProvider` bug becomes a compile error at the adapter edge. *Samples* appear in
 no public signature anywhere. Inside the mixer, plain `long`; a `Frames` type for internal
-discipline is noted against [ticket 07](07-migrate-faderio-core-into-v3.md).
+discipline is noted against [ticket 07](07-migrate-faderio-core.md).
 
 ### The placement rule
 

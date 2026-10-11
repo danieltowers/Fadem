@@ -267,7 +267,7 @@ as done; this would be a narrower new question.
 - FFmpeg master: `libavformat/mp3dec.c`, `libavformat/mp3enc.c`, `libavcodec/libmp3lame.c` at <https://github.com/FFmpeg/FFmpeg>
 - Rockbox master: `lib/rbcodec/metadata/mp3data.c`, `lib/rbcodec/metadata/mp3.c`, `lib/rbcodec/codecs/mpa.c` at <https://github.com/Rockbox/rockbox>
 - Apple TN2258: <https://developer.apple.com/library/archive/technotes/tn2258/_index.html>
-- faderio: `src/Fadem.Core/Playback/AudioProbe.cs`, `AudioSources.cs`; `tests/Fadem.Core.Tests/Fixtures/generate.sh` and the checked-in MP3 fixtures (bytes read directly); ticket 14 and ticket 08 of `.scratch/202609-faderio-v3/`
+- faderio: `src/Fadem.Core/Playback/AudioProbe.cs`, `AudioSources.cs`; `tests/Fadem.Core.Tests/Fixtures/generate.sh` and the checked-in MP3 fixtures (bytes read directly); ticket 14 and ticket 08 of `.scratch/202609-faderio-transition-you-can-trust/`
 
 ## Addendum: the library survey (2026-09-23)
 

@@ -9,7 +9,7 @@ decoder has read ahead to. We split position into two quantities with distinct t
 and derive the playhead at the output boundary from frames the device reports it has actually
 emitted, rather than by subtracting a latency constant.
 
-Decided in [ticket 03](../../.scratch/202609-faderio-v3/issues/03-what-position-does-set-from-here-capture.md),
+Decided in [ticket 03](../../.scratch/202609-faderio-transition-you-can-trust/issues/03-what-position-does-set-from-here-capture.md),
 which holds the detail. Terms are defined in [CONTEXT.md](../../CONTEXT.md).
 
 ## Considered options

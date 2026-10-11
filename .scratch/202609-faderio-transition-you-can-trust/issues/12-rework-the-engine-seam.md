@@ -7,7 +7,7 @@ Blocked by: 07
 ## Question
 
 Nothing to decide: build the interface [ticket 04](04-what-is-the-seam-between-the-shell-and-the-engine.md)
-settled, on the migrated core from [ticket 07](07-migrate-faderio-core-into-v3.md). This is the
+settled, on the migrated core from [ticket 07](07-migrate-faderio-core.md). This is the
 first of three build tickets graduated from the map's fog once 04 — the last gating decision —
 resolved.
 

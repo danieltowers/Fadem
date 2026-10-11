@@ -17,7 +17,7 @@ silently ignores the authored point and starts from the first sample.
 
 Note that a near-free repair, one warm-up read before the first seek, takes FLAC from two
 seconds of error to 31 ms. That repair is already recorded against
-[ticket 07](07-migrate-faderio-core-into-v3.md) and does not wait on this ticket. What this
+[ticket 07](07-migrate-faderio-core.md) and does not wait on this ticket. What this
 ticket decides is what happens after it.
 
 To settle:

@@ -11,7 +11,7 @@ it is added, with a structured reason the shell formats. The table and the matri
 same commit: a row without a test is unpromised, a test without a row proves nothing the product
 claims.
 
-Decided in [ticket 08](../../.scratch/202609-faderio-v3/issues/08-what-audio-does-faderio-promise-to-play-correctly.md),
+Decided in [ticket 08](../../.scratch/202609-faderio-transition-you-can-trust/issues/08-what-audio-does-faderio-promise-to-play-correctly.md),
 which holds the survey of the user's library (903 files: MP3, FLAC and WAV, all 16-bit, all
 stereo, all 44.1 kHz bar four 48 kHz MP3s) that sized the first table.
 

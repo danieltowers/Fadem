@@ -11,7 +11,7 @@ stop→set-current→play. The engine now exposes intent-shaped commands and a v
 `View`, and no live collection crosses the seam. Every command is total. State is published after
 the engine lock is released, through an `IEngineSink` the caller supplies.
 
-Decided in [ticket 04](../../.scratch/202609-faderio-v3/issues/04-what-is-the-seam-between-the-shell-and-the-engine.md),
+Decided in [ticket 04](../../.scratch/202609-faderio-transition-you-can-trust/issues/04-what-is-the-seam-between-the-shell-and-the-engine.md),
 which holds the full interface sketch. The placement rule is in [`CLAUDE.md`](../../CLAUDE.md).
 
 ## How it was reached

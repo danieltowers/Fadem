@@ -36,7 +36,7 @@ To settle:
 Note that fixing the two defects is cheap and does not need this ticket: the inverted
 conversion is a two-character change and the missing encoding is one switch case. Those are
 recorded against
-[Migrate Faderio.Core into v3](07-migrate-faderio-core-into-v3.md). This ticket exists
+[Migrate Faderio.Core into v3](07-migrate-faderio-core.md). This ticket exists
 because patching them without deciding the policy would leave the same trap for the next
 person.
 

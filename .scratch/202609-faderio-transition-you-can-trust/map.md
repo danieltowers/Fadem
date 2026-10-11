@@ -97,7 +97,7 @@ asking whether the current work could fail that way again.
   converged on the substance and differed only in packaging. Placement rule in `CLAUDE.md`.
   Recorded as [ADR 0003](../../docs/adr/0003-command-surface-and-view.md).
 
-- [Migrate Faderio.Core into v3](issues/07-migrate-faderio-core-into-v3.md):
+- [Migrate Faderio.Core into v3](issues/07-migrate-faderio-core.md):
   Done. Core and tests imported verbatim (true baseline **92**), then the four known defects
   repaired red-first with regression cells, the store's serialisation quirks fixed, and the
   real-input matrix started: **141 tests pass**. Measured along the way: NVorbis rejects

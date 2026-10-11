@@ -11,10 +11,10 @@ and the real-input matrix asserts on every promised cell that this equals the de
 **exactly, in frames**. `Track.Duration` is deleted; TagLib remains for title, artist and
 ReplayGain only.
 
-Decided in [ticket 10](../../.scratch/202609-faderio-v3/issues/10-which-length-is-a-track.md);
-built in [ticket 12](../../.scratch/202609-faderio-v3/issues/12-rework-the-engine-seam.md)
+Decided in [ticket 10](../../.scratch/202609-faderio-transition-you-can-trust/issues/10-which-length-is-a-track.md);
+built in [ticket 12](../../.scratch/202609-faderio-transition-you-can-trust/issues/12-rework-the-engine-seam.md)
 (probe, deletion, truncated-file behaviour) and
-[ticket 14](../../.scratch/202609-faderio-v3/issues/14-fill-the-real-input-matrix.md) (the
+[ticket 14](../../.scratch/202609-faderio-transition-you-can-trust/issues/14-fill-the-real-input-matrix.md) (the
 fourth assertion).
 
 ## Considered options

@@ -1,4 +1,4 @@
-# Fadem v3
+# Fadem
 
 ## Agent skills
 

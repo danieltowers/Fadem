@@ -9,8 +9,8 @@ a 48 kHz file on a 48 kHz device was resampled twice, once into the engine and o
 engine now takes its rate from the output adapter at launch and mixes there. A file at the device
 rate is never resampled; a file at any other promised rate is resampled once, on the way in.
 
-Decided in [ticket 08](../../.scratch/202609-faderio-v3/issues/08-what-audio-does-faderio-promise-to-play-correctly.md);
-built in [ticket 12](../../.scratch/202609-faderio-v3/issues/12-rework-the-engine-seam.md),
+Decided in [ticket 08](../../.scratch/202609-faderio-transition-you-can-trust/issues/08-what-audio-does-faderio-promise-to-play-correctly.md);
+built in [ticket 12](../../.scratch/202609-faderio-transition-you-can-trust/issues/12-rework-the-engine-seam.md),
 where the three constants were being replaced anyway.
 
 ## Considered options

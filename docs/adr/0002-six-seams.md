@@ -10,7 +10,7 @@ We test at six seams instead: the fake output (kept), real files through the pro
 the engine end to end, a presenter, the real Form instantiated headless, and the human with a
 rendered file and a smoke checklist.
 
-Decided in [ticket 06](../../.scratch/202609-faderio-v3/issues/06-how-do-we-make-green-tests-and-a-broken-app-impossible.md),
+Decided in [ticket 06](../../.scratch/202609-faderio-transition-you-can-trust/issues/06-how-do-we-make-green-tests-and-a-broken-app-impossible.md),
 which holds the detail. The smoke checklist is [`docs/smoke.md`](../smoke.md).
 
 ## Considered options

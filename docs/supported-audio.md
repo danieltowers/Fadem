@@ -1,7 +1,7 @@
 # Supported audio
 
 What Fadem promises to play and author correctly, and what it refuses. Decided in
-[wayfinder ticket 08](../.scratch/202609-faderio-v3/issues/08-what-audio-does-faderio-promise-to-play-correctly.md);
+[wayfinder ticket 08](../.scratch/202609-faderio-transition-you-can-trust/issues/08-what-audio-does-faderio-promise-to-play-correctly.md);
 policy recorded in [ADR 0007](adr/0007-audio-is-promised-or-rejected.md) and
 [ADR 0008](adr/0008-engine-runs-at-the-device-rate.md).
 
@@ -26,7 +26,7 @@ header cannot give an exact length has its probe scan frames instead, and its ro
 **Tolerance: 1 ms, at every promised cell, globally.** An authored point plays within 1 ms of
 where it was placed, on every format, rate, depth and channel count in the table. There is no
 per-format or per-transition tolerance. Set in
-[ticket 09](../.scratch/202609-faderio-v3/issues/09-how-exact-is-the-authoring-promise.md),
+[ticket 09](../.scratch/202609-faderio-transition-you-can-trust/issues/09-how-exact-is-the-authoring-promise.md),
 recorded in [ADR 0009](adr/0009-authoring-exactness-is-bought-in-the-decoder.md). A cell that
 cannot reach it leaves this table; the tolerance never widens to meet a cell.
 
@@ -40,8 +40,8 @@ cell, and a missing fixture is a red cell.
 
 | Format | Sample rates | Bit depths | Channels | Proven by | Status |
 |---|---|---|---|---|---|
-| WAV (PCM) | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | the five `Wav_*` theories over `WavCells()` | proven, 12 cells ([ticket 14](../.scratch/202609-faderio-v3/issues/14-fill-the-real-input-matrix.md)) |
-| FLAC | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | the five `Flac_*` theories over `FlacCells()` | proven, 12 cells (ticket 14; the first landing in [ticket 15](../.scratch/202609-faderio-v3/issues/15-make-flac-seek-exact.md)) |
+| WAV (PCM) | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | the five `Wav_*` theories over `WavCells()` | proven, 12 cells ([ticket 14](../.scratch/202609-faderio-transition-you-can-trust/issues/14-fill-the-real-input-matrix.md)) |
+| FLAC | 44.1, 48, 96 kHz | 16, 24 | mono, stereo | the five `Flac_*` theories over `FlacCells()` | proven, 12 cells (ticket 14; the first landing in [ticket 15](../.scratch/202609-faderio-transition-you-can-trust/issues/15-make-flac-seek-exact.md)) |
 | MP3, constant bitrate with a Xing/Info header | 44.1, 48 kHz | n/a (decodes to PCM) | mono, stereo | the five `Mp3_*` theories over `Mp3Cells()`, variant `CbrInfo`, and over `TaggedMp3Cells()` `Mp3_TaggedDecode_IsTheSourceFromItsFirstSample`, `Mp3_LameEncoderString_IsTrimmedLikeFfmpegsLavc` and `Mp3_TagFailingValidation_KeepsWholeFrames`: with a valid LAME tag the length is the source count (the tag's frame count less its delay and padding); otherwise the tag's frame count, whole frames | proven, 4 cells, 8 theories each (ticket 14; trimmed in [issue 18](../.scratch/202609-faderio-phase-1-build/issues/18-trim-tagged-mp3s.md)) |
 | MP3, constant bitrate with no Xing/Info/VBRI header | 44.1, 48 kHz | n/a | mono, stereo | the five `Mp3_*` theories, variant `CbrBare`: the length is the audio bytes over the frame size, whole frames, no frame scan | proven, 4 cells (ticket 14) |
 | MP3, variable bitrate with a Xing header | 44.1, 48 kHz | n/a | mono, stereo | the same eight theories as `CbrInfo`, variant `Vbr`: as `CbrInfo` | proven, 4 cells, 8 theories each (ticket 14; trimmed in issue 18) |

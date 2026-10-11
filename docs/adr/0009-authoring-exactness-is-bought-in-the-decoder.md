@@ -11,8 +11,8 @@ tolerance. FLAC moves from Windows Media Foundation to a managed decoder
 (`BunLabs.NAudio.Flac`, a re-port of CSCore's) that pre-scans frame headers on open and trims to
 the exact sample on seek. Media Foundation leaves the production chain entirely.
 
-Decided in [ticket 09](../../.scratch/202609-faderio-v3/issues/09-how-exact-is-the-authoring-promise.md),
-built in [ticket 15](../../.scratch/202609-faderio-v3/issues/15-make-flac-seek-exact.md).
+Decided in [ticket 09](../../.scratch/202609-faderio-transition-you-can-trust/issues/09-how-exact-is-the-authoring-promise.md),
+built in [ticket 15](../../.scratch/202609-faderio-transition-you-can-trust/issues/15-make-flac-seek-exact.md).
 
 ## Why 1 ms and why global
 

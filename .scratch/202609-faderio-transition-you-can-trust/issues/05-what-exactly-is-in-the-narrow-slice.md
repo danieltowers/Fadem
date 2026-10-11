@@ -131,7 +131,7 @@ it.
 
 ### Prerequisites, before the slice
 
-Two things land first, both in [ticket 07](07-migrate-faderio-core-into-v3.md)'s territory:
+Two things land first, both in [ticket 07](07-migrate-faderio-core.md)'s territory:
 
 1. **The core migration**, including the repairs tickets 01 and 02 turned up: the inverted
    `SourceNormalizer.Position` conversion, the missing `Extensible` case that renders 24-bit

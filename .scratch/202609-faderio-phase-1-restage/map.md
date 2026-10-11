@@ -47,7 +47,7 @@ Much of the restage is shell and semantics, not engine; the audit ticket says ex
 **v2 is retired for listening.** It stays read-only reference; v3 owns
 `%APPDATA%\faderio\transitions.json`.
 
-**Predecessor.** [faderio v3: a transition you can trust](../202609-faderio-v3/map.md) reached
+**Predecessor.** [faderio v3: a transition you can trust](../202609-faderio-transition-you-can-trust/map.md) reached
 its destination on 2026-09-23. Its fog for this effort was carried forward into the tickets
 below and the sections that follow.
 
