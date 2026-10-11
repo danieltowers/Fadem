@@ -48,6 +48,10 @@ the thumb in a capture (the accent), and click it with posted mouse messages. Th
 queue's ✎ button is different: the list answers a click where the real cursor is, not where a
 posted click says, so move the cursor onto the cell (`SetCursorPos`) before posting the click.
 
+Shuffle and repeat have no buttons: 🔀 and 🔁 are hidden, since they are not what Fadem is for,
+but the engine still honours them. An item that needs one sets it in the library's
+`.fadem\settings.json` before launch: `"shuffle": true`, or `"repeat": "All"` or `"One"`.
+
 - [ ] The window opens without an error dialog.
 - [ ] The title reads "Untitled — Fadem — *temp folder's name* · WASAPI shared at 44100 Hz"
       (or the mode in use), and nothing asked for a folder. **Open library…** is the last
@@ -75,7 +79,8 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       and in the title; Esc puts the old name back. A name another playlist has is refused with
       "Not renamed: …" in the strip, and the old name stays.
 - [ ] Add-files puts both tracks in the list, each with a title (or filename) and no blank row.
-- [ ] The transport row reads ⏮ ▶ ⏭ ⤳ ⇥ 🔀 🔁, then −5 s, the seek bar, +5 s and the time; no ⏹.
+- [ ] The transport row reads ⏮ ▶ ⏭ ⤳ ⇥, the seek bar, +5 s stacked over −5 s (interim
+      transport issue 05), and the time; no ⏹, and no 🔀 or 🔁 (hidden, see above).
       The editor has a TRANSITION EDITOR pane title with the **Sync editor** checkbox at its
       right (round 2 issue 02).
 - [ ] Between the buttons and the transport row, a line names the playing track in a larger
@@ -273,10 +278,9 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
 - [ ] While playing on WASAPI shared, **Delete** on the only row and **Clear queue** each
       stop playback, and the window keeps rendering afterwards: the play button
       shows ▶ and the readout resets. Repeat each a few times; the freeze was a race.
-- [ ] Beside ⏭, the shuffle toggle (🔀) and the repeat button read clearly in every state:
-      each shows pressed in while on and plain while off. Repeat cycles off (🔁, plain) → all
-      (🔁, pressed in) → one (🔁1, pressed in) → off, and each tooltip names its state.
-- [ ] Between ⏭ and the shuffle toggle, the Transition now button (⤳) reads clearly and its
+- [ ] No shuffle toggle (🔀) or repeat button (🔁) shows in the transport, with shuffle or
+      repeat on in `settings.json` or off.
+- [ ] After ⏭, the Transition now button (⤳) reads clearly and its
       tooltip says "Transition now". It is greyed out while stopped, while paused, on the last
       row with repeat off, and during a crossfade, and live otherwise.
 - [ ] Beside it, Cue transition is ⇥, an arrow into a bar (round 2 issue 12): about as large as
@@ -365,8 +369,8 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       chevron collapses its rows to the header; a right-click on a header offers that section's
       items. **Move section up** on End puts row 4 above rows 2–3, under its header. Relaunching
       with the same `--library=` shows the sections, colours and the collapsed one as left.
-      **Remove section** puts its rows under the header above. Shuffle on shows no headers,
-      stripes kept; off, the headers are back.
+      **Remove section** puts its rows under the header above. Relaunched with shuffle on in
+      `settings.json`, no headers show, stripes kept; with it off, the headers are back.
 
 ## Sounds — the user runs this
 
@@ -404,7 +408,8 @@ sharp percussive transient; the realism check is the authored boundary from the 
       Dragging the playing row elsewhere does not interrupt it.
 - [ ] The last track's tail plays to its very end before playback stops: no clipped final
       note, and no error.
-- [ ] With repeat-all on, the last track passes into the first through their adjacency, as
+- [ ] With repeat-all on (`"repeat": "All"` in the library's `.fadem\settings.json`, as there is
+      no button), the last track passes into the first through their adjacency, as
       any other boundary does.
 - [ ] Transition now mid-song fades into the next track as authored, starting from where you
       pressed.
@@ -504,8 +509,8 @@ which a background run cannot give.
 - [ ] With the settings file naming a library whose open playlist holds two generated tones,
       **Play** starts Fadem: the meter shows the tone. **Stop** ends it: the meter reads 0.
 - [ ] **The view** (phase 5 issue 10), placed as above and present after a restart: under a
-      "Fadem" header, the transport row ⏮ ▶ ⏹ ⏭ ⤳ ⇥ 🔀 🔁, then −5 s, the seek bar, +5 s and
-      "0:00 / -0:00"; **Playlists** listing the library's playlists with the open one bold in
+      "Fadem" header, the buttons ⏮ ▶ ⏹ ⏭ ⤳ ⇥ (no 🔀 or 🔁: hidden), then under them the seek
+      bar, +5 s stacked over −5 s, and "0:00 / -0:00"; **Playlists** listing the library's playlists with the open one bold in
       the accent on a raised tint; the pane labels PLAYLISTS, QUEUE and TRANSITION EDITOR in the
       text colour (round 2 issue 06); the queue with #, Title, Artist, Length and a ✎ on every
       row but the last, bold
