@@ -794,6 +794,29 @@ internal sealed class MainForm : Form
     /// The task is for the launch arguments, which must wait for the rows before --play.</summary>
     internal Task AddPaths(IEnumerable<string> paths) => _engine.Add(paths);
 
+    /// <summary>The launch arguments, for smoke runs: plain arguments are files to queue (drop
+    /// them on the executable); --edit-first opens the editor on the first boundary and --play
+    /// starts the queue, both once the add's rows are in.</summary>
+    internal async Task RunLaunchArguments(IReadOnlyList<string> args)
+    {
+        var paths = args.Where(a => !a.StartsWith("--", StringComparison.Ordinal)).ToList();
+        if (paths.Count > 0)
+        {
+            await AddPaths(paths);
+            // The sink's render of the new rows is still posted behind this call, and the
+            // editor finds its row among the drawn ones.
+            Render();
+        }
+        if (args.Contains("--edit-first", StringComparer.OrdinalIgnoreCase))
+        {
+            EditTransitionAt(0);
+        }
+        if (args.Contains("--play", StringComparer.OrdinalIgnoreCase))
+        {
+            _engine.Play();
+        }
+    }
+
     internal static RowId RowOf(ListViewItem item) => (RowId)item.Tag!;
 
     /// <summary>Each row's editor button (interim transport 07), after every column shown

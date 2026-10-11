@@ -76,26 +76,9 @@ internal static class Program
         output.ModeChanged += () => form.BeginInvoke(() => form.Render());
         form.Shown += (_, _) =>
         {
-            // Plain arguments are files to queue (drop them on the executable); --play starts
-            // them and --edit-first opens the editor on the first boundary. For smoke runs.
             // Queued behind the posted notices, so a rejection notice from the add is the last
-            // thing shown. The add runs in the background; the other two arguments wait for its rows.
-            form.BeginInvoke(async () =>
-            {
-                var paths = args.Where(a => !a.StartsWith("--", StringComparison.Ordinal)).ToList();
-                if (paths.Count > 0)
-                {
-                    await form.AddPaths(paths);
-                }
-                if (args.Contains("--edit-first", StringComparer.OrdinalIgnoreCase))
-                {
-                    form.EditTransitionAt(0);
-                }
-                if (args.Contains("--play", StringComparer.OrdinalIgnoreCase))
-                {
-                    engine.Play();
-                }
-            });
+            // thing shown.
+            form.BeginInvoke(async () => await form.RunLaunchArguments(args));
         };
         Application.Run(form);
     }

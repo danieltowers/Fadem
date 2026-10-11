@@ -38,14 +38,16 @@ public sealed partial class HeadlessFormTests
 
         /// <param name="inUse">The mode the output opened in, as the NAudio adapter reports it.</param>
         /// <param name="windowFile">The window.json the form keeps its geometry in, or none.</param>
-        public Harness(int latency = 0, AudioOutputMode? inUse = AudioOutputMode.WasapiShared, string? windowFile = null)
+        /// <param name="renders">Where the sink posts its renders, as the app's does; none delivers them inline.</param>
+        public Harness(int latency = 0, AudioOutputMode? inUse = AudioOutputMode.WasapiShared, string? windowFile = null,
+            SynchronizationContext? renders = null)
         {
             Directory.CreateDirectory(TempDir);
             Directory.CreateDirectory(TempDir + "-machine");
             Output = new FakeAudioOutput { Latency = latency };
             Library = Library.Open(TempDir);
             Store = Library.Transitions!;
-            var sink = new PostingSink(null); // inline: no message pump in a headless test
+            var sink = new PostingSink(renders); // null: inline, with no message pump in a headless test
             Sink = sink;
             // The add worker runs inline, so an add completes on this STA thread and the inline
             // sink never touches a control from another thread.
@@ -2111,6 +2113,27 @@ public sealed partial class HeadlessFormTests
         Assert.Null(h.Form.EditButtonAt(new System.Drawing.Point(title.X + 4, title.Y + 4)));
         Assert.Equal(1, h.Form.EditButtonAt(h.Form._queueList.Items[1].SubItems[h.Form.EditColumn].Bounds.Location + new Size(4, 4)));
     });
+
+    [Fact]
+    public void EditFirst_OpensTheFirstBoundary_BeforeThePostedRenderHasRun() => RunSta(() =>
+    {
+        using var h = new Harness(renders: new HeldContext());
+        var a = TestAudio.WriteDcWav("alpha.wav", 1, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 1, 0.4);
+
+        h.Form.RunLaunchArguments([a, b, "--edit-first"]).GetAwaiter().GetResult();
+
+        Assert.NotNull(h.Form._editor.Adjacency);
+        Assert.Equal(a, h.Form._editor.Adjacency!.Outgoing.FilePath);
+        Assert.Equal(b, h.Form._editor.Adjacency.Incoming.FilePath);
+    });
+
+    /// <summary>Holds what is posted to it, as a UI thread busy with the launch does: the sink's
+    /// render has not run when the launch arguments act.</summary>
+    private sealed class HeldContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback d, object? state) { }
+    }
 
     [Fact]
     public void EditTransitionAt_ARowOutOfRange_OpensNothing() => RunSta(() =>
