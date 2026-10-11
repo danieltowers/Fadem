@@ -18,24 +18,24 @@ item in the session's hand-off. Plain arguments are files to queue; `--play` sta
 `--unavailable=exclusive,shared` treats those modes as if their device were taken, to force the
 fallback chain; `--library=<folder>` opens that folder as the library without asking;
 `--machine=<folder>` keeps this machine's `settings.json` and `window.json` in that folder
-instead of `%APPDATA%\faderio`. Point both at fresh temp folders, so a smoke run writes nothing
+instead of `%APPDATA%\fadem`. Point both at fresh temp folders, so a smoke run writes nothing
 into the user's library or machine settings. `--library=` without `--machine=` keeps no machine
 files at all: the output mode is the default, nothing is remembered, and the window opens
 centred. The output mode is a machine setting, chosen in **⚙** settings and used from the next
 launch, so the items that relaunch pass the same two folders again:
 
 ```
-dotnet run --project src/Faderio.App -- "<outgoing>" "<incoming>" --play --edit-first --library="<temp library>" --machine="<temp machine>"
+dotnet run --project src/Fadem.App -- "<outgoing>" "<incoming>" --play --edit-first --library="<temp library>" --machine="<temp machine>"
 ```
 
 `<outgoing>` and `<incoming>` are **absolute paths to two real, promised files**; there are no
-sample files in the repo. `dotnet run` runs the app from `src/Faderio.App`, so a relative path
+sample files in the repo. `dotnet run` runs the app from `src/Fadem.App`, so a relative path
 resolves there, not where you typed the command. A path that does not exist is rejected like
 any other file: nothing is queued and the only sign is one line in the status strip
 ("Nothing added: … The file does not exist."). The agent generates its own WAVs for the Looks
 half; the Sounds half uses the two tracks of a boundary already in the store
-(`<library>\.faderio\transitions.json` lists them by full path). Everything the app writes for a
-library is under its `.faderio\`. `%APPDATA%\faderio\` holds only what is the machine's:
+(`<library>\.fadem\transitions.json` lists them by full path). Everything the app writes for a
+library is under its `.fadem\`. `%APPDATA%\fadem\` holds only what is the machine's:
 `settings.json` (the output mode, and the library a plain launch opens) and `window.json` (where
 the window was closed).
 
@@ -49,7 +49,7 @@ queue's ✎ button is different: the list answers a click where the real cursor 
 posted click says, so move the cursor onto the cell (`SetCursorPos`) before posting the click.
 
 - [ ] The window opens without an error dialog.
-- [ ] The title reads "Untitled — faderio — *temp folder's name* · WASAPI shared at 44100 Hz"
+- [ ] The title reads "Untitled — Fadem — *temp folder's name* · WASAPI shared at 44100 Hz"
       (or the mode in use), and nothing asked for a folder. **Open library…** is the last
       button in the command row (settings are the **⚙** at the status strip's far right, round 2
       issue 03); choosing another folder in it empties the queue and
@@ -68,7 +68,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       another row opens it, and the next **Open library…** lists it first. **Add folder…** shows
       the folder browser; a folder picked there opens. With `--machine=` on a fresh folder and no
       `--library=`, the launch shows the chooser with an empty list and "No library has opened
-      yet. Add folder… picks one: …"; Cancel opens faderio with no library.
+      yet. Add folder… picks one: …"; Cancel opens Fadem with no library.
 - [ ] Above the queue, beside the sidebar, the open playlist's name reads in a larger font, and
       the title bar starts with the same name. Double-click it, or press F2 in the queue: it
       becomes a text box holding the name, all selected. Enter renames it there, in the sidebar
@@ -162,7 +162,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       the 960 px minimum with all eight ticked does the list scroll sideways to ✎. Dragging a header moves it (never before # or after ✎), and a dragged width holds.
       A right-click on a row still shows the row's menu. Relaunched, or after **Open library…** elsewhere and back, the
       layout is as it was left; the other library shows its own. The file is
-      `<library>\.faderio\columns.json`.
+      `<library>\.fadem\columns.json`.
 - [ ] The editor saves itself (phase 6 issue 05): a box typed in saves on Tab, a click
       elsewhere or Enter, with "Saved *a* → *b*." in the strip; capture, − / +, **From end** and
       the curve save at once. Opening another adjacency, closing the window, switching playlist
@@ -203,7 +203,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       Switching mode saves a box being typed in to the mode left; the next ✎ opens in the last
       mode.
 - [ ] **Transitions…**, between **Export playlist…** and **Open library…**, opens a separate
-      "faderio — transitions" window on the selected row's track (else the first track with a
+      "Fadem — transitions" window on the selected row's track (else the first track with a
       transition), listing the boundary authored during the run: ← or →, the other track, then
       each parameter and the curve as "global | override", "–" where a layer sets none, the
       effective transition and a playlist-only ✓. A value saved in the editor while it is open
@@ -261,7 +261,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       several, and only `.m3u`/`.m3u8`) adds it to the sidebar as "*name* 2", open, with the same
       rows in the same order; the strip says "Imported *file* as *name* 2.". A `.m3u` of relative
       paths from another folder imports with its paths made absolute in
-      `<library>\.faderio\playlists\`.
+      `<library>\.fadem\playlists\`.
 - [ ] Ctrl-click or Shift-click selects several rows. **Delete** removes them all at once and
       the numbering closes up. The context menu's **Remove** does the same, and is disabled
       when nothing is selected.
@@ -300,7 +300,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       long cause is cut short without pushing the notice count off; its tooltip has it whole.
       Clicking it turns it dark again. (A track tagged well above 0 dB, with ReplayGain on,
       lights it.)
-- [ ] Launching with a corrupt `<library>\.faderio\transitions.json` shows
+- [ ] Launching with a corrupt `<library>\.fadem\transitions.json` shows
       no dialog: the strip says the file was moved aside to `transitions.json.corrupt`.
 - [ ] A queued file renamed before the track ahead of it starts is marked when that track starts:
       "⚠" before its row number, the row greyed, and a tooltip saying it is unreadable. The
@@ -313,7 +313,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       the title names WASAPI shared, not exclusive, and the strip says exclusive was
       unavailable. With `--unavailable=exclusive,shared` the title names WaveOut at 44100 Hz,
       with a notice for each step.
-- [ ] The **⚙** at the far right of the status strip (tooltip "faderio settings") opens a dialog with OK and Cancel showing the five settings in two
+- [ ] The **⚙** at the far right of the status strip (tooltip "Fadem settings") opens a dialog with OK and Cancel showing the five settings in two
       groups. **This machine**: the output mode with "Applies at the next launch." under it.
       **This library**: *Hard cut* or *Crossfade for N s*, with N greyed out under *Hard cut*;
       **Blank fade durations** in seconds (0 to 30, live under either choice); **Default fade
@@ -339,11 +339,11 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       and the label shows the old name. A slow second click on a selected name starts nothing.
 - [ ] **Delete** asks once, Yes/No with No the default, naming the playlist. No keeps it. Yes on
       the open playlist removes its file and opens the first remaining one.
-- [ ] A playlist file copied into `<library>\.faderio\playlists\` from outside appears at the
+- [ ] A playlist file copied into `<library>\.fadem\playlists\` from outside appears at the
       next playlist command (open, new, rename, delete) or library open, not on its own.
 - [ ] Resize and move the window, close it, relaunch with the same `--machine=`: it opens in
       the same place at the same size. Closed maximised, it opens maximised.
-- [ ] Launching with a corrupt `<library>\.faderio\settings.json` shows no
+- [ ] Launching with a corrupt `<library>\.fadem\settings.json` shows no
       dialog: the strip says the file was moved aside to `settings.json.corrupt`, and
       **⚙** settings shows the library's defaults.
 - [ ] Adding the library's longest FLAC (about 26 minutes) shows its full length in the time
@@ -353,7 +353,7 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       with its length in its row; played, the readout counts and a click three-quarters along
       the seek bar lands there. A 26-minute WMA added the same way shows its full length, and
       seeking into its last minute lands there at once. Adding a WMA 9 Pro file
-      (`tests/Faderio.Core.Tests/Fixtures/tone-windowspro-44100-2.wma`) queues nothing and
+      (`tests/Fadem.Core.Tests/Fixtures/tone-windowspro-44100-2.wma`) queues nothing and
       the strip names its codec.
 - [ ] **Sections** (phase 6 issue 09). With four rows and none selected, the queue menu's
       **Section** is greyed out. On the second row, **Section → Start a section here…** asks
@@ -424,7 +424,7 @@ sharp percussive transient; the realism check is the authored boundary from the 
       on; clicking it clears it.
 - [ ] Two consecutive tracks of a continuous MP3 album (a live or segued one, whose files
       carry a LAME tag), with no transition authored, hard-cut with no audible gap.
-- [ ] With another app holding the device exclusively, launch in exclusive mode; faderio falls
+- [ ] With another app holding the device exclusively, launch in exclusive mode; Fadem falls
       back to shared and says so.
 - [ ] Play a whole real album on WASAPI exclusive, through several queue advances and a track
       over 20 minutes long; it is clean throughout.
@@ -436,23 +436,25 @@ sharp percussive transient; the realism check is the authored boundary from the 
 
 ## MusicBee — the plugin in the portable MusicBee
 
-Run by every session that touches `src/Faderio.MusicBee`, and by the user for its Sounds half,
-against the portable MusicBee in `musicbee_portable`
+Run by every session that touches `src/Fadem.MusicBee`, and by the user for its Sounds half,
+against the portable MusicBee, kept outside this repo (on the author's machine, a
+`musicbee_portable` folder)
 ([phase 5](../.scratch/202609-faderio-phase-5-musicbee/spec.md), ADR 0012).
 
-**Installing.** Build the plugin (`dotnet build src/Faderio.MusicBee`; beside a running faderio,
-with `--artifacts-path`). Its `plugin\` output folder holds `mb_faderio.dll` and a `faderio\`
+**Installing.** Build the plugin (`dotnet build src/Fadem.MusicBee`; beside a running Fadem,
+with `--artifacts-path`). Its `plugin\` output folder holds `mb_fadem.dll` and a `fadem\`
 folder of everything it depends on. Close MusicBee, copy both into MusicBee's `Plugins\`, and
-start it. A plugin that failed to load is recorded as disabled in MusicBee's
-`AppData\MusicBee3Settings.ini` and stays so after it is fixed: enable it again in
-**Preferences → Plugins**, or, with MusicBee closed, delete its `<State>` for
-`mb_faderio.dll` so it is found as new.
+start it. A MusicBee that ran the plugin before the rename keeps its old DLL and folder:
+remove them first, or MusicBee loads both (ADR 0018). A plugin that failed to load is recorded
+as disabled in MusicBee's `AppData\MusicBee3Settings.ini` and stays so after it is fixed: enable
+it again in **Preferences → Plugins**, or, with MusicBee closed, delete its `<State>` for
+`mb_fadem.dll` so it is found as new.
 
-**Its settings** are `AppData\faderio\settings.json`, in MusicBee's persistent storage folder
-(the portable MusicBee's `AppData`), never standalone faderio's. faderio's dialog sets them:
-**Edit → Edit Preferences → Plugins**, faderio's **Configure…**. What its OK chose is sent when
+**Its settings** are `AppData\fadem\settings.json`, in MusicBee's persistent storage folder
+(the portable MusicBee's `AppData`), never standalone Fadem's. Fadem's dialog sets them:
+**Edit → Edit Preferences → Plugins**, Fadem's **Configure…**. What its OK chose is sent when
 Preferences' **Save** or **Apply** is pressed. To start a run from a known state, write the file
-by hand, with the library a standalone faderio library whose open playlist holds the tracks to
+by hand, with the library a standalone Fadem library whose open playlist holds the tracks to
 play:
 
 ```json
@@ -461,29 +463,29 @@ play:
 
 An `"outputDevice"` key names the device by its name in Windows (phase 5 issue 13); without it
 the plugin plays on MusicBee's own device, or Windows' default when MusicBee's is DirectSound's
-"Primary Sound Driver" or a device faderio cannot open.
+"Primary Sound Driver" or a device Fadem cannot open.
 
-The plugin's own `AppData\faderio\plugin.json` (phase 6 issue 08) holds what only the plugin
-uses: `{ "nowPlayingTab": true }` puts faderio in the Now Playing tab. Configure…'s **Show
-faderio in the Now Playing tab** sets it.
+The plugin's own `AppData\fadem\plugin.json` (phase 6 issue 08) holds what only the plugin
+uses: `{ "nowPlayingTab": true }` puts Fadem in the Now Playing tab. Configure…'s **Show
+Fadem in the Now Playing tab** sets it.
 
 ### Looks — the agent runs this
 
 MusicBee draws its own window, so UI Automation sees neither its menus nor its transport.
 Its main menu opens from a posted click on the "MusicBee ⌄" title, at (60, 19) in window
 coordinates, with the window raised topmost. Walk it with posted arrow keys to the newest
-dropdown (class `WindowsForms10.Window.20808…`): Tools is the fifth item, and faderio the last
+dropdown (class `WindowsForms10.Window.20808…`): Tools is the fifth item, and Fadem the last
 item of Tools (Up from the first). Read each dropdown from a `PrintWindow` capture. A click
 right after launch often does nothing: try again. The menu also closes between posted keys
 while another app has the foreground, so a run beside the user's own work may not reach it.
-Edit is the second item, and Edit Preferences the last of Edit. MusicBee shows faderio's dialog
+Edit is the second item, and Edit Preferences the last of Edit. MusicBee shows Fadem's dialog
 controls to UI Automation as panes: find the folder box by its window class (`…EDIT…`) and set
 it with `WM_SETTEXT`, the mode list with `CB_SETCURSEL`, and press buttons with a posted
-`BM_CLICK`. Whether faderio is sounding is read from MusicBee's audio session meter
+`BM_CLICK`. Whether Fadem is sounding is read from MusicBee's audio session meter
 (`AudioMeterInformation.MasterPeakValue` of the session whose process is MusicBee's), which a
 generated tone of amplitude 0.3 shows as 0.300.
 
-**The panel** (phase 5 issue 10). faderio is a panel element: **View → Arrange Panels** lists
+**The panel** (phase 5 issue 10). Fadem is a panel element: **View → Arrange Panels** lists
 it under *available elements*, and ticking it puts it in the right sidebar; **Save** shows it
 at once. MusicBee records it in `MusicBee3Settings.ini` as element `-61061107,0,0` in the
 `LC_…` list of the panel it sits in, so with MusicBee closed it can be moved by hand, say from
@@ -496,13 +498,13 @@ the queue in a sidebar, beside it in a main panel. A playlist's rename needs key
 which a background run cannot give.
 
 - [ ] Installed as above, MusicBee starts with no error dialog, and after it is closed its
-      `MusicBee3Settings.ini` lists `mb_faderio.dll` named "faderio", enabled, beside the
+      `MusicBee3Settings.ini` lists `mb_fadem.dll` named "Fadem", enabled, beside the
       plugins already there.
-- [ ] **Tools** ends with **faderio**, whose submenu reads **Play**, **Stop**.
+- [ ] **Tools** ends with **Fadem**, whose submenu reads **Play**, **Stop**.
 - [ ] With the settings file naming a library whose open playlist holds two generated tones,
-      **Play** starts faderio: the meter shows the tone. **Stop** ends it: the meter reads 0.
+      **Play** starts Fadem: the meter shows the tone. **Stop** ends it: the meter reads 0.
 - [ ] **The view** (phase 5 issue 10), placed as above and present after a restart: under a
-      "faderio" header, the transport row ⏮ ▶ ⏹ ⏭ ⤳ ⇥ 🔀 🔁, then −5 s, the seek bar, +5 s and
+      "Fadem" header, the transport row ⏮ ▶ ⏹ ⏭ ⤳ ⇥ 🔀 🔁, then −5 s, the seek bar, +5 s and
       "0:00 / -0:00"; **Playlists** listing the library's playlists with the open one bold in
       the accent on a raised tint; the pane labels PLAYLISTS, QUEUE and TRANSITION EDITOR in the
       text colour (round 2 issue 06); the queue with #, Title, Artist, Length and a ✎ on every
@@ -522,7 +524,7 @@ which a background run cannot give.
       ticked and greyed; ticking one adds its column, unticking hides it. Dragging a header moves
       it, never before # or after ✎; the speaker stays at the far left and ✎ at the far right.
       After a restart the layout is as it was left. It is the plugin's own, in
-      `<library>\.faderio\musicbee-columns.json`, apart from the App's `columns.json`.
+      `<library>\.fadem\musicbee-columns.json`, apart from the App's `columns.json`.
 - [ ] **▶** plays: the meter shows the tone, the track's name appears above the transport, the
       button reads ⏸, the readout and the thumb move, row 1 is marked. **⏸** pauses (meter 0,
       ▶ again); **▶** resumes; **⏹** stops: meter 0, the name blank, "0:00 / -0:00", the thumb
@@ -538,20 +540,20 @@ which a background run cannot give.
       whole, the editor's duration unchanged.
 - [ ] A double-click on a row plays that row from its start.
 - [ ] A click on another playlist opens it: it goes bold, the queue shows its rows.
-- [ ] A notice shows in the strip, not in a box: with faderio playing shared, an exclusive
+- [ ] A notice shows in the strip, not in a box: with Fadem playing shared, an exclusive
       stream opened from outside (the probe below, with `Play()` before `Dispose()`) evicts it,
       and the strip reads "Audio output lost (Ex…" with a **1 notice** link; no message box
-      appears. The link opens "faderio — notices", listing the time, the notice and the count,
+      appears. The link opens "Fadem — notices", listing the time, the notice and the count,
       with the selected notice in full below. **▶** plays again after.
-- [ ] **The device is free while faderio is stopped** (phase 5 issue 06). The probe below, run
+- [ ] **The device is free while Fadem is stopped** (phase 5 issue 06). The probe below, run
       from a PowerShell 7 outside MusicBee, initialises an exclusive `WasapiOut` on the default
       device and closes it again. With the plugin loaded it reads "exclusive: opened and closed"
-      before faderio has ever played, and again after **Play** then **Stop**; for each of the
+      before Fadem has ever played, and again after **Play** then **Stop**; for each of the
       three output modes in the settings file, with a MusicBee restart between them. This is
       the check, not listening. Held by another process it reads "refused (…)": 0x8889000A,
       or "Not implemented" on the DragonFly, which answers that way while an exclusive stream
-      is open, faderio's own included.
-      Never run it while faderio plays: an exclusive stream evicts a shared one, so faderio
+      is open, Fadem's own included.
+      Never run it while Fadem plays: an exclusive stream evicts a shared one, so Fadem
       would lose its device mid-play and say so, as it would under any exclusive-mode app.
 
       ```powershell
@@ -579,9 +581,9 @@ which a background run cannot give.
       under the field (red: the accent is blue whatever the skin, round 2 issue 07).
       Typed as 3, Enter: "Saved tone-a-440 → tone-b-660." in the strip, ✎ on row 1 bold,
       and the library's `transitions.json` holds the 3 s fade-out duration, as standalone
-      faderio would have saved it. **Undo** (and Ctrl+Z with focus in the editor) puts the
+      Fadem would have saved it. **Undo** (and Ctrl+Z with focus in the editor) puts the
       duration back, "Undone: saved …"; **Redo** puts 3 back.
-- [ ] **Preview** from the editor with faderio stopped: the meter shows sound, ▶ and the
+- [ ] **Preview** from the editor with Fadem stopped: the meter shows sound, ▶ and the
       readout stay as they were ("0:00 / -0:00"), both Capture buttons come live, the button
       reads **Preview again**, **Stop preview** is live and the line under them says where the
       preview is ("Pre-roll · outgoing 0:05"). **Stop preview**: meter 0, the buttons as before.
@@ -599,7 +601,7 @@ which a background run cannot give.
       boundary open and then with row 1's ✎: as in standalone, no white or system-grey box; the
       check box and radio buttons on the panel's ground, dim but readable when greyed; hint
       lines dim; the fade curve dark; the traffic light dim when stopped, with a dark ring.
-- [ ] **Dialogs and menus in the skin** (studio theme issue 06): faderio's **Configure…** in
+- [ ] **Dialogs and menus in the skin** (studio theme issue 06): Fadem's **Configure…** in
       MusicBee's Preferences, its library chooser (**Choose…**), the transition manager, the
       notice list and the section name dialog are in the skin's colours, with no white or
       system-grey surface. The queue's, header's and playlist's right-click menus are on
@@ -620,12 +622,12 @@ which a background run cannot give.
       nothing: the duration is saved ("Saved …" in the strip) and the editor goes.
 - [ ] **The transition manager** (phase 5 issue 12). The queue's right-click menu has
       **Transitions…** after the Edit transition items, live with any selection. With row 1
-      selected it opens "faderio — transitions", a separate window owned by MusicBee's, on
+      selected it opens "Fadem — transitions", a separate window owned by MusicBee's, on
       row 1's track: the picker names it, the legend reads "Each value reads global | override
       in *playlist*…", and the grid lists the authored crossfade as → *tone-b*, each value as
       "global | override" and the effective transition, with **Preview** and **Preview global**
       on the row. With no row selected it opens on the store's first track. **Preview** with
-      faderio stopped: the meter shows sound, ▶ and the readout stay as they were, the line
+      Fadem stopped: the meter shows sound, ▶ and the readout stay as they were, the line
       beside **Stop preview** reads "Pre-roll · outgoing 0:0…" counting up from 5 s before
       the fade-out point; **Stop preview** ends it. A
       double-click on the row opens it in the view's editor (the page in a sidebar), with
@@ -638,12 +640,12 @@ which a background run cannot give.
 - [ ] **MusicBee's selection added** (phase 5 issue 14). A right-click on a track in
       MusicBee's main panel (a posted left click to select it, then a posted right click; the
       menu is a top-level `…Window.20808…` window, the item last in it) shows **Add to
-      faderio's open playlist** at the end of MusicBee's context menu. On a promised track it
+      Fadem's open playlist** at the end of MusicBee's context menu. On a promised track it
       appends that track to the view's queue and to the open playlist's `.m3u8`, with no
       notice; on a track MusicBee lists but whose file is gone (an album on a
       drive that is not there) the strip reads "Nothing added: the file was rejected — …:
       The file does not exist. …" with a **1 notice** link and no box. Neither player starts
-      or stops: added while MusicBee's own player plays, MusicBee keeps playing and faderio's
+      or stops: added while MusicBee's own player plays, MusicBee keeps playing and Fadem's
       ▶ and "0:00 / -0:00" stay as they were. Restore the playlist file after.
 - [ ] **Tracks dropped on the view** (phase 6 issues 01 and 03). Tracks dragged from MusicBee's
       main panel onto the view's queue show the copy cursor and the drop line, and land on it
@@ -656,22 +658,22 @@ which a background run cannot give.
 - [ ] **Rows dragged in the view** (phase 6 issue 02). Selected rows dragged in the view's
       queue show the drop line and land on it, still selected, docked and floating alike;
       playback goes on. The user drags (a real mouse); the session reads the playlist file.
-- [ ] **One holder at a time** (phase 5 issue 15). With standalone faderio open on the smoke
+- [ ] **One holder at a time** (phase 5 issue 15). With standalone Fadem open on the smoke
       library, MusicBee starts with a box owned by it reading "The library library could not be
-      opened (it is open in faderio). Nothing is saved until a library opens; what is queued
+      opened (it is open in Fadem). Nothing is saved until a library opens; what is queued
       still plays.", the strip the same with **1 notice**, the host line "library (could not be
-      opened) · …", and an empty queue; `.faderio\host.lock` in the library reads "faderio".
-      faderio closed, then Configure…'s **Choose…** on the same library and Preferences' **Save**: the
+      opened) · …", and an empty queue; `.fadem\host.lock` in the library reads "Fadem".
+      Fadem closed, then Configure…'s **Choose…** on the same library and Preferences' **Save**: the
       playlists and queue fill, no new notice, the file reads "MusicBee". The reverse, standalone
-      faderio launched on the library MusicBee holds, reads "… (it is open in MusicBee) …" in
+      Fadem launched on the library MusicBee holds, reads "… (it is open in MusicBee) …" in
       its strip; MusicBee closed and Open library… on the folder opens it.
-- [ ] **Edit → Edit Preferences → Plugins** lists faderio with a **Configure…** button, which
-      opens faderio's dialog, owned by MusicBee's main window. It shows the settings file's
+- [ ] **Edit → Edit Preferences → Plugins** lists Fadem with a **Configure…** button, which
+      opens Fadem's dialog, owned by MusicBee's main window. It shows the settings file's
       library folder in a read-only box captioned **Library:**, with **Choose…** after it, its
       output mode by name ("WASAPI shared") and its output device (phase 5 issue 13):
       "MusicBee's device" first, with MusicBee's device named in brackets when it is
-      one faderio can open, then every active render device by name; with "The mode applies
-      when MusicBee next starts; the device when faderio next plays from stopped."
+      one Fadem can open, then every active render device by name; with "The mode applies
+      when MusicBee next starts; the device when Fadem next plays from stopped."
 - [ ] Configure…'s **ReplayGain:** lists Track, Album, Smart and Off, opens on the library's
       mode, is greyed with no library open, and a mode chosen with OK and Preferences' **Save**
       changes the playing track's level at once; standalone's **⚙** settings then shows it.
@@ -679,11 +681,11 @@ which a background run cannot give.
       S-curve, opens on the library's, is greyed with no library open, and one chosen with OK and
       Preferences' **Save** shows at once in the editor's Fade curve for a new boundary.
 - [ ] **Choose…** (library chooser issue 03) opens the same "Choose a library" as standalone's
-      **Open library…**, owned by faderio's dialog, listing the plugin's own known libraries
+      **Open library…**, owned by Fadem's dialog, listing the plugin's own known libraries
       (never standalone's), the open one selected. A row chosen with **Open** fills the box and
       nothing switches; Preferences' **Save** opens it, and **Choose…** again lists it first.
       Choosing again before Save selects the choice waiting. **Remove from list** is written to
-      `AppData\faderio\settings.json` at once, even if Preferences is then closed without Save.
+      `AppData\fadem\settings.json` at once, even if Preferences is then closed without Save.
 - [ ] **The output device** (phase 5 issue 13). Another device chosen (a second render device,
       say the Steam virtual speakers) and OK: the file is unchanged, and Configure… again opens
       on it. Preferences' **Save** writes `"outputDevice"` to the file and the strip reads
@@ -707,14 +709,14 @@ which a background run cannot give.
 - [ ] A folder that does not exist, typed and saved, shows "The library … could not be opened
       (the folder does not exist)…" in a box owned by MusicBee, and the settings file keeps the
       library before it. A relative path is refused by the dialog itself, which stays open.
-- [ ] **faderio in the Now Playing tab** (phase 6 issue 08, ADR 0013). Configure… shows **Show
-      faderio in the Now Playing tab** under the device, with "In place of MusicBee's own view,
+- [ ] **Fadem in the Now Playing tab** (phase 6 issue 08, ADR 0013). Configure… shows **Show
+      Fadem in the Now Playing tab** under the device, with "In place of MusicBee's own view,
       from the next visit to the tab."; ticked, OK and Preferences' **Save** write
       `"nowPlayingTab": true` to `plugin.json`. With no restart, the Now Playing tab then shows
-      faderio's view filling the centre and the right sidebar's place (playlists beside the
+      Fadem's view filling the centre and the right sidebar's place (playlists beside the
       queue, the editor at the right, the transport above), none of MusicBee's Now Playing
       content showing through, and no box. Restoring and maximising the window resizes it with
-      the window. The library tabs (MUSIC, INBOX…) look as before, the sidebar's faderio panel
+      the window. The library tabs (MUSIC, INBOX…) look as before, the sidebar's Fadem panel
       included. A transition opened with ✎ there is open again after a library tab and back.
       Three round trips leave no notice and no blank tab. Unticked and saved, the next visit
       shows MusicBee's own Now Playing.
@@ -724,30 +726,30 @@ which a background run cannot give.
       and the editor's page has its Close bar, no title.
 - [ ] **Sections** (phase 6 issue 09). In the sidebar, the queue menu's **Section → Start a
       section here…** on a row shows a header with its swatch, name and chevron, its rows striped in
-      its colour, as in standalone faderio; the chevron collapses it, and MusicBee restarted shows
+      its colour, as in standalone Fadem; the chevron collapses it, and MusicBee restarted shows
       it collapsed still.
-- [ ] With `Plugins\faderio\` removed, MusicBee starts, and a message box owned by it reads
-      "faderio could not start: Could not load file or assembly 'Faderio.Core…'". Put the
+- [ ] With `Plugins\fadem\` removed, MusicBee starts, and a message box owned by it reads
+      "Fadem could not start: Could not load file or assembly 'Fadem.Core…'". Put the
       folder back.
 
 ### Sounds — the user runs this
 
-- [ ] With MusicBee playing a track, **Tools → faderio → Play** stops it and plays the open
+- [ ] With MusicBee playing a track, **Tools → Fadem → Play** stops it and plays the open
       playlist: the two players never sound at once. So do the view's **▶** and a row's
       double-click (phase 5 issue 10).
-- [ ] An authored crossfade in the open playlist is heard as in standalone faderio.
-- [ ] **Preview** in the plugin's editor (phase 5 issue 11) is heard as standalone faderio's
+- [ ] An authored crossfade in the open playlist is heard as in standalone Fadem.
+- [ ] **Preview** in the plugin's editor (phase 5 issue 11) is heard as standalone Fadem's
       preview of the same draft: the pre-roll, the crossfade, the tail, then silence with the
       queue where it was. With MusicBee playing a track, Preview stops it first.
-- [ ] A transition authored in MusicBee's editor plays the same in standalone faderio opened
-      on that library, and one authored in standalone faderio plays the same in MusicBee.
-- [ ] After faderio's **Stop**, MusicBee's own player plays again straight away on WASAPI
-      shared, and within a few seconds on WASAPI exclusive (the output mode in faderio's
+- [ ] A transition authored in MusicBee's editor plays the same in standalone Fadem opened
+      on that library, and one authored in standalone Fadem plays the same in MusicBee.
+- [ ] After Fadem's **Stop**, MusicBee's own player plays again straight away on WASAPI
+      shared, and within a few seconds on WASAPI exclusive (the output mode in Fadem's
       Configure… dialog, then a MusicBee restart). In exclusive, MusicBee's "unable to start
       playback" on a start made at once after Stop is the known limit accepted at the spike's
       verdict (ADR 0012); a second try plays.
 - [ ] Playback survives MusicBee's other plugins being enabled.
-- [ ] **▶ while MusicBee's own player plays, in WASAPI exclusive** (phase 5 issue 13): faderio
+- [ ] **▶ while MusicBee's own player plays, in WASAPI exclusive** (phase 5 issue 13): Fadem
       stops MusicBee's player and plays, shared, with "WASAPI exclusive unavailable (Not
       implemented); trying WASAPI shared." in the strip: the known limit (ADR 0012). Once
       MusicBee's own player has played, its stream refuses an exclusive open from the same

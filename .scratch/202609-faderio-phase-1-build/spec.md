@@ -19,7 +19,7 @@ cite the ticket that decided them and restate only what a builder must check. **
 and its ticket disagree, the ticket wins.**
 
 v2's issues are cited as *v2 0003* and so on. They live, read-only, in
-`v2-GLM-5.3-flash\.scratch\202609-faderio-build\faderio-phase-1\`.
+the v2 build's `.scratch\202609-faderio-build\faderio-phase-1\` (v2 is kept outside this repo).
 Take intent from them, never code.
 
 ## Rules every issue inherits

@@ -285,9 +285,9 @@ Staged at the verdict (2026-09-30, pass), each `needs-triage` until it has its o
 
 ## Further Notes
 
-- The portable MusicBee for smoke runs is at `musicbee_portable`.
+- The portable MusicBee for smoke runs is kept outside this repo.
   The old plugin's vendored interface file (revision 53) is at
-  `mb_DummyTrackController\MusicBeeInterface.cs`. Newer
+  the old plugin's `mb_DummyTrackController\MusicBeeInterface.cs` (kept outside this repo). Newer
   copies (revision 58) are linked in the brief.
 - MusicBee.exe is x86 and not large-address-aware: 2 GB of address space. The engine's streaming
   keeps it to tens of MB. Any change that buffers a whole track breaks the plugin.

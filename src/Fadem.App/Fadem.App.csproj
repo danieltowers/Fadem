@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>fadem</AssemblyName>
+    <RootNamespace>Fadem.App</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fadem.Core\Fadem.Core.csproj" />
+    <ProjectReference Include="..\Fadem.Shell\Fadem.Shell.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The shell is reachable by a test from its first commit (ADR 0002, S5). -->
+    <InternalsVisibleTo Include="Fadem.App.Tests" />
+  </ItemGroup>
+
+</Project>

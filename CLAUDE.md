@@ -1,4 +1,4 @@
-# faderio v3
+# Fadem v3
 
 ## Agent skills
 
@@ -36,7 +36,9 @@ Frames never cross the shell seam: externally `Playhead`, `Point`, `Length` and 
 - Core's and the shared shell's tests run twice, on **net8.0** and on **net48 x86** (the MusicBee
   plugin's runtime, ADR 0012). The commit message states the net8.0 and net48 x86 counts
   separately. A net48 test that cannot run there is excluded in the test project with its
-  reason, never skipped.
+  reason, never skipped. So is a test that needs an optional host which is not installed: the
+  MusicBee BASS tests compile only where `bass.dll` is found, at `FADEM_MUSICBEE_DIR` or else the
+  default install, and the build says when it leaves them out (ADR 0019).
 - A session that touches the shell runs the **Looks** half of `docs/smoke.md` before its
   commit and reports item by item. The **Sounds** half is the user's; never claim it.
 - A research investigation that measures the engine leaves a **permanent test** behind, not a

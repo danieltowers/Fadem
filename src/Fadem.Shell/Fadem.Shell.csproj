@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- What both hosts share: standalone Fadem (net8.0-windows) and the MusicBee plugin
+         (net48, ADR 0012). The output, the Presenter, and the controls both hosts compose:
+         the transition editor panel, the transition manager, the playlist sidebar and the seek
+         bar (phase 5 issue 09). MainForm and Program stay standalone-only. -->
+    <TargetFrameworks>net8.0-windows;net48</TargetFrameworks>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fadem.Core\Fadem.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Each target compiles its own Compat folder: the WinForms members net48 lacks, and what
+       net8.0-windows already has. -->
+  <ItemGroup Condition="'$(TargetFramework)' != 'net48'">
+    <Compile Remove="Compat/Net48/**" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <Compile Remove="Compat/Net8/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The logo (round 2 issue 05), embedded so neither host ships a file for it. -->
+    <EmbeddedResource Include="..\..\assets\logo-white.png" LogicalName="Fadem.Shell.logo-white.png" />
+    <EmbeddedResource Include="..\..\assets\logo-black.png" LogicalName="Fadem.Shell.logo-black.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The hosts compose the controls, and their tests reach them (ADR 0002, S5). -->
+    <InternalsVisibleTo Include="fadem" /> <!-- the App: its assembly is named fadem -->
+    <InternalsVisibleTo Include="Fadem.App.Tests" />
+    <InternalsVisibleTo Include="Fadem.Shell.Tests" />
+    <InternalsVisibleTo Include="mb_fadem" /> <!-- the plugin: named to MusicBee's convention -->
+    <!-- The output's player factory: the plugin's tests stand a fake player in for NAudio's. -->
+    <InternalsVisibleTo Include="Fadem.MusicBee.Tests" />
+  </ItemGroup>
+
+</Project>

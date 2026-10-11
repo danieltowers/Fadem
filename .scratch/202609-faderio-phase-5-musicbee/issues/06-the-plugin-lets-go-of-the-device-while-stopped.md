@@ -150,7 +150,7 @@ started under automation at all, with or without the plugin. That one try was in
   44100 Hz", strip "WASAPI shared unavailable …; trying WaveOut." ✅ Exclusive chosen with no
   flag: "WASAPI exclusive at 48000 Hz" ✅.
 - **MusicBee Looks, in the portable MusicBee.** Smoke library authored through Core at
-  `faderio-smoke\library` (and `library2`): two 10 s
+  a smoke library kept outside this repo (`faderio-smoke\library`) (and `library2`): two 10 s
   tones at 0.3 (440 Hz, 660 Hz), a 2 s crossfade at 6 s.
   - ✅ Installed, MusicBee starts with no error box; `MusicBee3Settings.ini` lists
     `mb_faderio.dll` "faderio", enabled, after each close.

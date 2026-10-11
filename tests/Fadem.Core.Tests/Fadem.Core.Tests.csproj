@@ -1,0 +1,72 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- net48 x86 is the MusicBee plugin's runtime (phase 5, ADR 0012): the promise is proven
+         there too. -->
+    <TargetFrameworks>net8.0;net48</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- The assembly is its own child process: ChildProcess.Main (build issue 21). -->
+    <GenerateProgramFile>false</GenerateProgramFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Fadem.Core\Fadem.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- net48 x86 runs the whole suite (phase 5 issue 08). A test that cannot run there is
+       excluded by project item with its reason, never skipped. -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PlatformTarget>x86</PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <!-- ChildProcess starts this assembly as a child through dotnet, which a net48 test binary
+         cannot do; the tests built on it (a decoder that can kill its process, and a library
+         holder that is killed) stay net8.0. -->
+    <Compile Remove="ChildProcess.cs;FlacFrameTableTests.cs;TruncatedFlacTests.cs;LibraryHolderAcrossProcessesTests.cs" />
+  </ItemGroup>
+  <!-- PluginRuntimeTests proves the net48 build itself; Compat holds what the tests use that
+       net48 lacks, as Core's Compat/Net48 does for the engine. -->
+  <ItemGroup Condition="'$(TargetFramework)' != 'net48'">
+    <Compile Remove="PluginRuntimeTests.cs;Compat/**" />
+    <!-- The MusicBee BASS research loads MusicBee's 32-bit DLLs, which a 64-bit net8.0 test host
+         cannot. -->
+    <Compile Remove="MusicBeeBass.cs;MusicBeeBassWmaTests.cs" />
+  </ItemGroup>
+
+  <!-- MusicBee is an optional host, not this repo's: the tests on its own BASS DLLs are compiled
+       only where they are, at FADEM_MUSICBEE_DIR or else the default install, and the build says
+       when they are left out (ADR 0019). -->
+  <PropertyGroup>
+    <MusicBeeDir>$(FADEM_MUSICBEE_DIR)</MusicBeeDir>
+    <MusicBeeDir Condition="'$(MusicBeeDir)' == ''">$(MSBuildProgramFiles32)\MusicBee</MusicBeeDir>
+    <HasMusicBee Condition="Exists('$(MusicBeeDir)\bass.dll')">true</HasMusicBee>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(HasMusicBee)' != 'true'">
+    <Compile Remove="MusicBeeBass.cs;MusicBeeBassWmaTests.cs" />
+  </ItemGroup>
+  <Target Name="SayMusicBeeTestsAreLeftOut" BeforeTargets="CoreCompile"
+          Condition="'$(HasMusicBee)' != 'true' and '$(TargetFramework)' == 'net48'">
+    <Message Importance="high"
+             Text="MusicBee's bass.dll is not in $(MusicBeeDir), so MusicBeeBassWmaTests are left out (ADR 0019). Install MusicBee or set FADEM_MUSICBEE_DIR to run them." />
+  </Target>
+
+</Project>

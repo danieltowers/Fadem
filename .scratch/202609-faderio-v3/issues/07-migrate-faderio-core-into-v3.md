@@ -15,7 +15,7 @@ v2 as read-only reference, rewrite the shell rather than port it.
 What this involves:
 
 - Copy `src/Faderio.Core/` and `tests/Faderio.Core.Tests/` from
-  `v2-GLM-5.3-flash`, excluding `bin/` and `obj/`.
+  the v2 build (`v2-GLM-5.3-flash`, kept outside this repo), excluding `bin/` and `obj/`.
 - Copy `CONTEXT.md` and `docs/adr/` across; they are the domain record and still apply.
 - Create the solution and `Directory.Build.props`. v2 targets `net8.0`; the machine has the
   .NET 9 SDK only, so confirm the net8.0 targeting pack is present or settle on net9.0.

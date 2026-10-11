@@ -2,6 +2,9 @@
 
 Status: accepted (2026-10-02, phase 6 issue 09)
 
+Amended 2026-10-11: the line is now written `#FADEM-SECTION`, and `#FADERIO-SECTION` is still
+read (ADR 0018).
+
 ADR 0005 keeps transitions out of the playlist file, in the store, so a faderio `.m3u8` stays an
 ordinary playlist any player reads. Sections are different. A section belongs to one playlist
 and is about its rows' order, so it lives in that playlist's file, not in the store.

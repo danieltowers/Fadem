@@ -1,4 +1,4 @@
-# faderio
+# Fadem
 
 A music player where the handoff between two tracks is fully author-controlled: not a global
 "crossfade N seconds" setting, but per-boundary control over exactly where the outgoing track
@@ -13,7 +13,7 @@ A single audio file known to the player. The unit of metadata and playback; it n
 transition by itself.
 
 **Library**:
-A folder the user chooses that is one self-contained faderio instance: its playlists, its
+A folder the user chooses that is one self-contained Fadem instance: its playlists, its
 transitions and its listening settings live inside it, and its tracks may live anywhere on
 disk. Opening a different library is opening a different world; nothing carries across.
 _Avoid_: Workspace, collection, instance, profile
@@ -24,7 +24,7 @@ library chooser lists them; the user can take one off the list, which never touc
 _Avoid_: Recent libraries (they never expire), library history
 
 **Host**:
-The program playing a library: faderio itself, or MusicBee through the plugin. Both hosts run
+The program playing a library: Fadem itself, or MusicBee through the plugin. Both hosts run
 the same engine on the same library folder; each keeps its own machine settings. One host
 **holds** a library at a time, from opening it until it lets go: the other host is refused it
 with a notice naming the holder, and opens it once the holder has let go, a crashed one
@@ -34,7 +34,7 @@ how, not what)
 
 **Output device**:
 The sound device a host's output opens, named as Windows names it. A host's **default** device
-is what it opens with none chosen: Windows' default for faderio, **MusicBee's device** (what
+is what it opens with none chosen: Windows' default for Fadem, **MusicBee's device** (what
 MusicBee's own player plays on, followed as it changes) for the plugin. A chosen device that is
 **not found** falls to the default with a notice, and is tried again at the next open.
 _Avoid_: Endpoint (NAudio's word), sound card, DAC (one kind of device)

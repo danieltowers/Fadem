@@ -34,7 +34,7 @@ behind a Cloudflare challenge, so the pages were read through the Wayback Machin
   passed.
 - There is no DSP or output hook for plugins.
 
-This is the same wall the old plugin hit (`mb_DummyTrackController`).
+This is the same wall the old plugin hit (`mb_DummyTrackController`, kept outside this repo).
 It polled every 250 ms and seeked to trigger MusicBee's global crossfade. It was abandoned
 because it "could skip and cut, but it could not actually mix two streams" (v2's
 `tmp/planning/202609-faderio-build/sources/prototype/notes.md:25`).
@@ -124,8 +124,7 @@ Audited 2026-09-28. **Yes. The work is mechanical, with one real risk.**
     - Dependencies ship in a private subfolder, loaded by an `AppDomain.AssemblyResolve`
       handler. ILRepack (internalised) is the fallback if another plugin's copy wins.
     - The JSON store format does not change.
-    - Smoke runs against the portable MusicBee in
-      `musicbee_portable`, as a MusicBee section in
+    - Smoke runs against a portable MusicBee kept outside this repo, as a MusicBee section in
       `docs/smoke.md`.
 12. **Glossary.**
     - **Host** enters `CONTEXT.md` when the spike passes: the program playing a library, either

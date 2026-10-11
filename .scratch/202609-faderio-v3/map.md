@@ -22,7 +22,7 @@ pair (outgoing track, incoming track), never to a track alone.
 **This effort carries into execution.** Overriding wayfinder's plan-only default: the user
 chose a proven vertical slice, so the map ends with working, audible code, not a document.
 
-**Prior art, read-only.** `v2-GLM-5.3-flash` is reference
+**Prior art, read-only.** The v2 build (`v2-GLM-5.3-flash`, kept outside this repo) is reference
 material and must not be modified. Its spec at
 `tmp/planning/202609-faderio-build/spec.md` is good and still authoritative for intent. Its
 `.scratch/202609-faderio-build/faderio-phase-1/` holds 14 issue files worth mining later.

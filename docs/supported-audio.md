@@ -1,12 +1,12 @@
 # Supported audio
 
-What faderio promises to play and author correctly, and what it refuses. Decided in
+What Fadem promises to play and author correctly, and what it refuses. Decided in
 [wayfinder ticket 08](../.scratch/202609-faderio-v3/issues/08-what-audio-does-faderio-promise-to-play-correctly.md);
 policy recorded in [ADR 0007](adr/0007-audio-is-promised-or-rejected.md) and
 [ADR 0008](adr/0008-engine-runs-at-the-device-rate.md).
 
 **This table is the contract.** Every row names the real-input matrix test that proves it
-(`tests/Faderio.Core.Tests/RealInputMatrixTests.cs`). A row without a passing test is
+(`tests/Fadem.Core.Tests/RealInputMatrixTests.cs`). A row without a passing test is
 unpromised and must not be in this table. A test cell without a row here is a proof of nothing
 the product claims; add the row or delete the cell. Rejection messages quote this file.
 
@@ -85,7 +85,7 @@ The `LAME`-string and failing-tag files are crafted at test time from the checke
 No WMA header gives the decoded length, so the probe decodes the file once when it is added,
 about 0.3% of its duration, and issues what decodes: Windows' files include 17 to 43 ms of
 codec tail past the music, and ffmpeg's lose the source's last partial block. The same decode
-is the file's index, kept in `<library>\.faderio\wma-index\`, which places every seek on the
+is the file's index, kept in `<library>\.fadem\wma-index\`, which places every seek on the
 exact sample in milliseconds (`WmaRuntimeTests`).
 
 **Sample rate policy.** The engine runs at the output device's rate, fixed at launch
@@ -107,7 +107,7 @@ and leaves the decode and the exact seek to the package. WMA through the Windows
 runtime (`wmvcore.dll`, closed, part of Windows) behind `WmaTrackReader`, in both hosts. Windows
 Media Foundation is not in the production chain: its FLAC decoder is undocumented and landed seeks on the next block
 boundary. Every decoder that remains is open source, so a red cell can be read to its cause,
-except the Windows ACM codec behind NAudio's MP3 wrapper; the one number faderio takes from it,
+except the Windows ACM codec behind NAudio's MP3 wrapper; the one number Fadem takes from it,
 its decoder delay, is pinned by `Mp3DecoderOffsetTests`.
 
 **Length.** Length is a property of a file, not a format, so it is not a column. The matrix

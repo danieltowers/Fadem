@@ -1,4 +1,4 @@
 * text=auto eol=lf
 
 # Byte-for-byte file-format fixtures (phase 5 issue 01): CRLF as the engine writes them.
-tests/Faderio.Core.Tests/Fixtures/formats/** -text
+tests/Fadem.Core.Tests/Fixtures/formats/** -text

@@ -8,10 +8,10 @@ Research requested on 2026-10-05 after "we certainly need WMA". WMA is rejected
 ([ADR 0007](../adr/0007-audio-is-promised-or-rejected.md)) because Windows Media Foundation, the
 decoder ticket 02 measured, missed seeks by up to 71 ms and misreported length. The plugin has
 a second decoder available: the BASS stream MusicBee hands a plugin through
-`Player_OpenStreamHandle` (`src/Faderio.MusicBee/MusicBeeInterface.cs`). This file gives facts
+`Player_OpenStreamHandle` (`src/Fadem.MusicBee/MusicBeeInterface.cs`). This file gives facts
 and options only; no decision is recorded here.
 
-The measurements are a permanent test, `tests/Faderio.Core.Tests/MusicBeeBassWmaTests.cs`
+The measurements are a permanent test, `tests/Fadem.Core.Tests/MusicBeeBassWmaTests.cs`
 (net48 x86 only, on MusicBee's own DLLs through `MusicBeeBass.cs`), over fixtures from
 `Fixtures/generate.sh`. All 29 cases pass on BASS 2.4.17.0 and basswma 2.4.5, the DLLs of the
 installed MusicBee 3.6.

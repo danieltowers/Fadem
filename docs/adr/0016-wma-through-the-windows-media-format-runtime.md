@@ -2,6 +2,8 @@
 
 Status: accepted (2026-10-05)
 
+Amended 2026-10-11: the store is now `<library>\.fadem\` (ADR 0018).
+
 WMA was rejected ([ADR 0007](0007-audio-is-promised-or-rejected.md)) because Media Foundation,
 the only WMA decoder measured then, missed seeks by up to 71 ms (ticket 02). It is now a
 promised format in both hosts, through one decoder: the Windows Media Format runtime

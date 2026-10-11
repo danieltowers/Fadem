@@ -50,7 +50,7 @@ Then the outcome is recorded.
 - **The agent's half, 2026-09-28.** 03, 04 and 06 are resolved, and the MusicBee Looks half
   passes on the build of issue 06 (its comments list each item). The Sounds half is yours.
   - The plugin is installed in the portable MusicBee, its settings naming the smoke library
-    `faderio-smoke\library` (two tones, a 2 s
+    a smoke library kept outside this repo (`faderio-smoke\library`) (two tones, a 2 s
     crossfade at 6 s) in WASAPI shared. Point it at a real library in Configure… for the ear.
   - For exclusive: choose it in Configure…, Save, restart MusicBee. Expect at every start
     "WASAPI exclusive unavailable (Not implemented); trying WASAPI shared." (the device is

@@ -126,7 +126,7 @@ appear only in forum threads (for example
 
 ## 2. What faderio and NAudio do today
 
-- **The probe** (`src/Faderio.Core/Playback/AudioProbe.cs`, `ProbeMp3` and `XingFrames`) reads
+- **The probe** (`src/Fadem.Core/Playback/AudioProbe.cs`, `ProbeMp3` and `XingFrames`) reads
   the Xing/Info frame count and returns `frames × SamplesPerFrame`. For a bare file it returns
   `round(audio bytes ÷ average frame bytes) × 1152`. It never reads beyond the frame-count field.
 - **NAudio 2.2.1**, from the [`Mp3FileReaderBase.cs`](https://github.com/naudio/NAudio/blob/v2.2.1/NAudio.Core/Wave/WaveStreams/Mp3FileReaderBase.cs)
@@ -153,7 +153,7 @@ appear only in forum threads (for example
 
 ### The fixtures, read byte by byte (no decoder involved)
 
-- The LAME tags in the 16 tagged fixtures (`tests/Faderio.Core.Tests/Fixtures/*-cbrinfo-*`,
+- The LAME tags in the 16 tagged fixtures (`tests/Fadem.Core.Tests/Fixtures/*-cbrinfo-*`,
   `*-vbr-*`) all have encoder string `Lavc62.23` and delay 576.
 - At 44.1 kHz: 78 frames and padding 1080, so `78 × 1152 − 576 − 1080 = 88200`, the source
   count.
@@ -267,7 +267,7 @@ as done; this would be a narrower new question.
 - FFmpeg master: `libavformat/mp3dec.c`, `libavformat/mp3enc.c`, `libavcodec/libmp3lame.c` at <https://github.com/FFmpeg/FFmpeg>
 - Rockbox master: `lib/rbcodec/metadata/mp3data.c`, `lib/rbcodec/metadata/mp3.c`, `lib/rbcodec/codecs/mpa.c` at <https://github.com/Rockbox/rockbox>
 - Apple TN2258: <https://developer.apple.com/library/archive/technotes/tn2258/_index.html>
-- faderio: `src/Faderio.Core/Playback/AudioProbe.cs`, `AudioSources.cs`; `tests/Faderio.Core.Tests/Fixtures/generate.sh` and the checked-in MP3 fixtures (bytes read directly); ticket 14 and ticket 08 of `.scratch/202609-faderio-v3/`
+- faderio: `src/Fadem.Core/Playback/AudioProbe.cs`, `AudioSources.cs`; `tests/Fadem.Core.Tests/Fixtures/generate.sh` and the checked-in MP3 fixtures (bytes read directly); ticket 14 and ticket 08 of `.scratch/202609-faderio-v3/`
 
 ## Addendum: the library survey (2026-09-23)
 

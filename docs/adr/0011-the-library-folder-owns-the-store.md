@@ -2,6 +2,9 @@
 
 Status: accepted
 
+Amended 2026-10-11: the product is now Fadem, and the folder `<library>/.fadem/`. A library
+faderio left is renamed on first open (ADR 0018).
+
 Through Phase 1 the transition store and settings lived in `%APPDATA%\faderio\`, and a playlist
 was any M3U the user pointed at. That made one player with one store, and left overrides with
 nothing to be keyed by. A **Library** is now a folder the user chooses; everything faderio

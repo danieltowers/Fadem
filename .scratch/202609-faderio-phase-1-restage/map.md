@@ -34,7 +34,7 @@ meter (0011); ReplayGain (0012); settings persistence and a dialog replacing lau
 points, delete or unauthor). A ticket may cut or redesign any of them.
 
 **v2's issue files are mined, never reused.** They sit in
-`v2-GLM-5.3-flash\.scratch\202609-faderio-build\faderio-phase-1\`
+the v2 build's `.scratch\202609-faderio-build\faderio-phase-1\` (v2 is kept outside this repo)
 (read-only) and were written against a seam that no longer exists. Take intent and acceptance
 criteria from them; every build issue written here passes the three placement tests in
 `CLAUDE.md`. v2's spec at `tmp/planning/202609-faderio-build/spec.md` in that repo stays
