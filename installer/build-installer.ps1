@@ -2,12 +2,30 @@
 # Publishes the standalone app self-contained (no .NET runtime needed on the user's machine),
 # builds the MusicBee plugin, then compiles fadem.iss with Inno Setup 6
 # (winget install JRSoftware.InnoSetup).
-param(
-    [string]$Version = (Get-Date -Format 'yyyy.M.d')
-)
+# The version is the latest semver tag reachable from HEAD (v1.2.3 or v1.2.3-beta.1).
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+
+function Invoke-Git {
+    # Windows PowerShell turns a native command's stderr into an error under 'Stop'.
+    $ErrorActionPreference = 'Continue'
+    git -C $root @args 2>$null
+}
+
+$tag = Invoke-Git describe --tags --abbrev=0 --match 'v[0-9]*'
+if ($LASTEXITCODE -ne 0 -or -not $tag) {
+    Write-Warning 'No v* tag yet, so this installer is versioned 0.0.0.'
+    $tag = 'v0.0.0'
+}
+if ($tag -notmatch '^v(?<numeric>\d+\.\d+\.\d+)(-[0-9A-Za-z.-]+)?$') {
+    throw "The latest tag, $tag, is not a semver tag such as v1.2.3."
+}
+$Version = $tag.Substring(1)
+# Windows' file version takes numbers only, so a prerelease drops its suffix there.
+$numericVersion = $Matches.numeric
+$since = [int](Invoke-Git rev-list --count "$tag..HEAD")
+if ($since -gt 0) { Write-Warning "HEAD is $since commit(s) past $tag; the installer is still versioned $Version." }
 $publish = Join-Path $root 'artifacts\publish'
 $appOut = Join-Path $publish 'app'
 $pluginOut = Join-Path $publish 'plugin'
@@ -30,5 +48,5 @@ $iscc = @(
 ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 if (-not $iscc) { throw 'Inno Setup 6 not found: winget install JRSoftware.InnoSetup' }
 
-Invoke-Checked { & $iscc "/DAppVersion=$Version" "/DAppSource=$appOut" "/DPluginSource=$pluginOut" `
+Invoke-Checked { & $iscc "/DAppVersion=$Version" "/DNumericVersion=$numericVersion" "/DAppSource=$appOut" "/DPluginSource=$pluginOut" `
     "/DOutputDir=$(Join-Path $root 'artifacts\installer')" (Join-Path $PSScriptRoot 'fadem.iss') }

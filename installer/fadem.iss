@@ -8,6 +8,9 @@
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
+#ifndef NumericVersion
+  #define NumericVersion "0.0.0"
+#endif
 #ifndef AppSource
   #define AppSource "..\artifacts\publish\app"
 #endif
@@ -24,7 +27,7 @@ AppName=Fadem
 AppVersion={#AppVersion}
 AppVerName=Fadem {#AppVersion}
 AppPublisher=Daniel Towers
-VersionInfoVersion={#AppVersion}
+VersionInfoVersion={#NumericVersion}
 DefaultDirName={autopf}\Fadem
 DisableDirPage=yes
 DefaultGroupName=Fadem
