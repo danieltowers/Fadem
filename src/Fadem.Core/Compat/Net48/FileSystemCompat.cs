@@ -9,7 +9,7 @@ namespace Fadem.Core;
 /// behind every atomic write, and the folder listing's hidden, system and link rules. This is
 /// the net48 build; <c>Compat/Net8</c> holds the other, and both keep the same behaviour.
 /// </summary>
-internal static class FileSystemCompat
+internal static partial class FileSystemCompat
 {
     private const FileAttributes Skipped = FileAttributes.Hidden | FileAttributes.System;
 
@@ -22,8 +22,9 @@ internal static class FileSystemCompat
     /// replacing it if it exists, as .NET 8's overwriting <c>File.Move</c> does: by MoveFileEx,
     /// which never leaves the destination missing or half written. Not
     /// <see cref="File.Replace(string, string, string)"/>, which also carries the old file's
-    /// attributes and security over and took some 20 ms for a write that now takes 4.</summary>
-    public static void MoveReplacing(string source, string destination)
+    /// attributes and security over and took some 20 ms for a write that now takes 4. One
+    /// attempt: <see cref="MoveReplacing"/> retries it.</summary>
+    private static void MoveReplacingOnce(string source, string destination)
     {
         if (!MoveFileExW(Path.GetFullPath(source), Path.GetFullPath(destination), ReplaceExisting | CopyAllowed))
         {

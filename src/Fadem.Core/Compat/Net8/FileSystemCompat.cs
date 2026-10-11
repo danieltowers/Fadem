@@ -7,13 +7,13 @@ namespace Fadem.Core;
 /// behind every atomic write, and the folder listing's hidden, system and link rules. This is
 /// the net8.0 build, which has them all; <c>Compat/Net48</c> holds the other.
 /// </summary>
-internal static class FileSystemCompat
+internal static partial class FileSystemCompat
 {
     private static readonly EnumerationOptions Listing = new() { IgnoreInaccessible = false };
 
     /// <summary>Moves <paramref name="source"/> onto <paramref name="destination"/> in one step,
-    /// replacing it if it exists.</summary>
-    public static void MoveReplacing(string source, string destination) =>
+    /// replacing it if it exists. One attempt: <see cref="MoveReplacing"/> retries it.</summary>
+    private static void MoveReplacingOnce(string source, string destination) =>
         File.Move(source, destination, overwrite: true);
 
     /// <summary>The folder's files, leaving out hidden and system ones.</summary>
