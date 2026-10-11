@@ -28,10 +28,7 @@ internal sealed class Logo : Control
 
     public Logo(bool dark)
     {
-        using (var art = Art(dark))
-        {
-            _art = Trimmed(art);
-        }
+        _art = TrimmedArt(dark);
         IsDark = dark;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
         SetStyle(ControlStyles.Selectable, false);
@@ -155,6 +152,30 @@ internal sealed class Logo : Control
     private int Scaled(int pixels) => (int)Math.Round(pixels * DeviceDpi / 96.0);
 
     private int WidthAt(int height) => (int)Math.Round(height * (double)_art.Width / _art.Height);
+
+    /// <summary>The trimmed art for a light palette and a dark one, each decoded and trimmed once:
+    /// both took about 70 ms for every logo built, in every host and every test of a form.</summary>
+    private static readonly Bitmap?[] TrimmedArts = new Bitmap?[2];
+
+    private static readonly object TrimmedArtsLock = new();
+
+    /// <summary>A copy of the trimmed art, the logo's own: GDI+ draws a bitmap on one thread at a
+    /// time, and logos are built and drawn on several (tests in parallel, both hosts). A clone
+    /// copies the pixels exactly, where drawing the art into a new bitmap could round its edges.</summary>
+    private static Bitmap TrimmedArt(bool dark)
+    {
+        lock (TrimmedArtsLock)
+        {
+            var i = dark ? 1 : 0;
+            if (TrimmedArts[i] is null)
+            {
+                using var art = Art(dark);
+                TrimmedArts[i] = Trimmed(art);
+            }
+            var trimmed = TrimmedArts[i]!;
+            return trimmed.Clone(new Rectangle(Point.Empty, trimmed.Size), PixelFormat.Format32bppArgb);
+        }
+    }
 
     /// <summary>The art without its transparent margin.</summary>
     private static Bitmap Trimmed(Bitmap art)

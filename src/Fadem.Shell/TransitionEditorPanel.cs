@@ -143,6 +143,11 @@ internal sealed class TransitionEditorPanel : Panel
         scroller.Controls.Add(layout);
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
+        // Laid out once, at the end: the auto-sized table otherwise lays itself out again for
+        // each of its sixty-odd controls, a quarter of a second for every editor built.
+        SuspendLayout();
+        scroller.SuspendLayout();
+        layout.SuspendLayout();
 
         _title = new Label
         {
@@ -306,8 +311,11 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeInDurationLessSecond.Click += (_, _) => NudgeDuration(fadeOut: false, -1, coarse: true);
         _fadeInDurationMoreSecond.Click += (_, _) => NudgeDuration(fadeOut: false, +1, coarse: true);
 
+        layout.ResumeLayout(true);
+        scroller.ResumeLayout(true);
         Controls.Add(scroller);
         Controls.Add(heading);
+        ResumeLayout(true);
     }
 
     /// <summary>The width the editor is designed at, docked beside a queue: nothing wraps.</summary>
