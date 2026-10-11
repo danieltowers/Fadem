@@ -2,3 +2,12 @@
 
 # Byte-for-byte file-format fixtures (phase 5 issue 01): CRLF as the engine writes them.
 tests/Fadem.Core.Tests/Fixtures/formats/** -text
+
+# Binary files: never converted or diffed as text.
+*.flac binary
+*.mp3 binary
+*.wma binary
+*.ogg binary
+*.wav binary
+*.png binary
+*.ico binary

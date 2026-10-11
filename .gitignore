@@ -6,3 +6,10 @@ TestResults/
 *.user
 .vs/
 .idea/
+artifacts/
+
+# Claude Code's local state (shared settings such as .claude/settings.json stay trackable)
+.claude/settings.local.json
+.claude/scheduled_tasks.*
+.claude/worktrees/
+.claude/checkpoints/
