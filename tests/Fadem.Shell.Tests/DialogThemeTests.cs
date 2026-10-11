@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Fadem.Core.Persistence;
 using Fadem.Core.Tests;
 using Fadem.Shell.Theme;
+using Xunit.Sdk;
 
 namespace Fadem.Shell.Tests;
 
@@ -185,23 +186,40 @@ public sealed class DialogThemeTests
         Pump();
         list.Focus();
         list.Items[0].BeginEdit();
-        Pump();
-        var edit = SendMessage(list.Handle, LVM_GETEDITCONTROL, IntPtr.Zero, IntPtr.Zero);
+        // Waits for the box and its paint rather than a fixed time: a busy machine paints late,
+        // and one capture taken too early once failed the check.
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        var edit = IntPtr.Zero;
+        while (edit == IntPtr.Zero && DateTime.UtcNow < deadline)
+        {
+            Pump();
+            edit = SendMessage(list.Handle, LVM_GETEDITCONTROL, IntPtr.Zero, IntPtr.Zero);
+        }
         Assert.NotEqual(IntPtr.Zero, edit); // the box is open
         _ = SendMessage(edit, EM_SETSEL, IntPtr.Zero, IntPtr.Zero);
-        Pump();
-
-        _ = GetWindowRect(edit, out var box);
-        _ = GetWindowRect(form.Handle, out var window);
-        using var bitmap = new Bitmap(window.Right - window.Left, window.Bottom - window.Top);
-        using (var g = Graphics.FromImage(bitmap))
+        while (true)
         {
-            var dc = g.GetHdc();
-            _ = PrintWindow(form.Handle, dc, PW_RENDERFULLCONTENT);
-            g.ReleaseHdc(dc);
+            Pump();
+            _ = GetWindowRect(edit, out var box);
+            _ = GetWindowRect(form.Handle, out var window);
+            using var bitmap = new Bitmap(window.Right - window.Left, window.Bottom - window.Top);
+            using (var g = Graphics.FromImage(bitmap))
+            {
+                var dc = g.GetHdc();
+                _ = PrintWindow(form.Handle, dc, PW_RENDERFULLCONTENT);
+                g.ReleaseHdc(dc);
+            }
+            try
+            {
+                check(bitmap, new Rectangle(box.Left - window.Left, box.Top - window.Top, box.Right - box.Left, box.Bottom - box.Top));
+                break;
+            }
+            catch (XunitException) when (DateTime.UtcNow < deadline)
+            {
+                // not painted yet: capture again
+            }
         }
         form.Close();
-        check(bitmap, new Rectangle(box.Left - window.Left, box.Top - window.Top, box.Right - box.Left, box.Bottom - box.Top));
     }
 
     private static void Pump()
