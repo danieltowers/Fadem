@@ -1,5 +1,7 @@
 // Vendored from MusicBee's plugin API, revision 53 (the old mb_DummyTrackController's copy): the
 // oldest revision to hand with every member the plugin uses. Unchanged but for these lines.
+// MusicBee's code (https://getmusicbee.com), not covered by Fadem's MIT licence; see
+// THIRD-PARTY-NOTICES.md.
 #nullable disable
 namespace MusicBeePlugin
 {
