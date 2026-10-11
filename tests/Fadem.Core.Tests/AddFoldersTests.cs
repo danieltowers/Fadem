@@ -60,7 +60,7 @@ public sealed class AddFoldersTests
 
         Assert.Equal(new[]
         {
-            @"intro.mp3",                            // a folder's own files, then its subfolders
+            @"intro.mp3",                                    // a folder's own files, then its subfolders
             @"Albums\1969 - First Album\1 - Beyond.flac",
             @"Albums\1969 - First Album\CD2\1 - Early.flac", // "2" before "10", for folders too
             @"Albums\1969 - First Album\CD10\1 - Late.flac",

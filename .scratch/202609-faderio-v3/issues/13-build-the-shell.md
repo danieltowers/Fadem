@@ -34,7 +34,7 @@ control does.
 - A file that fails to open produces a message, not a crash. End of queue stops cleanly.
 - **`docs/smoke.md` passes**: the Looks half by screenshot in this session, the Sounds half
   by the user.
-- **Ticket 05's acceptance test passes**, on percussive material and on the authored boundary,
+- **Ticket 05's acceptance test passes**, on percussive material and on the store's authored boundary,
   on WASAPI shared, exclusive and WaveOut. That is the slice, and the map's destination.
 
 ## Answer

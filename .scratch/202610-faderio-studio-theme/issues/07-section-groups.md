@@ -20,7 +20,7 @@ Shell. See the [spec](../spec.md), "Section groups".
 
 ## Acceptance
 
-- [x] Looks, both hosts: in the "test playlist" playlist, "intro" and "foo" read in the palette with
+- [x] Looks, both hosts: in "test playlist", "intro" and "foo" read in the palette with
       their swatches. Collapse and expand still work by a double-click on the header.
 - [x] The existing section and group tests pass unchanged.
 - [x] `dotnet test` passes on net8.0 and net48 x86. The commit states both counts.
