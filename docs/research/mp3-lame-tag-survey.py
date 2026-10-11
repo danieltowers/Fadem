@@ -1,7 +1,7 @@
 # Header-only survey of the library's MP3s for gapless info (restage ticket 08). Throwaway.
 import os, sys, collections
 
-ROOT = r"the user's music folder"
+ROOT = sys.argv[1]  # the music folder to survey
 
 def crc16(data):  # CRC-16/ARC (poly 0xA001 reflected, init 0), as LAME's tag CRC
     crc = 0

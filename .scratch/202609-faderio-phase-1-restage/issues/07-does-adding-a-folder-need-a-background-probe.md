@@ -30,7 +30,7 @@ folder-add concern.
 ### The numbers
 
 `PlaybackEngine.AddTracks` was timed one file at a time (probe plus tag read, the real add path)
-over the user's whole library, `the user's music folder`: 903 files (654 MP3, 245 FLAC, 4
+over the user's whole music folder: 903 files (654 MP3, 245 FLAC, 4
 WAV), none rejected.
 
 | | Pass 1 (cold-ish disk) | Pass 2 (warm cache) |

@@ -74,7 +74,7 @@ Tests: net8.0 Core 1152, Shell 193, App 190; net48 x86 Core 1131, Shell 193, Mus
 0 failed.
 
 2026-10-07, a correction found in issue 06: the MusicBee look above ran in MusicBee's "temp"
-library (`a second music folder`), not the user's main one. S: was offline, and the script's
+library (the Windows user's Music folder), not the user's main one. S: was offline, and the script's
 fixed-position click on MusicBee's library prompt landed on temp. The theme looks the same in
 either library. The prompt notes in memory now say to check S: and read the rows before
 clicking.

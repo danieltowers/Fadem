@@ -38,7 +38,7 @@ an addendum stating the rule below.
 ### The fact that shaped it
 
 The user's library is almost entirely untagged. A sample of 342 files under
-`the user's music folder` (300 of about 2,500 MP3s and 42 of 309 FLACs, every seventh file,
+the user's music folder (300 of about 2,500 MP3s and 42 of 309 FLACs, every seventh file,
 first 256 KB) found **2** with any loudness tag: `REPLAYGAIN` in ASCII or UTF-16, or
 `iTunNORM`. ReplayGain as built is inert for about 99% of what is played.
 

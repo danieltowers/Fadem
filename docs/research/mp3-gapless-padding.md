@@ -272,7 +272,7 @@ as done; this would be a narrower new question.
 ## Addendum: the library survey (2026-09-23)
 
 This is the "cheap step" from section 5, run with `docs/research/mp3-lame-tag-survey.py`. It
-read headers only, over all 654 MP3s under `the user's music folder`.
+read headers only, over all 654 MP3s in the user's music folder.
 
 - **551 have an Info frame, 103 are bare.** No file has a `Xing`/VBR frame. Every tag sits at
   the offset `AudioProbe.XingFrames` checks (byte 36 from the frame, or 21 for mono), so this

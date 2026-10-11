@@ -250,8 +250,8 @@ posted click says, so move the cursor onto the cell (`SetCursorPos`) before post
       responsive — it moves and repaints — and
       the status strip shows *Adding N of M…* and a **Cancel**. Rows appear in order as files resolve. Both
       disappear when the add ends, and Cancel ends it at once, keeping the rows already listed.
-- [ ] **Add folder…** on a folder of several albums
-      lists the albums in year order, each album's discs in order, and each album's tracks
+- [ ] **Add folder…** on a folder of several albums, one subfolder each with its discs (the
+      user's own collection) lists the albums in year order, each album's discs in order, and each album's tracks
       "1" to "10" in natural order. The cover scans are ignored without a notice.
 - [ ] Dropping a mix of files and folders from Explorer onto the list adds them in the order
       dropped, each folder expanded in place: dragged over the rows they show the drop line and
