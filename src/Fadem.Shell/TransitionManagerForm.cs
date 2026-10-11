@@ -55,6 +55,7 @@ internal sealed class TransitionManagerForm : Form
         _beforeSounding = beforeSounding;
 
         Text = "Fadem — transitions";
+        Icon = AppIcon.Shared;
         FormBorderStyle = FormBorderStyle.SizableToolWindow;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.CenterParent;

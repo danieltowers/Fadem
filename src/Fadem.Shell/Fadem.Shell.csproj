@@ -28,6 +28,8 @@
     <!-- The logo (round 2 issue 05), embedded so neither host ships a file for it. -->
     <EmbeddedResource Include="..\..\assets\logo-white.png" LogicalName="Fadem.Shell.logo-white.png" />
     <EmbeddedResource Include="..\..\assets\logo-black.png" LogicalName="Fadem.Shell.logo-black.png" />
+    <!-- The icon every Fadem window wears, on both hosts (AppIcon). -->
+    <EmbeddedResource Include="..\..\assets\fadem.ico" LogicalName="Fadem.Shell.fadem.ico" />
   </ItemGroup>
 
   <ItemGroup>

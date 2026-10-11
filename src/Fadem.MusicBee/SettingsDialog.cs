@@ -65,6 +65,7 @@ internal sealed class SettingsDialog : Form
         FadeCurveKind defaultCurve, Palette? palette = null)
     {
         Text = "Fadem";
+        Icon = AppIcon.Shared;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;

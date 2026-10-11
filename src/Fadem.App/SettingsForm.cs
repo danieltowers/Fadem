@@ -62,6 +62,7 @@ internal sealed class SettingsForm : Form
         _shownMachine = machine;
         _shownLibrary = shown;
         Text = "Settings";
+        Icon = AppIcon.Shared;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;

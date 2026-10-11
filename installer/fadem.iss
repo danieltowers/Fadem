@@ -20,6 +20,13 @@
 #ifndef OutputDir
   #define OutputDir "..\artifacts\installer"
 #endif
+#ifndef WizardImages
+  ; Made by make-wizard-images.ps1: the panel at the left of the first and last pages, and the
+  ; corner image of the rest, each at 100 % to 250 % display scaling.
+  #define WizardImages "..\artifacts\wizard"
+#endif
+#define Large(Scale) WizardImages + "\large-" + Scale + ".bmp"
+#define Small(Scale) WizardImages + "\small-" + Scale + ".bmp"
 
 [Setup]
 AppId={{{#AppGuid}}
@@ -40,8 +47,14 @@ OutputBaseFilename=FademSetup-{#AppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+; The modern style skips the welcome page, and with it the logo's panel at the start.
+DisableWelcomePage=no
+SetupIconFile=..\assets\fadem.ico
+WizardImageFile={#Large("100")},{#Large("125")},{#Large("150")},{#Large("200")},{#Large("250")}
+WizardSmallImageFile={#Small("100")},{#Small("125")},{#Small("150")},{#Small("200")},{#Small("250")}
 UninstallDisplayName=Fadem
-UninstallDisplayIcon={app}\fadem.exe
+; Its own file, not the exe's: a plugin-only install has no fadem.exe.
+UninstallDisplayIcon={app}\fadem.ico
 
 [Types]
 Name: "full"; Description: "Standalone app and MusicBee plugin"
@@ -65,6 +78,7 @@ Type: filesandordirs; Name: "{code:PluginDir}\faderio"; Components: plugin
 Source: "{#AppSource}\*"; DestDir: "{app}"; Components: app; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PluginSource}\mb_fadem.dll"; DestDir: "{code:PluginDir}"; Components: plugin; Flags: ignoreversion
 Source: "{#PluginSource}\fadem\*"; DestDir: "{code:PluginDir}\fadem"; Components: plugin; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\assets\fadem.ico"; DestDir: "{app}"
 Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"
 Source: "..\THIRD-PARTY-NOTICES.md"; DestDir: "{app}"
 

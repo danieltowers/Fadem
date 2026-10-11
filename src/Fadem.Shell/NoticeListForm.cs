@@ -19,6 +19,7 @@ internal sealed class NoticeListForm : Form
     public NoticeListForm(Palette? palette = null)
     {
         Text = "Fadem — notices";
+        Icon = AppIcon.Shared;
         FormBorderStyle = FormBorderStyle.SizableToolWindow;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.CenterParent;

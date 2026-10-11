@@ -40,6 +40,8 @@ if (Test-Path $publish) { Remove-Item -Recurse -Force $publish }
 Invoke-Checked { dotnet publish (Join-Path $root 'src\Fadem.App') -c Release -r win-x64 --self-contained true -o $appOut "-p:Version=$Version" }
 Invoke-Checked { dotnet build (Join-Path $root 'src\Fadem.MusicBee') -c Release "-p:Version=$Version" }
 Copy-Item -Recurse (Join-Path $root 'src\Fadem.MusicBee\bin\Release\net48\plugin') $pluginOut
+$wizard = Join-Path $root 'artifacts\wizard'
+& (Join-Path $PSScriptRoot 'make-wizard-images.ps1') -OutDir $wizard
 
 $iscc = @(
     (Get-Command iscc -ErrorAction SilentlyContinue).Source,
@@ -48,5 +50,5 @@ $iscc = @(
 ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 if (-not $iscc) { throw 'Inno Setup 6 not found: winget install JRSoftware.InnoSetup' }
 
-Invoke-Checked { & $iscc "/DAppVersion=$Version" "/DNumericVersion=$numericVersion" "/DAppSource=$appOut" "/DPluginSource=$pluginOut" `
+Invoke-Checked { & $iscc "/DAppVersion=$Version" "/DNumericVersion=$numericVersion" "/DAppSource=$appOut" "/DPluginSource=$pluginOut" "/DWizardImages=$wizard" `
     "/DOutputDir=$(Join-Path $root 'artifacts\installer')" (Join-Path $PSScriptRoot 'fadem.iss') }

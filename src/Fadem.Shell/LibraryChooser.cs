@@ -39,6 +39,7 @@ internal sealed class LibraryChooser : Form
         _forget = forget;
         _chooseFolder = chooseFolder;
         Text = "Choose a library";
+        Icon = AppIcon.Shared;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;

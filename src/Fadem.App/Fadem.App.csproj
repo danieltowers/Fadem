@@ -8,6 +8,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>fadem</AssemblyName>
     <RootNamespace>Fadem.App</RootNamespace>
+    <!-- The exe's own icon, for Explorer and its shortcuts; the window's is AppIcon. -->
+    <ApplicationIcon>..\..\assets\fadem.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

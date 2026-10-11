@@ -119,6 +119,7 @@ internal sealed class MainForm : Form
         ShowTransitionManager = ShowModeless;
 
         Text = "Fadem";
+        Icon = AppIcon.Shared;
         // The sidebar's 200 px on top of what the queue and the editor need: at the least width the
         // queue still shows the default columns, the row buttons in view.
         MinimumSize = new Size(960, 480);
