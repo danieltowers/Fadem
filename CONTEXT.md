@@ -61,7 +61,7 @@ A named run of consecutive rows in a playlist, in its own order, that only organ
 section never changes what plays or how. It has a colour from a fixed palette and is shown
 collapsed or open, and the playlist keeps all three. Rows above the first section are in none.
 A section with no rows left is gone.
-_Avoid_: Group, folder, set
+_Avoid_: Group, folder, set, loop (a span inside one track)
 
 **Adjacency**:
 An ordered pair of tracks — the **outgoing** and the **incoming** — at a boundary in a
@@ -144,6 +144,41 @@ Hearing one adjacency's transition as currently drafted in the editor, saved or 
 shortly before its fade-out point to shortly after its fades complete. The queue is held where
 it was for the duration and is never moved by it.
 _Avoid_: Audition, test play, render (a render writes a file)
+
+### Loops
+
+**Loop**:
+A span inside one track, from its **loop start** to its **loop end** — two points, either
+measured from the start or from the end of the track — heard a number of times, its **count**,
+before the track plays on from the loop end. The count is the total number of hearings: a loop
+of 1 is heard once, a parked loop. Or it is **open-ended** (∞): heard until the user acts with
+**Transition now** (the authored transition plays from the playhead and the voice keeps looping
+as it fades) or a **Skip**; there is no transition to cue. A loop belongs to the track,
+globally, with a playlist override, as a transition belongs to its adjacency; a playlist's
+override is a whole list of loops that stands in for the track's, an empty list included. A
+track may have several loops; they never overlap or nest and are in track order. A loop never
+changes the track's length or moves a point: a fade-out point inside the span starts the
+transition on the last pass, and a voice that is fading keeps looping. The seam from loop end
+back to loop start is a splice, not a fade. A loop that no longer fits its track — its end past
+the length, its start not before its end — is **passed over** with a notice and the track plays
+straight.
+_Avoid_: Section (a run of rows), A-B repeat, region, segment, cycle, repeat (the queue's)
+
+**Pass**:
+One hearing of a loop's span. The listener sees which pass is sounding ("pass 2 of 4"), and the
+playhead returns to the loop start as each new pass begins; the playhead is still a position in
+the track, not in some longer unrolled one. A span is always entered at pass 1, whether played
+into, seeked into from before it, or started inside at a fade-in point; a seek within the span
+stays on its pass; a seek past the loop end leaves the loop behind. Editing a sounding loop
+takes effect at once and never moves the playhead: a count now below the current pass makes this
+pass the last, and a span moved off the playhead is left behind.
+_Avoid_: Iteration, repetition, lap
+
+**Loop preview**:
+Hearing one loop's seam as currently drafted, saved or not: from shortly before the loop end,
+across the splice, to shortly after the loop start, once. As with a **Preview**, the queue is
+held where it was and is never moved by it.
+_Avoid_: Audition, test loop
 
 ### Position
 
