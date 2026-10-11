@@ -21,7 +21,7 @@ background probe with the queue filling in as files resolve. Agent alone.
 
 ## Answer
 
-Measured by the agent alone on 2026-09-23 against `main` at `001e544`, in a Debug build.
+Measured by the agent alone on 2026-09-23 against `main` at `bfe938f`, in a Debug build.
 
 **Verdict: folder add needs a background probe.** Adding must also never probe under the
 engine lock. That second point is a defect in today's **Add files** as well, not only a

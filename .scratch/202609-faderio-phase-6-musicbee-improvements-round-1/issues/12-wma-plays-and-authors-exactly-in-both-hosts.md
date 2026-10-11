@@ -16,7 +16,7 @@ the standalone app and the MusicBee plugin use**.
 
 Research on 2026-10-05, in [`docs/research/wma-through-musicbee-bass.md`](../../../docs/research/wma-through-musicbee-bass.md).
 The findings are pinned by `tests/Faderio.Core.Tests/MusicBeeBassWmaTests.cs` (commit
-`dc52d8a`). Measured on MusicBee's own `bass.dll` 2.4.17 and `basswma.dll` 2.4.5, over WMA 9
+`f17bf22`). Measured on MusicBee's own `bass.dll` 2.4.17 and `basswma.dll` 2.4.5, over WMA 9
 Standard files from Windows' own encoder (what Windows Media Player rips) and from ffmpeg:
 
 - **basswma decodes through Windows.** It is a thin wrapper over the Windows Media Format

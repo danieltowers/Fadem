@@ -15,7 +15,7 @@ transition in the global layer (and so what it saves), and the test for unsaved 
 
 ## What to build
 
-A library setting, as the blank duration is (`fd7a1d3`): `PlayerSettings.DefaultCurve`,
+A library setting, as the blank duration is (`8f2f6f2`): `PlayerSettings.DefaultCurve`,
 Equal-power by default, under Settings… > This library as **Default fade curve**, in both hosts.
 
 - A transition with no curve of its own plays it; one with a curve keeps its curve.

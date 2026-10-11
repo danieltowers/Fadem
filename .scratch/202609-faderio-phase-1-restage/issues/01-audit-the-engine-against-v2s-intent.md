@@ -24,7 +24,7 @@ Agent alone. The answer is a table in this ticket, not code. Tickets 02 and 05 w
 
 ## Answer
 
-Audited 2026-09-23 against v3 `main` at `5cbe3dc`, reading v2 issues 0003, 0008, 0012, 0013
+Audited 2026-09-23 against v3 `main` at `7c81499`, reading v2 issues 0003, 0008, 0012, 0013
 and 0014 and v2's spec (stories 1, 4–6, 19–25, 27, 31, 34, 36). Findings come from reading the
 code. Nothing was run, and no build issue should cite them as measured.
 

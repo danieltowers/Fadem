@@ -4,7 +4,7 @@ Status: resolved
 Blocked by: —
 
 Found while building [issue 21](21-a-truncated-flac-crashes-the-app.md) on 2026-09-24. Not
-caused by it: the HEAD build before issue 21 (e6be23d) raises the same notice.
+caused by it: the HEAD build before issue 21 (f6f0d2d) raises the same notice.
 
 ## What happened
 

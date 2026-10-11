@@ -4,7 +4,7 @@ Status: resolved
 Blocked by: —
 
 Found while building [issue 10](10-unreadable-tracks-are-passed-over.md) on 2026-09-24. Not
-caused by it: the HEAD build before issue 10 (d515140) crashes the same way.
+caused by it: the HEAD build before issue 10 (fc6662d) crashes the same way.
 
 ## What happened
 

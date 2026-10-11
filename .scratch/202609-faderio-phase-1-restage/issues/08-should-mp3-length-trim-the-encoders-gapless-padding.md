@@ -27,7 +27,7 @@ decision itself goes into the build issues via ticket 11.
 ## Answer
 
 Researched on 2026-09-23. The findings live on branch `research/mp3-gapless-padding`
-(`76626fa`, plus the library survey addendum in `c7788f9`), in
+(`39ab530`, plus the library survey addendum in `98c7ee0`), in
 `docs/research/mp3-gapless-padding.md`. That branch is never merged.
 
 **Feasibility, per promised variant:**

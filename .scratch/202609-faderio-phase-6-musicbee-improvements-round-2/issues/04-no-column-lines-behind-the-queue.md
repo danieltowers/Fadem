@@ -32,7 +32,7 @@ row, with and without sections, in both hosts. The column header's own separator
 
 - The screenshot the issue describes is from the plugin at 08:45 on 2026-10-09 (section "F",
   rules down every column edge and in the one-pixel gaps between rows). That is two hours before
-  `dfc5bba`, which refuses `LVN_HOTTRACK` (`NoHotRow`) so a grouped list no longer fades the row
+  `626db26`, which refuses `LVN_HOTTRACK` (`NoHotRow`) so a grouped list no longer fades the row
   under the mouse in and out, and draws rows and headers on opaque bitmaps.
 - A capture of the installed plugin today (built 2026-10-10 19:49), the queue in a section
   (FOO BAR) on Duophonic: no rules below the last row or between rows.

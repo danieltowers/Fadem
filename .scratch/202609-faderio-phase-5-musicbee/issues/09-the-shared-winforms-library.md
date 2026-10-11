@@ -60,7 +60,7 @@ The moved code stays a shell under `CLAUDE.md`'s three placement tests.
       unticked 3.6 again.
     - ✅ A fade-out point of 25 is refused: "Not saved: …" in the strip, the reason in red under
       the field, readable in full. Render is then partly below the window edge at the default
-      size, in this build and in `47eb005` alike (captured both): pre-existing, not this move's.
+      size, in this build and in `0d38313` alike (captured both): pre-existing, not this move's.
     - ✅ Save says "Saved outgoing → incoming." and row 1's ✎ turns bold; a second Save reads
       "×2". Remove transition says "Removed …" and leaves the fields filled; Save puts it back;
       Revert reloads 3.6 over a typed 9.

@@ -71,7 +71,7 @@ every known defect repaired red-first and the real-input matrix started.**
 
 ### What was done
 
-**Imported verbatim, then repaired — two commits.** The import (`8bc92c4`) copies
+**Imported verbatim, then repaired — two commits.** The import (`5e92876`) copies
 `src/Faderio.Core` and `tests/Faderio.Core.Tests` from v2 commit `91cb980` unchanged, minus
 `bin/`, `obj/`, the 31 checked-in `.trx` artefacts, and `UnitTest1.cs`. `Directory.Build.props`
 as-is; `faderio.sln` new; `.gitignore` gains v2's entries (which v2 had and ignored).
@@ -144,7 +144,7 @@ message. Ticket 14 fills the grid.
 - swresample mono→stereo upmix: 0.707 gain. Raw s16 at frame 66150 of the ramp: 15638 (0.477),
   not 22118 (0.675).
 
-Commits: `8bc92c4` (import), then the repairs. Tests: 141 passed, 0 failed.
+Commits: `5e92876` (import), then the repairs. Tests: 141 passed, 0 failed.
 
 ## Noted from ticket 05
 

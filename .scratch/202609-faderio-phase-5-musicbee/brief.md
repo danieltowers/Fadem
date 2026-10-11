@@ -184,7 +184,7 @@ all pass, ADR 0012 is accepted, **Host** enters the glossary, and the issues bel
      shows "unable to start playback" if started at once. It plays a few seconds later or on a
      second try. Accepted by the user as a known limit.
 4. **The promise.** Core's promise tests pass on net48 x86 every commit: 290 there, 855 on
-   net8.0, at `c8f260b`.
+   net8.0, at `f705486`.
 
 **Left open, carried into the staged issues** (mostly [issue 13](issues/13-the-output-device-setting.md)):
 

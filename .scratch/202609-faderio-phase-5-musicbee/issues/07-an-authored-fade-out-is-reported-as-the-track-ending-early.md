@@ -21,7 +21,7 @@ outgoing voice is removed when its fade completes, and `OnVoiceEnded` finds it n
 it, which is why it went unseen.
 
 Reproduced headless at 44100 Hz ("2.0 s") and at 48000 Hz ("1.9 s", rounding) with the test
-below, which is red on `a7770f2` and is not committed because of that. The fix should commit it.
+below, which is red on `46e2bc8` and is not committed because of that. The fix should commit it.
 
 ## Acceptance criteria
 

@@ -60,7 +60,7 @@ Then the outcome is recorded.
     engine's, [issue 07](07-an-authored-fade-out-is-reported-as-the-track-ending-early.md),
     not the plugin's. Weigh both notices at the verdict.
 - **The Sounds half so far, 2026-09-30**, in the portable MusicBee on the build of issue 07
-  (`c8f260b`), default device "Speakers (C-Media(R) Audio)", 48 kHz. The user listened; the
+  (`f705486`), default device "Speakers (C-Media(R) Audio)", 48 kHz. The user listened; the
   agent timed the device.
   - ✅ **The authored crossfade** sounds as in standalone faderio, and no notice shows: issue
     07's fix holds in MusicBee.
