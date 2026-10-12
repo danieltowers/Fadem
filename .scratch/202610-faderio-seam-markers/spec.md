@@ -1,7 +1,4 @@
-# 01: The open pair is a tab on the editor
-
-Status: ready-for-agent
-Blocked by: none
+# Seam markers: the open pair is a tab on the editor
 
 Replaces the queue's ✎ column, bold where a transition is saved and plain where not, and the
 editor's traffic light. The look was settled by a prototype on the branch
@@ -127,22 +124,15 @@ The stub, reviewed with the same decisions: kept as built; it follows the tab's 
 heard next, even while another match is in view, so scrolling never moves the tab to another
 row; a click scrolls the pair into view and leaves the selection alone.
 
-## What to build
+## Issues
 
-Split into issues if it is more than one session's work.
+Built in five, each its own session and commit:
 
-- Engine: decision 1's query, with tests on both runtimes: a match, none, the pair twice (in
-  playback order, from the playing row and from the top), a stale adjacency, repeat-all's
-  last → first, repeat-one's this → this, and a pair across an unreadable row.
-- `QueueRowStyle`: the seam buttons and the pairs' tint in place of the ✎ glyph
-  (`Presenter.EditGlyph`, the bold and plain fonts go); `EditButtonAt` becomes the seam under a
-  point. The outline round the first match, as decision 3 draws it, and the stub. On hover,
-  invalidate only the cells that change, as round 8 found: invalidating the whole list
-  flickered.
-- The gap panel and the tab (decision 4), in `MainForm` and in `PluginView`'s wide layout;
-  `NarrowWidth` 576.
-- `TransitionEditorPanel`: without `TrafficLight` (and `StudioTheme`'s case for it); the
-  numbered halves, the speaker, the status line, the tint and the frame.
+1. [The engine says which rows are the open pair](issues/01-the-engine-says-which-rows-are-the-open-pair.md)
+2. [The queue's seam buttons and the tint](issues/02-the-queues-seam-buttons-and-the-tint.md) (after 1)
+3. [The editor without the traffic light](issues/03-the-editor-without-the-traffic-light.md) (after 1)
+4. [The link: gap, tab, outline and stub](issues/04-the-link-gap-tab-outline-and-stub.md) (after 2 and 3)
+5. [The link in MusicBee](issues/05-the-link-in-musicbee.md) (after 4)
 
 ## Tests and docs that change
 
@@ -160,23 +150,9 @@ Split into issues if it is more than one session's work.
   "Each half names its track"; new items for the open pair (twice, across a row, wrapped,
   collapsed, out of view), on CalciumMetro, and in MusicBee wide and narrow.
 
-## Acceptance
-
-- [ ] A saved seam shows ⋈ and an unsaved one nothing until the mouse is on its row or button;
-      a click on either opens that pair, and saving or removing flips it.
-- [ ] The open pair is tinted, the tint runs into a tinted editor, and one rounded outline goes
-      round both, broken at any seam button it crosses.
-- [ ] Every match is tinted; the tab goes to the one heard next, through the stub when out of
-      view; rows between, a wrap, repeat-one and a collapsed section draw as decision 3 says.
-- [ ] The halves are numbered; the half heard has 🔊 and "· playing"; the status line says
-      when something else plays or another track comes next. No traffic light.
-- [ ] In MusicBee, wide: the same link, the gap panel between; narrow (under 576 px): the seam
-      buttons and tint only.
-- [ ] `dotnet test` passes on net8.0 and net48 x86, and the commit states both counts; the
-      Looks smoke runs, with its items updated, at 960 px and on CalciumMetro.
-
 ## Comments
 
 - 2026-10-12: decision 1 is the engine query, as the user chose.
 - 2026-10-12: decisions 2–7 and the stub settled with the user in one grilling; Status to
   ready-for-agent.
+- 2026-10-12: moved from issues/01 to the spec, split into issues 01–05 to build it.
