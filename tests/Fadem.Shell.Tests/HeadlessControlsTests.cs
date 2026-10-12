@@ -100,7 +100,7 @@ public sealed class HeadlessControlsTests
     });
 
     [Fact]
-    public void TheRowStyle_MarksTheAttendedRow_AndSetsThePencil_BoldWhileAuthored_BlankOnTheLastRow() => RunSta(() =>
+    public void TheRowStyle_MarksTheAttendedRow_AndSetsTheSeam_ACrossfadeWhileAuthored_BlankOnTheLastRow() => RunSta(() =>
     {
         using var tc = TestEngine.Create();
         var a = tc.TrackOfLength(Path.Combine(tc.TempDir, "a.wav"), 30);
@@ -126,17 +126,13 @@ public sealed class HeadlessControlsTests
         Assert.Equal(0, list.Columns[3].DisplayIndex); // shown at the far left
         Assert.Equal(SystemColors.Window, rows[0].SubItems[1].BackColor); // no yellow
         Assert.Equal(SystemColors.Window, rows[1].SubItems[1].BackColor);
-        Assert.Equal("✎", rows[0].SubItems[2].Text);
-        Assert.True(rows[0].SubItems[2].Font.Bold);
-        Assert.Equal(SystemColors.WindowText, rows[0].SubItems[2].ForeColor);
+        Assert.Equal("⋈", rows[0].SubItems[2].Text);
         Assert.Equal("", rows[1].SubItems[2].Text); // the last row has no next
 
         tc.Engine.Unauthor(new Adjacency(a, b));
         style.Apply(rows[0], tc.View.Queue[0], 0, tc.View, editColumn: 2);
 
-        Assert.Equal("✎", rows[0].SubItems[2].Text);
-        Assert.False(rows[0].SubItems[2].Font.Bold);
-        Assert.Equal(SystemColors.GrayText, rows[0].SubItems[2].ForeColor);
+        Assert.Equal("+", rows[0].SubItems[2].Text);
     });
 
     [Fact]

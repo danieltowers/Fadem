@@ -104,7 +104,7 @@ public sealed record PlayerView(
 
     /// <summary>What an editor following playback opens: the attended row's this → next, the
     /// <see cref="NextAdjacency"/> of the row the listener is on. Null when stopped, where there is
-    /// no next adjacency, and on the queue's last row, which has no ✎ (D9) even where repeat-all
+    /// no next adjacency, and on the queue's last row, which has no seam button (D9) even where repeat-all
     /// gives it one. Given whether or not <see cref="PlayerSettings.EditorFollowsPlayback"/> is on.</summary>
     public Adjacency? EditorFollow { get; init; }
 

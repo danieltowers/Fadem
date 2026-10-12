@@ -1,6 +1,6 @@
 # 02: The queue's seam buttons and the tint
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01
 
 Shell, both hosts' queues. See the [spec](../spec.md), "The answer: G3 soft" (seam buttons,
@@ -39,11 +39,28 @@ the open pair is tinted) and decision 2. The look is `round-7-short.png` on
 
 ## Acceptance
 
-- [ ] A saved seam shows ⋈ and an unsaved one nothing until the mouse is on its row or button;
+- [x] A saved seam shows ⋈ and an unsaved one nothing until the mouse is on its row or button;
       a click on either opens that pair, and saving or removing flips it.
-- [ ] The open pair's rows are tinted and its seam filled, at every match.
-- [ ] Moving the mouse down the list does not flicker.
-- [ ] `dotnet test` passes on net8.0 and net48 x86, and the commit states both counts; the
+- [x] The open pair's rows are tinted and its seam filled, at every match.
+- [x] Moving the mouse down the list does not flicker.
+- [x] `dotnet test` passes on net8.0 and net48 x86, and the commit states both counts; the
       Looks smoke runs and is reported item by item.
 
 ## Comments
+
+2026-10-12, built. `QueueRowStyle` draws the seam buttons' cell: its text is the seam's glyph,
+⋈, + or nothing (`Presenter.SeamGlyph`), for the click and for a screen reader, and the cell is
+drawn as the lower half of the seam above and the upper half of its own. The hosts pass
+`RowPairsOf` for the editor's adjacency to `Apply`, which tints each pair's rows (`Palette.Mix`,
+now internal) and fills each pair's seam; the tooltip asks the host for the seam's adjacency
+(`SeamAdjacency`). `EditButtonAt` is the seam under a point. Hover repaints the seam cells of
+the rows it leaves and enters only. Two things the prototype did not meet: a seam a section's
+header parts is drawn whole and a little shorter in its upper row (and is clicked there only);
+and within a section the list leaves a pixel between rows, which the upper row's seam cell now
+paints so the button is whole across it. A selected row keeps the raised ground over the tint.
+Looks smoke by `seam-smoke.ps1` (captures, UI Automation, posted messages): the open pair, the
+pair twice, a selected row, 960 px, sections parted and within. Hover cannot be shown by posted
+messages, since the real cursor is elsewhere and the list hears it leave at once: the headless
+test covers it, and flicker is for the eye.
+
+2026-10-12: hover, clicks and flicker checked by the user's eye: "looks good".

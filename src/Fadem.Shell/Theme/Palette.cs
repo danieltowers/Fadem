@@ -152,7 +152,7 @@ internal sealed record Palette(
     private static Color Shade(Color c, double by) => by >= 0 ? Mix(Color.White, c, by) : Mix(Color.Black, c, -by);
 
     /// <summary><paramref name="a"/> at <paramref name="amount"/> over <paramref name="b"/>.</summary>
-    private static Color Mix(Color a, Color b, double amount) => Color.FromArgb(
+    internal static Color Mix(Color a, Color b, double amount) => Color.FromArgb(
         (int)Math.Round(b.R + (a.R - b.R) * amount), (int)Math.Round(b.G + (a.G - b.G) * amount), (int)Math.Round(b.B + (a.B - b.B) * amount));
 
     /// <summary>WCAG relative luminance.</summary>

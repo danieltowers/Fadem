@@ -6,7 +6,7 @@ namespace Fadem.Shell;
 
 /// <summary>
 /// The queue list's columns in either host (playlists issue 06, D25): the shown ones from a
-/// <see cref="ColumnLayout"/>, in its order and at its widths, then the ✎ button's and the
+/// <see cref="ColumnLayout"/>, in its order and at its widths, then the seam buttons' and the
 /// speaker's, which are fixed at the far right and the far left and never ones a user shows,
 /// sizes or moves. A right-click on the header opens <see cref="Menu"/>, a tick per column; a
 /// header dragged to a new place moves its column; a width dragged is kept. Each change is
@@ -158,7 +158,7 @@ internal sealed class QueueColumns : IDisposable
     public int EditColumn => _list.Columns.Count - 2;
 
     /// <summary>A row of the list for <paramref name="row"/>, the queue's
-    /// <paramref name="number"/>th: # as its own text, a cell per other column shown, then the ✎
+    /// <paramref name="number"/>th: # as its own text, a cell per other column shown, then the seam
     /// and speaker cells, which <see cref="QueueRowStyle"/> fills.</summary>
     public ListViewItem Row(int number, QueueRow row)
     {

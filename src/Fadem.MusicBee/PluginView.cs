@@ -18,9 +18,9 @@ namespace Fadem.MusicBee;
 /// (the placement rule in CLAUDE.md). Starting sound stops MusicBee's player first, as the Tools
 /// menu's Play does: never two players at once, nor two on one device.
 /// <para>The shared transition editor sits in it too (phase 5 issue 11), opened from the queue's
-/// ✎ and its menu: docked right and always shown in a main panel, and in a sidebar a page that
-/// takes the lists' place while an adjacency is open, under a bar that closes it. Its preview
-/// sounds through the plugin's output, so it stops MusicBee's player first as ▶ does.</para>
+/// seam buttons and its menu: docked right and always shown in a main panel, and in a sidebar a
+/// page that takes the lists' place while an adjacency is open, under a bar that closes it. Its
+/// preview sounds through the plugin's output, so it stops MusicBee's player first as ▶ does.</para>
 /// <para>The shared transition manager is the view's too (phase 5 issue 12), opened from the
 /// queue's menu as a window owned by MusicBee's: a double-click on its rows opens the editor
 /// here, and its previews stop MusicBee's player first as the editor's do.</para>
@@ -86,7 +86,7 @@ internal sealed class PluginView : UserControl
     private long _shownQueue = -1;
 
     /// <summary>The queue's columns, as the App's: a right-click on the header ticks which show,
-    /// and a header drags to a new place. The speaker at the far left and ✎ at the far right stay.
+    /// and a header drags to a new place. The speaker at the far left and the seam buttons at the far right stay.
     /// The plugin keeps its own layout in each library, apart from the App's.</summary>
     internal readonly QueueColumns _columns;
 
@@ -95,7 +95,7 @@ internal sealed class PluginView : UserControl
     /// <summary>The colours MusicBee's skin gives this view (studio theme issue 01).</summary>
     internal Fadem.Shell.Theme.Palette Palette { get; }
 
-    /// <summary>The ✎ column, after the queue's own: the editor button on every row but the last.</summary>
+    /// <summary>The seam buttons' column, after the queue's own: a button on every row's seam but the last.</summary>
     internal int EditColumn => _columns.EditColumn;
 
     /// <param name="notices">The session's notices, the composition's: it outlives this view.</param>
@@ -215,8 +215,9 @@ internal sealed class PluginView : UserControl
             HideSelection = false,
             ShowItemToolTips = true,
         };
-        QueueRowStyle.Draw(_queueList, Palette); // a selected row raised, not blue
+        QueueRowStyle.Draw(_queueList, Palette, queue: _rowStyle); // a selected row raised, not blue; the seam buttons
         _rowStyle.Palette = Palette;
+        _rowStyle.SeamAdjacency = row => AdjacenciesAt(row).Next;
         // Rows drag to a new place, as in the App (phase 6 issue 02). Files dropped from
         // MusicBee's track list, or from Explorer, are both a shell drag of the files (issue 01),
         // and land where they are dropped (issue 03).
@@ -427,7 +428,7 @@ internal sealed class PluginView : UserControl
             RebuildRows(view, _queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToHashSet());
             _shownQueue = view.QueueVersion;
         }
-        _rowStyle.Apply(_queueList, view, EditColumn);
+        _rowStyle.Apply(_queueList, view, EditColumn, _editor.Adjacency is { } open ? _engine.RowPairsOf(open) : []);
         _sections.Apply(view);
 
         var attended = view.Attended;
@@ -497,7 +498,7 @@ internal sealed class PluginView : UserControl
         }
         foreach (var row in view.Queue.Skip(kept))
         {
-            var item = _columns.Row(++kept, row); // the ✎ and speaker cells styled at render
+            var item = _columns.Row(++kept, row); // the seam and speaker cells styled at render
             _queueList.Items.Add(item);
             item.Selected = selected.Contains(row.Id);
         }
@@ -702,7 +703,7 @@ internal sealed class PluginView : UserControl
     private RowAdjacencies AdjacenciesAt(int index) =>
         index >= 0 && index < _queueList.Items.Count ? _engine.AdjacenciesOf(RowOf(_queueList.Items[index])) : RowAdjacencies.None;
 
-    /// <summary>✎ on a row: the editor opens on its this → next, as the menu's first item does.</summary>
+    /// <summary>A row's seam button: the editor opens on its this → next, as the menu's first item does.</summary>
     internal void EditTransitionAt(int index) => Edit(AdjacenciesAt(index).Next);
 
     /// <summary>Opens the editor on an adjacency, and shows it where a sidebar hides it.</summary>

@@ -83,7 +83,7 @@ public sealed class QueueColumnRuleTests
         {
             Size = new Size(460, 360), StartPosition = FormStartPosition.Manual, Location = new Point(-2000, -2000), ShowInTaskbar = false,
         };
-        // Its columns, the ✎ button's, then the speaker's shown first; headers that drag.
+        // Its columns, the seam buttons', then the speaker's shown first; headers that drag.
         var list = QueueOf(tc, 4);
         list.Columns.Add("Artist", 100);
         list.Columns.Add("Length", 60, HorizontalAlignment.Right);
@@ -95,7 +95,7 @@ public sealed class QueueColumnRuleTests
             item.UseItemStyleForSubItems = false;
             item.SubItems.Add("artist");
             item.SubItems.Add("0:01");
-            item.SubItems.Add("✎");
+            item.SubItems.Add("⋈");
             item.SubItems.Add("");
         }
         list.Dock = DockStyle.Fill;

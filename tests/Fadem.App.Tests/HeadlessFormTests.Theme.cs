@@ -1,3 +1,4 @@
+using System.Reflection;
 using Fadem.Core.Tests;
 using Fadem.Shell.Theme;
 
@@ -77,9 +78,8 @@ public sealed partial class HeadlessFormTests
         var p = h.Form.Palette;
         var rows = h.Form._queueList.Items;
 
-        // Every cell of the playing row but the ✎, which is dim while not authored.
-        Assert.All(rows[0].SubItems.Cast<ListViewItem.ListViewSubItem>().Where((_, i) => i != h.Form.EditColumn),
-            cell => Assert.Equal(p.Accent, cell.ForeColor));
+        // Every cell of the playing row: the seam buttons' cell draws its buttons in their own colours.
+        Assert.All(rows[0].SubItems.Cast<ListViewItem.ListViewSubItem>(), cell => Assert.Equal(p.Accent, cell.ForeColor));
         Assert.Equal(p.Text, rows[1].ForeColor);
 
         rows[1].Selected = true;
@@ -164,4 +164,71 @@ public sealed partial class HeadlessFormTests
         h.Form.Render();
         Assert.False(StudioTheme.IsLit(h.Form._playPause));
     });
+
+    /// <summary>How many pixels of <paramref name="colour"/> are around row
+    /// <paramref name="index"/>'s seam, in its seam buttons' cell: a button showing there fills
+    /// some in its own colour.</summary>
+    private static int SeamPixels(Bitmap drawn, Fadem.App.MainForm form, int index, Color colour)
+    {
+        var cell = form._queueList.Items[index].SubItems[form.EditColumn].Bounds;
+        var count = 0;
+        for (var x = cell.Left; x < cell.Right; x++)
+        {
+            for (var y = cell.Bottom - 6; y < cell.Bottom + 6; y++)
+            {
+                count += drawn.GetPixel(x, y).ToArgb() == colour.ToArgb() ? 1 : 0;
+            }
+        }
+        return count;
+    }
+
+    [Fact]
+    public void TheOpenPair_IsTinted_AtEveryMatch_AndItsSeamFilledInTheAccent() => RunSta(() =>
+    {
+        using var h = new Harness();
+        var a = TestAudio.WriteDcWav("alpha.wav", 5, 0.4);
+        var b = TestAudio.WriteDcWav("beta.wav", 5, 0.2);
+        var c = TestAudio.WriteDcWav("gamma.wav", 5, 0.3);
+        h.Form.AddPaths(new[] { a, b, c, a, b });
+        h.Form.Render();
+        var p = h.Form.Palette;
+        var rows = h.Form._queueList.Items.Cast<ListViewItem>().ToArray();
+        Assert.All(rows, row => Assert.Equal(p.Well, row.SubItems[1].BackColor));
+
+        h.Form.EditTransitionAt(0);
+        h.Form.Render();
+
+        var tint = Palette.Mix(p.Accent, p.Well, 0.16);
+        Assert.Equal(new[] { tint, tint, p.Well, tint, tint }, rows.Select(row => row.SubItems[1].BackColor));
+        var drawn = QueuePixels(h.Form._queueList);
+        Assert.True(SeamPixels(drawn, h.Form, 0, p.Accent) > 100); // filled, each match
+        Assert.True(SeamPixels(drawn, h.Form, 3, p.Accent) > 100);
+        Assert.Equal(0, SeamPixels(drawn, h.Form, 1, p.Accent)); // not the open pair's seam: none shown
+    });
+
+    [Fact]
+    public void AnUnsavedSeam_ShowsItsButton_OnlyWhileTheMouseIsOnItsRow_RaisedAndWithTheHandOnTheButton() => RunSta(() =>
+    {
+        using var h = new Harness();
+        h.Form.AddPaths(new[] { TestAudio.WriteDcWav("alpha.wav", 5, 0.4), TestAudio.WriteDcWav("beta.wav", 5, 0.2) });
+        h.Form.Render();
+        var p = h.Form.Palette;
+        var list = h.Form._queueList;
+        Assert.Equal(0, SeamPixels(QueuePixels(list), h.Form, 0, p.Raised)); // unsaved: no button
+
+        var button = list.Items[0].SubItems[h.Form.EditColumn].Bounds;
+        Move(list, new Point(button.X + button.Width / 2, button.Bottom - 3));
+
+        Assert.Same(Cursors.Hand, list.Cursor);
+        Assert.True(SeamPixels(QueuePixels(list), h.Form, 0, p.Raised) > 100); // shown, raised
+
+        typeof(Control).GetMethod("OnMouseLeave", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { EventArgs.Empty });
+
+        Assert.Same(Cursors.Default, list.Cursor);
+        Assert.Equal(0, SeamPixels(QueuePixels(list), h.Form, 0, p.Raised));
+    });
+
+    private static void Move(ListView list, Point at) =>
+        typeof(Control).GetMethod("OnMouseMove", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(list, new object[] { new MouseEventArgs(MouseButtons.None, 0, at.X, at.Y, 0) });
 }

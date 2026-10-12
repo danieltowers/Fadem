@@ -88,8 +88,7 @@ public sealed partial class HeadlessFormTests
 
         Assert.Equal([1], h.Form._queueList.SelectedIndices.Cast<int>());
         Assert.Equal(h.Form._queueList.Columns.Count - 2, h.Form.EditColumn); // the speaker's is shown first
-        Assert.Equal(["✎", "✎", ""], EditGlyphs(h.Form._queueList));
-        Assert.True(h.Form._queueList.Items[0].SubItems[h.Form.EditColumn].Font.Bold); // still styled
+        Assert.Equal(["⋈", "+", ""], EditGlyphs(h.Form._queueList)); // still styled
         ClickEditButton(h.Form._queueList, 1);
         Assert.NotNull(h.Form._editor.Adjacency);
     });

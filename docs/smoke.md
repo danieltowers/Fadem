@@ -45,7 +45,7 @@ folds some symbol glyphs together, so find a transport button by comparing names
 with a name condition. The status strip's items are not exposed to it; read them
 from a capture. The seek bar is a pane named "Seek" whose thumb is not an element of its own: find
 the thumb in a capture (the accent), and click it with posted mouse messages. The
-queue's ✎ button is different: the list answers a click where the real cursor is, not where a
+queue's seam buttons are different: the list answers a click where the real cursor is, not where a
 posted click says, so move the cursor onto the cell (`SetCursorPos`) before posting the click.
 
 Shuffle and repeat have no buttons: 🔀 and 🔁 are hidden, since they are not what Fadem is for,
@@ -92,7 +92,7 @@ but the engine still honours them. An item that needs one sets it in the library
       column. Playing or paused, the marker is 🔊. The marked row's text is in the accent, and no
       row is shaded. When the queue runs out it goes back to the first row, 🔈, and ▶ plays that
       row. A selected row is a raised tint, not blue, whether or not the queue has focus, and its
-      ✎ is whole, not "✎…". The header reads in small dim capitals, and the list's empty part
+      seam button is drawn whole. The header reads in small dim capitals, and the list's empty part
       below the rows is plain, with no rule down any column's edge.
 - [ ] Pause, click a different row, press ▶: that row plays from 0:00 and carries the marker.
       With the playing row, no row or several rows selected, ▶ resumes where it paused.
@@ -151,20 +151,28 @@ but the engine still honours them. An item that needs one sets it in the library
       clearly, and a disabled one looks disabled. With repeat off, this → next is disabled on
       the last row and previous → this on the first. Under repeat-all, this → next on the last
       row opens last → first. This → this opens the row into itself.
-- [ ] At the far right of every row but the last sits ✎: bold and black where that row into the
-      next has a saved transition, plain and grey where it has none. The last row has none, even
-      under repeat-all. Clicking it opens the editor on this → next, as the menu does: the
-      heading changes to that adjacency. Saving or removing the transition flips its row's ✎.
-      At the 960 px minimum width it is still in view, with no sideways scroll bar.
+- [ ] At the far right, on the line between each row and the next, sits a seam button, half in
+      each row (seam markers issue 02); the last row has none under it, even under repeat-all.
+      ⋈, a key with a crossfade mark, where that row into the next has a saved transition. Where
+      it has none, nothing, until the mouse is on the row above or on the button: then +. Over a
+      button the cursor is the hand, the button is raised, and its tooltip reads "Edit the
+      transition: *a* → *b*" or "Add a transition: *a* → *b*". A click in that column's lower
+      half of a row opens the editor on the row's this → next, in its upper half on the row
+      above's, as the menu does: the heading changes to that adjacency. The pair open in the
+      editor has both its rows tinted toward the accent, the playing row's text in the text
+      colour there, and its seam filled in the accent with a white mark; where the pair is in the
+      queue twice, both. Saving or removing the transition flips ⋈ and +. Moving the mouse up and
+      down the list does not flicker. At the 960 px minimum width the column is still in view,
+      with no sideways scroll bar.
 - [ ] A fresh library shows the queue's default four columns: #, Title, Artist, Length. A
       right-click on the header (not on a row) shows a checklist of #, Title, Artist, Album,
       Length, Format, Track gain and Path, with # ticked and greyed out. Ticking Path adds a Path
       column showing each row's full path; ticking Album, Format and Track gain shows, for a
-      tagged FLAC, its album, "44.1 kHz / 16-bit" and "−7.2 dB" (blank where untagged). ✎ stays
-      the rightmost column. With Album, Format, Track gain and Path ticked at the default size,
-      ✎ is still in view with no sideways scroll bar: Path, Album and Artist give way, in that
+      tagged FLAC, its album, "44.1 kHz / 16-bit" and "−7.2 dB" (blank where untagged). The seam
+      buttons stay the rightmost column. With Album, Format, Track gain and Path ticked at the default size,
+      the seam buttons are still in view with no sideways scroll bar: Path, Album and Artist give way, in that
       order. Widening the window gives Artist, then Album, then Path their widths back. Only at
-      the 960 px minimum with all eight ticked does the list scroll sideways to ✎. Dragging a header moves it (never before # or after ✎), and a dragged width holds.
+      the 960 px minimum with all eight ticked does the list scroll sideways to the seam buttons. Dragging a header moves it (never before # or after the seam buttons), and a dragged width holds.
       A right-click on a row still shows the row's menu. Relaunched, or after **Open library…** elsewhere and back, the
       layout is as it was left; the other library shows its own. The file is
       `<library>\.fadem\columns.json`.
@@ -205,7 +213,7 @@ but the engine still honours them. An item that needs one sets it in the library
       and **Remove override** sits under Remove transition, in view at the default window size. Typing one value shows it black among the grey; leaving the
       box says "Saved *a* → *b* in *name*." and a grey line under the selector names what the
       playlist plays. **Remove override** says "Removed the override of …" and the line goes.
-      Switching mode saves a box being typed in to the mode left; the next ✎ opens in the last
+      Switching mode saves a box being typed in to the mode left; the next seam button opens in the last
       mode.
 - [ ] **Transitions…**, between **Export playlist…** and **Open library…**, opens a separate
       "Fadem — transitions" window on the selected row's track (else the first track with a
@@ -512,8 +520,8 @@ which a background run cannot give.
       "Fadem" header, the buttons ⏮ ▶ ⏹ ⏭ ⤳ ⇥ (no 🔀 or 🔁: hidden), then under them the seek
       bar, +5 s stacked over −5 s, and "0:00 / -0:00"; **Playlists** listing the library's playlists with the open one bold in
       the accent on a raised tint; the pane labels PLAYLISTS, QUEUE and TRANSITION EDITOR in the
-      text colour (round 2 issue 06); the queue with #, Title, Artist, Length and a ✎ on every
-      row but the last, bold
+      text colour (round 2 issue 06); the queue with #, Title, Artist, Length and a seam button under
+      every row but the last, ⋈
       where this → next is authored (phase 5 issue 11), and row 1 marked at rest (🔈); the strip
       reading "Ready." and, at its right, "library · WASAPI shared at 48000 Hz on Speakers
       (…)", the device in use (phase 5 issue 13). In the
@@ -527,7 +535,8 @@ which a background run cannot give.
       Title, Artist, Length and Track gain. A right-click on the queue's header (not a row)
       shows the checklist of #, Title, Artist, Album, Length, Format, Track gain and Path, #
       ticked and greyed; ticking one adds its column, unticking hides it. Dragging a header moves
-      it, never before # or after ✎; the speaker stays at the far left and ✎ at the far right.
+      it, never before # or after the seam buttons; the speaker stays at the far left and the seam
+      buttons at the far right.
       After a restart the layout is as it was left. It is the plugin's own, in
       `<library>\.fadem\musicbee-columns.json`, apart from the App's `columns.json`.
 - [ ] **▶** plays: the meter shows the tone, the track's name appears above the transport, the
@@ -570,8 +579,8 @@ which a background run cannot give.
       catch { "exclusive: refused ($($_.Exception.GetBaseException().Message))" }
       finally { $out.Dispose() }
       ```
-- [ ] **The editor in a sidebar** (phase 5 issue 11). No editor shows until ✎ on row 1 is
-      clicked: then "tone-a-440 → tone-b-660" opens as a page in the lists' place, under the
+- [ ] **The editor in a sidebar** (phase 5 issue 11). No editor shows until row 1's seam button
+      is clicked: then "tone-a-440 → tone-b-660" opens as a page in the lists' place, under the
       transport and a **Close editor** bar, with the authored values in its fields, Editing:
       Global ticked, every field, From end, the curve, Preview and Remove transition
       live (Render hidden), Undo and Redo beside Remove transition, scrolling inside where the panel is short
@@ -580,11 +589,11 @@ which a background run cannot give.
       lists back, a box being typed in saved first, with no question.
 - [ ] **The editor in a main panel** (the element moved to `LC_RightMainPanel` as above): the
       editor is docked at the right from the start, 340 px wide, reading "No boundary
-      selected" with its fields greyed, and no Close bar; ✎ on row 1 fills it.
+      selected" with its fields greyed, and no Close bar; row 1's seam button fills it.
 - [ ] **A save and its notice.** Fade-out duration typed as "abc", Enter: the strip reads "Not
       saved: …" with a **1 notice** link and no box appears; the reason shows in the mark colour
       under the field (red: the accent is blue whatever the skin, round 2 issue 07).
-      Typed as 3, Enter: "Saved tone-a-440 → tone-b-660." in the strip, ✎ on row 1 bold,
+      Typed as 3, Enter: "Saved tone-a-440 → tone-b-660." in the strip, row 1's seam ⋈,
       and the library's `transitions.json` holds the 3 s fade-out duration, as standalone
       Fadem would have saved it. **Undo** (and Ctrl+Z with focus in the editor) puts the
       duration back, "Undone: saved …"; **Redo** puts 3 back.
@@ -594,16 +603,16 @@ which a background run cannot give.
       preview is ("Pre-roll · outgoing 0:05"). **Stop preview**: meter 0, the buttons as before.
       Then **▶** plays the queue from its start, and **⏹** stops it.
 - [ ] **Capture reads its own track** (phase 6 issue 06). Row 1 playing, the editor on row 2's
-      ✎: both Capture buttons greyed, with no line under either point (hints hidden, round 2
+      seam: both Capture buttons greyed, with no line under either point (hints hidden, round 2
       issue 11). Playing row 2 brings the fade-out Capture live, its tooltip "Capture *b*'s
       playhead"; the fade-in one stays greyed.
 - [ ] **The traffic light** (phase 6 issue 07) at the editor's top right, beside the heading:
-      red while row 1 plays with row 2's ✎ open, green while row 2 plays, amber while row 3
+      red while row 1 plays with row 2's seam open, green while row 2 plays, amber while row 3
       plays, dim when stopped. With Sync editor ticked and row 1 playing, a track dragged from
       MusicBee between rows 1 and 2 moves the editor to row 1 → the dropped track, green
       (round 2 issue 08).
 - [ ] **The transition editor in the skin** (studio theme issue 05), in a main panel, with no
-      boundary open and then with row 1's ✎: as in standalone, no white or system-grey box; the
+      boundary open and then with row 1's seam: as in standalone, no white or system-grey box; the
       check box and radio buttons on the panel's ground, dim but readable when greyed; hint
       lines dim; the fade curve dark; the traffic light dim when stopped, with a dark ring.
 - [ ] **Dialogs and menus in the skin** (studio theme issue 06): Fadem's **Configure…** in
@@ -722,7 +731,7 @@ which a background run cannot give.
       queue, the editor at the right, the transport above), none of MusicBee's Now Playing
       content showing through, and no box. Restoring and maximising the window resizes it with
       the window. The library tabs (MUSIC, INBOX…) look as before, the sidebar's Fadem panel
-      included. A transition opened with ✎ there is open again after a library tab and back.
+      included. A transition opened with a seam button there is open again after a library tab and back.
       Three round trips leave no notice and no blank tab. Unticked and saved, the next visit
       shows MusicBee's own Now Playing.
 - [ ] **Three panes, three titles** (phase 6). In a main panel or the Now Playing tab, "Playlists",

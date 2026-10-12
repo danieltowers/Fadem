@@ -9,7 +9,7 @@ namespace Fadem.MusicBee.Tests;
 
 /// <summary>The plugin queue's columns, as the App's: a right-click on the header ticks which
 /// show, a header drags to a new place, and the layout is the plugin's own in each library. The
-/// speaker at the far left and ✎ at the far right stay where they are.</summary>
+/// speaker at the far left and the seam buttons at the far right stay where they are.</summary>
 public sealed partial class PluginTests
 {
     private string PluginColumnsFile => Path.Combine(LibraryFolder, Library.StoreFolderName, PluginView.ColumnsFileName);
@@ -43,9 +43,9 @@ public sealed partial class PluginTests
     {
         var columns = view._queueList.Columns;
         Assert.Equal(0, columns[columns.Count - 1].DisplayIndex); // the speaker, at the far left
-        Assert.Equal(columns.Count - 2, view.EditColumn); // ✎, after every column shown
+        Assert.Equal(columns.Count - 2, view.EditColumn); // the seam buttons, after every column shown
         Assert.Equal(columns.Count - 1, columns[view.EditColumn].DisplayIndex); // at the far right
-        Assert.Equal("✎", view._queueList.Items[0].SubItems[view.EditColumn].Text);
+        Assert.Equal("⋈", view._queueList.Items[0].SubItems[view.EditColumn].Text);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public sealed partial class PluginTests
         AssertEndsFixed(view);
 
         view._columns.Move(QueueColumn.Title, 0); // dropped on #, or the speaker: lands after #
-        view._columns.Move(QueueColumn.Artist, 99); // dropped on ✎: lands before it
+        view._columns.Move(QueueColumn.Artist, 99); // dropped on the seam buttons: lands before it
         view._columns.Move(QueueColumn.Number, 3); // # stays
 
         Assert.Equal(new[] { "#", "Title", "Length", "Track gain", "Artist", "" }, Headings(view));

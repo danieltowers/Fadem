@@ -285,9 +285,15 @@ internal static class Presenter
     public static string RowTip(bool unreadable) =>
         unreadable ? "Unreadable: its file could not be opened, so it is passed over. Double-click to try it again." : "";
 
-    /// <summary>A queue row's editor button (interim transport 07): on every row that has a
-    /// this → next, except the last, which has none even where repeat-all gives it one (D9).</summary>
-    public static string EditGlyph(bool? nextAuthored, bool isLast) => !isLast && nextAuthored is not null ? "✎" : "";
+    /// <summary>A queue row's seam button, on the line under it (seam markers issue 02): ⋈ where
+    /// its this → next is saved, + where it is not, on every row that has one except the last,
+    /// which has none even where repeat-all gives it one (D9).</summary>
+    public static string SeamGlyph(bool? nextAuthored, bool isLast) =>
+        isLast || nextAuthored is null ? "" : nextAuthored.Value ? "⋈" : "+";
+
+    /// <summary>A seam button's tooltip: what a click on it does, and to which two tracks.</summary>
+    public static string SeamTip(Adjacency adjacency, bool authored) =>
+        $"{(authored ? "Edit the transition" : "Add a transition")}: {TitleOf(adjacency.Outgoing)} → {TitleOf(adjacency.Incoming)}";
 
     public static string PlayPauseGlyph(Transport transport) => transport == Transport.Playing ? "⏸" : "▶";
 

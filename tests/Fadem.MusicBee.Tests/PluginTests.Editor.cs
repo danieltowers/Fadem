@@ -11,14 +11,14 @@ namespace Fadem.MusicBee.Tests;
 
 /// <summary>
 /// The transition editor and preview inside MusicBee (phase 5 issue 11): the shared editor
-/// composed into the plugin's view, opened from the queue's ✎, previewing through the plugin's
+/// composed into the plugin's view, opened from the queue's seam buttons, previewing through the plugin's
 /// output with MusicBee's player stopped first, and the store it writes read back as standalone
 /// Fadem reads it.
 /// </summary>
 public sealed partial class PluginTests
 {
     [Fact]
-    public void ThePencilOnARow_OpensTheEditorOnThisToNext_WithTheAuthoredCrossfade() => RunSta(() =>
+    public void TheSeamButtonOnARow_OpensTheEditorOnThisToNext_WithTheAuthoredCrossfade() => RunSta(() =>
     {
         var (a, b) = AuthorLibrary();
         ChooseLibrary(LibraryFolder);
@@ -29,7 +29,7 @@ public sealed partial class PluginTests
         var view = View(panel);
         view.Render();
 
-        Assert.Equal("✎", view._queueList.Items[0].SubItems[view.EditColumn].Text);
+        Assert.Equal("⋈", view._queueList.Items[0].SubItems[view.EditColumn].Text);
         Assert.Equal("", view._queueList.Items[1].SubItems[view.EditColumn].Text); // the last row has no next
         Assert.Equal("No boundary selected", view._editor._title.Text);
 
@@ -340,8 +340,7 @@ public sealed partial class PluginTests
             Curve = FadeCurveKind.Linear,
         }, stored);
         view.Render();
-        Assert.Equal("✎", view._queueList.Items[0].SubItems[view.EditColumn].Text);
-        Assert.True(view._queueList.Items[0].SubItems[view.EditColumn].Font.Bold);
+        Assert.Equal("⋈", view._queueList.Items[0].SubItems[view.EditColumn].Text);
     });
 
     [Fact]

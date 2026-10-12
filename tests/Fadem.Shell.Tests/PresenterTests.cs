@@ -372,4 +372,22 @@ public sealed class PresenterTests
     public void ColumnHeading_NamesEachColumn() =>
         Assert.Equal(["#", "Title", "Artist", "Album", "Length", "Format", "Track gain", "Path"],
             ShellCompat.Values<QueueColumn>().Select(Presenter.ColumnHeading));
+
+    [Fact]
+    public void SeamGlyph_IsACrossfadeWhereSaved_APlusWhereNot_AndNoneOnTheLastRowOrWithNoNext()
+    {
+        Assert.Equal("⋈", Presenter.SeamGlyph(nextAuthored: true, isLast: false));
+        Assert.Equal("+", Presenter.SeamGlyph(nextAuthored: false, isLast: false));
+        Assert.Equal("", Presenter.SeamGlyph(nextAuthored: null, isLast: false));
+        Assert.Equal("", Presenter.SeamGlyph(nextAuthored: true, isLast: true)); // repeat-all's wrap (D9)
+    }
+
+    [Fact]
+    public void SeamTip_SaysWhatAClickDoes_ToWhichTwoTracks()
+    {
+        var adjacency = new Adjacency(TrackNamed(@"C:\m\last light.flac", "Last Light"), TrackNamed(@"C:\m\northbound.flac"));
+
+        Assert.Equal("Edit the transition: Last Light → northbound", Presenter.SeamTip(adjacency, authored: true));
+        Assert.Equal("Add a transition: Last Light → northbound", Presenter.SeamTip(adjacency, authored: false));
+    }
 }

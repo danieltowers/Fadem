@@ -1,27 +1,30 @@
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
+using Fadem.Core.Domain;
 using Fadem.Core.Playback;
+
+using Point = System.Drawing.Point;
 
 namespace Fadem.Shell;
 
 /// <summary>
 /// How a queue row looks in either host (phase 5 issue 11): the attended row's speaker
 /// (<see cref="RowMarks"/>) in a column of its own, shown at the far left but kept last, after
-/// the ✎ cell, so every other cell keeps its index (<see cref="AddMarkColumn"/>); an unreadable
-/// row's grey, the row's label and tip, and the editor
-/// button cell, ✎ on every row but the last, bold while this → next is authored and grey and
-/// plain while it is not. A render runs on every tick, so each cell's look is set only when it
-/// changes. The fonts are this style's: the list's own size draws the pencil at eight pixels.
+/// the seam buttons' cell, so every other cell keeps its index (<see cref="AddMarkColumn"/>); an
+/// unreadable row's grey, the row's label and tip, and the seam buttons (seam markers issue 02).
+/// A seam button sits on the line between a row and the next, half in each row's cell: ⋈ where
+/// the row's this → next is saved; + where it is not, shown only while the mouse is on the row or
+/// the button; filled in the accent where the editor has that pair open, whose rows are tinted.
+/// A render runs on every tick, so each cell's look is set only when it changes.
 /// <see cref="Draw"/> has the list drawn by this style, so a selected row is
 /// <see cref="RowMarks.Selected"/>'s grey rather than the system's blue, and each row's image,
 /// a section's stripe, at its left edge (studio theme issue 07).
 /// </summary>
 internal sealed class QueueRowStyle : IDisposable
 {
-    private readonly Font _buttonFont = new("Segoe UI Symbol", 11f);
-    private readonly Font _authoredFont;
     private readonly Font _markFont = new("Segoe UI Symbol", 12f);
+    private readonly ToolTip _tip = new();
 
     /// <summary>The speaker's column: wide enough for its glyph, and no wider.</summary>
     public const int MarkColumnWidth = 26;
@@ -29,60 +32,97 @@ internal sealed class QueueRowStyle : IDisposable
     /// <summary>The rows' height: tall enough for the speaker. A section's stripes are as tall.</summary>
     public const int RowHeight = 22;
 
+    /// <summary>How far toward the accent the open pair's rows are tinted (G3 soft, the prototype's
+    /// round 7).</summary>
+    private const double TintAmount = 0.16;
+
     /// <summary>The colours rows are drawn in (studio theme issue 02), or none for the system's.</summary>
     public Theme.Palette? Palette { get; set; }
 
-    /// <summary>The pencil's fonts: the list's own size draws it at eight pixels.</summary>
-    public QueueRowStyle()
-    {
-        _authoredFont = new Font(_buttonFont, FontStyle.Bold);
-    }
+    /// <summary>The adjacency a row's seam opens, from the engine: the tooltip names its two tracks.</summary>
+    public Func<int, Adjacency?>? SeamAdjacency { get; set; }
+
+    /// <summary>The seam buttons' cell, as the last <see cref="Apply(ListView, PlayerView, int, IReadOnlyList{RowPair})"/>
+    /// gave it; none before.</summary>
+    private int _editColumn = -1;
+
+    /// <summary>The rows whose seam is the editor's open pair: their buttons are filled.</summary>
+    private HashSet<int> _openSeams = [];
+
+    /// <summary>The seam under the mouse, and the row it is on.</summary>
+    private int? _hoverSeam, _hoverRow;
 
     /// <summary>Styles every row <paramref name="list"/> shows for the queue in
-    /// <paramref name="view"/>, as far as both reach; <paramref name="editColumn"/> is the ✎
-    /// cell's index, and the speaker's cell is the one after it.</summary>
-    public void Apply(ListView list, PlayerView view, int editColumn)
+    /// <paramref name="view"/>, as far as both reach; <paramref name="editColumn"/> is the seam
+    /// buttons' cell, and the speaker's cell is the one after it. <paramref name="open"/> is where
+    /// the editor's adjacency is in the queue, from the engine: each pair's rows are tinted, and
+    /// each pair's seam filled.</summary>
+    public void Apply(ListView list, PlayerView view, int editColumn, IReadOnlyList<RowPair> open)
     {
+        var index = new Dictionary<RowId, int>(view.Queue.Count);
+        for (var i = 0; i < view.Queue.Count; i++)
+        {
+            index[view.Queue[i].Id] = i;
+        }
+        var tinted = new HashSet<int>();
+        var seams = new HashSet<int>();
+        foreach (var pair in open)
+        {
+            if (index.TryGetValue(pair.Outgoing, out var outgoing) && index.TryGetValue(pair.Incoming, out var incoming))
+            {
+                tinted.Add(outgoing);
+                tinted.Add(incoming);
+                if (outgoing != incoming)
+                {
+                    seams.Add(outgoing); // this → this is no seam between rows
+                }
+            }
+        }
+        _editColumn = editColumn;
+        if (!seams.SetEquals(_openSeams))
+        {
+            foreach (var seam in seams.Union(_openSeams).ToList())
+            {
+                InvalidateSeam(list, seam);
+            }
+            _openSeams = seams;
+        }
         for (var i = 0; i < list.Items.Count && i < view.Queue.Count; i++)
         {
-            Apply(list.Items[i], view.Queue[i], i, view, editColumn);
+            Apply(list.Items[i], view.Queue[i], i, view, editColumn, tinted.Contains(i));
         }
     }
 
     /// <summary>Styles <paramref name="item"/>, the list's row at <paramref name="index"/>, for
-    /// <paramref name="row"/>.</summary>
-    public void Apply(ListViewItem item, QueueRow row, int index, PlayerView view, int editColumn)
+    /// <paramref name="row"/>; <paramref name="tinted"/> while it is in the editor's open pair.</summary>
+    public void Apply(ListViewItem item, QueueRow row, int index, PlayerView view, int editColumn, bool tinted = false)
     {
-        var back = Palette?.Well ?? SystemColors.Window;
+        var well = Palette?.Well ?? SystemColors.Window;
+        var back = tinted ? Theme.Palette.Mix(Palette?.Accent ?? SystemColors.Highlight, well, TintAmount) : well;
         var dim = Palette?.Dim ?? SystemColors.GrayText;
-        // The attended row, the one that plays, reads at a glance in the accent (studio theme issue 03).
+        // The attended row, the one that plays, reads at a glance in the accent (studio theme issue
+        // 03); on the open pair's tint, in the text colour.
         var fore = row.IsUnreadable ? dim
-            : row.IsCurrent && Palette is { } p ? p.Accent
+            : row.IsCurrent && !tinted && Palette is { } p ? p.Accent
             : Palette?.Text ?? SystemColors.WindowText;
-        var authored = row.NextAuthored == true;
-        var button = item.SubItems[editColumn];
         foreach (ListViewItem.ListViewSubItem cell in item.SubItems)
         {
             if (cell.BackColor != back)
             {
                 cell.BackColor = back;
             }
-            // ✎ is the plain text when authored, on the playing row too, and dim when not.
-            var cellFore = cell != button ? fore : authored && !row.IsUnreadable ? Palette?.Text ?? SystemColors.WindowText : dim;
-            if (cell.ForeColor != cellFore)
+            if (cell.ForeColor != fore)
             {
-                cell.ForeColor = cellFore;
+                cell.ForeColor = fore;
             }
         }
-        var glyph = Presenter.EditGlyph(row.NextAuthored, isLast: index == view.Queue.Count - 1);
+        // The seam's glyph is drawn as a button (DrawSeams), never as text; the cell's text says
+        // which button, for a click and for a screen reader.
+        var button = item.SubItems[editColumn];
+        var glyph = Presenter.SeamGlyph(row.NextAuthored, isLast: index == view.Queue.Count - 1);
         if (button.Text != glyph)
         {
             button.Text = glyph;
-        }
-        var font = authored ? _authoredFont : _buttonFont;
-        if (button.Font != font)
-        {
-            button.Font = font;
         }
         if (editColumn + 1 < item.SubItems.Count)
         {
@@ -105,25 +145,186 @@ internal sealed class QueueRowStyle : IDisposable
         }
     }
 
-    /// <summary>The row whose editor button is at <paramref name="location"/> in
-    /// <paramref name="list"/>, or null: a click anywhere else on a row, or on a row that shows
-    /// no button, is not a press of it.</summary>
-    public static int? EditButtonAt(ListView list, Point location, int editColumn) =>
-        list.HitTest(location) is { Item: { } item, SubItem: { } cell }
-            && cell == item.SubItems[editColumn] && cell.Text.Length > 0
-            ? item.Index
+    /// <summary>The row whose seam button is at <paramref name="location"/> in
+    /// <paramref name="list"/>, or null. The seam buttons' column is all buttons: a cell's lower
+    /// half is its row's seam into the next, its upper half the row above's. A seam whose rows a
+    /// section's header parts is in its upper row's cell only. A point anywhere else on a row, or
+    /// on a row that has no seam there, is no press of one.</summary>
+    public static int? EditButtonAt(ListView list, Point location, int editColumn)
+    {
+        if (list.HitTest(location) is not { Item: { } item, SubItem: { } cell } || cell != item.SubItems[editColumn])
+        {
+            return null;
+        }
+        var lower = location.Y >= cell.Bounds.Top + cell.Bounds.Height / 2;
+        var row = lower ? item.Index : item.Index - 1;
+        return row >= 0 && (lower || Touching(list, row)) && list.Items[row].SubItems[editColumn].Text.Length > 0
+            ? row
             : null;
+    }
+
+    /// <summary>Whether row <paramref name="index"/> and the next sit one on the other, with no
+    /// section's header between them.</summary>
+    private static bool Touching(ListView list, int index) =>
+        index + 1 < list.Items.Count && list.Items[index].Group == list.Items[index + 1].Group;
+
+    /// <summary>The pixels the list leaves between row <paramref name="index"/> and the next, where
+    /// they touch: none in a plain list, one in sections.</summary>
+    private static int GapBelow(ListView list, int index) =>
+        Touching(list, index) ? Math.Max(0, Math.Min(4, list.Items[index + 1].Bounds.Top - list.Items[index].Bounds.Bottom)) : 0;
+
+    /// <summary>The mouse on <paramref name="list"/>: the seam under it shows its button raised,
+    /// with the hand and a tooltip, and the row under it shows its seam's + (none where off).
+    /// Only the buttons that come or go are drawn again: the whole list, on every row the mouse
+    /// crossed, flickered (the prototype's round 8).</summary>
+    private void Hover(ListView list, Point? location)
+    {
+        var seam = location is { } at && _editColumn >= 0 && _editColumn < list.Columns.Count
+            ? EditButtonAt(list, at, _editColumn) : null;
+        var row = location is { } on ? list.HitTest(on).Item?.Index : null;
+        if (seam == _hoverSeam && row == _hoverRow)
+        {
+            return;
+        }
+        var changed = new[] { _hoverSeam, _hoverRow, seam, row };
+        var seamChanged = seam != _hoverSeam;
+        _hoverSeam = seam;
+        _hoverRow = row;
+        var cursor = seam is null ? Cursors.Default : Cursors.Hand;
+        if (list.Cursor != cursor)
+        {
+            list.Cursor = cursor;
+        }
+        if (seamChanged)
+        {
+            var tip = seam is { } s && SeamAdjacency?.Invoke(s) is { } adjacency
+                ? Presenter.SeamTip(adjacency, list.Items[s].SubItems[_editColumn].Text == Presenter.SeamGlyph(true, false))
+                : "";
+            if (_tip.GetToolTip(list) != tip)
+            {
+                _tip.SetToolTip(list, tip);
+            }
+        }
+        foreach (var index in changed.OfType<int>().Distinct())
+        {
+            InvalidateSeam(list, index);
+        }
+    }
+
+    /// <summary>Draws row <paramref name="index"/>'s seam button again: the seam cells of that row
+    /// and the next, where its halves are.</summary>
+    private void InvalidateSeam(ListView list, int index)
+    {
+        foreach (var r in new[] { index, index + 1 })
+        {
+            if (r >= 0 && r < list.Items.Count && _editColumn >= 0 && _editColumn < list.Columns.Count)
+            {
+                list.Invalidate(list.Items[r].SubItems[_editColumn].Bounds);
+            }
+        }
+    }
+
+    /// <summary>A seam cell's buttons: the lower half of the seam above, at the cell's top, and the
+    /// upper half of its own row's, at its bottom. A seam whose rows a section's header parts is
+    /// whole in its upper row's cell, a little shorter, under the half from above. Where the list
+    /// leaves a gap between two rows (in sections, a pixel), the seam's line is the gap's top,
+    /// which the upper row's cell takes in.</summary>
+    private void DrawSeams(Graphics g, Rectangle area, ListView list, ListViewItem item)
+    {
+        var i = item.Index;
+        var cx = area.Left + area.Width / 2;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        if (i > 0 && Touching(list, i - 1) && Shown(list, i - 1))
+        {
+            SeamButton(g, new Rectangle(cx - 10, area.Top - GapBelow(list, i - 1) - 8, 20, 16), list, i - 1);
+        }
+        if (Shown(list, i))
+        {
+            SeamButton(g, Touching(list, i) ? new Rectangle(cx - 10, area.Bottom - 8, 20, 16)
+                : new Rectangle(cx - 10, area.Bottom - 14, 20, 13), list, i);
+        }
+        g.SmoothingMode = SmoothingMode.Default;
+    }
+
+    /// <summary>Whether row <paramref name="index"/>'s seam shows its button: saved, open, or under
+    /// the mouse, its own or its row.</summary>
+    private bool Shown(ListView list, int index)
+    {
+        var glyph = list.Items[index].SubItems[_editColumn].Text;
+        return glyph.Length > 0
+            && (glyph == Presenter.SeamGlyph(true, false) || _openSeams.Contains(index) || _hoverSeam == index || _hoverRow == index);
+    }
+
+    /// <summary>One seam button in <paramref name="box"/>: a key, raised under the mouse, or filled
+    /// in the accent where its pair is open; ⋈ in it where saved, + where not.</summary>
+    private void SeamButton(Graphics g, Rectangle box, ListView list, int index)
+    {
+        var authored = list.Items[index].SubItems[_editColumn].Text == Presenter.SeamGlyph(true, false);
+        var open = _openSeams.Contains(index);
+        var hovered = _hoverSeam == index;
+        var well = Palette?.Well ?? SystemColors.Window;
+        var accent = Palette?.Accent ?? SystemColors.Highlight;
+        var text = Palette?.Text ?? SystemColors.WindowText;
+        var dim = Palette?.Dim ?? SystemColors.GrayText;
+        var fill = open ? accent : hovered ? Palette?.Raised ?? SystemColors.ControlLight : authored ? Palette?.Key ?? SystemColors.Control : well;
+        var edge = open ? accent : hovered ? text : authored ? Palette?.Edge ?? SystemColors.ControlDark : Theme.Palette.Mix(dim, well, 0.6);
+        using (var path = Rounded(box, 4))
+        {
+            using (var brush = new SolidBrush(fill))
+            {
+                g.FillPath(brush, path);
+            }
+            using var pen = new Pen(edge, 1f);
+            g.DrawPath(pen, path);
+        }
+        float cx = box.Left + box.Width / 2f, cy = box.Top + box.Height / 2f;
+        if (authored)
+        {
+            // A crossfade's mark, ⋈: the outgoing track's level falling to the middle, the
+            // incoming's rising from it, over it.
+            var ink = open ? Color.White : accent;
+            using var outgoing = new SolidBrush(Color.FromArgb(150, ink));
+            using var incoming = new SolidBrush(Color.FromArgb(230, ink));
+            g.FillPolygon(outgoing, new[] { new PointF(cx - 7, cy - 5), new PointF(cx, cy), new PointF(cx - 7, cy + 5) });
+            g.FillPolygon(incoming, new[] { new PointF(cx + 7, cy - 5), new PointF(cx, cy), new PointF(cx + 7, cy + 5) });
+        }
+        else
+        {
+            using var mark = new Pen(open ? Color.White : hovered ? text : dim, 1.8f);
+            g.DrawLine(mark, cx - 4, cy, cx + 4, cy);
+            g.DrawLine(mark, cx, cy - 4, cx, cy + 4);
+        }
+    }
+
+    private static GraphicsPath Rounded(Rectangle r, int radius)
+    {
+        var d = radius * 2;
+        var path = new GraphicsPath();
+        path.AddArc(r.Left, r.Top, d, d, 180, 90);
+        path.AddArc(r.Right - d, r.Top, d, d, 270, 90);
+        path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+        path.AddArc(r.Left, r.Bottom - d, d, d, 90, 90);
+        path.CloseFigure();
+        return path;
+    }
 
     /// <summary>Has <paramref name="list"/>, a details view, drawn here: each cell in its own
     /// colours and font, aligned as its column, on the palette's Raised (or
     /// <see cref="RowMarks.Selected"/> with none) while its row is selected. The header is drawn
     /// in the palette, or is the system's with none. With <paramref name="ownRowHeight"/> the rows
-    /// keep the list's own height (the playlists', studio theme issue 06), not the queue's.</summary>
-    public static void Draw(ListView list, Theme.Palette? palette = null, bool ownRowHeight = false)
+    /// keep the list's own height (the playlists', studio theme issue 06), not the queue's. With
+    /// <paramref name="queue"/>, the queue's own style, its seam buttons' cells are drawn as
+    /// buttons and follow the mouse.</summary>
+    public static void Draw(ListView list, Theme.Palette? palette = null, bool ownRowHeight = false, QueueRowStyle? queue = null)
     {
         list.OwnerDraw = true;
         _ = new BufferedPaint(list);
         _ = new NoHotRow(list);
+        if (queue is not null)
+        {
+            list.MouseMove += (_, e) => queue.Hover(list, e.Location);
+            list.MouseLeave += (_, _) => queue.Hover(list, null);
+        }
         // An image list's height sets the rows': the list has no other.
         var rows = new ImageList { ImageSize = new Size(1, RowHeight) };
         if (!ownRowHeight)
@@ -167,9 +368,17 @@ internal sealed class QueueRowStyle : IDisposable
             // the row under the mouse in and out, drawing it into a buffer with an alpha channel;
             // GDI's text leaves that alpha at nought there, so a row drawn straight onto it showed
             // no text while it faded, a flicker (2026-10-09).
-            using var buffer = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format24bppRgb);
+            // A seam cell takes in the gap under its row too, where the list leaves one, so a seam
+            // button is whole across it.
+            var below = queue is not null && e.ColumnIndex == queue._editColumn ? GapBelow(list, item.Index) : 0;
+            using var buffer = new Bitmap(bounds.Width, bounds.Height + below, PixelFormat.Format24bppRgb);
             using (var g = Graphics.FromImage(buffer))
             {
+                if (below > 0)
+                {
+                    using var ground = new SolidBrush(palette?.Well ?? list.BackColor);
+                    g.FillRectangle(ground, 0, bounds.Height, bounds.Width, below);
+                }
                 DrawCell(g, new Rectangle(Point.Empty, bounds.Size));
             }
             e.Graphics.DrawImageUnscaled(buffer, bounds.Location);
@@ -201,7 +410,12 @@ internal sealed class QueueRowStyle : IDisposable
                     HorizontalAlignment.Center => TextFormatFlags.HorizontalCenter,
                     _ => TextFormatFlags.Left,
                 };
-                // A centred cell is the ✎ button's: narrow, and never cut short.
+                if (queue is not null && e.ColumnIndex == queue._editColumn)
+                {
+                    queue.DrawSeams(g, area, list, item);
+                    return;
+                }
+                // A centred cell is narrow, the speaker's: never cut short.
                 var centred = align == TextFormatFlags.HorizontalCenter;
                 var text = centred ? area : Rectangle.Inflate(area, -4, 0);
                 TextRenderer.DrawText(
@@ -421,19 +635,18 @@ internal sealed class QueueRowStyle : IDisposable
         private static extern bool BitBlt(IntPtr dc, int x, int y, int width, int height, IntPtr source, int sx, int sy, int rop);
     }
 
-    /// <summary>Adds the speaker's column after every other, the ✎ button's included, and shows it
-    /// first: at the far left, while each other cell keeps its index.</summary>
+    /// <summary>Adds the speaker's column after every other, the seam buttons' included, and shows
+    /// it first: at the far left, while each other cell keeps its index.</summary>
     public static void AddMarkColumn(ListView list)
     {
         var mark = list.Columns.Add("", MarkColumnWidth, HorizontalAlignment.Center);
         mark.DisplayIndex = 0;
     }
 
-    /// <summary>After the list, which draws with the fonts.</summary>
+    /// <summary>After the list, which draws with the font.</summary>
     public void Dispose()
     {
-        _buttonFont.Dispose();
-        _authoredFont.Dispose();
         _markFont.Dispose();
+        _tip.Dispose();
     }
 }

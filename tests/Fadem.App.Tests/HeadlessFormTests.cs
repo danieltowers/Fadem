@@ -2057,17 +2057,17 @@ public sealed partial class HeadlessFormTests
         ThreeQueued(h);
 
         Assert.Equal(h.Form.EditColumn, h.Form._queueList.Columns.Count - 2); // the speaker's is shown first
-        Assert.Equal(new[] { "✎", "✎", "" }, EditGlyphs(h.Form._queueList));
+        Assert.Equal(new[] { "+", "+", "" }, EditGlyphs(h.Form._queueList));
 
         h.Engine.SetRepeat(RepeatMode.All); // the last row has a this → next, but no button (D9)
         ClickEditButton(h.Form._queueList, 2);
 
-        Assert.Equal(new[] { "✎", "✎", "" }, EditGlyphs(h.Form._queueList));
+        Assert.Equal(new[] { "+", "+", "" }, EditGlyphs(h.Form._queueList));
         Assert.Null(h.Form._editor.Adjacency);
     });
 
     [Fact]
-    public void TheRowButton_IsBoldWhileItsAdjacencyIsAuthored_AndGreyWhileNot() => RunSta(() =>
+    public void TheSeamButton_IsTheCrossfadeMarkWhileItsAdjacencyIsAuthored_AndPlusWhileNot() => RunSta(() =>
     {
         using var h = new Harness();
         ThreeQueued(h);
@@ -2078,14 +2078,12 @@ public sealed partial class HeadlessFormTests
         });
 
         var cells = h.Form._queueList.Items.Cast<ListViewItem>().Select(i => i.SubItems[h.Form.EditColumn]).ToArray();
-        Assert.True(cells[0].Font.Bold);
-        Assert.Equal(h.Form.Palette.Text, cells[0].ForeColor);
-        Assert.False(cells[1].Font.Bold);
-        Assert.Equal(h.Form.Palette.Dim, cells[1].ForeColor);
+        Assert.Equal("⋈", cells[0].Text);
+        Assert.Equal("+", cells[1].Text);
 
         h.Engine.Unauthor(h.Engine.AdjacenciesOf(h.Engine.View.Queue[0].Id).Next!);
 
-        Assert.False(cells[0].Font.Bold);
+        Assert.Equal("+", cells[0].Text);
     });
 
     [Fact]
@@ -2110,8 +2108,15 @@ public sealed partial class HeadlessFormTests
         _ = h.Form._queueList.Handle;
         var title = h.Form._queueList.Items[1].SubItems[1].Bounds;
 
+        var seams = h.Form._queueList.Items[1].SubItems[h.Form.EditColumn].Bounds;
+        var first = h.Form._queueList.Items[0].SubItems[h.Form.EditColumn].Bounds;
+
         Assert.Null(h.Form.EditButtonAt(new System.Drawing.Point(title.X + 4, title.Y + 4)));
-        Assert.Equal(1, h.Form.EditButtonAt(h.Form._queueList.Items[1].SubItems[h.Form.EditColumn].Bounds.Location + new Size(4, 4)));
+        // The seam buttons' column is all buttons: a cell's lower half is its row's seam into the
+        // next, its upper half the row above's (seam markers issue 02).
+        Assert.Equal(1, h.Form.EditButtonAt(new System.Drawing.Point(seams.X + 4, seams.Bottom - 4)));
+        Assert.Equal(0, h.Form.EditButtonAt(seams.Location + new Size(4, 4)));
+        Assert.Null(h.Form.EditButtonAt(first.Location + new Size(4, 4))); // no seam above the first row
     });
 
     [Fact]

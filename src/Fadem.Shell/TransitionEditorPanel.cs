@@ -825,7 +825,7 @@ internal sealed class TransitionEditorPanel : Panel
     }
 
     /// <summary>While the editor follows playback, each row the listener comes to opens it on the
-    /// engine's <see cref="PlayerView.EditorFollow"/>, as ✎ would, once: between rows the user can
+    /// engine's <see cref="PlayerView.EditorFollow"/>, as a seam button would, once: between rows the user can
     /// open another. So does a drop, a move or a removal that gives the row another next (round 2
     /// issue 08). Switched on, it follows at once. The last row has nothing to follow to, so the
     /// editor stays where it was. A preview is never ended by it: it follows once the preview has.</summary>

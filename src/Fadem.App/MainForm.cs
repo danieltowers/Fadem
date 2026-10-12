@@ -241,8 +241,9 @@ internal sealed class MainForm : Form
             HideSelection = false,
             ShowItemToolTips = true,
         };
-        QueueRowStyle.Draw(_queueList, Palette); // a selected row raised, not blue
+        QueueRowStyle.Draw(_queueList, Palette, queue: _rowStyle); // a selected row raised, not blue; the seam buttons
         _rowStyle.Palette = Palette;
+        _rowStyle.SeamAdjacency = row => AdjacenciesAt(row).Next;
         // The columns (playlists issue 06): the default four until the library's own layout is
         // read, at the first render.
         _columns = new QueueColumns(_queueList, ColumnLayout.Default, ColumnLayout.FileName, selected =>
@@ -464,7 +465,7 @@ internal sealed class MainForm : Form
             _shownQueue = view.QueueVersion;
         }
         // Render runs on every tick: each row's look is set only when it changes (build issue 20).
-        _rowStyle.Apply(_queueList, view, EditColumn);
+        _rowStyle.Apply(_queueList, view, EditColumn, _editor.Adjacency is { } open ? _engine.RowPairsOf(open) : []);
         _sections.Apply(view);
 
         var attended = view.Attended;
