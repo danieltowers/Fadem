@@ -48,6 +48,10 @@ internal sealed class PluginView : UserControl
     internal readonly QueueDrag _queueDrag;
     internal readonly QueueSections _sections;
 
+    /// <summary>The open pair as a tab on the editor, in a main panel: the gap, the stub and the
+    /// outline (seam markers issue 05). In a sidebar, unlinked.</summary>
+    internal readonly PairLink _link;
+
     internal readonly PlaylistSidebar _playlists;
     internal readonly ListView _queueList;
     internal readonly Label _attendedTrack;
@@ -312,10 +316,14 @@ internal sealed class PluginView : UserControl
         _editorBar.Controls.Add(_closeEditor);
         _closeEditor.Click += (_, _) => CloseEditor();
         _playlists = new PlaylistSidebar(engine, LeaveEditor) { Palette = Palette };
+        _link = new PairLink(_queueList, _rowStyle, _editor, Render);
 
         // Docking order: the strip and the editor's bar first, then the playlists, then the
-        // editor (at the right, or filling the lists' place), and the list last.
+        // editor (at the right, or filling the lists' place), the gap the tab crosses between it
+        // and the queue, and the list last. The gap is its own control, there from the start in a
+        // main panel, so the queue's columns never jump: PlaceEditor sets the pane's width afresh.
         Controls.Add(_queuePane);
+        Controls.Add(_link.Gap);
         Controls.Add(_editorPane);
         Controls.Add(_playlists);
         Controls.Add(_editorBar);
@@ -428,8 +436,10 @@ internal sealed class PluginView : UserControl
             RebuildRows(view, _queueList.SelectedItems.Cast<ListViewItem>().Select(RowOf).ToHashSet());
             _shownQueue = view.QueueVersion;
         }
-        _rowStyle.Apply(_queueList, view, EditColumn, _editor.Adjacency is { } open ? _engine.RowPairsOf(open) : []);
+        var open = _editor.Adjacency is { } adjacency ? _engine.RowPairsOf(adjacency) : [];
+        _rowStyle.Apply(_queueList, view, EditColumn, open);
         _sections.Apply(view);
+        _link.Show(view, open);
 
         var attended = view.Attended;
         _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length, attended?.Marks);
@@ -506,8 +516,9 @@ internal sealed class PluginView : UserControl
     }
 
     /// <summary>Below this width the panel is a sidebar: the playlists go above the queue, not
-    /// beside it, so the queue keeps its columns.</summary>
-    internal const int NarrowWidth = 560;
+    /// beside it, so the queue keeps its columns. 560 until the link's 16 px gap (seam markers
+    /// issue 05), so the queue keeps the room it had.</summary>
+    internal const int NarrowWidth = 560 + PairLink.GapWidth;
 
     /// <summary>The readout's column: the App's width in a main panel, where the LED readout is
     /// whole at full size, and narrower in a sidebar, where it draws smaller and the seek bar
@@ -604,11 +615,13 @@ internal sealed class PluginView : UserControl
             _editorBar.Visible = false;
             Hold(_syncEditor, _editorTitle, DockStyle.Right);
             _playlists.Visible = _queuePane.Visible = true;
+            _link.Linked = true;
             return;
         }
         // A sidebar can be short (MusicBee stacks its panels), so the editor and the lists do
         // not share it: the editor is a page in their place, scrolling inside, with the transport
-        // still above it for capture by ear.
+        // still above it for capture by ear. Its numbered halves are its only link to the queue.
+        _link.Linked = false;
         var open = _editor.Adjacency is not null;
         _editorPane.Dock = DockStyle.Fill;
         _editorTitle.Visible = false;

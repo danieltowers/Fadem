@@ -770,6 +770,19 @@ which a background run cannot give.
       "Queue" and "Transition editor" sit on one line, and the three boxes under them start and
       end level. In the sidebar "Queue" sits over the queue as "Playlists" does over its list,
       and the editor's page has its Close bar, no title.
+- [ ] **The open pair in a main panel** (seam markers issue 05), in a main panel or the Now
+      Playing tab: a 16 px gap parts the queue from the editor, a pair open or not, and the
+      queue's columns do not move as a seam opens or the editor empties (another playlist). With
+      row 1's seam open, the link as standalone Fadem's "The open pair as a tab on the editor":
+      the rows tinted, the tint straight across the queue's frame and the gap into a tinted editor
+      under its title, one rounded outline round both, broken at the seam button. Scrolled away,
+      the stub stands in, and its click scrolls the pair back. The pieces still meet after
+      MusicBee's window is restored, maximised and sized by hand. On a light skin the tint and the
+      outline read.
+- [ ] **The open pair in a sidebar** (decision 5), under 576 px: the seam buttons as in a main
+      panel and no gap. Row 1's seam opens the editor's page with no tint, outline or tab, its
+      halves numbered "1 · *row 1*" and "2 · *row 2*", the only link to the queue. Dragged to a
+      main panel with the pair still open, the link and the gap come back with it.
 - [ ] **Sections** (phase 6 issue 09). In the sidebar, the queue menu's **Section → Start a
       section here…** on a row shows a header with its swatch, name and chevron, its rows striped in
       its colour, as in standalone Fadem; the chevron collapses it, and MusicBee restarted shows

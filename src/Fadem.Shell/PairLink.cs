@@ -94,13 +94,42 @@ internal sealed class PairLink
 
     private Theme.Palette? Palette => _rows.Palette;
 
+    /// <summary>Whether the queue and the editor stand side by side, linked: false where the editor
+    /// is a page in the queue's place (MusicBee's sidebar, decision 5), with no gap, tab, outline or
+    /// tint in the editor; the queue's rows keep theirs. Off at once; back on at the next
+    /// <see cref="Show"/>. Unlinked, the gap is narrowed to nothing, not hidden: hidden while the
+    /// host's window is made, it would have no window of its own, and WinForms, putting its
+    /// controls in the order of their windows, would move it to the editor's far side.</summary>
+    public bool Linked
+    {
+        get => _linked;
+        set
+        {
+            if (value == _linked)
+            {
+                return;
+            }
+            _linked = value;
+            Gap.Width = value ? GapWidth : 0;
+            if (!value)
+            {
+                _span = null;
+                _alone = null;
+                _editor.Tint(null);
+                Update();
+            }
+        }
+    }
+
+    private bool _linked = true;
+
     /// <summary>Called on every render, after the queue's rows: where the editor's adjacency is in
     /// the queue, from the engine, the first of <paramref name="open"/> taking the tab.</summary>
     public void Show(PlayerView view, IReadOnlyList<RowPair> open)
     {
         (int, int)? span = null;
         int? alone = null;
-        if (_editor.Adjacency is not null && open.Count > 0
+        if (_linked && _editor.Adjacency is not null && open.Count > 0
             && IndexOf(view, open[0].Outgoing) is { } outgoing && IndexOf(view, open[0].Incoming) is { } incoming)
         {
             // The incoming row drawn above the outgoing, repeat-all's last → first: the tab from the
