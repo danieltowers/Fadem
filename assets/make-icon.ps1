@@ -1,13 +1,14 @@
-# Makes fadem.ico from icon.png: the exe's icon, the installer's, and every Fadem window's.
+# Makes fadem.ico from logo-mark-color.png, the logo's mark: the exe's icon, the installer's,
+# and every Fadem window's.
 # The art's transparent margin is trimmed and the rest centred on a square, then scaled to each
 # size Windows asks for. Up to 64 px each image is a 32-bit bitmap, which every reader of icons
 # takes (.NET Framework's System.Drawing among them); 256 px is PNG, as Windows expects there.
-# Run it again whenever icon.png changes, and commit both.
+# Run it again whenever the mark changes, and commit both.
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
-$source = Join-Path $PSScriptRoot 'icon.png'
+$source = Join-Path $PSScriptRoot 'logo-mark-color.png'
 $target = Join-Path $PSScriptRoot 'fadem.ico'
 $sizes = 16, 20, 24, 32, 40, 48, 64, 256
 

@@ -34,14 +34,14 @@ public sealed class LogoTests
         using var column = new Panel { Size = new Size(600, logo.Room) };
         column.Controls.Add(logo);
 
-        Assert.Equal(logo.Room - 4, logo.ArtSize.Height); // 66 at 100 %
-        Assert.InRange((double)logo.ArtSize.Width / logo.ArtSize.Height, 2.5, 3.0); // the art's margin trimmed
-        Assert.Equal(logo.ArtSize.Width + 4, logo.Width);
+        Assert.Equal(logo.Room - 6, logo.ArtSize.Height); // 66 at 100 %
+        Assert.InRange((double)logo.ArtSize.Width / logo.ArtSize.Height, 3.3, 3.7); // the art's margin trimmed
+        Assert.Equal(logo.ArtSize.Width + 6, logo.Width);
         Assert.Equal(column.Width, logo.Right);
     });
 
     [Fact]
-    public void OnATwentySixPixelLine_ItShrinksToTwentyTwo_AndTheNameEndsBeforeIt() => RunSta(() =>
+    public void OnATwentySixPixelLine_ItShrinksToTwenty_AndTheNameEndsBeforeIt() => RunSta(() =>
     {
         using var line = new Panel { Size = new Size(300, 26) };
         using var name = new Label { Dock = DockStyle.Fill, Text = "A track", AutoEllipsis = true };
@@ -49,8 +49,8 @@ public sealed class LogoTests
         line.Controls.Add(name);
         line.Controls.Add(logo); // docked after the name, so rightmost
 
-        Assert.Equal(22, logo.ArtSize.Height);
-        Assert.Equal(logo.ArtSize.Width + 4, logo.Width);
+        Assert.Equal(20, logo.ArtSize.Height);
+        Assert.Equal(logo.ArtSize.Width + 6, logo.Width);
         Assert.Equal(line.Width, logo.Right);
         Assert.Equal(logo.Left, name.Right); // the name is cut short before it
     });
@@ -62,9 +62,9 @@ public sealed class LogoTests
         using var logo = new Logo(dark: false) { Dock = DockStyle.Right };
         line.Controls.Add(logo);
 
-        Assert.Equal(12, logo.ArtSize.Height);
-        Assert.InRange((double)logo.ArtSize.Width / logo.ArtSize.Height, 2.5, 3.0);
-        Assert.Equal(logo.ArtSize.Width + 4, logo.Width); // no wider than its art
+        Assert.Equal(10, logo.ArtSize.Height);
+        Assert.InRange((double)logo.ArtSize.Width / logo.ArtSize.Height, 3.3, 3.7);
+        Assert.Equal(logo.ArtSize.Width + 6, logo.Width); // no wider than its art
         Assert.Equal(line.Width, logo.Right);
     });
 

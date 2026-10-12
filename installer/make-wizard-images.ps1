@@ -52,7 +52,7 @@ function Add-Art($g, $art, [System.Drawing.Rectangle]$from, [double]$x, [double]
     $height
 }
 
-$mark = New-Object System.Drawing.Bitmap (Join-Path $assets 'icon.png')
+$mark = New-Object System.Drawing.Bitmap (Join-Path $assets 'logo-mark-color.png')
 $markBounds = Get-Trimmed $mark (New-Object System.Drawing.Rectangle 0, 0, $mark.Width, $mark.Height)
 
 # The wordmark is the logo's right part, past the widest empty gap after the mark.

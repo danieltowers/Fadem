@@ -1240,7 +1240,7 @@ public sealed partial class HeadlessFormTests
         Assert.Equal(header.ClientSize.Width, h.Form._logo.Right);
         Assert.Equal(0, h.Form._logo.Top);
         Assert.Equal(h.Form._logo.Room, header.Height); // no taller than the logo needs
-        Assert.Equal(h.Form._logo.Room - 4, h.Form._logo.ArtSize.Height);
+        Assert.Equal(h.Form._logo.Room - 6, h.Form._logo.ArtSize.Height);
         Assert.True(h.Form._attendedTrack.Parent.Right <= h.Form._logo.Left); // the name is cut short before it
     });
 

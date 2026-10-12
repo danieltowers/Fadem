@@ -3,7 +3,7 @@ namespace Fadem.Shell;
 /// <summary>
 /// The Fadem icon every Fadem window wears, on both hosts (2026-10-11): in the title bar, on the
 /// taskbar and in Alt+Tab. Embedded in the shell, as the logo is, so the plugin's windows wear it
-/// too rather than MusicBee's or WinForms' own. Made from assets/icon.png by
+/// too rather than MusicBee's or WinForms' own. Made from assets/logo-mark-color.png, the logo's mark, by
 /// assets/make-icon.ps1, which also gives the standalone exe and the installer the same file.
 /// </summary>
 internal static class AppIcon

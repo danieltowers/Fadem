@@ -19,8 +19,8 @@ internal sealed class Logo : Control
     /// 22, as the user asked (2026-10-10), so the hosts give it a column of its own.</summary>
     public const int LogicalHeight = 66;
 
-    /// <summary>The room kept above and below it, and at its right.</summary>
-    private const int Inset = 2;
+    /// <summary>The room kept round it, on every side (2026-10-12).</summary>
+    private const int Inset = 3;
 
     private readonly Bitmap _art;
     private Bitmap? _scaled;
