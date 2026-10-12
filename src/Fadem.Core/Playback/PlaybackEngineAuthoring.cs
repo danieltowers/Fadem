@@ -159,6 +159,21 @@ public sealed partial class PlaybackEngine
         return _snapshot.AdjacenciesOf(row);
     }
 
+    /// <summary>Where <paramref name="adjacency"/> is in the queue: every row pair whose this →
+    /// next is it, as <see cref="AdjacenciesOf"/> gives a row's <c>Next</c>, and under repeat-one
+    /// each row into itself (seam markers issue 01). In the order the queue reaches them from
+    /// the current row, playing or paused, so the first is the one heard next; from the top when
+    /// there is none. A pair need not be two neighbouring rows: <c>Next</c> passes over unreadable
+    /// rows and wraps under repeat-all. Read from the same published state as <see cref="View"/>,
+    /// without the lock, since the queue asks on every paint.</summary>
+    public IReadOnlyList<RowPair> RowPairsOf(Adjacency adjacency)
+    {
+        ThrowIfDisposed();
+        var snapshot = _snapshot;
+        var current = snapshot.At(_output.FramesEmitted.Count).Queue.FirstOrDefault(row => row.IsCurrent)?.Id;
+        return snapshot.RowPairsOf(adjacency, current);
+    }
+
     /// <summary>Whether saving <paramref name="draft"/> would leave the store as it is: it holds
     /// this transition for the adjacency, or holds nothing and the draft is blank, since a blank
     /// save stores nothing. A missing curve is the default curve, as the resolver reads it, and a blank

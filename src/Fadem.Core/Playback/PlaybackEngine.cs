@@ -691,6 +691,32 @@ public sealed partial class PlaybackEngine : IDisposable
                 Repeat == RepeatMode.One ? new Adjacency(track, track) : null);
         }
 
+        /// <summary>The row pairs whose this → next, or this → this under repeat-one, is
+        /// <paramref name="adjacency"/>, by <see cref="AdjacenciesOf"/>'s rules, in the order the
+        /// queue reaches them from <paramref name="from"/>: that row on, then round from the top to
+        /// it; from the top when it is not in the queue. Within a row, under repeat-one, this →
+        /// this comes first: it is what the row's natural end plays.</summary>
+        public IReadOnlyList<RowPair> RowPairsOf(Adjacency adjacency, RowId? from)
+        {
+            var pairs = new List<RowPair>();
+            var start = IndexOf(from) ?? 0;
+            for (var k = 0; k < Entries.Length; k++)
+            {
+                var i = (start + k) % Entries.Length;
+                var row = Entries[i];
+                if (Repeat == RepeatMode.One && SamePair(new Adjacency(row.Track, row.Track), adjacency))
+                {
+                    pairs.Add(new RowPair(row.Id, row.Id));
+                }
+                if (FirstReadable(i, After, intoPassing: false) is { } next
+                    && SamePair(new Adjacency(row.Track, Entries[next].Track), adjacency))
+                {
+                    pairs.Add(new RowPair(row.Id, Entries[next].Id));
+                }
+            }
+            return pairs;
+        }
+
         private int? After(int index) => PlaybackQueue.IndexSkippedTo(index, Entries.Length, Repeat);
 
         private int? Before(int index) => PlaybackQueue.IndexBefore(index, Entries.Length, Repeat);

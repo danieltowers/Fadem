@@ -267,6 +267,10 @@ public sealed record RowAdjacencies(Adjacency? Previous, Adjacency? Next, Adjace
     public static RowAdjacencies None { get; } = new(null, null, null);
 }
 
+/// <summary>Two rows whose this → next is one adjacency: the row it leaves and the row it goes
+/// into, the same row for this → this under repeat-one (seam markers issue 01).</summary>
+public sealed record RowPair(RowId Outgoing, RowId Incoming);
+
 /// <summary>How far the running add has got: files resolved (queued or rejected) out of every
 /// file given to it, including those of an add waiting behind the first.</summary>
 public sealed record AddProgress(int Resolved, int Total);
