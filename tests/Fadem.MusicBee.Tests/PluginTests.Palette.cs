@@ -105,7 +105,7 @@ public sealed partial class PluginTests
 
         Assert.NotSame(view._logo.Parent, view._attendedTrack.Parent);
         Assert.Equal(view.ClientSize.Width, view._logo.Right);
-        Assert.Equal(view._logo.Room - 6, view._logo.ArtSize.Height);
+        Assert.Equal(view._logo.Room - 14, view._logo.ArtSize.Height);
         Assert.True(view._logo.Parent!.Height >= view._logo.Room);
         Assert.True(view._attendedTrack.Parent!.Parent!.Right <= view._logo.Left);
         Assert.True(view._playPause.Bottom + view._playPause.Parent!.Top <= view._logo.Bottom); // the buttons beside it
@@ -125,8 +125,8 @@ public sealed partial class PluginTests
         panel.Width = 1200;
 
         Assert.NotSame(view._attendedTrack.Parent, view._logo.Parent);
-        Assert.Equal(view._logo.Room - 6, view._logo.ArtSize.Height);
-        Assert.Equal(view._logo.ArtSize.Width + 6, view._logo.Width);
+        Assert.Equal(view._logo.Room - 14, view._logo.ArtSize.Height);
+        Assert.Equal(view._logo.ArtSize.Width + 10, view._logo.Width);
         Assert.Equal(view.ClientSize.Width, view._logo.Right);
     });
 
