@@ -6,7 +6,8 @@ using Fadem.Shell.Theme;
 
 namespace Fadem.Shell.Tests;
 
-/// <summary>Round 2 issue 10: each half of the editor names its track, the outgoing one above the
+/// <summary>Round 2 issue 10: each half of the editor names its track, numbered as the queue
+/// numbers its row (seam markers issue 03), the outgoing one above the
 /// fade-out fields and the incoming one above the fade-in fields; with no adjacency open both are
 /// empty and take no height.</summary>
 public sealed class EditorNamesItsTracksTests
@@ -21,8 +22,8 @@ public sealed class EditorNamesItsTracksTests
 
         editor.Open(tc.AdjacencyOf(paths[0], paths[1]));
 
-        Assert.Equal(NameOf(paths[0]), editor._outgoingTitle.Text);
-        Assert.Equal(NameOf(paths[1]), editor._incomingTitle.Text);
+        Assert.Equal($"1 · {NameOf(paths[0])}", editor._outgoingTitle.Text);
+        Assert.Equal($"2 · {NameOf(paths[1])}", editor._incomingTitle.Text);
         Assert.True(IsSetVisible(editor._outgoingTitle) && IsSetVisible(editor._incomingTitle));
         // Each sits on the row just above its half's first label.
         var layout = (TableLayoutPanel)editor._outgoingTitle.Parent!;
@@ -51,8 +52,8 @@ public sealed class EditorNamesItsTracksTests
         editor.Open(tc.AdjacencyOf(paths[0], paths[1]));
         editor.Open(tc.AdjacencyOf(paths[1], paths[2]));
 
-        Assert.Equal(NameOf(paths[1]), editor._outgoingTitle.Text);
-        Assert.Equal(NameOf(paths[2]), editor._incomingTitle.Text);
+        Assert.Equal($"2 · {NameOf(paths[1])}", editor._outgoingTitle.Text);
+        Assert.Equal($"3 · {NameOf(paths[2])}", editor._incomingTitle.Text);
 
         editor.Close();
 
@@ -79,8 +80,8 @@ public sealed class EditorNamesItsTracksTests
         Assert.False(label.AutoSize);
         Assert.True(label.Height < 2 * label.Font.Height, $"the name is {label.Height} px tall: more than a line");
         Assert.True(TextRenderer.MeasureText(name, label.Font).Width > TransitionEditorPanel.DefaultWidth); // it must be cut
-        Assert.Equal(NameOf(paths[0]), editor._titleTips.GetToolTip(label));
-        Assert.Equal(NameOf(paths[1]), editor._titleTips.GetToolTip(editor._incomingTitle));
+        Assert.Equal($"1 · {NameOf(paths[0])}", editor._titleTips.GetToolTip(label));
+        Assert.Equal($"2 · {NameOf(paths[1])}", editor._titleTips.GetToolTip(editor._incomingTitle));
     });
 
     /// <summary>A track with no title tag is named by its file.</summary>

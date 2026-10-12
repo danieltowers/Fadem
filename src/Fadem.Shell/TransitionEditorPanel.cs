@@ -35,8 +35,7 @@ internal sealed class TransitionEditorPanel : Panel
     internal readonly Label _outgoingTitle;
     internal readonly Label _incomingTitle;
     internal readonly ToolTip _titleTips = new();
-    internal readonly TrafficLight _light;
-    internal readonly ToolTip _lightTip = new();
+    internal readonly Label _heardLine;
     internal readonly RadioButton _editGlobal;
     internal readonly RadioButton _editPlaylist;
     internal readonly Label _effective;
@@ -157,12 +156,8 @@ internal sealed class TransitionEditorPanel : Panel
             TextAlign = ContentAlignment.MiddleLeft,
             AutoEllipsis = true,
         };
-        // The traffic light (phase 6 issue 07): which of the adjacency's tracks is heard, at the
-        // heading's right, so it takes no height of its own.
-        _light = new TrafficLight { Dock = DockStyle.Right, Width = 32, Visible = false };
         var heading = new Panel { Dock = DockStyle.Top, Height = 28 };
         heading.Controls.Add(_title);
-        heading.Controls.Add(_light);
 
         var row = 0;
         _editGlobal = new RadioButton { Text = "Global", AutoSize = true, Checked = true, Enabled = false, Margin = new Padding(3, 0, 3, 0) };
@@ -188,6 +183,20 @@ internal sealed class TransitionEditorPanel : Panel
         selector.Controls.Add(_editPlaylist);
         layout.Controls.Add(selector, 0, row);
         layout.SetColumnSpan(selector, 2);
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        row++;
+        // What the traffic light's red said (seam markers issue 03): another track playing, or
+        // another coming next. Hidden otherwise, so its row takes no height.
+        _heardLine = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(290, 0),
+            Visible = false,
+            Margin = new Padding(3, 0, 3, 0),
+        };
+        StudioTheme.SetInk(_heardLine, Ink.Dim);
+        layout.Controls.Add(_heardLine, 0, row);
+        layout.SetColumnSpan(_heardLine, 2);
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         row++;
         // Hidden unless the open playlist plays something other than the global transition.
@@ -408,15 +417,38 @@ internal sealed class TransitionEditorPanel : Panel
         return title;
     }
 
-    /// <summary>The track titles above the halves: the open adjacency's, or none.</summary>
-    private void ShowTrackTitles(Adjacency? adjacency)
+    /// <summary>The track titles above the halves: the open adjacency's, or none. Each is numbered
+    /// as the queue numbers its row, by the pair the engine says is heard next (seam markers
+    /// issue 03); the names alone where the pair is not in the queue. The half heard, as the
+    /// engine says, has the speaker and is in the text colour; the line under the selector says
+    /// when another track plays or comes next. These replace the traffic light.</summary>
+    private void ShowHalves(PlayerView view)
     {
-        foreach (var (label, track) in new[] { (_outgoingTitle, adjacency?.Outgoing), (_incomingTitle, adjacency?.Incoming) })
+        var adjacency = _adjacency;
+        var hearing = adjacency is null ? new AdjacencyHearing(AdjacencyHeard.Nothing) : _engine.Hearing(adjacency);
+        var pair = adjacency is null ? null : _engine.RowPairsOf(adjacency).FirstOrDefault();
+        ShowHalf(_outgoingTitle, adjacency?.Outgoing, pair is null ? null : Presenter.RowNumber(view.Queue, pair.Outgoing), hearing.Heard == AdjacencyHeard.Outgoing);
+        ShowHalf(_incomingTitle, adjacency?.Incoming, pair is null ? null : Presenter.RowNumber(view.Queue, pair.Incoming), hearing.Heard == AdjacencyHeard.Incoming);
+        var line = adjacency is null ? "" : Presenter.FmtHeardLine(hearing, adjacency);
+        if (_heardLine.Text != line)
         {
-            label.Text = track is null ? "" : Presenter.TitleOf(track);
-            label.Visible = track is not null;
-            _titleTips.SetToolTip(label, label.Text);
+            _heardLine.Text = line;
         }
+        _heardLine.Visible = line.Length > 0; // no room kept for it otherwise
+    }
+
+    /// <summary>One half's line, whole in its tooltip: in the text colour while its track is heard,
+    /// dim otherwise. Its text says which, so the ink changes only with it.</summary>
+    private void ShowHalf(Label label, Track? track, int? number, bool heard)
+    {
+        var text = track is null ? "" : Presenter.FmtHalf(track, number, heard);
+        if (label.Text != text)
+        {
+            label.Text = text;
+            _titleTips.SetToolTip(label, text);
+            StudioTheme.SetInk(label, heard ? Ink.Text : Ink.Dim);
+        }
+        label.Visible = track is not null;
     }
 
     private TextBox Field(
@@ -692,7 +724,6 @@ internal sealed class TransitionEditorPanel : Panel
         _adjacency = adjacency;
         _loadedStore = _engine.View.StoreVersion;
         _title.Text = adjacency.Name;
-        ShowTrackTitles(adjacency);
         ShowLayer();
         var layers = _engine.Transition(adjacency);
         var playlist = Layer == TransitionLayer.Playlist;
@@ -736,7 +767,6 @@ internal sealed class TransitionEditorPanel : Panel
     {
         _adjacency = null;
         _title.Text = NoAdjacency;
-        ShowTrackTitles(null);
         Fill(null, editing: false, global: null, TransitionLayers.None.GlobalCurve);
         ShowLayers(TransitionLayers.None);
     }
@@ -779,13 +809,14 @@ internal sealed class TransitionEditorPanel : Panel
         _missing.Visible = _missing.Text.Length > 0;
         ShowNudges();
         ShowCaptures();
-        ShowLight();
+        ShowHalves(_engine.View);
     }
 
     /// <summary>Called on every render: the editor following playback, the layers shown again once
     /// the library's settings have changed, the fields loaded again once the store has moved, unless a box is being typed in (phase 6 issue 11: a drag on the
     /// seek bar saves the transition shown here), each capture button live
-    /// only while its own track is heard, as the engine says, the traffic light, and the preview's
+    /// only while its own track is heard, as the engine says, the halves' numbers and which is
+    /// heard, and the preview's
     /// buttons and line, which follow the preview.</summary>
     public void Refresh(PlayerView view)
     {
@@ -815,7 +846,7 @@ internal sealed class TransitionEditorPanel : Panel
         }
         ShowSelector(view.OpenPlaylist);
         ShowCaptures();
-        ShowLight();
+        ShowHalves(view);
         _preview.Text = view.Preview is null ? "Preview" : "Preview again";
         _stopPreview.Enabled = view.Preview is not null;
         _previewStatus.Text = Presenter.FmtPreview(view.Preview);
@@ -873,27 +904,6 @@ internal sealed class TransitionEditorPanel : Panel
         }
         hint.Text = track is null ? "" : Presenter.FmtCaptureHint(track);
         hint.Visible = CaptureHints && playable && !live;
-    }
-
-    /// <summary>The traffic light: green while the open adjacency's outgoing track is heard,
-    /// amber while only its incoming track is, red while another track is, grey when stopped, as
-    /// the engine says; hidden with no adjacency open. Its tooltip and accessible name say
-    /// which.</summary>
-    private void ShowLight()
-    {
-        _light.Visible = _adjacency is not null;
-        if (_adjacency is null)
-        {
-            return;
-        }
-        var heard = _engine.Heard(_adjacency);
-        _light.Heard = heard;
-        var words = Presenter.FmtHeard(heard, _adjacency);
-        _light.AccessibleName = words;
-        if (_lightTip.GetToolTip(_light) != words)
-        {
-            _lightTip.SetToolTip(_light, words);
-        }
     }
 
     /// <summary>Undo and Redo live while the engine has a change to walk, and say which.</summary>

@@ -115,16 +115,40 @@ internal static class Presenter
     /// preview plays both of the boundary's tracks, so it always serves.</summary>
     public static string FmtCaptureHint(Track track) => $"Play {TitleOf(track)} or preview to capture";
 
-    /// <summary>The editor's traffic light, in words (phase 6 issue 07): its tooltip and its
-    /// accessible name.</summary>
-    public static string FmtHeard(AdjacencyHeard heard, Adjacency adjacency) => heard switch
+    /// <summary>The line above a half of the editor naming its track (seam markers issue 03):
+    /// numbered as the queue numbers the track's row, "20 · Last Light", or the name alone where
+    /// the pair is not in the queue. The half whose track is heard has the speaker, "🔊 20 · Last
+    /// Light · playing" (the traffic light's green and amber before).</summary>
+    public static string FmtHalf(Track track, int? number, bool heard)
     {
-        AdjacencyHeard.Outgoing => $"Playing {TitleOf(adjacency.Outgoing)}, this transition's first track",
-        AdjacencyHeard.OutgoingIntoAnother => $"Playing {TitleOf(adjacency.Outgoing)}, this transition's first track, but next comes another track",
-        AdjacencyHeard.Incoming => $"Playing {TitleOf(adjacency.Incoming)}, this transition's second track",
-        AdjacencyHeard.OtherTrack => "Playing a track that is not in this transition",
-        _ => "Nothing is playing",
+        var name = number is { } n ? $"{n} · {TitleOf(track)}" : TitleOf(track);
+        return heard ? $"🔊 {name} · playing" : name;
+    }
+
+    /// <summary>The editor's line under the selector (seam markers issue 03; the traffic light's
+    /// red before): which track plays while neither half's does, and which plays next while the
+    /// outgoing track's goes into another, "Nothing" after the last row. Empty otherwise.</summary>
+    public static string FmtHeardLine(AdjacencyHearing hearing, Adjacency adjacency) => hearing.Heard switch
+    {
+        AdjacencyHeard.OtherTrack when hearing.Playing is { } playing => $"Playing {TitleOf(playing)}, not in this transition",
+        AdjacencyHeard.OutgoingIntoAnother =>
+            $"{(hearing.Next is { } next ? TitleOf(next) : "Nothing")} plays next, not {TitleOf(adjacency.Incoming)}",
+        _ => "",
     };
+
+    /// <summary>A row's number as the queue's # column shows it, or null for a row not in
+    /// <paramref name="queue"/>: the editor's halves are numbered by it (seam markers issue 03).</summary>
+    public static int? RowNumber(IReadOnlyList<QueueRow> queue, RowId row)
+    {
+        for (var i = 0; i < queue.Count; i++)
+        {
+            if (queue[i].Id == row)
+            {
+                return i + 1;
+            }
+        }
+        return null;
+    }
 
     /// <summary>A track's display name: its title, else its file's name.</summary>
     public static string TitleOf(Track track) =>

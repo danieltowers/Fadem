@@ -192,9 +192,6 @@ internal static class StudioTheme
             case SeekBar seek:
                 seek.Palette = p;
                 break;
-            case TrafficLight light:
-                light.Palette = p; // its ring and off state (studio theme issue 05)
-                break;
         }
         if (first)
         {

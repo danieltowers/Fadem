@@ -47,7 +47,7 @@ public sealed class EditorThemeTests
         Assert.Equal(Duophonic.Mark, editor._missing.ForeColor);
         Assert.All(new[] { editor._fadeOutLess, editor._fadeOutMore, editor._fadeOutLessSecond, editor._fadeOutMoreSecond },
             b => Assert.True(StudioTheme.IsKey(b) && b.FlatStyle == FlatStyle.Flat));
-        Assert.Equal(Duophonic, editor._light.Palette);
+        Assert.Equal(Duophonic.Dim, editor._heardLine.ForeColor);
         Assert.Equal(Duophonic.Well, editor._curve.BackColor);
     }
 
@@ -143,19 +143,6 @@ public sealed class EditorThemeTests
 
         Assert.DoesNotContain(pixels, Light);
         Assert.Contains(pixels, c => c.ToArgb() == Duophonic.Edge.ToArgb());
-    });
-
-    [Fact]
-    public void TheTrafficLight_KeepsItsMeaning_AndIsOffAndRingedInThePalette() => RunSta(() =>
-    {
-        using var light = new TrafficLight { Size = new Size(32, 28), Palette = Duophonic };
-
-        Assert.Equal(Duophonic.Dim, light.Lit); // stopped
-        Assert.Contains(Draw(light), c => c.ToArgb() == Duophonic.Edge.ToArgb());
-
-        light.Heard = AdjacencyHeard.Outgoing;
-        Assert.Equal(TrafficLight.Colour(AdjacencyHeard.Outgoing, Palette.Studio), light.Lit); // green in any skin
-        Assert.Contains(Draw(light), c => Near(c, light.Lit));
     });
 
     private static List<Color> Draw(Control control)

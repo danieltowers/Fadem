@@ -124,9 +124,8 @@ but the engine still honours them. An item that needs one sets it in the library
       edge. **From end**, ● Global and ○ This playlist sit on the panel's own ground, their box
       or circle on the well and ticked in the accent; greyed, they are dim but readable. The
       heading is in the text colour, the hint line under the selector is dim. − / + and −1 / +1 are small keys. The fade curve sits on the
-      well, its frame and button dark too, its chevron dim when greyed. The traffic light keeps
-      its green, amber and red, is dim when stopped, and has a dark ring. The editor's scroll
-      bar is the dark one.
+      well, its frame and button dark too, its chevron dim when greyed. The half heard is in the text
+      colour, the other dim (seam markers issue 03). The editor's scroll bar is the dark one.
 - [ ] **Dialogs and menus** (studio theme issue 06): **⚙** settings, **Transitions…**, **Open
       library…**, the notice list (the status strip's "1 notice" link, in the accent), the
       section name dialog (row menu → Section → Start a section here…) and the playlist rename
@@ -185,8 +184,11 @@ but the engine still honours them. An item that needs one sets it in the library
       another control.
 - [ ] **Each half names its track** (round 2 issue 10): with a boundary open, the outgoing
       track's title, dim, on its own line above **Fade-out point**, and the incoming track's above
-      **Fade-in point**. A title wider than the editor ends in "…" and is whole in its tooltip.
-      With no boundary open neither line shows and they leave no gap.
+      **Fade-in point**, each numbered as the queue numbers its row, "2 · b" and "3 · c" (seam
+      markers issue 03). Open on two tracks the queue does not play one into the other (the
+      manager), the names alone; under repeat-one, b → b reads "2 · b" twice. A title wider
+      than the editor ends in "…" and is whole in its tooltip. With no boundary open neither
+      line shows and they leave no gap.
 - [ ] All four parameter fields, the capture buttons, **From end** beside the fade-out point
       and the **Fade curve** list are visible without scrolling at the default window size.
 - [ ] Undo, Redo and Remove transition are visible (Render is hidden, round 2 issue 09) once the editor is open on an
@@ -238,11 +240,12 @@ but the engine still honours them. An item that needs one sets it in the library
       or preview to capture" hints are hidden, round 2 issue 11). Play b: the
       fade-out Capture comes live, its tooltip reads "Capture *b*'s playhead";
       the fade-in one stays greyed. A preview of b → c makes both live.
-- [ ] The traffic light (phase 6 issue 07) sits at the editor's top right, on the heading's
-      line, hidden with no boundary open. Editor on b → c: dim when stopped, red while a plays,
-      green while b plays, amber while c plays. Its tooltip says which ("Playing *b*, this
-      transition's first track"). With b playing and c removed (Del), red: "…, but next comes
-      another track" (round 2 issue 08).
+- [ ] **The half heard** (seam markers issue 03; the traffic light before): no light at the
+      editor's top right. Editor on b → c: both halves dim and no line under the selector when
+      stopped; while a plays, the line "Playing *a*, not in this transition", dim; while b plays,
+      "🔊 2 · b · playing" above the fade-out, in the text colour; while c plays, the same on the
+      fade-in's half. In a queue of a, b, c, d, with b playing and c removed (Del): "*d* plays
+      next, not *c*" (round 2 issue 08), and the halves lose their numbers.
 - [ ] Beside each **point** box (not the durations) sit **−** and **+**. Each press moves the
       number shown by 0.1, Shift-click by 1; with **From end** ticked, + makes the from-end number
       bigger. They stop at 0 and at the track's length, and are greyed out while the box is blank
@@ -606,15 +609,16 @@ which a background run cannot give.
       seam: both Capture buttons greyed, with no line under either point (hints hidden, round 2
       issue 11). Playing row 2 brings the fade-out Capture live, its tooltip "Capture *b*'s
       playhead"; the fade-in one stays greyed.
-- [ ] **The traffic light** (phase 6 issue 07) at the editor's top right, beside the heading:
-      red while row 1 plays with row 2's seam open, green while row 2 plays, amber while row 3
-      plays, dim when stopped. With Sync editor ticked and row 1 playing, a track dragged from
-      MusicBee between rows 1 and 2 moves the editor to row 1 → the dropped track, green
-      (round 2 issue 08).
+- [ ] **The half heard** (seam markers issue 03; the traffic light before), with row 2's seam
+      open: "Playing *row 1*, not in this transition" under the selector while row 1 plays;
+      "🔊 2 · *row 2* · playing" on the upper half while row 2 plays, and on the lower half,
+      numbered 3, while row 3 plays; no speaker and no line when stopped. With Sync editor ticked
+      and row 1 playing, a track dragged from MusicBee between rows 1 and 2 moves the editor to
+      row 1 → the dropped track, the speaker on "1 · *row 1*" (round 2 issue 08).
 - [ ] **The transition editor in the skin** (studio theme issue 05), in a main panel, with no
       boundary open and then with row 1's seam: as in standalone, no white or system-grey box; the
       check box and radio buttons on the panel's ground, dim but readable when greyed; hint
-      lines dim; the fade curve dark; the traffic light dim when stopped, with a dark ring.
+      lines dim; the fade curve dark.
 - [ ] **Dialogs and menus in the skin** (studio theme issue 06): Fadem's **Configure…** in
       MusicBee's Preferences, its library chooser (**Choose…**), the transition manager, the
       notice list and the section name dialog are in the skin's colours, with no white or

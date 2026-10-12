@@ -97,7 +97,7 @@ public sealed class EditorFollowsPlaybackTests
     });
 
     /// <summary>Round 2 issue 08: a drop between the playing track and its next moves the editor to
-    /// the playing track's transition into the dropped one, and the light, green, is for that pair.</summary>
+    /// the playing track's transition into the dropped one, and the speaker is on its upper half.</summary>
     [Fact]
     public void ADropBeforeThePlayingTracksNext_MovesTheEditorToTheNewPair() => RunSta(() =>
     {
@@ -114,7 +114,7 @@ public sealed class EditorFollowsPlaybackTests
         editor.Refresh(tc.View);
 
         Assert.Equal(tc.AdjacencyOf(a, x), editor.Adjacency);
-        Assert.Equal(AdjacencyHeard.Outgoing, editor._light.Heard);
+        Assert.StartsWith("🔊 ", editor._outgoingTitle.Text);
     });
 
     /// <summary>A row moved in as the playing track's next does the same.</summary>
@@ -133,7 +133,7 @@ public sealed class EditorFollowsPlaybackTests
         editor.Refresh(tc.View);
 
         Assert.Equal(tc.AdjacencyOf(a, c), editor.Adjacency);
-        Assert.Equal(AdjacencyHeard.Outgoing, editor._light.Heard);
+        Assert.StartsWith("🔊 ", editor._outgoingTitle.Text);
     });
 
     /// <summary>So does removing the playing track's next.</summary>
@@ -152,13 +152,13 @@ public sealed class EditorFollowsPlaybackTests
         editor.Refresh(tc.View);
 
         Assert.Equal(tc.AdjacencyOf(a, c), editor.Adjacency);
-        Assert.Equal(AdjacencyHeard.Outgoing, editor._light.Heard);
+        Assert.StartsWith("🔊 ", editor._outgoingTitle.Text);
     });
 
     /// <summary>Removing the playing track's next leaves it the last row, with nothing to follow
-    /// to: the editor stays on the pair, and the light is not green for it.</summary>
+    /// to: the editor stays on the pair, and its line says nothing plays next.</summary>
     [Fact]
-    public void RemovingTheLastRowsNext_LeavesTheEditor_AndTheLightIsNotGreen() => RunSta(() =>
+    public void RemovingTheLastRowsNext_LeavesTheEditor_AndSaysNothingPlaysNext() => RunSta(() =>
     {
         using var tc = TestEngine.Create();
         var (_, b, c) = Queue(tc);
@@ -172,7 +172,8 @@ public sealed class EditorFollowsPlaybackTests
         editor.Refresh(tc.View);
 
         Assert.Equal(b, editor.Adjacency!.Outgoing.FilePath);
-        Assert.Equal(AdjacencyHeard.OutgoingIntoAnother, editor._light.Heard);
+        Assert.Equal($"Nothing plays next, not {Path.GetFileNameWithoutExtension(c)}", editor._heardLine.Text);
+        Assert.DoesNotContain("🔊", editor._outgoingTitle.Text);
     });
 
     private static TransitionEditorPanel Editor(TestEngine tc) => new(tc.Engine, _ => { }, _ => null);

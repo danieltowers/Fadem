@@ -1,6 +1,6 @@
 # 03: The editor without the traffic light
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01
 
 Shell, `TransitionEditorPanel`, both hosts. See the [spec](../spec.md), "The answer: G3
@@ -33,9 +33,24 @@ soft": the halves are numbered, and a status line for the light's red.
 
 ## Acceptance
 
-- [ ] The halves are numbered; the half heard has 🔊 and "· playing"; the status line says
+- [x] The halves are numbered; the half heard has 🔊 and "· playing"; the status line says
       when something else plays or another track comes next. No traffic light.
-- [ ] `dotnet test` passes on net8.0 and net48 x86, and the commit states both counts; the
+- [x] `dotnet test` passes on net8.0 and net48 x86, and the commit states both counts; the
       Looks smoke runs and is reported item by item.
 
 ## Comments
+
+2026-10-12, built. One departure: "the names come from the view" became the engine's. Review found
+that `view.Attended` and `view.NextAdjacency` do not follow `Heard`'s rules: in a crossfade into
+the outgoing track, `NextAdjacency` is the attended row's next, not the outgoing row's; under
+repeat-one the track plays into itself, which `NextAdjacency` never gives; and a preview's track
+is not the attended one. So `Heard` became `Hearing`, an `AdjacencyHearing` carrying the
+`AdjacencyHeard` with the track playing and, while `OutgoingIntoAnother`, the track the outgoing
+row plays into, from the same rows (CLAUDE.md test 2); six Core tests pin those three cases and
+the plain ones. Wording the spec did not give: "Nothing plays next, not *b*" after the last row.
+The halves are numbered by `Presenter.RowNumber` in the view's queue, as the # column numbers
+them. The halves' ink follows their text. Looks smoke by `heard-smoke.ps1` (captures, UI
+Automation, a posted double-click with the cursor set on the row): stopped, the outgoing, the
+incoming and another track playing, and the outgoing into another. With the status line showing,
+the editor at the default window size gains its scroll bar and the Undo row is cut at the bottom;
+without it, nothing scrolls. Left for the user's eye: whether the line should take less room.

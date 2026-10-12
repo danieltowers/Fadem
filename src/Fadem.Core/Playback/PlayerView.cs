@@ -237,7 +237,8 @@ public enum FadeSide
 }
 
 /// <summary>Which of an adjacency's tracks the listener has in hand (phase 6 issue 07): the
-/// editor's traffic light. <see cref="Outgoing"/> while its outgoing track is heard, whether or
+/// editor's speaker on the half heard and its line under the selector (seam markers issue 03).
+/// <see cref="Outgoing"/> while its outgoing track is heard, whether or
 /// not its incoming one is too; <see cref="Incoming"/> while only its incoming track is;
 /// <see cref="OtherTrack"/> while a track of neither side is; <see cref="Nothing"/> when stopped.
 /// <see cref="Outgoing"/> only while the pair is the transition the queue would play from the
@@ -252,6 +253,14 @@ public enum AdjacencyHeard
     Outgoing,
     OutgoingIntoAnother,
 }
+
+/// <summary>Which of an adjacency's tracks is heard, with the tracks the editor's line under the
+/// selector names (seam markers issue 03). <see cref="Playing"/> is the track heard, the one the
+/// listener attends to, or a running preview's; null when <see cref="AdjacencyHeard.Nothing"/>.
+/// <see cref="Next"/> is, while <see cref="AdjacencyHeard.OutgoingIntoAnother"/>, the track the
+/// outgoing track's row plays into: itself under repeat-one, else the row ⏭ reaches; null on the
+/// last row with nothing after it, and in every other state.</summary>
+public sealed record AdjacencyHearing(AdjacencyHeard Heard, Track? Playing = null, Track? Next = null);
 
 /// <summary>The adjacencies the editor can open from one row, each as the queue would reach it
 /// (build issue 15). <see cref="Next"/> is this → next: the adjacency ⏭ would reach from the row,
