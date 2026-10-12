@@ -36,6 +36,25 @@ internal sealed class QueueRowStyle : IDisposable
     /// round 7).</summary>
     private const double TintAmount = 0.16;
 
+    /// <summary>How far toward the accent the outline round the open pair and the editor is.</summary>
+    private const double OutlineAmount = 0.6;
+
+    /// <summary>How much further toward the accent a row is while the mouse is on its half of the
+    /// editor (seam markers issue 04).</summary>
+    private const double LitAmount = 0.35;
+
+    /// <summary>The open pair's tint: the Well, 16 % toward the accent.</summary>
+    public static Color TintOf(Theme.Palette? palette) => TowardAccent(palette, palette?.Well ?? SystemColors.Window, TintAmount);
+
+    /// <summary>The outline round the open pair and the editor: the Well, 60 % toward the accent.</summary>
+    public static Color OutlineOf(Theme.Palette? palette) => TowardAccent(palette, palette?.Well ?? SystemColors.Window, OutlineAmount);
+
+    /// <summary>A row of the open pair while the mouse is on its half of the editor.</summary>
+    public static Color LitOf(Theme.Palette? palette) => TowardAccent(palette, TintOf(palette), LitAmount);
+
+    private static Color TowardAccent(Theme.Palette? palette, Color from, double amount) =>
+        Theme.Palette.Mix(palette?.Accent ?? SystemColors.Highlight, from, amount);
+
     /// <summary>The colours rows are drawn in (studio theme issue 02), or none for the system's.</summary>
     public Theme.Palette? Palette { get; set; }
 
@@ -52,6 +71,18 @@ internal sealed class QueueRowStyle : IDisposable
     /// <summary>The seam under the mouse, and the row it is on.</summary>
     private int? _hoverSeam, _hoverRow;
 
+    /// <summary>The rows tinted, as the last render gave them: a collapsed section's header stands
+    /// in for those it hides.</summary>
+    private HashSet<int> _tinted = [];
+
+    /// <summary>The editor's half under the mouse, which lights its row of the first match (seam
+    /// markers issue 04); none.</summary>
+    public FadeSide? LitHalf { get; set; }
+
+    /// <summary>Drawn over the list once its rows are, into the same off-screen paint: the outline
+    /// round the open pair (seam markers issue 04).</summary>
+    public Action<Graphics>? Overlay { get; set; }
+
     /// <summary>Styles every row <paramref name="list"/> shows for the queue in
     /// <paramref name="view"/>, as far as both reach; <paramref name="editColumn"/> is the seam
     /// buttons' cell, and the speaker's cell is the one after it. <paramref name="open"/> is where
@@ -66,6 +97,11 @@ internal sealed class QueueRowStyle : IDisposable
         }
         var tinted = new HashSet<int>();
         var seams = new HashSet<int>();
+        int? lit = null;
+        if (LitHalf is { } half && open.Count > 0 && index.TryGetValue(half == FadeSide.FadeOut ? open[0].Outgoing : open[0].Incoming, out var litRow))
+        {
+            lit = litRow;
+        }
         foreach (var pair in open)
         {
             if (index.TryGetValue(pair.Outgoing, out var outgoing) && index.TryGetValue(pair.Incoming, out var incoming))
@@ -79,6 +115,7 @@ internal sealed class QueueRowStyle : IDisposable
             }
         }
         _editColumn = editColumn;
+        _tinted = tinted;
         if (!seams.SetEquals(_openSeams))
         {
             foreach (var seam in seams.Union(_openSeams).ToList())
@@ -89,16 +126,17 @@ internal sealed class QueueRowStyle : IDisposable
         }
         for (var i = 0; i < list.Items.Count && i < view.Queue.Count; i++)
         {
-            Apply(list.Items[i], view.Queue[i], i, view, editColumn, tinted.Contains(i));
+            Apply(list.Items[i], view.Queue[i], i, view, editColumn, tinted.Contains(i), lit == i);
         }
     }
 
     /// <summary>Styles <paramref name="item"/>, the list's row at <paramref name="index"/>, for
-    /// <paramref name="row"/>; <paramref name="tinted"/> while it is in the editor's open pair.</summary>
-    public void Apply(ListViewItem item, QueueRow row, int index, PlayerView view, int editColumn, bool tinted = false)
+    /// <paramref name="row"/>; <paramref name="tinted"/> while it is in the editor's open pair, and
+    /// <paramref name="lit"/> while the mouse is on its half of the editor.</summary>
+    public void Apply(ListViewItem item, QueueRow row, int index, PlayerView view, int editColumn, bool tinted = false, bool lit = false)
     {
         var well = Palette?.Well ?? SystemColors.Window;
-        var back = tinted ? Theme.Palette.Mix(Palette?.Accent ?? SystemColors.Highlight, well, TintAmount) : well;
+        var back = lit ? LitOf(Palette) : tinted ? TintOf(Palette) : well;
         var dim = Palette?.Dim ?? SystemColors.GrayText;
         // The attended row, the one that plays, reads at a glance in the accent (studio theme issue
         // 03); on the open pair's tint, in the text colour.
@@ -236,12 +274,11 @@ internal sealed class QueueRowStyle : IDisposable
         g.SmoothingMode = SmoothingMode.AntiAlias;
         if (i > 0 && Touching(list, i - 1) && Shown(list, i - 1))
         {
-            SeamButton(g, new Rectangle(cx - 10, area.Top - GapBelow(list, i - 1) - 8, 20, 16), list, i - 1);
+            SeamButton(g, SeamBox(cx, area.Top - GapBelow(list, i - 1), touching: true), list, i - 1);
         }
         if (Shown(list, i))
         {
-            SeamButton(g, Touching(list, i) ? new Rectangle(cx - 10, area.Bottom - 8, 20, 16)
-                : new Rectangle(cx - 10, area.Bottom - 14, 20, 13), list, i);
+            SeamButton(g, SeamBox(cx, area.Bottom, Touching(list, i)), list, i);
         }
         g.SmoothingMode = SmoothingMode.Default;
     }
@@ -254,6 +291,31 @@ internal sealed class QueueRowStyle : IDisposable
         return glyph.Length > 0
             && (glyph == Presenter.SeamGlyph(true, false) || _openSeams.Contains(index) || _hoverSeam == index || _hoverRow == index);
     }
+
+    /// <summary>Row <paramref name="index"/>'s seam button in <paramref name="list"/>'s client area
+    /// while it shows, or none: the outline round the open pair breaks there, so the button sits
+    /// on it (seam markers issue 04). Where <see cref="DrawSeams"/> draws it.</summary>
+    public Rectangle? SeamButtonBounds(ListView list, int index)
+    {
+        if (_editColumn < 0 || _editColumn >= list.Columns.Count || index < 0 || index >= list.Items.Count || !Shown(list, index))
+        {
+            return null;
+        }
+        var cell = list.Items[index].SubItems[_editColumn].Bounds;
+        return SeamBox(cell.Left + list.Columns[_editColumn].Width / 2, cell.Bottom, Touching(list, index));
+    }
+
+    /// <summary>A seam button centred at <paramref name="cx"/> on the seam's <paramref name="line"/>,
+    /// half in each row; whole above the line, and a little shorter, where a section's header
+    /// parts the two rows.</summary>
+    private static Rectangle SeamBox(int cx, int line, bool touching) =>
+        touching ? new Rectangle(cx - 10, line - 8, 20, 16) : new Rectangle(cx - 10, line - 14, 20, 13);
+
+    /// <summary>Whether <paramref name="group"/>'s header stands in for a tinted row: collapsed,
+    /// over a row of the open pair (seam markers issue 04).</summary>
+    private bool TintsHeader(ListView list, ListViewGroup group) =>
+        _tinted.Count > 0 && list.IsHandleCreated && ListGroups.IsCollapsed(list, group)
+        && group.Items.Cast<ListViewItem>().Any(item => _tinted.Contains(item.Index));
 
     /// <summary>One seam button in <paramref name="box"/>: a key, raised under the mouse, or filled
     /// in the accent where its pair is open; ⋈ in it where saved, + where not.</summary>
@@ -318,10 +380,11 @@ internal sealed class QueueRowStyle : IDisposable
     public static void Draw(ListView list, Theme.Palette? palette = null, bool ownRowHeight = false, QueueRowStyle? queue = null)
     {
         list.OwnerDraw = true;
-        _ = new BufferedPaint(list);
+        _ = new BufferedPaint(list, queue);
         _ = new NoHotRow(list);
         if (queue is not null)
         {
+            Theme.StudioTheme.SetHeaderGround(list, group => queue.TintsHeader(list, group) ? TintOf(queue.Palette) : null);
             list.MouseMove += (_, e) => queue.Hover(list, e.Location);
             list.MouseLeave += (_, _) => queue.Hover(list, null);
         }
@@ -488,14 +551,18 @@ internal sealed class QueueRowStyle : IDisposable
     /// and its own paint, the cells' owner drawing included, go to a bitmap
     /// (<c>WM_PRINTCLIENT</c>). Windows' own buffering (<c>LVS_EX_DOUBLEBUFFER</c>) is not used: it
     /// erases without <c>WM_ERASEBKGND</c>, and its theme draws rules at the columns' edges again.
+    /// The queue's <see cref="Overlay"/> is drawn over every print of the list, on screen and in a
+    /// copy alike.
     /// </summary>
     private sealed class BufferedPaint : NativeWindow
     {
         private readonly ListView _list;
+        private readonly QueueRowStyle? _queue;
 
-        public BufferedPaint(ListView list)
+        public BufferedPaint(ListView list, QueueRowStyle? queue)
         {
             _list = list;
+            _queue = queue;
             if (list.IsHandleCreated)
             {
                 AssignHandle(list.Handle);
@@ -506,6 +573,13 @@ internal sealed class QueueRowStyle : IDisposable
 
         protected override void WndProc(ref Message m)
         {
+            if (m.Msg == WM_PRINTCLIENT && _queue?.Overlay is { } overlay && m.WParam != IntPtr.Zero)
+            {
+                base.WndProc(ref m);
+                using var g = Graphics.FromHdc(m.WParam);
+                overlay(g);
+                return;
+            }
             if (m.Msg != WM_PAINT || m.WParam != IntPtr.Zero || _list.View != View.Details)
             {
                 base.WndProc(ref m);

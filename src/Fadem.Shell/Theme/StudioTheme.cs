@@ -83,6 +83,18 @@ internal static class StudioTheme
         _ => p.Text,
     };
 
+    /// <summary>Each list's own ground for a group's header, where it has one.</summary>
+    private static readonly ConditionalWeakTable<ListView, Func<ListViewGroup, Color?>> HeaderGrounds = new();
+
+    /// <summary>Draws a group's header in <paramref name="list"/> on the colour
+    /// <paramref name="ground"/> gives it, or on the list's own where it gives none: a collapsed
+    /// section standing in for the open pair's rows, in their tint (seam markers issue 04).</summary>
+    public static void SetHeaderGround(ListView list, Func<ListViewGroup, Color?> ground)
+    {
+        HeaderGrounds.Remove(list);
+        HeaderGrounds.Add(list, ground);
+    }
+
     /// <summary>Whether <paramref name="key"/>'s LED is lit.</summary>
     public static bool IsLit(ButtonBase key) =>
         key is CheckBox { Appearance: Appearance.Button, Checked: true } || (States.TryGetValue(key, out var s) && s.On);
@@ -393,8 +405,9 @@ internal static class StudioTheme
 
         private void DrawOpaque(IntPtr dc, Rectangle header, ListViewGroup group, Palette p, bool focused)
         {
+            var back = HeaderGrounds.TryGetValue(_list, out var grounds) && grounds(group) is { } own ? own : _list.BackColor;
             using (var g = Graphics.FromHdc(dc))
-            using (var ground = new SolidBrush(_list.BackColor))
+            using (var ground = new SolidBrush(back))
             {
                 g.FillRectangle(ground, header);
             }
@@ -439,7 +452,7 @@ internal static class StudioTheme
             }
             if (focused)
             {
-                ControlPaint.DrawFocusRectangle(gr, Rectangle.Inflate(header, -1, -1), p.Dim, _list.BackColor);
+                ControlPaint.DrawFocusRectangle(gr, Rectangle.Inflate(header, -1, -1), p.Dim, back);
             }
         }
     }

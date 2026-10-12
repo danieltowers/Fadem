@@ -72,6 +72,10 @@ internal sealed class MainForm : Form
     internal readonly ToolStripMenuItem _clearQueue;
     private readonly QueueDrag _queueDrag;
     internal readonly QueueSections _sections;
+
+    /// <summary>The open pair as a tab on the editor: the gap, the stub and the outline (seam
+    /// markers issue 04).</summary>
+    internal readonly PairLink _link;
     private readonly System.Windows.Forms.Timer _timer;
 
     /// <summary>The line showing where dragged rows will land.</summary>
@@ -327,12 +331,15 @@ internal sealed class MainForm : Form
         var editorPane = new Panel { Dock = DockStyle.Right, Width = TransitionEditorPanel.DefaultWidth };
         editorPane.Controls.Add(_editor);
         editorPane.Controls.Add(editorTitle);
+        _link = new PairLink(_queueList, _rowStyle, _editor, Render);
 
         // Docking order: the side panels and bottom strip first, then the name over the queue,
-        // between them, and the fill-docked list last.
+        // between them, and the fill-docked list last. The gap the tab crosses sits between the
+        // queue and the editor's pane, there from the start, so the columns never jump.
         Controls.Add(_queueList);
         Controls.Add(_playlistName);
         Controls.Add(_playlists);
+        Controls.Add(_link.Gap);
         Controls.Add(editorPane);
         Controls.Add(statusStrip);
         Controls.Add(transport);
@@ -465,8 +472,10 @@ internal sealed class MainForm : Form
             _shownQueue = view.QueueVersion;
         }
         // Render runs on every tick: each row's look is set only when it changes (build issue 20).
-        _rowStyle.Apply(_queueList, view, EditColumn, _editor.Adjacency is { } open ? _engine.RowPairsOf(open) : []);
+        var open = _editor.Adjacency is { } adjacency ? _engine.RowPairsOf(adjacency) : [];
+        _rowStyle.Apply(_queueList, view, EditColumn, open);
         _sections.Apply(view);
+        _link.Show(view, open);
 
         var attended = view.Attended;
         _seek.Show(attended?.Playhead ?? Playhead.Zero, attended?.Length, attended?.Marks);

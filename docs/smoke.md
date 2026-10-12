@@ -163,6 +163,34 @@ but the engine still honours them. An item that needs one sets it in the library
       queue twice, both. Saving or removing the transition flips ⋈ and +. Moving the mouse up and
       down the list does not flicker. At the 960 px minimum width the column is still in view,
       with no sideways scroll bar.
+- [ ] **The open pair as a tab on the editor** (seam markers issue 04, G3 soft). A 16 px gap
+      always parts the queue from the editor's pane, a pair open or not. With a pair open and in
+      view, its rows' tint runs straight on past their cells, over the list's frame and scroll bar
+      and across the gap into the editor, level with the pair, with no bend. The whole editor is in
+      the tint: its ground, heading strip, labels, check boxes and radio buttons; its text boxes,
+      keys and lists keep their own. One 2 px outline, the Well 60 % toward the accent, goes round
+      the pair and the editor, every corner rounded at 8 px inside and out, smooth; where it
+      crosses a seam button on the pair's top or bottom edge it breaks, so the button sits on it.
+      The pieces meet with no step or seam, also after scrolling the queue by its scroll bar or the
+      wheel and after sizing the window. The mouse on a half's line in the editor lights its row in
+      the queue, a stronger tint, until it leaves. Closing the editor's pair (another library)
+      leaves no tint, outline or tab.
+- [ ] **The open pair's other cases** (decision 3). In the queue twice: both tinted and filled,
+      the outline and tab on the one heard next. Across a row playback passed over (⚠): one outline
+      from the outgoing row to the incoming, the row between keeping its own colours, the seam filled
+      on the outgoing row's bottom edge. Under repeat-all, last → first (the queue's menu on the last
+      row): each row outlined on its own, the tab from the last. Under repeat-one, b → b: the one row
+      outlined, the tab from it, no seam filled. In a collapsed section: its header tinted and
+      outlined in the rows' place, the tab from it; with the other row in view, one outline from
+      that row to the header. A click on the header still only expands.
+- [ ] **The open pair out of view**: scrolled away, a stub at the queue's top right edge reads
+      "▲ 1–2 *a* → *b*" (▼ at its bottom edge while the pair is below), in the tint, outlined, the tab
+      running from it. While another match is in view, the stub still stands in for the one heard
+      next. A click on the stub scrolls the pair into view and leaves the selection as it was.
+- [ ] **The open pair on CalciumMetro** (a CalciumMetro `palette.json` in the `--machine=`
+      folder): the tint and the outline read against the light Well, and the editor's boxes stand
+      out from its tint. At the 960 px minimum width, with the gap, the seam buttons are still in
+      view with no sideways scroll bar.
 - [ ] A fresh library shows the queue's default four columns: #, Title, Artist, Length. A
       right-click on the header (not on a row) shows a checklist of #, Title, Artist, Album,
       Length, Format, Track gain and Path, with # ticked and greyed out. Ticking Path adds a Path

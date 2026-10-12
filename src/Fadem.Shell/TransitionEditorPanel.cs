@@ -127,7 +127,8 @@ internal sealed class TransitionEditorPanel : Panel
         Dock = DockStyle.Right;
         Width = DefaultWidth;
         Padding = new Padding(10);
-        BorderStyle = BorderStyle.FixedSingle;
+        // Its frame is its own (OnPaint): the outline round the open pair takes its place.
+        ResizeRedraw = true;
 
         // The fields take their own height; the panel around them scrolls only when that
         // overflows (a short window, or long refusal reasons), and only up and down.
@@ -233,6 +234,11 @@ internal sealed class TransitionEditorPanel : Panel
         _fadeOutDuration = Field(layout, ref row, TransitionField.FadeOutDuration, "Fade-out duration (s)", null, out _, null, out _);
         (_fadeOutDurationLess, _fadeOutDurationMore, _fadeOutDurationLessSecond, _fadeOutDurationMoreSecond) = NudgeButtons(_fadeOutDuration, "Shorter", "Longer");
         _incomingTitle = TrackTitle(layout, ref row);
+        foreach (var (title, side) in new[] { (_outgoingTitle, FadeSide.FadeOut), (_incomingTitle, FadeSide.FadeIn) })
+        {
+            title.MouseEnter += (_, _) => HalfHovered?.Invoke(side);
+            title.MouseLeave += (_, _) => HalfHovered?.Invoke(null);
+        }
         _fadeInPoint = Field(layout, ref row, TransitionField.FadeInPoint, "Fade-in point (s)", null, out _captureIn, "Capture", out _captureInHint);
         (_fadeInLess, _fadeInMore, _fadeInLessSecond, _fadeInMoreSecond) = NudgeButtons(_fadeInPoint);
         _fadeInDuration = Field(layout, ref row, TransitionField.FadeInDuration, "Fade-in duration (s)", null, out _, null, out _);
@@ -329,6 +335,67 @@ internal sealed class TransitionEditorPanel : Panel
 
     /// <summary>The width the editor is designed at, docked beside a queue: nothing wraps.</summary>
     internal const int DefaultWidth = 340;
+
+    /// <summary>The mouse on a half's line, or off both: the host lights that half's row in the
+    /// queue (seam markers issue 04).</summary>
+    internal event Action<FadeSide?>? HalfHovered;
+
+    /// <summary>Paints the editor's frame in place of the plain one, and says whether it did: the
+    /// outline round the open pair and the editor, open where the tab joins (seam markers issue 04).</summary>
+    internal Func<Graphics, bool>? Frame { get; set; }
+
+    /// <summary>What each control <see cref="Tint"/> coloured had before.</summary>
+    private readonly Dictionary<Control, Color> _grounds = new();
+
+    /// <summary>The tint last given, so a render that keeps it changes nothing.</summary>
+    private Color? _tint;
+
+    /// <summary>The editor's ground in <paramref name="tint"/>, the open pair's, which runs into it
+    /// from the queue (seam markers issue 04): its heading strip, labels, check boxes and radio
+    /// buttons with it; the text boxes, keys and lists keep their own. None puts back what each had.</summary>
+    internal void Tint(Color? tint)
+    {
+        if (tint == _tint)
+        {
+            return;
+        }
+        _tint = tint;
+        IEnumerable<Control> Grounds(Control c) => new[] { c }.Concat(c.Controls.Cast<Control>()
+            .Where(k => k is Panel or TableLayoutPanel or FlowLayoutPanel or Label or RadioButton or CheckBox { Appearance: Appearance.Normal })
+            .SelectMany(Grounds));
+        if (tint is { } ground)
+        {
+            foreach (var c in Grounds(this))
+            {
+                if (!_grounds.ContainsKey(c))
+                {
+                    _grounds[c] = c.BackColor;
+                }
+                if (c.BackColor != ground)
+                {
+                    c.BackColor = ground;
+                }
+            }
+            return;
+        }
+        foreach (var kept in _grounds)
+        {
+            kept.Key.BackColor = kept.Value;
+        }
+        _grounds.Clear();
+    }
+
+    /// <summary>The frame: the link's, or a hairline in Edge.</summary>
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        if (Frame?.Invoke(e.Graphics) == true)
+        {
+            return;
+        }
+        using var edge = new Pen(StudioTheme.PaletteOf(this).Edge);
+        e.Graphics.DrawRectangle(edge, 0, 0, Width - 1, Height - 1);
+    }
 
     public Adjacency? Adjacency => _adjacency;
 

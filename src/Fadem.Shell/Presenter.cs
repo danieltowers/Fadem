@@ -315,6 +315,12 @@ internal static class Presenter
     public static string SeamGlyph(bool? nextAuthored, bool isLast) =>
         isLast || nextAuthored is null ? "" : nextAuthored.Value ? "⋈" : "+";
 
+    /// <summary>The stub standing in for the open pair while its rows are out of the queue's view
+    /// (seam markers issue 04): "▲ 20–21 Last Light → Northbound", ▼ while they are below; one
+    /// number where the pair is one row's, under repeat-one.</summary>
+    public static string FmtPairStub(bool above, int outgoing, int incoming, Track outgoingTrack, Track incomingTrack) =>
+        $"{(above ? "▲" : "▼")} {(outgoing == incoming ? $"{outgoing}" : $"{outgoing}–{incoming}")} {TitleOf(outgoingTrack)} → {TitleOf(incomingTrack)}";
+
     /// <summary>A seam button's tooltip: what a click on it does, and to which two tracks.</summary>
     public static string SeamTip(Adjacency adjacency, bool authored) =>
         $"{(authored ? "Edit the transition" : "Add a transition")}: {TitleOf(adjacency.Outgoing)} → {TitleOf(adjacency.Incoming)}";
