@@ -122,6 +122,7 @@ internal sealed class QueueRowStyle : IDisposable
     public static void Draw(ListView list, Theme.Palette? palette = null, bool ownRowHeight = false)
     {
         list.OwnerDraw = true;
+        _ = new BufferedPaint(list);
         _ = new NoHotRow(list);
         // An image list's height sets the rows': the list has no other.
         var rows = new ImageList { ImageSize = new Size(1, RowHeight) };
@@ -264,6 +265,160 @@ internal sealed class QueueRowStyle : IDisposable
 
         private const int WM_REFLECT_NOTIFY = 0x204E;
         private const int LVN_HOTTRACK = -121;
+    }
+
+    /// <summary>
+    /// Paints the list off screen and copies it on in one go (2026-10-12). Painted straight on, a
+    /// repaint showed the ground first, the rows wiped, then each cell drawn over it, a flicker as
+    /// rows changed or the mouse moved. The list's own erase, the theme's plain ground included,
+    /// and its own paint, the cells' owner drawing included, go to a bitmap
+    /// (<c>WM_PRINTCLIENT</c>). Windows' own buffering (<c>LVS_EX_DOUBLEBUFFER</c>) is not used: it
+    /// erases without <c>WM_ERASEBKGND</c>, and its theme draws rules at the columns' edges again.
+    /// </summary>
+    private sealed class BufferedPaint : NativeWindow
+    {
+        private readonly ListView _list;
+
+        public BufferedPaint(ListView list)
+        {
+            _list = list;
+            if (list.IsHandleCreated)
+            {
+                AssignHandle(list.Handle);
+            }
+            list.HandleCreated += (_, _) => AssignHandle(list.Handle);
+            list.HandleDestroyed += (_, _) => ReleaseHandle();
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg != WM_PAINT || m.WParam != IntPtr.Zero || _list.View != View.Details)
+            {
+                base.WndProc(ref m);
+                return;
+            }
+            var size = _list.ClientSize;
+            // Not BeginPaint: it would erase the window itself, on screen, before the copy.
+            var region = CreateRectRgn(0, 0, 0, 0);
+            try
+            {
+                _ = GetUpdateRgn(Handle, region, false);
+                _ = ValidateRect(Handle, IntPtr.Zero);
+                if (size.Width <= 0 || size.Height <= 0 || GetRgnBox(region, out var p) == NULLREGION)
+                {
+                    return;
+                }
+                var dc = GetDC(Handle);
+                try
+                {
+                    _ = SelectClipRgn(dc, region);
+                    // The header, and a name being edited in place, are windows of their own and
+                    // paint themselves: the copy leaves them be.
+                    for (var child = GetWindow(Handle, GW_CHILD); child != IntPtr.Zero; child = GetWindow(child, GW_HWNDNEXT))
+                    {
+                        if (IsWindowVisible(child) && GetWindowRect(child, out var c))
+                        {
+                            var r = _list.RectangleToClient(Rectangle.FromLTRB(c.Left, c.Top, c.Right, c.Bottom));
+                            _ = ExcludeClipRect(dc, r.Left, r.Top, r.Right, r.Bottom);
+                        }
+                    }
+                    var memory = CreateCompatibleDC(dc);
+                    var bitmap = CreateCompatibleBitmap(dc, size.Width, size.Height);
+                    var old = SelectObject(memory, bitmap);
+                    try
+                    {
+                        // Erased by whoever erases the list, the theme's plain ground, then painted.
+                        _ = SendMessage(Handle, WM_ERASEBKGND, memory, IntPtr.Zero);
+                        _ = SendMessage(Handle, WM_PRINTCLIENT, memory, (IntPtr)PRF_CLIENT);
+                        _ = BitBlt(dc, p.Left, p.Top, p.Right - p.Left, p.Bottom - p.Top, memory, p.Left, p.Top, SRCCOPY);
+                    }
+                    finally
+                    {
+                        _ = SelectObject(memory, old);
+                        _ = DeleteObject(bitmap);
+                        _ = DeleteDC(memory);
+                    }
+                }
+                finally
+                {
+                    _ = ReleaseDC(Handle, dc);
+                }
+            }
+            finally
+            {
+                _ = DeleteObject(region);
+            }
+            m.Result = IntPtr.Zero;
+        }
+
+        private const int WM_PAINT = 0x000F;
+        private const int WM_ERASEBKGND = 0x0014;
+        private const int WM_PRINTCLIENT = 0x0318;
+        private const int PRF_CLIENT = 0x04;
+        private const int GW_HWNDNEXT = 2;
+        private const int GW_CHILD = 5;
+        private const int SRCCOPY = 0x00CC0020;
+        private const int NULLREGION = 1;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left, Top, Right, Bottom;
+        }
+
+        [DllImport("user32.dll")]
+        private static extern int GetUpdateRgn(IntPtr hwnd, IntPtr region, bool erase);
+
+        [DllImport("user32.dll")]
+        private static extern bool ValidateRect(IntPtr hwnd, IntPtr rect);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetDC(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        private static extern int ReleaseDC(IntPtr hwnd, IntPtr dc);
+
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+
+        [DllImport("gdi32.dll")]
+        private static extern int GetRgnBox(IntPtr region, out RECT box);
+
+        [DllImport("gdi32.dll")]
+        private static extern int SelectClipRgn(IntPtr dc, IntPtr region);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetWindow(IntPtr hwnd, int relation);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hwnd);
+
+        [DllImport("gdi32.dll")]
+        private static extern int ExcludeClipRect(IntPtr dc, int left, int top, int right, int bottom);
+
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr CreateCompatibleDC(IntPtr dc);
+
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr CreateCompatibleBitmap(IntPtr dc, int width, int height);
+
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr SelectObject(IntPtr dc, IntPtr obj);
+
+        [DllImport("gdi32.dll")]
+        private static extern bool DeleteObject(IntPtr obj);
+
+        [DllImport("gdi32.dll")]
+        private static extern bool DeleteDC(IntPtr dc);
+
+        [DllImport("gdi32.dll")]
+        private static extern bool BitBlt(IntPtr dc, int x, int y, int width, int height, IntPtr source, int sx, int sy, int rop);
     }
 
     /// <summary>Adds the speaker's column after every other, the ✎ button's included, and shows it
