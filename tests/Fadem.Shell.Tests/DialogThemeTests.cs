@@ -131,6 +131,24 @@ public sealed class DialogThemeTests
         Assert.IsType<StudioRenderer>(strip.Renderer);
     });
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AStatusStrip_HasNoWhiteLineAlongItsTop_ItsChromeRightUpToTheEdge(bool studio) => RunSta(() =>
+    {
+        var palette = studio ? Palette.Studio : Duophonic;
+        using var panel = new Panel { Size = new Size(400, 100) };
+        var strip = new StatusStrip { Items = { new ToolStripStatusLabel("Ready.") } };
+        panel.Controls.Add(strip);
+        StudioTheme.Apply(panel, palette);
+
+        using var bitmap = new Bitmap(strip.Width, strip.Height);
+        strip.DrawToBitmap(bitmap, new Rectangle(0, 0, strip.Width, strip.Height));
+
+        // The professional renderer drew SystemColors.ButtonHighlight across the top (2026-10-13).
+        Assert.All(Enumerable.Range(0, bitmap.Width), x => Assert.Equal(palette.Chrome.ToArgb(), bitmap.GetPixel(x, 0).ToArgb()));
+    });
+
     [Fact]
     public void ASpinBoxAndAGroup_AreInThePalette() => RunSta(() =>
     {

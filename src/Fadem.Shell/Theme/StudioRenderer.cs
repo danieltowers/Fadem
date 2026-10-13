@@ -33,6 +33,18 @@ internal sealed class StudioRenderer : ToolStripProfessionalRenderer
         TextRenderer.DrawText(e.Graphics, e.Text, e.TextFont, e.TextRectangle, e.TextColor, e.TextFormat);
     }
 
+    /// <summary>A status strip has no border: the professional renderer draws a line along its top
+    /// in <see cref="SystemColors.ButtonHighlight"/>, white whatever the palette (2026-10-13), and the
+    /// panes above already end in Edge.</summary>
+    protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
+    {
+        if (e.ToolStrip is StatusStrip)
+        {
+            return;
+        }
+        base.OnRenderToolStripBorder(e);
+    }
+
     protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
     {
         e.ArrowColor = e.Item?.Enabled == false ? Palette.Dim : Palette.Text;
