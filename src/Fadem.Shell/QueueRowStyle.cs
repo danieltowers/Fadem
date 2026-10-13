@@ -161,6 +161,11 @@ internal sealed class QueueRowStyle : IDisposable
         if (button.Text != glyph)
         {
             button.Text = glyph;
+            // The list draws again only this row's cell; the button's lower half is the next row's.
+            if (item.ListView is { } list)
+            {
+                InvalidateSeam(list, index);
+            }
         }
         if (editColumn + 1 < item.SubItems.Count)
         {

@@ -2090,6 +2090,31 @@ public sealed partial class HeadlessFormTests
         Assert.Equal("+", cells[0].Text);
     });
 
+    /// <summary>A seam's button straddles its two rows, so a save or a removal (Capture, Remove
+    /// transition) draws the next row's seam cell again too, where the button's lower half is: it
+    /// was left half the old button until something else drew it (2026-10-13).</summary>
+    [Fact]
+    public void TheSeamButton_ChangingIsDrawnAgainInBothItsRows() => RunSta(() =>
+    {
+        using var h = new Harness();
+        ThreeQueued(h);
+        CreateWindows(h.Form);
+        var list = h.Form._queueList;
+        var lower = list.Items[1].SubItems[h.Form.EditColumn].Bounds;
+        var drawn = new List<Rectangle>();
+        list.Invalidated += (_, e) => drawn.Add(e.InvalidRect);
+        var seam = h.Engine.AdjacenciesOf(h.Engine.View.Queue[0].Id).Next!;
+
+        h.Engine.Author(seam, FadeOutAt(1));
+
+        Assert.Contains(drawn, r => r.Contains(lower));
+        drawn.Clear();
+
+        h.Engine.Unauthor(seam);
+
+        Assert.Contains(drawn, r => r.Contains(lower));
+    });
+
     [Fact]
     public void TheRowButton_SavesABoxBeingTypedIn_ThenOpensItsAdjacency() => RunSta(() =>
     {
