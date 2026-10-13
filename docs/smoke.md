@@ -513,6 +513,12 @@ The plugin's own `AppData\fadem\plugin.json` (phase 6 issue 08) holds what only 
 uses: `{ "nowPlayingTab": true }` puts Fadem in the Now Playing tab. Configure…'s **Show
 Fadem in the Now Playing tab** sets it.
 
+**The user's palette.** On every start the plugin writes the skin's colours to the standalone
+App's machine folder, `%APPDATA%\fadem\palette.json` (studio theme issue 01), outside the portable
+MusicBee. The portable MusicBee's skin is light and the user's own MusicBee's is dark, so a run
+turns the user's standalone Fadem light. Back the file up before MusicBee starts and put it back
+after it closes.
+
 ### Looks — the agent runs this
 
 MusicBee draws its own window, so UI Automation sees neither its menus nor its transport.
