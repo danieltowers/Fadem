@@ -50,6 +50,23 @@ public sealed class SplashTests
         Assert.True(colours.Count() > 10, "the middle row is all background");
     });
 
+    [Fact]
+    public void UnderTheVersion_TheSplashNamesTheCopyright_AsTheAboutBoxDoes() => RunSta(() =>
+    {
+        using var splash = new Splash(Palette.Studio, "1.2.3");
+
+        Assert.Equal(new[] { "Version 1.2.3", "© 2026 Daniel Towers" }, splash.Lines);
+        Assert.Equal(AboutBox.Copyright, splash.Lines.Last());
+    });
+
+    [Fact]
+    public void WithNoVersion_TheSplashStillNamesTheCopyright() => RunSta(() =>
+    {
+        using var splash = new Splash(Palette.Studio, null);
+
+        Assert.Equal(new[] { AboutBox.Copyright }, splash.Lines);
+    });
+
     [Theory]
     [InlineData("1.2.3", "Version 1.2.3")]
     [InlineData("1.2.3+4f2a9c1e0b", "Version 1.2.3")]

@@ -6,7 +6,7 @@ namespace Fadem.App;
 
 /// <summary>
 /// The App's splash (2026-10-11), as MusicBee shows one while it loads: the logo card with the
-/// version below the logo. Shown once the library is known, so never over the library chooser,
+/// version below the logo and the copyright under it, the About box's (2026-10-13). Shown once the library is known, so never over the library chooser,
 /// and closed when the main window appears. It stays up for <see cref="MinimumShown"/> at the
 /// least, so a quick launch shows it rather than flashing it.
 /// </summary>
@@ -22,7 +22,7 @@ internal sealed class Splash : LogoCard
 
     /// <param name="informationalVersion">The App's informational version, as the build stamps it.</param>
     public Splash(Palette palette, string? informationalVersion)
-        : base(palette, LogicalSize, new[] { (VersionLine(informationalVersion), palette.Dim) })
+        : base(palette, LogicalSize, new[] { (VersionLine(informationalVersion), palette.Dim), (AboutBox.Copyright, palette.Dim) })
     {
         StartPosition = FormStartPosition.CenterScreen;
     }
