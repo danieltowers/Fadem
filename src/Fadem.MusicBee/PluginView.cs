@@ -340,6 +340,7 @@ internal sealed class PluginView : UserControl
         // the track's line and the buttons; in a sidebar on the track's line, as tall as the line
         // allows, so the buttons keep the sidebar's width (FitWidth).
         _logo = new Logo(Palette.IsDark) { Dock = DockStyle.Right };
+        _logo.Click += (_, _) => AboutBox.Open(FindForm(), Palette, typeof(PluginView).Assembly);
         _header = new Panel { Dock = DockStyle.Top };
         _header.Controls.Add(_rows);
         Controls.Add(_header);

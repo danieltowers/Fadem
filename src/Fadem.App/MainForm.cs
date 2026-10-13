@@ -154,6 +154,7 @@ internal sealed class MainForm : Form
         // The logo (round 2 issue 05) in a column of its own at the top right, beside the command
         // row and the track's line, which it is about as tall as.
         _logo = new Logo(Palette.IsDark) { Dock = DockStyle.Right };
+        _logo.Click += (_, _) => AboutBox.Open(this, Palette, typeof(MainForm).Assembly);
         var symbols = new Font("Segoe UI Symbol", 9f);
         _prev = new Button { Text = "⏮", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };
         _playPause = new Button { Text = "▶", Font = symbols, Width = 36, Height = 28, Margin = new Padding(2, 8, 2, 4) };

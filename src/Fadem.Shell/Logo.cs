@@ -12,6 +12,7 @@ namespace Fadem.Shell;
 /// transparent margin is trimmed first, so the height is all logo, <see cref="LogicalHeight"/>
 /// scaled for the display, or less where its parent is shorter. Docked at a side, it takes the
 /// art's width as its parent lays out, before the docking, so a name beside it gets the rest.
+/// A click on it is the host's to answer: both open the About box (2026-10-13).
 /// </summary>
 internal sealed class Logo : Control
 {
@@ -36,8 +37,9 @@ internal sealed class Logo : Control
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
         SetStyle(ControlStyles.Selectable, false);
         TabStop = false;
-        AccessibleName = "Fadem";
-        AccessibleRole = AccessibleRole.Graphic;
+        Cursor = Cursors.Hand;
+        AccessibleName = "About Fadem";
+        AccessibleRole = AccessibleRole.PushButton;
         FitWidth();
     }
 
