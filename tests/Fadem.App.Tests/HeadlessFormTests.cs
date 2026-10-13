@@ -427,7 +427,7 @@ public sealed partial class HeadlessFormTests
         var transport = h.Form._seek.Parent!;
         var track = h.Form._attendedTrack;
         Assert.Equal(transport.Top, track.Bottom);
-        Assert.Equal(h.Form._addFiles.Parent!.Bottom, track.Top);
+        Assert.Equal(h.Form._menuButton.Parent!.Bottom, track.Top);
     });
 
     [Fact]
@@ -1235,7 +1235,7 @@ public sealed partial class HeadlessFormTests
         header.PerformLayout();
 
         Assert.True(h.Form._logo.IsDark);
-        Assert.Same(header, h.Form._addFiles.Parent!.Parent!.Parent);
+        Assert.Same(header, h.Form._menuButton.Parent!.Parent!.Parent);
         Assert.Same(header, h.Form._attendedTrack.Parent!.Parent);
         Assert.Equal(header.ClientSize.Width, h.Form._logo.Right);
         Assert.Equal(0, h.Form._logo.Top);
@@ -1244,19 +1244,23 @@ public sealed partial class HeadlessFormTests
         Assert.True(h.Form._attendedTrack.Parent.Right <= h.Form._logo.Left); // the name is cut short before it
     });
 
-    /// <summary>Round 2 issue 03: Settings is a flat ⚙ at the status strip's far right, as in the
-    /// plugin, and the toolbar has no Settings… button.</summary>
+    /// <summary>The ☰ menu (2026-10-13): the command row is ☰ then Transitions…, and the ☰ holds
+    /// the rest, settings last with its ⚙ in the image margin, gone from the status strip.</summary>
     [Fact]
-    public void Settings_IsAGearAtTheStatusStripsRight_NotInTheToolbar() => RunSta(() =>
+    public void TheCommandRow_IsTheMenuThenTransitions_AndTheMenuHoldsTheRest() => RunSta(() =>
     {
         using var h = new Harness();
 
-        Assert.Equal("⚙", h.Form._settings.Text);
-        Assert.Equal("Fadem settings", h.Form._settings.ToolTipText);
-        var strip = h.Form._settings.Owner!;
-        Assert.IsType<StatusStrip>(strip);
-        Assert.Same(h.Form._settings, strip.Items[strip.Items.Count - 1]);
-        Assert.DoesNotContain(h.Form._addFiles.Parent!.Controls.Cast<Control>(), c => c.Text.StartsWith("Settings"));
+        Assert.Equal(new Control[] { h.Form._menuButton, h.Form._openTransitions }, h.Form._menuButton.Parent!.Controls.Cast<Control>());
+        Assert.Equal("☰", h.Form._menuButton.Text);
+        Assert.Equal("Menu", h.Form._tips.GetToolTip(h.Form._menuButton));
+        Assert.Equal(
+            new[] { "Add files…", "Add folder…", "-", "Import playlist…", "Export playlist…", "-", "Open library…", "-", "Settings…" },
+            h.Form._menu.Items.Cast<ToolStripItem>().Select(i => i is ToolStripSeparator ? "-" : i.Text));
+        Assert.Same(h.Form._settings, h.Form._menu.Items[h.Form._menu.Items.Count - 1]);
+        Assert.NotNull(h.Form._settings.Image); // the ⚙, drawn in the margin
+        Assert.Equal("Fadem settings", h.Form._settings.AccessibleName);
+        Assert.Same(h.Form._clip, h.Form._clip.Owner!.Items[h.Form._clip.Owner.Items.Count - 1]); // the strip ends at the clip light
     });
 
     /// <summary>Round 2 issue 02: Sync editor is the editor's, at the right of its pane title,

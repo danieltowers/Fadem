@@ -21,7 +21,7 @@ fallback chain; `--library=<folder>` opens that folder as the library without as
 instead of `%APPDATA%\fadem`. Point both at fresh temp folders, so a smoke run writes nothing
 into the user's library or machine settings. `--library=` without `--machine=` keeps no machine
 files at all: the output mode is the default, nothing is remembered, and the window opens
-centred. The output mode is a machine setting, chosen in **⚙** settings and used from the next
+centred. The output mode is a machine setting, chosen in **☰ → Settings…** and used from the next
 launch, so the items that relaunch pass the same two folders again:
 
 ```
@@ -54,10 +54,14 @@ but the engine still honours them. An item that needs one sets it in the library
 
 - [ ] The window opens without an error dialog.
 - [ ] The title reads "Untitled — Fadem — *temp folder's name* · WASAPI shared at 44100 Hz"
-      (or the mode in use), and nothing asked for a folder. **Open library…** is the last
-      button in the command row (settings are the **⚙** at the status strip's far right, round 2
-      issue 03); choosing another folder in it empties the queue and
-      the editor and puts that folder's name in the title.
+      (or the mode in use), and nothing asked for a folder. Choosing another folder in
+      **☰ → Open library…** empties the queue and the editor and puts that folder's name in the
+      title.
+- [ ] **The ☰ menu** (2026-10-13): the command row is a **☰** (tooltip "Menu") then
+      **Transitions…**, nothing else. ☰ opens a menu just under it, its left edge on the button's,
+      in the palette: **Add files…**, **Add folder…** ─ **Import playlist…**, **Export
+      playlist…** ─ **Open library…** ─ **Settings…**, its ⚙ in the menu's left margin in the
+      text colour and the labels all in line. The status strip ends at the clip light, no ⚙.
 - [ ] **The logo** (round 2 issue 05): at the top right, in a column beside the command row and
       the track's line, the Fadem logo 66 px tall, white lettering on a dark palette and black on
       a light one (a `palette.json` in the `--machine=` folder gives a light one), crisp and not
@@ -68,14 +72,14 @@ but the engine still honours them. An item that needs one sets it in the library
       switching away closes it; a click on the handle opens x.com/mrdanieltowers. The logo is a
       posted click away only when the window is uncovered (WinForms checks the window under
       the point), so make it topmost first.
-- [ ] **The library chooser** (library chooser issue 02). **Open library…** opens "Choose a
+- [ ] **The library chooser** (library chooser issue 02). **☰ → Open library…** opens "Choose a
       library": the known libraries by Name and Folder, most recently opened first, the open one
       reading *open* and selected, and under the list "Removing a library from the list leaves
       its folder as it is." Its buttons are **Add folder…** and **Remove from list** on the left,
       **Open** and **Cancel** on the right. Remove is greyed on the open row. A library whose
       folder was deleted reads *not found* in grey, Open greyed; **Remove from list** takes it
       off at once and `settings.json`'s `otherLibraries` no longer names it. Double-clicking
-      another row opens it, and the next **Open library…** lists it first. **Add folder…** shows
+      another row opens it, and the next **☰ → Open library…** lists it first. **Add folder…** shows
       the folder browser; a folder picked there opens. With `--machine=` on a fresh folder and no
       `--library=`, the launch shows the chooser with an empty list and "No library has opened
       yet. Add folder… picks one: …"; Cancel opens Fadem with no library.
@@ -132,7 +136,7 @@ but the engine still honours them. An item that needs one sets it in the library
       heading is in the text colour, the hint line under the selector is dim. − / + and −1 / +1 are small keys. The fade curve sits on the
       well, its frame and button dark too, its chevron dim when greyed. The half heard is in the text
       colour, the other dim (seam markers issue 03). The editor's scroll bar is the dark one.
-- [ ] **Dialogs and menus** (studio theme issue 06): **⚙** settings, **Transitions…**, **Open
+- [ ] **Dialogs and menus** (studio theme issue 06): **☰** and its menu, **Settings…**, **Transitions…**, **Open
       library…**, the notice list (the status strip's "1 notice" link, in the accent), the
       section name dialog (row menu → Section → Start a section here…) and the playlist rename
       box (its one-pixel frame stays Windows' grey, a known gap). Each is in the palette, with
@@ -206,7 +210,7 @@ but the engine still honours them. An item that needs one sets it in the library
       the seam buttons are still in view with no sideways scroll bar: Path, Album and Artist give way, in that
       order. Widening the window gives Artist, then Album, then Path their widths back. Only at
       the 960 px minimum with all eight ticked does the list scroll sideways to the seam buttons. Dragging a header moves it (never before # or after the seam buttons), and a dragged width holds.
-      A right-click on a row still shows the row's menu. Relaunched, or after **Open library…** elsewhere and back, the
+      A right-click on a row still shows the row's menu. Relaunched, or after **☰ → Open library…** elsewhere and back, the
       layout is as it was left; the other library shows its own. The file is
       `<library>\.fadem\columns.json`.
 - [ ] The editor saves itself (phase 6 issue 05): a box typed in saves on Tab, a click
@@ -234,9 +238,9 @@ but the engine still honours them. An item that needs one sets it in the library
 - [ ] With the editor open, an empty duration box shows in grey what it plays if left blank:
       the **Blank fade durations** setting (5 by default) in Global, and in This playlist the
       global's duration, or that setting where the global sets none. Typing over it shows the
-      typed value in the text colour. Change the setting in **⚙** settings with the editor open: the grey
+      typed value in the text colour. Change the setting in **☰ → Settings…** with the editor open: the grey
       value follows at once.
-- [ ] With no boundary open (at launch, and after **Open library…**), the editor reads "No
+- [ ] With no boundary open (at launch, and after **☰ → Open library…**), the editor reads "No
       boundary selected" and every field, **From end**, the curve, ● Global and ○ This playlist
       are greyed out. Opening a boundary makes them live.
 - [ ] Ticking **From end** on a fade-out point of 3.5 on a 5 s track shows 1.5; unticking shows
@@ -251,7 +255,7 @@ but the engine still honours them. An item that needs one sets it in the library
       playlist plays. **Remove override** says "Removed the override of …" and the line goes.
       Switching mode saves a box being typed in to the mode left; the next seam button opens in the last
       mode.
-- [ ] **Transitions…**, between **Export playlist…** and **Open library…**, opens a separate
+- [ ] **Transitions…**, after the **☰** in the command row, opens a separate
       "Fadem — transitions" window on the selected row's track (else the first track with a
       transition), listing the boundary authored during the run: ← or →, the other track, then
       each parameter and the curve as "global | override", "–" where a layer sets none, the
@@ -295,19 +299,19 @@ but the engine still honours them. An item that needs one sets it in the library
       plays. The main window's readout reads "Held 1:10 / -2:50" and stands still, and the play
       button shows ▶. When the preview ends, the line clears and the readout loses "Held".
 - [ ] Resizing the window narrower does not hide the transport or the editor's buttons.
-- [ ] While adding a folder's worth of files (fifty or more, through **Add files…**, **Add
+- [ ] While adding a folder's worth of files (fifty or more, through **☰ → Add files…**, **Add
       folder…** or as arguments, and once the whole `MUSIC` library), the window stays
       responsive — it moves and repaints — and
       the status strip shows *Adding N of M…* and a **Cancel**. Rows appear in order as files resolve. Both
       disappear when the add ends, and Cancel ends it at once, keeping the rows already listed.
-- [ ] **Add folder…** on a folder of several albums, one subfolder each with its discs (the
+- [ ] **☰ → Add folder…** on a folder of several albums, one subfolder each with its discs (the
       user's own collection) lists the albums in year order, each album's discs in order, and each album's tracks
       "1" to "10" in natural order. The cover scans are ignored without a notice.
 - [ ] Dropping a mix of files and folders from Explorer onto the list adds them in the order
       dropped, each folder expanded in place: dragged over the rows they show the drop line and
       land on it (phase 6 issue 03), and below the rows at the end.
-- [ ] **Export playlist…** offers "*open playlist*.m3u8"; saved in a folder whose name has `†`
-      or `⭐️`, the strip names the file saved. **Import playlist…** on that file (it takes
+- [ ] **☰ → Export playlist…** offers "*open playlist*.m3u8"; saved in a folder whose name has `†`
+      or `⭐️`, the strip names the file saved. **☰ → Import playlist…** on that file (it takes
       several, and only `.m3u`/`.m3u8`) adds it to the sidebar as "*name* 2", open, with the same
       rows in the same order; the strip says "Imported *file* as *name* 2.". A `.m3u` of relative
       paths from another folder imports with its paths made absolute in
@@ -358,11 +362,11 @@ but the engine still honours them. An item that needs one sets it in the library
 - [ ] Adding a rejected file (an `.m4a`, an `.ogg`, or a file with more than two channels)
       leaves the list unchanged and shows one notice naming the property that failed and
       pointing at `docs/supported-audio.md`. Nothing is queued, nothing plays.
-- [ ] With WASAPI exclusive chosen in **⚙** settings, launched with `--unavailable=exclusive`,
+- [ ] With WASAPI exclusive chosen in **☰ → Settings…**, launched with `--unavailable=exclusive`,
       the title names WASAPI shared, not exclusive, and the strip says exclusive was
       unavailable. With `--unavailable=exclusive,shared` the title names WaveOut at 44100 Hz,
       with a notice for each step.
-- [ ] The **⚙** at the far right of the status strip (tooltip "Fadem settings") opens a dialog with OK and Cancel showing the five settings in two
+- [ ] **☰ → Settings…** opens a dialog with OK and Cancel showing the five settings in two
       groups. **This machine**: the output mode with "Applies at the next launch." under it.
       **This library**: *Hard cut* or *Crossfade for N s*, with N greyed out under *Hard cut*;
       **Blank fade durations** in seconds (0 to 30, live under either choice); **Default fade
@@ -372,7 +376,7 @@ but the engine still honours them. An item that needs one sets it in the library
 - [ ] A setting changed and saved with OK is still set after a restart; Cancel keeps nothing.
       Changing only the output mode says "Saved machine settings."; only a library setting,
       "Saved settings.".
-- [ ] Crossfade for 12 s in one library, then **Open library…** on a fresh folder: **⚙** settings
+- [ ] Crossfade for 12 s in one library, then **☰ → Open library…** on a fresh folder: **☰ → Settings…**
       shows *Hard cut* there, and the output mode chosen before. Back to the first library:
       12 s again.
 - [ ] Down the left, between the transport row and the status strip, a ~200 px **Playlists**
@@ -394,7 +398,7 @@ but the engine still honours them. An item that needs one sets it in the library
       the same place at the same size. Closed maximised, it opens maximised.
 - [ ] Launching with a corrupt `<library>\.fadem\settings.json` shows no
       dialog: the strip says the file was moved aside to `settings.json.corrupt`, and
-      **⚙** settings shows the library's defaults.
+      **☰ → Settings…** shows the library's defaults.
 - [ ] Adding the library's longest FLAC (about 26 minutes) shows its full length in the time
       readout, and seeking into its last minute lands there. Length is not proven by the test
       suite; this is where it is checked.
@@ -462,10 +466,10 @@ sharp percussive transient; the realism check is the authored boundary from the 
       without a gap or a fade into silence.
 - [ ] Unplug headphones mid-song; playback pauses and nothing plays from the speakers. Replug
       and press Play; it resumes where it paused.
-- [ ] With *Crossfade for 8 s* on in **⚙** settings, two tracks with no authored transition
+- [ ] With *Crossfade for 8 s* on in **☰ → Settings…**, two tracks with no authored transition
       crossfade over 8 s. Switched on mid-track, the very next boundary crossfades.
 - [ ] On a track with a ReplayGain tag (the library has two; tag one with rsgain or foobar2000
-      if needed), choosing Off in **⚙** settings mid-track changes the level at once,
+      if needed), choosing Off in **☰ → Settings…** mid-track changes the level at once,
       with no click, and Track brings it back. An untagged track does not change. On a track
       tagged with a different album gain, Album changes the level to it; Smart does too while
       the rows beside it are of the same album, with shuffle off.
@@ -478,7 +482,7 @@ sharp percussive transient; the realism check is the authored boundary from the 
       back to shared and says so.
 - [ ] Play a whole real album on WASAPI exclusive, through several queue advances and a track
       over 20 minutes long; it is clean throughout.
-- [ ] Add the whole `MUSIC` library (**Add folder…** on the `MUSIC` folder) while a track plays;
+- [ ] Add the whole `MUSIC` library (**☰ → Add folder…** on the `MUSIC` folder) while a track plays;
       the track plays on without a dropout, and adding never starts or stops playback.
 - [ ] Play a playlist whose files are on a network share, through several authored transitions
       and a FLAC over 20 minutes long; no transition is choppy as its fade begins, and the strip
@@ -724,7 +728,7 @@ which a background run cannot give.
       Fadem closed, then Configure…'s **Choose…** on the same library and Preferences' **Save**: the
       playlists and queue fill, no new notice, the file reads "MusicBee". The reverse, standalone
       Fadem launched on the library MusicBee holds, reads "… (it is open in MusicBee) …" in
-      its strip; MusicBee closed and Open library… on the folder opens it.
+      its strip; MusicBee closed and ☰ → Open library… on the folder opens it.
 - [ ] **Edit → Edit Preferences → Plugins** lists Fadem with a **Configure…** button, which
       opens Fadem's dialog, owned by MusicBee's main window. It shows the settings file's
       library folder in a read-only box captioned **Library:**, with **Choose…** after it, its
@@ -734,7 +738,7 @@ which a background run cannot give.
       when MusicBee next starts; the device when Fadem next plays from stopped."
 - [ ] Configure…'s **ReplayGain:** lists Track, Album, Smart and Off, opens on the library's
       mode, is greyed with no library open, and a mode chosen with OK and Preferences' **Save**
-      changes the playing track's level at once; standalone's **⚙** settings then shows it.
+      changes the playing track's level at once; standalone's **☰ → Settings…** then shows it.
 - [ ] Configure…'s **Default fade curve:** (round 2 issue 14) lists Equal-power, Linear and
       S-curve, opens on the library's, is greyed with no library open, and one chosen with OK and
       Preferences' **Save** shows at once in the editor's Fade curve for a new boundary.

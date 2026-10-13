@@ -41,13 +41,15 @@ internal sealed class MainForm : Form
     internal readonly Readout _time;
     internal readonly Readout _seconds;
     internal readonly Label _attendedTrack;
-    internal readonly Button _addFiles;
-    internal readonly Button _addFolder;
-    internal readonly Button _importPlaylist;
-    internal readonly Button _exportPlaylist;
+    internal readonly Button _menuButton;
+    internal readonly ContextMenuStrip _menu;
+    internal readonly ToolStripMenuItem _addFiles;
+    internal readonly ToolStripMenuItem _addFolder;
+    internal readonly ToolStripMenuItem _importPlaylist;
+    internal readonly ToolStripMenuItem _exportPlaylist;
     internal readonly Button _openTransitions;
-    internal readonly ToolStripButton _settings;
-    internal readonly Button _openLibrary;
+    internal readonly ToolStripMenuItem _settings;
+    internal readonly ToolStripMenuItem _openLibrary;
     internal readonly Logo _logo;
     internal readonly Button _prev;
     internal readonly Button _playPause;
@@ -138,19 +140,30 @@ internal sealed class MainForm : Form
         _cancelAdd = new ToolStripButton("Cancel") { Available = false, DisplayStyle = ToolStripItemDisplayStyle.Text };
         // The clip light (build issue 17): dark until the engine latches a clip.
         _clip = new ToolStripStatusLabel { ForeColor = Palette.Dim, Margin = new Padding(8, 3, 0, 2) };
-        // Settings: a flat ⚙ at the strip's far right, as in the plugin (round 2 issue 03).
-        _settings = SettingsGear.Create(() => EditSettings());
-        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _addProgress, _cancelAdd, _clip, _settings }, ShowItemToolTips = true };
+        var statusStrip = new StatusStrip { Items = { _status, _noticeCount, _addProgress, _cancelAdd, _clip }, ShowItemToolTips = true };
 
-        _addFiles = new Button { Text = "Add files…", Width = 90, Height = 28, Margin = new Padding(4, 8, 4, 0) };
-        _addFolder = new Button { Text = "Add folder…", Width = 90, Height = 28, Margin = new Padding(0, 8, 4, 0) };
-        _importPlaylist = new Button { Text = "Import playlist…", Width = 112, Height = 28, Margin = new Padding(0, 8, 4, 0) };
-        _exportPlaylist = new Button { Text = "Export playlist…", Width = 112, Height = 28, Margin = new Padding(0, 8, 4, 0) };
-        _openTransitions = new Button { Text = "Transitions…", Width = 96, Height = 28, Margin = new Padding(16, 8, 4, 0) };
-        _openLibrary = new Button { Text = "Open library…", Width = 100, Height = 28, Margin = new Padding(16, 8, 4, 0) };
+        // The ☰ menu (2026-10-13): the commands the row once showed as buttons, and settings,
+        // which had the status strip's far right (round 2 issue 03).
+        _addFiles = new ToolStripMenuItem("Add files…");
+        _addFolder = new ToolStripMenuItem("Add folder…");
+        _importPlaylist = new ToolStripMenuItem("Import playlist…");
+        _exportPlaylist = new ToolStripMenuItem("Export playlist…");
+        _openLibrary = new ToolStripMenuItem("Open library…");
+        _settings = SettingsGear.MenuItem(() => EditSettings(), Palette.Text);
+        _menu = new ContextMenuStrip
+        {
+            Items =
+            {
+                _addFiles, _addFolder, new ToolStripSeparator(), _importPlaylist, _exportPlaylist, new ToolStripSeparator(),
+                _openLibrary, new ToolStripSeparator(), _settings,
+            },
+        };
+        Disposed += (_, _) => _menu.Dispose();
+        _menuButton = new Button { Text = "☰", Font = new Font("Segoe UI Symbol", 9f), Width = 36, Height = 28, Margin = new Padding(4, 8, 4, 0) };
+        _openTransitions = new Button { Text = "Transitions…", Width = 96, Height = 28, Margin = new Padding(0, 8, 4, 0) };
         // The queue's own commands get a row of their own, so the seek bar keeps its travel.
         var queueBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36, WrapContents = false };
-        queueBar.Controls.AddRange(new Control[] { _addFiles, _addFolder, _importPlaylist, _exportPlaylist, _openTransitions, _openLibrary });
+        queueBar.Controls.AddRange(new Control[] { _menuButton, _openTransitions });
         // The logo (round 2 issue 05) in a column of its own at the top right, beside the command
         // row and the track's line, which it is about as tall as.
         _logo = new Logo(Palette.IsDark) { Dock = DockStyle.Right };
@@ -172,6 +185,7 @@ internal sealed class MainForm : Form
         // The editor's (round 2 issue 02): at the right of its pane title. Its own font, not the title's.
         _syncEditor = new CheckBox { Text = "Sync editor", AutoCheck = false, AutoSize = true, Dock = DockStyle.Right, Font = Font };
         _tips = new ToolTip();
+        _tips.SetToolTip(_menuButton, "Menu");
         _tips.SetToolTip(_syncEditor, Presenter.SyncEditorTip);
         _tips.SetToolTip(_transitionNow, "Transition now");
         _tips.SetToolTip(_cueTransition, "Cue transition: play from 5 s before it");
@@ -355,6 +369,7 @@ internal sealed class MainForm : Form
         header.Controls.Add(_logo); // docked after the rows, so rightmost
         Controls.Add(header);
 
+        _menuButton.Click += (_, _) => _menu.Show(_menuButton, new System.Drawing.Point(0, _menuButton.Height));
         _addFiles.Click += (_, _) => AddChosen(ChooseFiles);
         _addFolder.Click += (_, _) => AddChosen(ChooseFolders);
         _importPlaylist.Click += (_, _) => ImportPlaylists();
@@ -415,6 +430,7 @@ internal sealed class MainForm : Form
 
         Fadem.Shell.Theme.StudioTheme.Apply(this, Palette); // the studio look (studio theme issue 02)
         Fadem.Shell.Theme.StudioTheme.Apply(_columns.Menu, Palette); // the header's menu, shown by itself (studio theme issue 06)
+        Fadem.Shell.Theme.StudioTheme.Apply(_menu, Palette); // and the ☰ menu
         PlaceWindow();
         Render(_engine.View);
     }
