@@ -11,7 +11,8 @@ namespace Fadem.Shell;
 /// </summary>
 internal sealed class AboutBox : LogoCard
 {
-    public const string Copyright = "© 2026 Daniel Towers";
+    /// <summary>"© *this year* Daniel Towers": the year is the one it is opened in.</summary>
+    public static string Copyright => $"© {DateTime.Now.Year} Daniel Towers";
     public const string TwitterHandle = "@mrdanieltowers";
     public const string HandleUrl = "https://x.com/mrdanieltowers";
 

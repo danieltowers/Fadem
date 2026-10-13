@@ -64,7 +64,7 @@ but the engine still honours them. An item that needs one sets it in the library
       stretched. The track's line meets the transport, with no gap.
 - [ ] **About Fadem** (2026-10-13): the cursor is a hand over the logo, and clicking it opens
       a borderless card centred on the window, like the splash: the logo, then "Version *x.y.z*",
-      "© 2026 Daniel Towers" and "@mrdanieltowers" in the accent. Esc, a click on the card or
+      "© *this year* Daniel Towers" and "@mrdanieltowers" in the accent. Esc, a click on the card or
       switching away closes it; a click on the handle opens x.com/mrdanieltowers. The logo is a
       posted click away only when the window is uncovered (WinForms checks the window under
       the point), so make it topmost first.

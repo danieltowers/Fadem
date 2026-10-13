@@ -13,7 +13,7 @@ public sealed class AboutBoxTests
     {
         using var about = new AboutBox(Palette.Studio, "1.2.3+4f2a9c1e0b");
 
-        Assert.Equal(new[] { "Version 1.2.3", "© 2026 Daniel Towers", "@mrdanieltowers" }, about.Lines);
+        Assert.Equal(new[] { "Version 1.2.3", $"© {DateTime.Now.Year} Daniel Towers", "@mrdanieltowers" }, about.Lines);
         Assert.Equal("https://x.com/mrdanieltowers", AboutBox.HandleUrl);
     });
 
@@ -22,7 +22,7 @@ public sealed class AboutBoxTests
     {
         using var about = new AboutBox(Palette.Studio, null);
 
-        Assert.Equal(new[] { "© 2026 Daniel Towers", "@mrdanieltowers" }, about.Lines);
+        Assert.Equal(new[] { $"© {DateTime.Now.Year} Daniel Towers", "@mrdanieltowers" }, about.Lines);
         Assert.True(about.HandleBounds.Width > 0);
     });
 
