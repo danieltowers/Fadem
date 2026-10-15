@@ -92,6 +92,12 @@ of the track.
 **Fade-in point**:
 The point in the incoming track that it begins playing from.
 
+**Fade-out half**:
+The part of a transition that belongs to its outgoing track: the fade-out point and the fade-out
+duration. **Fade-in half**: the part that belongs to its incoming track, the fade-in point and the
+fade-in duration. The curve belongs to neither half.
+_Avoid_: Side, end, tail, head
+
 **Transition override**:
 A playlist-scoped modification of a transition, specifying any subset of its parameters; every
 parameter it omits falls through to the global transition for that adjacency.
@@ -144,6 +150,14 @@ Hearing one adjacency's transition as currently drafted in the editor, saved or 
 shortly before its fade-out point to shortly after its fades complete. The queue is held where
 it was for the duration and is never moved by it.
 _Avoid_: Audition, test play, render (a render writes a file)
+
+**Carry**:
+Copying authored transitions onto the adjacencies that a row or section move creates, half by
+half. Each new adjacency takes the fade-out half its outgoing row had at its old next boundary,
+and the fade-in half its incoming row had at its old previous boundary. Each half keeps the layer
+it was authored in. The old adjacencies keep their transitions. A new adjacency that is already
+authored is kept unless the user chooses to replace it.
+_Avoid_: Preserve, keep, migrate, move (the old transition stays)
 
 ### Loops
 
