@@ -219,7 +219,7 @@ public sealed partial class HeadlessFormTests
         var button = list.Items[0].SubItems[h.Form.EditColumn].Bounds;
         Move(list, new Point(button.X + button.Width / 2, button.Bottom - 3));
 
-        Assert.Same(Cursors.Hand, list.Cursor);
+        Assert.Equal(Cursors.Hand, list.Cursor); // Equal: Cursors.Hand can race into two instances
         Assert.True(SeamPixels(QueuePixels(list), h.Form, 0, p.Raised) > 100); // shown, raised
 
         typeof(Control).GetMethod("OnMouseLeave", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(list, new object[] { EventArgs.Empty });

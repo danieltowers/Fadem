@@ -73,7 +73,7 @@ public sealed class AboutBoxTests
     {
         using var logo = new Logo(dark: true);
 
-        Assert.Same(Cursors.Hand, logo.Cursor);
+        Assert.Same(Cursors.Hand, logo.Cursor); // one instance: see SharedCursors
         Assert.Equal(AccessibleRole.PushButton, logo.AccessibleRole);
         Assert.Equal("About Fadem", logo.AccessibleName);
     });
