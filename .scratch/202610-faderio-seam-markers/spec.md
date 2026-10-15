@@ -8,7 +8,8 @@ editor's traffic light. The look was settled by a prototype on the branch
 `.scratch/202610-seam-prototype/round-N.png` on that branch. G3 soft is
 `round-7-short.png` and `round-7-deep.png`. The prototype matches the queue's tracks to the
 editor's in the shell, which test 2 of CLAUDE.md forbids, so its look carries over and its
-code does not.
+code does not. The branch was deleted on 2026-10-15, once issues 01–05 were built, so its code
+and captures are gone: this spec and the built queue are the record.
 
 ## The question
 
