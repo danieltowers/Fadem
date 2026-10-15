@@ -77,9 +77,12 @@ public partial class Plugin
         _about.Author = "Fadem";
         _about.TargetApplication = "Fadem"; // the header MusicBee draws for the panel
         _about.Type = PluginType.PanelView; // a plugin with a panel element (issue 10)
-        _about.VersionMajor = 0;
-        _about.VersionMinor = 1;
-        _about.Revision = 0;
+        // The release's version, which the build stamps on this assembly from the git tag.
+        // MusicBee's third number is semver's patch, which .NET calls Build.
+        var version = typeof(Plugin).Assembly.GetName().Version;
+        _about.VersionMajor = (short)version.Major;
+        _about.VersionMinor = (short)version.Minor;
+        _about.Revision = (short)version.Build;
         _about.MinInterfaceVersion = MinInterfaceVersion;
         _about.MinApiRevision = MinApiRevision;
         _about.ReceiveNotifications = ReceiveNotificationFlags.StartupOnly;
