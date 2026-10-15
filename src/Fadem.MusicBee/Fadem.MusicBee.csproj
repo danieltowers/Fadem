@@ -26,10 +26,13 @@
 
   <!-- What is copied into MusicBee's Plugins folder: the plugin beside a private fadem\ folder
        of everything it depends on, which its assembly-resolve handler loads (it has no binding
-       redirects of its own). -->
+       redirects of its own). The dependencies come from what this build resolved, not a glob of
+       the output folder, so a DLL left there by an older build (such as mb_faderio.dll from
+       before ADR 0018) is never shipped. -->
   <Target Name="PluginLayout" AfterTargets="Build">
     <ItemGroup>
-      <PluginDependency Include="$(OutDir)*.dll" Exclude="$(OutDir)$(TargetFileName)" />
+      <PluginDependency Include="@(ReferenceCopyLocalPaths)"
+                        Condition="'%(Extension)' == '.dll' And '%(ReferenceCopyLocalPaths.DestinationSubDirectory)' == ''" />
     </ItemGroup>
     <RemoveDir Directories="$(OutDir)plugin" />
     <Copy SourceFiles="$(OutDir)$(TargetFileName)" DestinationFolder="$(OutDir)plugin" />
