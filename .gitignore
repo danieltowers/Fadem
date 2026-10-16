@@ -7,6 +7,8 @@ TestResults/
 .vs/
 .idea/
 artifacts/
+dev.md
+DEV.md
 
 # Claude Code's local state (shared settings such as .claude/settings.json stay trackable)
 .claude/settings.local.json
