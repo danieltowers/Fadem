@@ -39,8 +39,10 @@ Frames never cross the shell seam: externally `Playhead`, `Point`, `Length` and 
   reason, never skipped. So is a test that needs an optional host which is not installed: the
   MusicBee BASS tests compile only where `bass.dll` is found, at `FADEM_MUSICBEE_DIR` or else the
   default install, and the build says when it leaves them out (ADR 0019).
-- A session that touches the shell runs the **Looks** half of `docs/smoke.md` before its
-  commit and reports item by item. The **Sounds** half is the user's; never claim it.
+- `docs/smoke.md` runs only when the user asks for it, by name. A session that touches the shell
+  or `src/Fadem.MusicBee` suggests a run in its hand-off, naming the half and the items its
+  change bears on, and leaves the choice to the user. Asked for its **Looks** half, report item
+  by item. The **Sounds** half is the user's; never claim it.
 - A research investigation that measures the engine leaves a **permanent test** behind, not a
   throwaway script. If it rendered through the production chain, it is already an integration
   test — commit it as one.

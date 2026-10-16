@@ -1,7 +1,10 @@
 # Smoke checklist
 
-Run by **every session that touches the shell**, before that session's commit. Decided in
+Run **only when the user asks for it**. Until October 2026 every session that touched the shell
+ran it before its commit, as decided in
 [wayfinder ticket 06](../.scratch/202609-faderio-transition-you-can-trust/issues/06-how-do-we-make-green-tests-and-a-broken-app-impossible.md).
+A full run now takes too long for every commit or release, so it's manual. A session that
+touches the shell suggests a run instead, naming the items its change bears on.
 
 The list is in two halves, each run by the party that can actually judge it. A session never
 reports "smoke passed" on items it could not perceive.
@@ -490,9 +493,9 @@ sharp percussive transient; the realism check is the authored boundary from the 
 
 ## MusicBee — the plugin in the portable MusicBee
 
-Run by every session that touches `src/Fadem.MusicBee`, and by the user for its Sounds half,
-against the portable MusicBee, kept outside this repo (on the author's machine, a
-`musicbee_portable` folder)
+Run only when the user asks for it, like the rest of this list. A session that touches
+`src/Fadem.MusicBee` suggests a run of this section. Run it against the portable MusicBee, kept
+outside this repo (on the author's machine, a `musicbee_portable` folder)
 ([phase 5](../.scratch/202609-faderio-phase-5-musicbee/spec.md), ADR 0012).
 
 **Installing.** Build the plugin (`dotnet build src/Fadem.MusicBee`; beside a running Fadem,
