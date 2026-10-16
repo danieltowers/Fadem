@@ -20,9 +20,10 @@ At every boundary between two tracks you choose:
 
 You can set these by ear, simply play the track and capture the moment you want it to fade out.
 
-![Fadem's standalone window: a playlist in two sections, the transition editor open on the first
-boundary and joined to its two rows by a tinted tab, and the seek bar marking that boundary's fades
-in red](docs/images/main-window.png)
+![Fadem's standalone window with a playlist open and the transition editor beside it. On the seek
+bar, the fade-out's start mark is pulled earlier, its end mark pulled in, the whole fade-out moved
+by its shading, then the fade-in stretched, with the editor's values and the status strip updating
+after each drag](docs/images/fade-drag.gif)
 
 Fadem runs in two ways:
 
@@ -123,8 +124,13 @@ Also:
 
 - **Transitions…** lists every transition that includes one track. In the standalone app it's
   the button beside **☰**; in MusicBee it's on the queue's right-click menu.
-- The seek bar marks fades in red. You can drag the marks to change them.
+- The seek bar marks each fade in red, with the fade shaded between its marks. Drag a mark to
+  move one end of the fade, or drag the shading to move the whole fade.
 - **Sections** group consecutive rows under a coloured header. They never change what plays.
+
+![Fadem's standalone window: a playlist in two sections, the transition editor open on the first
+boundary and joined to its two rows by a tinted tab, and the seek bar marking that boundary's fades
+in red](docs/images/main-window.png)
 
 To open the settings in the standalone app, click **☰ → Settings…**. In MusicBee, click **⚙** at
 the right end of Fadem's status strip. Choose the output mode there: WASAPI shared, WASAPI exclusive or WaveOut.
